@@ -315,7 +315,9 @@ fn test_bbcode_placeholder_and_right_aligned_brackets() {
         is_divider: false,
     }]);
 
-    let area = Rect::new(0, 0, 100, 24);
+    std::env::set_var("BASHMENU_DIR", "/opt/bashmenu");
+
+    let area = Rect::new(0, 0, 80, 24);
     let mut buf = Buffer::empty(area);
     view.render(area, &mut buf);
 
@@ -323,7 +325,7 @@ fn test_bbcode_placeholder_and_right_aligned_brackets() {
     let mut found_notes_line = false;
     for y in 2..20 {
         let mut line_str = String::new();
-        for x in 0..100 {
+        for x in 0..80 {
             line_str.push(buf[(x, y)].symbol().chars().next().unwrap_or(' '));
         }
         if line_str.contains("Notes") {
@@ -334,12 +336,12 @@ fn test_bbcode_placeholder_and_right_aligned_brackets() {
                 line_str
             );
             assert!(
-                line_str.contains("notes.yml]"),
+                line_str.contains("/opt/bashmenu/notebooks/notes.yml]"),
                 "Expanded path must be present in label: {}",
                 line_str
             );
-            // Verify bracket is right-aligned: ends near column 98 (before border at 99)
-            let trimmed = line_str[..99].trim_end();
+            // Verify bracket is right-aligned: ends near column 78 (before border at 79)
+            let trimmed = line_str[..79].trim_end();
             assert!(
                 trimmed.ends_with(']'),
                 "Square bracket must be right-aligned near the right margin: {}",
@@ -355,7 +357,7 @@ fn test_bbcode_placeholder_and_right_aligned_brackets() {
     let mut found_plugin_line = false;
     for y in 2..20 {
         let mut line_str = String::new();
-        for x in 0..100 {
+        for x in 0..80 {
             line_str.push(buf[(x, y)].symbol().chars().next().unwrap_or(' '));
         }
         if line_str.contains("Alienware") {
