@@ -114,6 +114,9 @@ esac
 
 BASHMENU_BIN="$(locate_binary)"
 
+# Export BASHMENU_DIR so child processes and macro engines know the install root
+export BASHMENU_DIR="$SCRIPT_DIR"
+
 # If binary is missing, attempt to compile on-demand
 if [ -z "$BASHMENU_BIN" ] || [ ! -x "$BASHMENU_BIN" ]; then
     echo "==> BashMenu binary not found. Compiling release binary with Cargo..."
@@ -128,14 +131,26 @@ if [ -z "$BASHMENU_BIN" ] || [ ! -x "$BASHMENU_BIN" ]; then
 fi
 
 # Ensure default menu and config fixtures exist in current working directory if missing
-if [ ! -f "bashmenu.mnu" ] && [ -f "$SCRIPT_DIR/tests/fixtures/bashmenu.mnu" ]; then
-    cp "$SCRIPT_DIR/tests/fixtures/bashmenu.mnu" ./bashmenu.mnu 2>/dev/null || true
+if [ ! -f "bashmenu.mnu" ]; then
+    if [ -f "$SCRIPT_DIR/bashmenu.mnu" ]; then
+        cp "$SCRIPT_DIR/bashmenu.mnu" ./bashmenu.mnu 2>/dev/null || true
+    elif [ -f "$SCRIPT_DIR/tests/fixtures/bashmenu.mnu" ]; then
+        cp "$SCRIPT_DIR/tests/fixtures/bashmenu.mnu" ./bashmenu.mnu 2>/dev/null || true
+    fi
 fi
-if [ ! -f "bashmenu.yml" ] && [ -f "$SCRIPT_DIR/tests/fixtures/bashmenu.yml" ]; then
-    cp "$SCRIPT_DIR/tests/fixtures/bashmenu.yml" ./bashmenu.yml 2>/dev/null || true
+if [ ! -f "bashmenu.yml" ]; then
+    if [ -f "$SCRIPT_DIR/bashmenu.yml" ]; then
+        cp "$SCRIPT_DIR/bashmenu.yml" ./bashmenu.yml 2>/dev/null || true
+    elif [ -f "$SCRIPT_DIR/tests/fixtures/bashmenu.yml" ]; then
+        cp "$SCRIPT_DIR/tests/fixtures/bashmenu.yml" ./bashmenu.yml 2>/dev/null || true
+    fi
 fi
-if [ ! -f "bashmenu.themes" ] && [ -f "$SCRIPT_DIR/tests/fixtures/bashmenu.themes" ]; then
-    cp "$SCRIPT_DIR/tests/fixtures/bashmenu.themes" ./bashmenu.themes 2>/dev/null || true
+if [ ! -f "bashmenu.themes" ]; then
+    if [ -f "$SCRIPT_DIR/bashmenu.themes" ]; then
+        cp "$SCRIPT_DIR/bashmenu.themes" ./bashmenu.themes 2>/dev/null || true
+    elif [ -f "$SCRIPT_DIR/tests/fixtures/bashmenu.themes" ]; then
+        cp "$SCRIPT_DIR/tests/fixtures/bashmenu.themes" ./bashmenu.themes 2>/dev/null || true
+    fi
 fi
 
 # Execute compiled Rust binary

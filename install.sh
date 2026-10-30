@@ -38,6 +38,7 @@ echo "==> Installing binaries to $BIN_DIR..."
 for bin in bashmenu ymlcheck menuedit themeedit bashedit; do
     src="$SCRIPT_DIR/target/release/$bin"
     if [ -f "$src" ]; then
+        rm -f "$BIN_DIR/$bin"
         cp -f "$src" "$BIN_DIR/$bin"
         chmod +x "$BIN_DIR/$bin"
         echo "  [+] Installed $bin -> $BIN_DIR/$bin"
@@ -49,6 +50,14 @@ done
 # Install 'bm' convenience shortcut
 ln -sf "$BIN_DIR/bashmenu" "$BIN_DIR/bm"
 echo "  [+] Created shortcut 'bm' -> $BIN_DIR/bm"
+
+# Install companion tool shortcuts
+ln -sf "$SCRIPT_DIR/scripts/pager.sh" "$BIN_DIR/bmpager"
+echo "  [+] Created shortcut 'bmpager' -> $BIN_DIR/bmpager"
+ln -sf "$SCRIPT_DIR/scripts/cheat.sh" "$BIN_DIR/cheat"
+echo "  [+] Created shortcut 'cheat' -> $BIN_DIR/cheat"
+ln -sf "$SCRIPT_DIR/scripts/rich.sh" "$BIN_DIR/rich"
+echo "  [+] Created shortcut 'rich' -> $BIN_DIR/rich"
 
 # Initialize user config directory if missing
 CONFIG_DIR="$HOME/.config/bashmenu"

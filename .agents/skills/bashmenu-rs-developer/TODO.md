@@ -50,3 +50,9 @@
 - [x] Implement `install.sh` for release compilation and user installation to `$HOME/.local/bin`.
 - [x] Implement `uninstall.sh` with automated cleanups and config removal confirmation.
 - [x] Add Shellcheck linting to GitHub Actions CI workflow.
+
+## Phase 9: Asset Localization & Python Decoupling
+- [x] Copy all extension scripts (`scripts/`), assets (`assets/`), templates (`templates/`), notebooks (`notebooks/`), documentation (`bashmenu.md`, `bashmenu.1`), and production YAML configurations (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`) into the local repository.
+- [x] Eliminate stale references to `../bashmenu` across all shell scripts, documentation, and user launcher symlinks.
+- [x] Update `macro_engine`, `bashmenu-cli`, `menuedit-cli`, and `themeedit-cli` to resolve files locally using `$BASHMENU_DIR`, user config `~/.config/bashmenu`, and current workspace paths.
+- [x] Update `bashmenu.mnu` actions to target compiled Rust binaries (`menuedit`, `themeedit`, `bashedit`) and local `bashmenu-rs-developer` skill paths.

@@ -1,0 +1,837 @@
+.TH BASHMENU 1 "2026-09-13" "v0.0.1" "HA Bash Menu Manual"
+.SH NAME
+bashmenu \- lightweight Textual TUI menu engine and settings manager
+.SH SYNOPSIS
+.B bashmenu.sh
+.SH DESCRIPTION
+.B bashmenu
+is a data-driven, Textual-based Text User Interface (TUI) menu engine designed
+for Linux system administration, settings management, and command execution. It
+reads its menu structure from a YAML-formatted menu file, dynamically
+interpolates configurations and system environment variables, and supports
+custom Nerd Fonts, visual file chooser dialogs, and modular code templates.
+.SH COMPONENT FILES
+.TP
+.I install.sh
+Universal POSIX installation script with package manager detection.
+.TP
+.I uninstall.sh
+Universal POSIX uninstallation script removing installed files and links.
+.TP
+.I bashmenu.sh
+Launcher wrapper script. Handles binary resolution and environment setup.
+.TP
+.I bashmenu
+Core Ratatui application containing the main menu rendering engine.
+.TP
+.I bashedit
+Built-in terminal text editor engine with swap file management.
+.TP
+.I menuedit
+Interactive TUI menu tree editor for managing bashmenu.mnu.
+.TP
+.I themeedit
+Interactive TUI visual theme creator and palette editor.
+.TP
+.I ymlcheck
+YAML configuration, menu, and theme validator tool.
+.TP
+.I bashmenu.yml
+Settings configuration database in YAML format.
+.TP
+.I bashmenu.mnu
+Menu layout structure definitions list in YAML format.
+.TP
+.I bashmenu.themes
+Color theme definitions (supporting 256, 16, and 8 color modes).
+.TP
+.I ymlcheck.py
+Command line utility to validate YAML syntax and schemas.
+.SH MAN PAGES (MANUALS)
+The application provides a local man page for terminal-based help:
+.TP
+.I bashmenu.1
+Terminal manual page for HA Bash Menu.
+.SH DYNAMIC SCRIPTS & TEMPLATES
+.SS Provided Utility Scripts (scripts/)
+These custom utility scripts are stored inside the scripts directory:
+.TP
+.I scripts/ascii.sh
+Standard and Extended ASCII viewing utility.
+.TP
+.I scripts/asteroids.sh
+Terminal Asteroids game runner and automatic source build installer.
+.TP
+.I scripts/bsdgames.sh
+Interactive menu runner for classic BSD games (adventure, atc, tetris).
+.TP
+.I scripts/cheat.py
+Python CLI cheatsheet search engine supporting tags and full-text search.
+.TP
+.I scripts/cheat.sh
+Cheatsheet lookup utility wrapper for rich.sh and pager.sh.
+.TP
+.I scripts/dnsconfig.sh
+Configures IPv4 and IPv6 DNS addresses for active connections.
+.TP
+.I scripts/games.sh
+Interactive menu runner for terminal games (ninvaders, greed, nsnake).
+.TP
+.I scripts/get_api_key.sh
+Securely retrieves and formats credentials or keys.
+.TP
+.I scripts/getdns.py
+Discovers currently configured upstream system DNS settings.
+.TP
+.I scripts/glyphs.sh
+Curses preview dialog box utility for Unicode emojis and icons.
+.TP
+.I scripts/gorillas.py
+QBasic Gorillas clone TUI game implemented as a Textual Screen.
+.TP
+.I scripts/hostname.sh
+Discovers and displays system hostname, FQDN, kernel, and OS identity.
+.TP
+.I scripts/install_basics.sh
+Cross-platform basic tools installer wrapper.
+.TP
+.I scripts/install_cheat.sh
+Installs interactive cheat sheet terminal tools.
+.TP
+.I scripts/install_games.sh
+Cross-platform installer for terminal games.
+.TP
+.I scripts/install_glow.sh
+Installer script for the Glow markdown viewer.
+.TP
+.I scripts/install_kmscon.sh
+Installs the kmscon console emulator for better Unicode rendering.
+.TP
+.I scripts/install_node.sh
+Installer script for Node.js via nvm or system package manager.
+.TP
+.I scripts/install_scripts.sh
+Installer script that registers and deploys custom bash scripts.
+.TP
+.I scripts/ip_info.sh
+Displays current network interface IP addresses and connection status.
+.TP
+.I scripts/ncurses_colors.py
+Visual tester for ncurses color support.
+.TP
+.I scripts/otd.sh
+Fetches a random "On This Day" historical quote/event and link from today.zenquotes.io API using curl and jq.
+.TP
+.I scripts/pager.sh
+Interactive full-screen terminal text pager supporting ANSI colors and links.
+.TP
+.I scripts/ping.sh
+Cross-platform ping wrapper with unprivileged TCP handshake latency fallback.
+.TP
+.I scripts/rich.sh
+Markdown file rendering wrapper utilizing Python Rich piped into pager.sh.
+.TP
+.I scripts/serverup.sh
+Cross-platform server ping and uptime availability check script.
+.TP
+.I scripts/system_update.sh
+Cross-platform system update wrapper supporting apt, dnf, pacman, pkg, and brew.
+.TP
+.I scripts/theme_from_image.py
+Auto-generates HA Bash Menu theme palettes derived from an image file using Pillow color quantization.
+.TP
+.I scripts/unicode.sh
+Interactive Unicode Block Explorer script.
+.TP
+.I scripts/webopen.sh
+Cross-platform web browser launcher wrapper script. Supports --gui for graphical browsers and --tty or tty for console/terminal browsers (such as lynx, links, brow6el).
+.SS Provided Templates (templates/)
+Utilized as layout sources for code generation and block injections:
+.TP
+.I templates/autoexec.sh.tmpl
+Configurable template for autoexec shell scripts.
+.TP
+.I templates/bash_aliases.tmpl
+Dynamic aliases shell template sourced inside user profiles.
+.SH KEYBOARD SHORTCUTS
+.SS Main Menu Interface (bashmenu.py)
+.TP
+.B UP, DOWN
+Navigate highlighted selection row.
+.TP
+.B 0-9, a-z
+Select menu option directly by shortcut hotkey.
+.TP
+.B ENTER
+Execute active selected menu option action.
+.TP
+.B F1
+Display Markdown help manual modal.
+.TP
+.B F2
+Open Theme selector dialog.
+.TP
+.B F3
+Launch built-in text editor (bashedit.py).
+.TP
+.B F4
+Launch menuedit.py visual menu tree editor.
+.TP
+.B F5
+Refresh menu, reload configuration, menu files, and plugin outputs.
+.TP
+.B F6
+Toggle visibility of option shortcut key badges.
+.TP
+.B ESC
+Return to parent menu, or quit if at the root menu level.
+
+.PP
+.B Intelligent State Retention:
+When returning from editors, or scripts with refresh: true, the engine traces and preserves your submenu coordinate depth to return you to your exact location, skipping the root menu.
+.SS Visual Menu Editor (menuedit.py)
+.TP
+.B a
+Add new menu option node.
+.TP
+.B e, ENTER
+Edit node properties or submenu header title (opens ItemEditModal).
+.TP
+.B t
+Change selected item type.
+.TP
+.B SPACE
+Expand or collapse submenu tree node.
+.TP
+.B d
+Delete selected menu option node (with confirm box).
+.TP
+.B m
+Move selected item down.
+.TP
+.B M
+Move selected item up.
+.TP
+.B >
+Indent (>) item into preceding Submenu folder.
+.TP
+.B <
+Outdent (<) item to parent menu.
+.TP
+.B F1, ?
+Display HA Bash Menu manual (bashmenu.md) modal.
+.TP
+.B F2
+Toggle (collapse/expand) all children of top root menu.
+.TP
+.B F3, CTRL+A
+View ASCII character table (ascii.sh) modal.
+.TP
+.B F4, CTRL+N
+Search Nerd Font & Emoji glyphs (glyphs.sh) modal.
+.TP
+.B F5, CTRL+P
+View available placeholders and macros modal.
+.TP
+.B s, CTRL+S
+Save changes to bashmenu.mnu.
+.TP
+.B ESC, q
+Exit editor (prompts to save if modifications exist).
+
+.PP
+.B ItemEditModal Dialog Keybindings:
+CTRL+S / F2 / s (Save changes), CTRL+T / t (Change item type), CTRL+A / F3 (ASCII table), CTRL+N / F4 (Glyphs), CTRL+P / F5 (Placeholders), F1 / ? (Item property help), ESC / c (Cancel).
+
+.PP
+.B Menu Focus Synchronization & Property Inspector Previews:
+When launching menuedit.py from bashmenu.py (via F4 or menu item action), the editor tree automatically synchronizes active keyboard focus and selection directly on the item that was selected in bashmenu.py, so pressing e or ENTER immediately opens the ItemEditModal dialog for that exact item. The Property Inspector side panel features a real-time visual Preview section for all item types (commands, submenus, scripts, dividers, etc.) showing exactly how the item will appear in the main menu (including resolved Nerd Font/emoji icons, placeholders, and right-aligned shortcut brackets). Additionally, the ItemEditModal dialog dynamically updates its preview box in real-time as title or icon fields are edited. Property inspector binary switches match window background styling (Switch:focus { background: transparent; }), and the help text footer explicitly displays [ESC / C] Cancel.
+.SS Built-in Text Editor (bashedit.py)
+The application features a built-in text editor supporting tabs and desktop
+shortcuts.
+.TP
+.B F1
+View BashEdit keybindings manual modal dialog.
+.TP
+.B F2
+Toggle whitespace visibility (spaces as dots, tabs as arrows).
+.TP
+.B F3
+Stream ASCII character table (ascii.sh) in modal viewer.
+.TP
+.B F4
+Stream terminal colors table (ncurses_colors.py) in modal viewer.
+.TP
+.B F5
+Show modal with available placeholders and macros.
+.TP
+.B F6
+View Markdown via Rich pager (scripts/rich.sh).
+.TP
+.B F7
+Toggle line numbers gutter display.
+.TP
+.B F8
+View Markdown syntax quick reference modal.
+.TP
+.B Ctrl+Q, ESC
+Exit editor (prompts to save if modifications exist).
+.TP
+.B Ctrl+O, Ctrl+R
+Open file via file picker modal into current or new tab.
+.TP
+.B Ctrl+S
+Save active file buffer.
+.TP
+.B Ctrl+A, Ctrl+Shift+S
+Save As (prompts for destination file path).
+.TP
+.B Ctrl+N, [ + ]
+Create a new empty document tab.
+.TP
+.B Alt+Left, Alt+Right / Alt+], Alt+[
+Switch to next or previous document tab.
+.TP
+.B Ctrl+W
+Where Is (search text within active buffer).
+.TP
+.B Shift+Arrows, Shift+Home, Shift+End
+Select text range (standard desktop text selection).
+.TP
+.B Ctrl+Left, Ctrl+Right
+Skip cursor by word left or right.
+.TP
+.B Ctrl+Up, Ctrl+Down
+Skip cursor by paragraph up or down.
+.TP
+.B Ctrl+X
+Cut line or active selection block to clipboard.
+.TP
+.B Ctrl+C
+Copy line or active selection block to clipboard.
+.TP
+.B Ctrl+V
+Paste cutbuffer or system clipboard text at cursor.
+.TP
+.B Ctrl+Z, Ctrl+Y
+Undo or redo edit operations.
+.SS Visual Theme Editor (themeedit.py)
+Interactive split-screen theme designer with a quarter-scale live preview of the main menu and real-time color and glyph inspector.
+.TP
+.B c, ENTER
+Open 256-color picker modal dialog (ColorPickerModal) for focused color field.
+.TP
+.B a
+Open box-drawing and character glyph picker modal dialog (AsciiPickerModal) for focused border/glyph field.
+.TP
+.B t
+Clone existing theme as a base (ThemeCloneModal).
+.TP
+.B d
+Auto-derive 16-color and 8-color fallback palettes from the active 256-color palette.
+.TP
+.B s
+Save theme to bashmenu.themes and optionally activate it in bashmenu.yml (SaveThemeModal).
+.TP
+.B F8
+Toggle expand/collapse all property inspector sections.
+.TP
+.B F9
+Auto-generate theme palette from an image file (ThemeFromImageModal).
+.TP
+.B Ctrl+R
+Rename theme (RenameThemeModal). Themes can also be renamed in the inspector panel under General & Identity.
+.TP
+.B Ctrl+D
+Delete theme from bashmenu.themes (prompts confirmation). Themes can also be deleted in the Theme Picker modal via [d].
+.TP
+.B F1, ?
+Display theme editor keyboard shortcuts and help modal.
+.TP
+.B ESC, q
+Exit theme editor (prompts to save if modifications exist).
+.SH CONFIGURATION & SCHEMA SPECIFICATIONS
+.SS Settings Store (bashmenu.yml)
+Stores nested, dot-notation accessible key-value settings. Any nested path (e.g.
+settings.dns.ipv4) can be interpolated inside menu files or actions.
+The special setting
+.I settings.status_gutter
+defines which system badges are displayed in the bottom right corner (the status
+gutter). This value is specified as a string of badges separated by pipe symbols
+(|). Neither the status gutter nor the left-aligned help gutter ever exceeds
+50% of the screen width. Badges and help action items are delimited by pipe
+symbols (|) and treated as atomic units. When text exceeds 50% of the screen
+width, overlapping items drop to the next line. Neither gutter ever exceeds two
+lines, with two lines being the maximum allowed height.
+Available badges include:
+.I {user}, {username}
+(current user),
+.I {host}
+(hostname),
+.I {battery}
+(battery percentage),
+.I {date_time_12}, {date_time_24}
+(full date/time),
+.I {date_time_12_short}, {date_time_24_short}
+(short date/time; optimal for performance),
+.I {time_12}, {time_24}
+(current time),
+.I {time_12_short}, {time_24_short}
+(short time; optimal for performance),
+.I {date}
+(YYYY-MM-DD), and
+.I {utc_seconds}
+(epoch seconds).
+Status refresh frequency is automatically set to 1.0s if second-precision tokens are present, or 5.0s if minute-precision or static badges are used. Users can explicitly configure
+.I settings.refresh_interval
+in seconds (e.g. 1.0) or milliseconds (e.g. 1000) to override this default.
+.SS Menu Structure (bashmenu.mnu)
+The menu is defined as a hierarchical YAML options list. Options can utilize the
+following configuration keys:
+.TP
+.B type
+Option action type (see SECTION TYPES).
+.TP
+.B label
+Row label. Can use dynamic placeholders.
+.TP
+.B icon
+Icon tags utilizing brackets: {nf:[char]:[nerd-font hex]:[emoji]}.
+.TP
+.B action, file
+Shell command, script, editor file, or notebook YAML notes path ({notebooks_dir}/notes.yml).
+.TP
+.B template, target, block_id
+Path, destination, and unique tag for dynamic templates (inject_block).
+.TP
+.B quiet, stream, interactive, external, user_mode
+Execution privilege and console behavior flags.
+.TP
+.B key, picker, start_dir, masked
+Dot-notation settings key and visual configuration chooser flags.
+.TP
+.B show_whitespace, tab_to_spaces, tabstop
+Text editor layout configurations.
+.TP
+.B on_yes, on_no, message
+Confirmation options and alert prompts.
+.SH SECTION TYPES
+.TP
+.B submenu
+Opens a nested submenu options list.
+.TP
+.B command
+Executes a standard shell command.
+.TP
+.B script
+Launches an external script or executable.
+.TP
+.B config
+Prompts user to edit setting value.
+.TP
+.B toggle
+True/False/Cancel settings toggle modal.
+.TP
+.B radio
+Select single setting value from radio button list modal.
+.TP
+.B editor
+Opens file in built-in Nano-style editor.
+.TP
+.B notebook
+Opens dynamic notes collection menu from YAML file ({notebooks_dir}/notes.yml).
+Supports interactive task-list checkboxes, Markdown/BBCode modal viewers, full TextArea editor modals with smart list auto-formatting, ghost text, shared cross-interface clipboard ([C]/Ctrl+C/Ctrl+V), and help gutter note creation ([N]).
+.TP
+.B confirm
+Launches Yes/No confirmation dialog box.
+.TP
+.B message
+Informational alert or popup dialog.
+.TP
+.B python
+Dispatches internal Python routine.
+.TP
+.B inject_block
+Installs or uninstalls template blocks inside profiles.
+.TP
+.B theme_selector
+Launches list of registered color themes.
+.TP
+.B divider
+Renders an aesthetic non-selectable horizontal line separator. Supports optional length and char attributes.
+.TP
+.B back
+Navigates back to the preceding submenu level.
+.TP
+.B exit
+Shuts down the menu interface completely.
+.SH DYNAMIC DIRECTIVES & SYSTEM PLACEHOLDERS
+.SS Dynamic Input Directives
+These directives prompt the user inside modal dialogs, replacing the placeholder
+with the chosen value prior to action execution.
+.TP
+.B {param}
+Prompts for a single-line text value using a modal input box. Supports
+\fBtitle\fR (modal header), \fBprompt\fR (body prompt text), and
+\fBmasked\fR (boolean to mask input with asterisks for secrets/passwords).
+.TP
+.B {file_picker}
+Launches a visual file chooser dialog box.
+.TP
+.B {file_picker:path:<dir>}
+Launches a visual file chooser dialog box defaulting to the specified directory.
+.TP
+.B {file_picker_new}, {file_picker:new}
+Launches a visual file chooser dialog box allowing creation of new files.
+.TP
+.B {dir_picker}
+Launches a visual directory chooser dialog box.
+.TP
+.B {dir_picker:path:<dir>}
+Launches a visual directory chooser dialog box defaulting to the specified directory.
+.TP
+.B {dir_picker_new}, {dir_picker:new}
+Launches a visual directory chooser dialog box allowing creation of new folders.
+.SS Path Modifiers for Pickers
+Pickers support suffix modifiers to extract subcomponents of the chosen path prior to shell execution:
+.TP
+.B {file_picker:stem}
+Full path without the file extension (e.g. "/path/to/img" from "/path/to/img.png").
+.TP
+.B {file_picker:name}
+Filename with extension (e.g. "img.png").
+.TP
+.B {file_picker:base}
+Filename without extension (e.g. "img").
+.TP
+.B {file_picker:dir}
+Parent directory path (e.g. "/path/to").
+.TP
+.B {file_picker:ext}
+File extension including leading dot (e.g. ".png").
+.TP
+.B {dir_picker:name}
+Folder name without parent path.
+.TP
+.B {dir_picker:dir}
+Parent directory path of the chosen directory.
+.SS Picker Auto-Starting Folders
+Default starting folders can be configured inline using \fB:path:<dir>\fR (e.g.
+"{file_picker:path:{bashmenu_dir}/assets/wallpapers}"), or by preceding
+the placeholder with a folder path (e.g. "{templates_dir}/{file_picker}" or
+"~/projects/{dir_picker}"). Both methods set the visual chooser's start
+folder and avoid double-prefixing.
+.SS System Placeholders
+The following placeholders are auto-interpolated inside actions or templates:
+.TP
+.B {user}, {username}
+Current system username.
+.TP
+.B {host}, {hostname}
+System host name.
+.TP
+.B {user-mode}
+Current privilege mode ("root" if running with root/sudo privileges, otherwise "user").
+.TP
+.B {version}
+Script version (e.g., 0.0.1).
+.TP
+.B {home}
+User's absolute home directory path.
+.TP
+.B {bashmenu_dir}
+Application script directory.
+.TP
+.B {templates_dir}, {templates}, {scripts_dir}, {scripts}
+Templates and scripts folders paths.
+.TP
+.B {cache_dir}, {cache}
+Cache folder paths (defaults to ~/.cache/bashmenu). Sets $CACHE_DIR.
+.TP
+.B {notebooks_dir}, {notebooks}
+Custom notes and notebooks directory path ({bashmenu_dir}/notebooks).
+.TP
+.B {bashrc}, {zshrc}, {profile}, {bash_profile}, {zprofile}, {shell_profile}
+User shell profile configuration paths with intelligent existence fallback.
+.TP
+.B {vimrc}, {nanorc}, {bash_aliases}
+Editor configuration files and shell alias paths.
+.TP
+.B {prefix}, {termux_properties}, {termux_storage}
+Termux environment prefix and mobile terminal paths.
+.TP
+.B {powershell_profile}, {appdata}, {userprofile}
+Windows / PowerShell profile scripts and environment paths.
+.TP
+.B {divider}
+Themed horizontal divider line (defaults to {ascii:196} across window width).
+.TP
+.B {date_time_12}, {date_time_24}
+12-hour and 24-hour formatted date-time (includes seconds).
+.TP
+.B {date_time_12_short}, {date_time_24_short}
+Short 12-hour and 24-hour formatted date-time (excludes seconds; optimal for performance).
+.TP
+.B {date}
+Current date (YYYY-MM-DD).
+.TP
+.B {time_12}, {time_24}
+12-hour and 24-hour current time (includes seconds).
+.TP
+.B {time_12_short}, {time_24_short}
+Short 12-hour and 24-hour current time (excludes seconds; optimal for performance).
+.TP
+.B {battery}
+Current battery percentage (e.g. 84% or N/A). Includes a 5-second
+performance cache.
+.TP
+.B {battery_stat}, {battery_status}
+Current battery charging status (e.g. Charging, Discharging, Full, or N/A). Includes a 5-second
+performance cache.
+.TP
+.B {theme}
+Active color theme name from bashmenu.yml (e.g. tokyo_night, dracula).
+.TP
+.B {localip}
+Primary outbound IPv4 address (e.g. 192.168.1.50). Evaluated on demand
+via UDP socket probe with TTL cache.
+.TP
+.B {utc_seconds}
+Current UTC epoch seconds.
+.TP
+.B {window_width}, {window_height}
+Current active window width (columns) and height (lines) in characters.
+.TP
+.B {ascii:decimal}
+Prints character corresponding to decimal code (uses CP437 for extended ASCII, e.g. {ascii:168} resolves to ¿).
+.TP
+.B {app.<key.path>}, {<key.path>}, {settings.dot_key}, {user.dot_key}
+Configuration key lookup from bashmenu.yml using explicit app namespace (e.g.,
+{app.theme}, {app.settings.tabstop}, {app.user.postal_code}) or shorthand format
+({settings.cache_dir}, {user.editor}, {user.divider}).
+.TP
+.B {command:shell_cmd}
+Dynamic shell command execution placeholder. Runs shell_cmd via the system shell, trims trailing whitespace/newlines, and replaces the tag with the command output. Fully supports nested curly braces (e.g., {command:hostname -I | awk '{print $1}'}). Features a 30.0-second performance cache TTL and a 3.0-second safety execution timeout.
+.SS Nerd Fonts & Emoji Adaptive Resolution
+The application resolves icons dynamically using three properties: a fallback
+ASCII character, a Nerd Font PUA code point, and a Unicode emoji icon:
+.RS
+.B {nf:[char]:[nerd-font hex]:[emoji-glyph]}
+.RE
+Precedence is evaluated as follows:
+.IP \(bu 2
+.B Emoji Icon (Unicode capable)
+\- Chosen if system is Unicode capable, use_nerd_fonts is enabled, and emoji is provided.
+.IP \(bu 2
+.B Nerd Font Glyph (Nerd Fonts enabled)
+\- Chosen if system is Unicode capable, use_nerd_fonts is true, and hex is
+provided. Translates and renders the Nerd Font glyph.
+.IP \(bu 2
+.B Fallback Character
+\- Displayed if Nerd Fonts are disabled or no icon/hex is defined (e.g., {nf:#} displays '#').
+.IP \(bu 2
+.B Fallback
+\- Resolves to empty string if all properties are unconfigured.
+.PP
+Every menu option icon slot occupies a standardized 4-column display width (vis_w + pad_w = 4), ensuring that all menu labels and descriptions strictly align vertically at column 11 regardless of icon presence or type. Unicode variation selectors are normalized to ensure terminal font cell alignment.
+.SS Console Tag Rich Formatting
+The application incorporates a rich inline formatting parser allowing developers to
+use nested bracketed formatting tags inside labels, headers, status gutters, and dialogues.
+.TP
+.B [b]text[/b]
+Renders bold text (Rich Style(bold=True)).
+.TP
+.B [u]text[/u]
+Renders underlined text (Rich Style(underline=True)).
+.TP
+.B [dim]text[/dim]
+Renders dimmed contrast text (Rich Style(dim=True)).
+.TP
+.B [reverse]text[/reverse]
+Renders reversed contrast text (Rich Style(reverse=True)).
+.TP
+.B [color=color_name]text[/color]
+Renders custom theme-colored text. Supports active theme semantic tokens (text, border, title, highlight, footer, help_text, plugin, shortcut_key, accent, divider, background, selection, gutter, button_primary, button_error, button_cancel, button_success, window_close_button, scrollbar, whitespace), named ANSI/bright constants (COLOR_BLACK, COLOR_RED, COLOR_GREEN, COLOR_YELLOW, COLOR_BLUE, COLOR_MAGENTA, COLOR_CYAN, COLOR_WHITE, COLOR_GREY, COLOR_GRAY, COLOR_BRIGHT_BLACK, COLOR_BRIGHT_RED, COLOR_BRIGHT_GREEN, COLOR_BRIGHT_YELLOW, COLOR_BRIGHT_BLUE, COLOR_BRIGHT_MAGENTA, COLOR_BRIGHT_CYAN, COLOR_BRIGHT_WHITE, COLOR_ORANGE, COLOR_PURPLE, COLOR_PINK, COLOR_BROWN), 256-color palette numbers (0 to 255), and 24-bit TrueColor hex values (#rrggbb).
+.TP
+.B [table width=100%][tr][th]Col[/th][/tr][tr][td]Val[/td][/tr][/table]
+Renders an aligned box-drawing Unicode table with dynamically fitted or percentage-based column widths (e.g. 50/50, 33/33/33), bold headers, in-cell word wrapping, and optional row separators.
+.TP
+.B [list][*]Item 1[*]Item 2[/list]
+Renders an unordered bulleted list (using bullet glyphs). Closing [/*] tags are optional.
+.TP
+.B [list=1][*]Item 1[*]Item 2[/list]
+Renders an ordered numbered list (1., 2., etc.). Also supports alphabetical lists ([list=a]).
+.PP
+.B Formatting Rules & Feature Flags:
+.IP \(bu 2
+.B Code Block & Backtick Suppression:
+Formatting tags within code backticks (`[b]code[/b]`) or fenced code blocks are automatically suppressed and rendered literally.
+.IP \(bu 2
+.B Backslash Tag Escaping:
+Preceding a tag bracket with a backslash (e.g. \[rs][b] or \[rs][/b]) escapes the parser, outputting literal bracketed tag text.
+.IP \(bu 2
+.B no_formatting Directive:
+Modals and text formatting conversion utilities accept an optional no_formatting parameter to disable tag processing entirely.
+.SS Color Themes Specification (bashmenu.themes)
+Color themes configure the visual color scheme for the main menu, visual menu editor, text editor, and modal screens. Themes are defined under top-level theme names (dracula, nord, cyberpunk, gruvbox, qbasic, pacman, industry, matrix, monochrome, synthwave, amber_crt, hotdog_stand) for 256, 16, and 8 color modes using single-line compact lists [fg, bg].
+.PP
+Supported Theme Elements: background, title, border, text, highlight, accent,
+footer, help_text (configures help text in bottom gutter and modal footers),
+plugin (configures text color of background plugin feeds), gutter, selection,
+shortcut_key, divider, button_primary, button_error,
+button_cancel, button_success, window_close_button, scrollbar, and whitespace (configures
+non-visible whitespace character color in the text editor).
+.PP
+.B Formatting Rule for Editor Compatibility:
+Theme definitions maintain compact single-line flow-style bracket lists (e.g. title: [201, -1]). This enables bashedit.py's --display-theme-colors feature to accurately parse inline bracketed color values and render live color swatch previews.
+.PP
+.B Window Border & Divider Customization (window: and divider:):
+Themes can optionally customize outer window frame border characters using a
+top-level \fBwindow:\fR section, and horizontal dividers using a top-level
+\fBdivider:\fR section. Authors can specify CP437 ASCII directives (e.g.,
+{ascii:205}, {ascii:221}), Unicode characters, or Nerd Font glyphs. Supported
+window border keys: \fBborder_horizontal_top\fR, \fBborder_horizontal_bottom\fR,
+\fBborder_vertical_left\fR, \fBborder_vertical_right\fR (with \fBborder_horizontal\fR
+and \fBborder_vertical\fR as shorthands), \fBborder_top_left\fR,
+\fBborder_top_right\fR, \fBborder_bottom_left\fR, \fBborder_bottom_right\fR,
+\fBborder_tee_top\fR / \fBtop_tee\fR, \fBborder_tee_bottom\fR / \fBbottom_tee\fR,
+\fBborder_tee_left\fR / \fBleft_tee\fR, \fBborder_tee_right\fR / \fBright_tee\fR,
+\fBborder_cross\fR, \fBgutter_border\fR, \fBgutter_separator\fR, \fBgutter_left_tee\fR,
+\fBgutter_right_tee\fR, \fBgutter_top_tee\fR, \fBgutter_bottom_tee\fR,
+\fBtitle_left_cap\fR, \fBtitle_right_cap\fR, and \fBshadow_char\fR.
+Omitted keys fall back to standard single-line box drawing characters.
+Dividers strictly follow a 4-tier style priority: theme divider definitions
+override plugin divider definitions in bashmenu.yml, which override declared
+definitions in bashmenu.mnu, which fall back to {ascii:196}. Outer window
+borders never override dividers. Dividers only appear in a menu if declared as
+an option in bashmenu.mnu. Dividers of length \fB{window_width}\fR render
+within standard margins with vertical borders and no tees; dividers of length
+\fB{screen_width}\fR run border to border using left and right tees without margins.
+.SS Wallpaper Backgrounds & TrueColor Compositing (settings.background)
+HA Bash Menu features a TrueColor half-block (\(bu) wallpaper compositing engine that renders graphical background images directly behind menus, options, and status lines using universal ANSI text capabilities.
+Wallpapers can be specified in user settings (\fIsettings.background\fR in bashmenu.yml) or bundled with themes (\fItheme_background\fR in bashmenu.themes).
+Supported settings:
+.TP
+.B enabled
+Boolean master switch enabling or disabling wallpaper compositing.
+.TP
+.B image
+Path to wallpaper image (PNG or JPG format). Supports system placeholders like {bashmenu_dir}.
+.TP
+.B opacity
+Float factor between 0.0 (transparent) and 1.0 (opaque), default 0.35. Lower values blend more theme background tint.
+.TP
+.B scaling
+Image scaling mode: "cover" (maintains aspect ratio, auto-cropping), "stretch" (exact fit), "fit" (proportional inside window), "center" (1:1 original size), or "tile" (pattern repeat).
+.TP
+.B clustering
+Integer delta threshold between 0 and 128 (default: 0). Default 0 preserves full photographic fidelity and gradients without horizontal run-length streaking. Values above 0 merge neighboring spans for high-latency connections.
+.TP
+.B quantization
+Color channel quantization step between 1 and 32 (default: 1). Default 1 retains full 24-bit TrueColor depth without banding.
+.SH MODULARITY & PLUGINS
+.SS Dynamic Block Injection
+The inject_block type installs templates inside profile files (e.g. .bashrc).
+It wraps the template in markers (# CODEBLOCK:block_id:START/END) to manage
+seamless interactive installs, updates, and uninstalls.
+.SS In-Process Python Plugins (external: false)
+Python script items of type "script" can set "external: false" to run inside
+bashmenu's parent process, avoiding terminal flashes. Plugins must implement
+a Textual Screen subclass pushed via screen.app.push_screen().
+.SS Background Footer Plugins & Plugin Creation
+HA Bash Menu features an asynchronous, background-cached plugin architecture configured under
+.I settings.plugins
+in
+.I bashmenu.yml.
+Plugin output lines are rendered in a dedicated display area above the help footer.
+.IP \(bu 2
+.B Asynchronous Execution & Caching:
+Plugin scripts run in background daemon threads with re-entrant locking to ensure network calls never lag the main TUI rendering loop. Script outputs are cached in memory for the duration specified by
+.I sleep
+(in seconds, defaulting to 300). Setting
+.I sleep: 0
+forces live execution on every frame refresh.
+.IP \(bu 2
+.B Priority Rendering:
+Menu options hold top rendering priority. The engine calculates available vertical screen space between the menu options list and help footer; if terminal height is constrained, plugin lines are automatically wrapped, truncated, or dropped so menu navigation remains unhindered.
+.IP \(bu 2
+.B Pretext & Posttext:
+Plugins support optional
+.I pretext
+and
+.I posttext
+lines (such as {user.divider}) rendered before and after script output lines.
+.IP \(bu 2
+.B Declarative Multi-Column Table Layout & Entries Chunking:
+Plugins can be arranged horizontally in equal-width columns (e.g. 50/50, 33/33/33) across the terminal window by specifying
+.I type: table
+directly under
+.I settings.plugins
+or within a nested
+.I layout
+mapping. Setting
+.I divider: true
+(or
+.I top_divider: true\c
+) renders a native horizontal divider above the plugin dashboard, automatically allocating vertical line budget. The
+.I entries
+setting (default: 2) sets the maximum plugins per table row. When additional plugins are encountered, subsequent tables are constructed automatically. Long text within cells wraps cleanly at word boundaries.
+.IP \(bu 2
+.B Standalone Plugins (standalone: true or span: full):
+Full-width plugins such as Quote of the Day or system status banners can stretch across the entire screen on their own line without table borders by setting
+.I standalone: true
+or
+.I span: full,
+rendering cleanly above or below multi-column tables.
+.PP
+.B Creating & Registering a Custom Plugin:
+To create a custom plugin, write an executable script in
+.I scripts_dir
+(e.g., scripts/my_status.sh) that outputs text to standard stdout (supporting BBCode styling tags like [b] or [color=accent]). Then register it under
+.I settings.plugins
+in
+.I bashmenu.yml:
+.RS
+.nf
+settings:
+  plugins:
+    my_status:
+      script: my_status.sh
+      sleep: 60
+      pretext: '{user.divider}'
+      posttext: '{user.divider}'
+.fi
+.RE
+.SS Inactivity Timeout & Screensaver (settings.inactivity_timeout)
+HA Bash Menu supports automated screensaver and command execution when no
+keyboard or mouse interaction occurs for a specified duration. This subsystem
+is configured under \fIsettings.inactivity_timeout\fR in \fIbashmenu.yml\fR:
+.RS
+.nf
+settings:
+  inactivity_timeout:
+    milliseconds: 300000
+    # command: 'cmatrix'
+.fi
+.RE
+.IP \(bu 2
+.B Unconfigured Default:
+The timeout directive does not include a command argument by default. If this
+setting is not configured, the timeout function does nothing.
+.IP \(bu 2
+.B Keystroke & Mouse Event Reset:
+Any keyboard keystroke, mouse movement, click, or scroll resets the countdown
+timer back to the start.
+.IP \(bu 2
+.B Alternate Screen Buffer Isolation:
+When triggered, the command executes in an alternate screen buffer (\(rsx1b[?1049h)
+after suspending Textual. This prevents disturbance to underlying terminal
+lines and the active menu layout.
+.IP \(bu 2
+.B Automatic Restoration:
+When the screensaver command terminates, the menu interface is seamlessly
+restored and the inactivity timer is automatically re-armed.
+.SS Multi-Platform Support & Environment Detection
+HA Bash Menu incorporates an environment detection engine in bashmenu.sh enabling graceful degradation and multi-platform compatibility without manual configuration. All files leverage universal shebangs. Cross-Platform package wrappers automatically translate dependency installs to the correct local package manager (apt, dnf, pacman, pkg, or brew), and smartly add or omit sudo depending on whether it is running in standard Linux, macOS, WSL, or containerized user-spaces like Termux.
+.SH AUTHOR
+Distributed under the MIT License.

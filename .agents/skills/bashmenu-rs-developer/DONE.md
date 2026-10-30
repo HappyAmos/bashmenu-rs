@@ -77,3 +77,11 @@
 - [x] Implemented `install.sh` for multi-crate release workspace compilation, copying all 5 binaries (`bashmenu`, `ymlcheck`, `menuedit`, `themeedit`, `bashedit`) plus `bm` shortcut to `$HOME/.local/bin`, deploying default config fixtures to `~/.config/bashmenu/`, and updating user shell RC files (`.bashrc`, `.zshrc`, `.profile`).
 - [x] Implemented `uninstall.sh` removing all installed binaries, shortcuts, and cleanly cleaning configuration/cache directories with interactive or `-y` confirmation.
 - [x] Added `shellcheck` verification to GitHub Actions CI workflow (`.github/workflows/rust-app.yml`). All shell scripts pass Shellcheck with 0 warnings.
+
+## Phase 9: Asset Localization & Python Decoupling
+- [x] Copied and localized all extension scripts (`scripts/`), assets (`assets/` including wallpapers, cheat sheet, and gifs), templates (`templates/`), notebooks (`notebooks/notes.yml`), documentation (`bashmenu.md`, `bashmenu.1`), and configurations (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`) into the local repository.
+- [x] Updated `scripts/pager.sh` to execute the compiled `bashedit` Rust binary directly rather than attempting to call `bashedit.py`.
+- [x] Updated `bashmenu.mnu` to invoke `menuedit` and `themeedit` compiled binaries and updated developer skill file paths to `bashmenu-rs-developer`.
+- [x] Updated file resolution logic in `bashmenu-cli`, `menuedit-cli`, `themeedit-cli`, and `macro_engine` to respect `$BASHMENU_DIR`, user configurations in `~/.config/bashmenu/`, and local repository files before fallback.
+- [x] Updated `install.sh` and `uninstall.sh` to install and cleanly remove localized `bmpager`, `cheat`, and `rich` companion shortcuts in `$HOME/.local/bin` pointing strictly to the local `bashmenu-rs` scripts.
+- [x] Verified zero references pointing to `../bashmenu` or old python scripts, and validated that all Rust tests, Clippy lints, formatting, and Shellcheck pass with 0 warnings.

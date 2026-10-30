@@ -28,7 +28,7 @@ items:
           - Edit DONE.md:
               type: editor
               icon: '{nf:\:#ec46}'
-              file: '{bashmenu_dir}/.agents/skills/bashmenu-developer/DONE.md'
+              file: '{bashmenu_dir}/.agents/skills/bashmenu-rs-developer/DONE.md'
               tabstop: 4
               interactive: true
               quiet: false
@@ -43,7 +43,7 @@ items:
               file: '{bashmenu_dir}/README.md'
           - Edit SKILL.md:
               type: editor
-              file: '{bashmenu_dir}/.agents/skills/bashmenu-developer/SKILL.md'
+              file: '{bashmenu_dir}/.agents/skills/bashmenu-rs-developer/SKILL.md'
               tabstop: 4
               interactive: true
               quiet: false
@@ -56,7 +56,7 @@ items:
               interactive: true
               quiet: false
               alt_buffer: true
-              file: '{bashmenu_dir}/.agents/skills/bashmenu-developer/TODO.md'
+              file: '{bashmenu_dir}/.agents/skills/bashmenu-rs-developer/TODO.md'
           - Toast Test:
               type: script
               script: '{toast:2:"Hello, world. {date_time_24_short} Using theme: {theme}"}'
@@ -509,10 +509,13 @@ items:
                   - Change Theme:
                       type: theme_selector
                       icon: '{nf::#f03d8}'
-                  - Theme Editor:
-                      type: python
-                      action: action_theme_editor
+                  - Theme Editor [themeedit]:
+                      type: script
+                      action: themeedit
                       icon: '{nf::#f0426}'
+                      interactive: true
+                      quiet: true
+                      refresh: true
                   - Edit Configuration File [{bashmenu_dir}/bashmenu.yml]:
                       type: editor
                       action: '{bashmenu_dir}/bashmenu.yml'
@@ -624,9 +627,9 @@ items:
                       interactive: true
                       quiet: false
                       alt_buffer: true
-                  - Visual Menu Editor [menuedit.py]:
+                  - Visual Menu Editor [menuedit]:
                       type: script
-                      action: menuedit.py
+                      action: menuedit
                       icon: '{nf::#f044}'
                       interactive: true
                       quiet: true

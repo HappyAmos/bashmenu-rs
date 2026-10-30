@@ -39,7 +39,9 @@ impl<'a> MacroContext<'a> {
         let home_dir = std::env::var("HOME")
             .map(PathBuf::from)
             .unwrap_or_else(|_| PathBuf::from("/"));
-        let bashmenu_dir = std::env::current_dir().unwrap_or_else(|_| home_dir.clone());
+        let bashmenu_dir = std::env::var("BASHMENU_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| std::env::current_dir().unwrap_or_else(|_| home_dir.clone()));
 
         Self {
             config,

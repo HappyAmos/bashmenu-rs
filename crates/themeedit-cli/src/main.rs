@@ -36,6 +36,18 @@ fn resolve_themes_path(target: &Path) -> PathBuf {
     if target.exists() {
         return target.to_path_buf();
     }
+    if let Ok(dir) = std::env::var("BASHMENU_DIR") {
+        let candidate = PathBuf::from(dir).join(target);
+        if candidate.exists() {
+            return candidate;
+        }
+    }
+    if let Ok(home) = std::env::var("HOME") {
+        let user_cfg = PathBuf::from(home).join(".config/bashmenu").join(target);
+        if user_cfg.exists() {
+            return user_cfg;
+        }
+    }
     let fixture = PathBuf::from("tests/fixtures").join(target);
     if fixture.exists() {
         return fixture;
