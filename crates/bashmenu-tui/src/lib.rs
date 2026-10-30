@@ -6,6 +6,7 @@ pub mod menu_view;
 pub mod modals;
 pub mod style;
 pub mod terminal;
+pub mod wallpaper;
 
 pub use bbcode::{
     is_bbcode_tag, parse_bbcode_spans, parse_color, split_label_brackets, strip_bbcode,
@@ -19,6 +20,10 @@ pub use modals::{
 };
 pub use style::ResolvedThemeStyles;
 pub use terminal::TerminalGuard;
+pub use wallpaper::{
+    color_to_rgb, composite_buffer, resolve_wallpaper_path, WallpaperCell, WallpaperCompositor,
+    WallpaperGrid,
+};
 
 use std::panic;
 

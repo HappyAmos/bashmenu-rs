@@ -30,6 +30,7 @@
 - [x] Main menu item rendering with 4-column icon alignment and status gutter.
 - [x] Immediate `MouseDown` mouse event handler and zero-delay keyboard navigation (`j`/`k`, arrows, shortcuts).
 - [x] Subprocess execution with terminal raw mode suspension and recovery.
+- [x] TrueColor background wallpaper half-block compositing and rendering engine.
 
 ## Phase 5: Modal Dialogs & Pickers (`crates/bashmenu-tui`)
 - [x] Classic drop-shadow frame widget (`render_modal_frame`, `░` drop shadow).

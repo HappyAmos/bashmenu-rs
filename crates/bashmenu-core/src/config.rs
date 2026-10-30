@@ -1,6 +1,7 @@
 //! Configuration definitions and persistence for `bashmenu.yml`.
 
 use crate::error::{BashMenuError, Result};
+use crate::theme::{Theme, WallpaperConfig, WallpaperSetting};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -89,6 +90,10 @@ pub struct Settings {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub plugins: Option<serde_yml::Value>,
 
+    /// Background wallpaper configuration
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub background: Option<WallpaperSetting>,
+
     /// Additional arbitrary user-defined settings preserved across saves
     #[serde(flatten)]
     pub extra: HashMap<String, serde_yml::Value>,
@@ -134,6 +139,62 @@ impl Default for BashMenuConfig {
             user: HashMap::new(),
             settings: Settings::default(),
             extra: HashMap::new(),
+        }
+    }
+}
+
+impl BashMenuConfig {
+    /// Returns the effective wallpaper config, combining user settings override with theme config.
+    pub fn resolve_wallpaper(&self, theme: Option<&Theme>) -> Option<WallpaperConfig> {
+        let user_bg = self.settings.background.as_ref().map(|s| s.to_config());
+        let theme_bg = theme.and_then(|t| t.wallpaper_config());
+
+        match (user_bg, theme_bg) {
+            (Some(user), Some(theme)) => {
+                if !user.enabled {
+                    return None;
+                }
+                Some(WallpaperConfig {
+                    enabled: user.enabled,
+                    image: user.image.or(theme.image),
+                    opacity: if (user.opacity - 0.35).abs() > f32::EPSILON {
+                        user.opacity
+                    } else {
+                        theme.opacity
+                    },
+                    scaling: if user.scaling != "cover" {
+                        user.scaling
+                    } else {
+                        theme.scaling
+                    },
+                    clustering: if user.clustering != 0 {
+                        user.clustering
+                    } else {
+                        theme.clustering
+                    },
+                    quantization: if user.quantization != 1 {
+                        user.quantization
+                    } else {
+                        theme.quantization
+                    },
+                    mode: user.mode.or(theme.mode),
+                })
+            }
+            (Some(user), None) => {
+                if !user.enabled {
+                    None
+                } else {
+                    Some(user)
+                }
+            }
+            (None, Some(theme)) => {
+                if !theme.enabled {
+                    None
+                } else {
+                    Some(theme)
+                }
+            }
+            (None, None) => None,
         }
     }
 }

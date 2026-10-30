@@ -159,6 +159,8 @@ fn main() -> Result<()> {
     let mut guard = TerminalGuard::init()?;
     let mut menu_view =
         MenuView::new(menu, styles.clone(), use_nerd, status_gutter).with_config(config.clone());
+    let initial_wallpaper = config.resolve_wallpaper(active_theme);
+    menu_view.set_wallpaper(initial_wallpaper);
     if let Some(show) = config.settings.show_menu_shortcuts {
         menu_view.set_show_shortcuts(show);
     }
@@ -231,6 +233,8 @@ fn main() -> Result<()> {
                             if let Some(t) = themes.get(&config.theme) {
                                 styles = ResolvedThemeStyles::from_theme(t, use_nerd);
                                 menu_view.set_styles(styles.clone());
+                                let wp_config = config.resolve_wallpaper(Some(t));
+                                menu_view.set_wallpaper(wp_config);
                             }
                         }
                         active_modal = ActiveModal::None;
@@ -314,6 +318,8 @@ fn main() -> Result<()> {
                             if let Some(t) = themes.get(&config.theme) {
                                 styles = ResolvedThemeStyles::from_theme(t, use_nerd);
                                 menu_view.set_styles(styles.clone());
+                                let wp_config = config.resolve_wallpaper(Some(t));
+                                menu_view.set_wallpaper(wp_config);
                             }
                             plugin_engine.trigger_refresh(&config, true);
                         }

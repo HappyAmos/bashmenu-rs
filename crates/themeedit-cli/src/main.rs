@@ -2,8 +2,8 @@
 
 use anyhow::Result;
 use bashmenu_tui::{
-    install_panic_hook, AsciiGridModal, ColorGridModal, ConfirmModal, InputModal,
-    ResolvedThemeStyles, TerminalGuard,
+    composite_buffer, install_panic_hook, AsciiGridModal, ColorGridModal, ConfirmModal, InputModal,
+    ResolvedThemeStyles, TerminalGuard, WallpaperCompositor,
 };
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
@@ -200,6 +200,20 @@ fn main() -> Result<()> {
                 "[Esc] Back | [Ctrl+S] Save",
                 preview_styles.gutter,
             );
+
+            let mut wp_compositor = state
+                .current_theme
+                .wallpaper_config()
+                .map(WallpaperCompositor::new);
+            if let Some(comp) = &mut wp_compositor {
+                if let Some(grid) = comp.get_grid(
+                    right_area.width as usize,
+                    right_area.height as usize,
+                    preview_styles.background,
+                ) {
+                    composite_buffer(right_area, buf, grid, preview_styles.background);
+                }
+            }
 
             // 3. Render Bottom Footer Status
             let footer_y = area.y + area.height - 1;

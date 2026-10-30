@@ -85,3 +85,18 @@
 - [x] Updated file resolution logic in `bashmenu-cli`, `menuedit-cli`, `themeedit-cli`, and `macro_engine` to respect `$BASHMENU_DIR`, user configurations in `~/.config/bashmenu/`, and local repository files before fallback.
 - [x] Updated `install.sh` and `uninstall.sh` to install and cleanly remove localized `bmpager`, `cheat`, and `rich` companion shortcuts in `$HOME/.local/bin` pointing strictly to the local `bashmenu-rs` scripts.
 - [x] Verified zero references pointing to `../bashmenu` or old python scripts, and validated that all Rust tests, Clippy lints, formatting, and Shellcheck pass with 0 warnings.
+
+## Phase 10: Background Wallpaper Compositing Engine
+- [x] Implemented `WallpaperConfig` and `WallpaperSetting` schemas in `crates/bashmenu-core/src/theme.rs` and `crates/bashmenu-core/src/config.rs` with user-override precedence logic in `BashMenuConfig::resolve_wallpaper`.
+- [x] Added lean pure-Rust `image` dependency with PNG and JPEG decoders.
+- [x] Implemented `WallpaperCompositor` in `crates/bashmenu-tui/src/wallpaper.rs` supporting:
+  - Macro placeholder and relative path resolution with `$BASHMENU_DIR` and fallback paths.
+  - Aspect ratio scaling modes: `cover`, `fit`, `stretch`, `center`, and `tile`.
+  - Opacity blending with theme base background color and color channel quantization.
+  - Half-block (`▀`) TrueColor cell grid generation with internal mtime/dimension caching.
+- [x] Implemented `composite_buffer` for Ratatui `Buffer`:
+  - Padding space runs (length >= 2, borders, margins, empty rows) become `'▀'` TrueColor half-blocks.
+  - Active selection highlights retain their explicit highlight styling.
+  - Non-space characters (text labels, box borders, icons) preserve their glyph and foreground style while their background color is set to the underlying cell's blended average color.
+- [x] Connected wallpaper engine into `MenuView::render` and `themeedit-cli` live preview canvas.
+- [x] Colocated comprehensive unit and integration test suite `crates/bashmenu-tui/tests/wallpaper_test.rs` validating RGB conversions, path resolution, scaling modes, cache hit rates, padding space conversion, and user configuration overrides. Verified zero Clippy warnings and 100% test pass rate.

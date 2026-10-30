@@ -94,6 +94,92 @@ pub struct DividerConfig {
     pub length: Option<String>,
 }
 
+fn default_true() -> bool {
+    true
+}
+
+fn default_opacity() -> f32 {
+    0.35
+}
+
+fn default_scaling() -> String {
+    "cover".to_string()
+}
+
+fn default_quantization() -> usize {
+    1
+}
+
+/// Configuration for background wallpapers (theme or user settings)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct WallpaperConfig {
+    /// Master switch for background wallpaper compositing
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+
+    /// Image path (e.g. assets/wallpapers/alaska-mountain.png or {bashmenu_dir}/...)
+    #[serde(default)]
+    pub image: Option<String>,
+
+    /// Opacity factor between 0.0 and 1.0 (blends wallpaper with theme background)
+    #[serde(default = "default_opacity")]
+    pub opacity: f32,
+
+    /// Scaling mode: "cover", "stretch", "fit", "center", "tile"
+    #[serde(default = "default_scaling")]
+    pub scaling: String,
+
+    /// Horizontal delta clustering threshold (0..128)
+    #[serde(default)]
+    pub clustering: usize,
+
+    /// Color channel quantization (>= 1)
+    #[serde(default = "default_quantization")]
+    pub quantization: usize,
+
+    /// Rendering mode (e.g. "halfblock", "quarterblock")
+    #[serde(default)]
+    pub mode: Option<String>,
+}
+
+impl Default for WallpaperConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            image: None,
+            opacity: 0.35,
+            scaling: "cover".to_string(),
+            clustering: 0,
+            quantization: 1,
+            mode: Some("halfblock".to_string()),
+        }
+    }
+}
+
+/// Wallpaper configuration setting representation in YAML (string path or full config map)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(untagged)]
+pub enum WallpaperSetting {
+    /// Direct string path to image
+    Simple(String),
+    /// Structured configuration map
+    Config(WallpaperConfig),
+}
+
+impl WallpaperSetting {
+    /// Convert setting to concrete `WallpaperConfig`
+    pub fn to_config(&self) -> WallpaperConfig {
+        match self {
+            WallpaperSetting::Simple(path) => WallpaperConfig {
+                enabled: true,
+                image: Some(path.clone()),
+                ..WallpaperConfig::default()
+            },
+            WallpaperSetting::Config(cfg) => cfg.clone(),
+        }
+    }
+}
+
 /// A single theme palette and border definition.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct Theme {
@@ -127,11 +213,30 @@ pub struct Theme {
 
     /// Background wallpaper configuration
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub background: Option<serde_yml::Value>,
+    pub background: Option<WallpaperSetting>,
 
     /// Additional arbitrary theme fields
     #[serde(flatten)]
     pub extra: HashMap<String, serde_yml::Value>,
+}
+
+impl Theme {
+    /// Resolves wallpaper configuration from `background`, `theme_background`, or `wallpaper`
+    pub fn wallpaper_config(&self) -> Option<WallpaperConfig> {
+        if let Some(bg) = &self.background {
+            return Some(bg.to_config());
+        }
+        if let Some(val) = self
+            .extra
+            .get("theme_background")
+            .or_else(|| self.extra.get("wallpaper"))
+        {
+            if let Ok(setting) = serde_yml::from_value::<WallpaperSetting>(val.clone()) {
+                return Some(setting.to_config());
+            }
+        }
+        None
+    }
 }
 
 /// Type alias for all loaded themes mapped by theme name

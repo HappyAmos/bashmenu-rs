@@ -4,9 +4,10 @@ use crate::bbcode::{
     parse_bbcode_spans, split_label_brackets, truncate_to_width, visible_text_len,
 };
 use crate::style::ResolvedThemeStyles;
+use crate::wallpaper::{composite_buffer, WallpaperCompositor};
 use bashmenu_core::{
     format_icon_slot, interpolate_placeholders, BashMenuConfig, MacroContext, MenuItem,
-    MenuItemType, MenuSchema, PluginDisplayRow,
+    MenuItemType, MenuSchema, PluginDisplayRow, WallpaperConfig,
 };
 use crossterm::event::{KeyCode, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
@@ -60,6 +61,7 @@ pub struct MenuView {
     show_shortcuts: bool,
     plugin_rows: Vec<PluginDisplayRow>,
     pub config: BashMenuConfig,
+    wallpaper: Option<WallpaperCompositor>,
 }
 
 impl MenuView {
@@ -88,6 +90,7 @@ impl MenuView {
             show_shortcuts: true,
             plugin_rows: Vec::new(),
             config,
+            wallpaper: None,
         };
         view.ensure_selectable();
         view
@@ -97,6 +100,17 @@ impl MenuView {
     pub fn with_config(mut self, config: BashMenuConfig) -> Self {
         self.config = config;
         self
+    }
+
+    /// Sets background wallpaper compositor configuration
+    pub fn with_wallpaper(mut self, config: Option<WallpaperConfig>) -> Self {
+        self.set_wallpaper(config);
+        self
+    }
+
+    /// Updates background wallpaper compositor configuration
+    pub fn set_wallpaper(&mut self, config: Option<WallpaperConfig>) {
+        self.wallpaper = config.map(WallpaperCompositor::new);
     }
 
     /// Updates configuration
@@ -731,6 +745,17 @@ impl MenuView {
             b.border_bottom_right
         );
         buf.set_string(area.x, bot_y, &bot_line, border_style);
+
+        // 8. Composite background wallpaper if active
+        if let Some(compositor) = &mut self.wallpaper {
+            if let Some(grid) = compositor.get_grid(
+                area.width as usize,
+                area.height as usize,
+                self.styles.background,
+            ) {
+                composite_buffer(area, buf, grid, self.styles.background);
+            }
+        }
     }
 }
 
