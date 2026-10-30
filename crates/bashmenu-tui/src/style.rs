@@ -1,5 +1,6 @@
 //! Theme color mapping and Ratatui style conversion.
 
+use crate::borders::ResolvedWindowBorders;
 use bashmenu_core::Theme;
 use ratatui::style::{Color, Modifier, Style};
 
@@ -14,10 +15,12 @@ pub struct ResolvedThemeStyles {
     pub accent: Style,
     pub footer: Style,
     pub gutter: Style,
+    pub help_text: Style,
     pub selection: Style,
     pub shortcut_key: Style,
     pub divider: Style,
     pub indicator_symbol: String,
+    pub borders: ResolvedWindowBorders,
 }
 
 impl Default for ResolvedThemeStyles {
@@ -36,12 +39,14 @@ impl Default for ResolvedThemeStyles {
             accent: Style::default().fg(Color::LightCyan),
             footer: Style::default().fg(Color::DarkGray),
             gutter: Style::default().fg(Color::DarkGray),
+            help_text: Style::default().fg(Color::Cyan),
             selection: Style::default().fg(Color::Black).bg(Color::Cyan),
             shortcut_key: Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
             divider: Style::default().fg(Color::Cyan),
             indicator_symbol: "► ".to_string(),
+            borders: ResolvedWindowBorders::default(),
         }
     }
 }
@@ -173,6 +178,9 @@ impl ResolvedThemeStyles {
             if let Some(st) = parse_style_pair(p.get("gutter")) {
                 resolved.gutter = st;
             }
+            if let Some(st) = parse_style_pair(p.get("help_text")) {
+                resolved.help_text = st;
+            }
             if let Some(st) = parse_style_pair(p.get("selection")) {
                 resolved.selection = st;
             }
@@ -183,6 +191,8 @@ impl ResolvedThemeStyles {
                 resolved.divider = st;
             }
         }
+
+        resolved.borders = ResolvedWindowBorders::from_theme_borders(theme.window.as_ref());
 
         resolved
     }

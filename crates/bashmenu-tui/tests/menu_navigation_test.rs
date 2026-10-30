@@ -212,3 +212,79 @@ fn test_menu_priority_over_plugins_rendering() {
         "Plugin should be dropped when terminal height is constrained"
     );
 }
+
+#[test]
+fn test_function_key_actions() {
+    let schema = create_sample_menu();
+    let mut view = MenuView::new(
+        schema,
+        ResolvedThemeStyles::default(),
+        true,
+        "Status".to_string(),
+    );
+
+    assert_eq!(view.handle_key(KeyCode::F(1)), MenuAction::Help);
+    assert_eq!(view.handle_key(KeyCode::F(2)), MenuAction::ThemeSelector);
+    assert_eq!(view.handle_key(KeyCode::F(3)), MenuAction::LaunchEditor);
+    assert_eq!(view.handle_key(KeyCode::F(4)), MenuAction::EditMenu);
+    assert_eq!(view.handle_key(KeyCode::F(5)), MenuAction::Reload);
+    assert_eq!(view.handle_key(KeyCode::F(6)), MenuAction::ToggleShortcuts);
+    assert_eq!(view.handle_key(KeyCode::F(7)), MenuAction::ConfigureGutter);
+    assert_eq!(
+        view.handle_key(KeyCode::F(8)),
+        MenuAction::LaunchThemeEditor
+    );
+}
+
+#[test]
+fn test_gutter_border_rendering() {
+    let schema = create_sample_menu();
+    let mut view = MenuView::new(
+        schema,
+        ResolvedThemeStyles::default(),
+        true,
+        "user | 100% | 12:00".to_string(),
+    );
+
+    let area = Rect::new(0, 0, 80, 24);
+    let mut buf = Buffer::empty(area);
+    view.render(area, &mut buf);
+
+    // Bottom border is at row 23
+    let mut bot_line = String::new();
+    for x in 0..80 {
+        bot_line.push(buf[(x, 23)].symbol().chars().next().unwrap_or(' '));
+    }
+    assert!(
+        bot_line.starts_with('└'),
+        "Bottom border must start with └, got: {}",
+        bot_line
+    );
+    assert!(
+        bot_line.ends_with('┘'),
+        "Bottom border must end with ┘, got: {}",
+        bot_line
+    );
+    assert!(
+        bot_line.contains('┴'),
+        "Bottom border must contain bottom tee ┴, got: {}",
+        bot_line
+    );
+
+    // Gutter top border should be at row 20 or 21 (with 1 or 2 gutter content rows)
+    let mut found_gutter_top_border = false;
+    for y in 19..23 {
+        let mut line_str = String::new();
+        for x in 0..80 {
+            line_str.push(buf[(x, y)].symbol().chars().next().unwrap_or(' '));
+        }
+        if line_str.starts_with('├') && line_str.ends_with('┤') && line_str.contains('┬') {
+            found_gutter_top_border = true;
+            break;
+        }
+    }
+    assert!(
+        found_gutter_top_border,
+        "Gutter top border (├ ... ┬ ... ┤) must be rendered above gutter content"
+    );
+}

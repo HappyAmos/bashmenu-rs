@@ -7,7 +7,6 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Modifier;
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Widget};
 
 /// Outcome of handling a user input event
 #[derive(Debug, Clone, PartialEq)]
@@ -18,10 +17,22 @@ pub enum MenuAction {
     Execute(Box<MenuItem>),
     /// Return to parent menu or exit application
     Back,
-    /// Open help manual
+    /// Open help manual (F1)
     Help,
-    /// Request menu and config reload
+    /// Open theme selector modal (F2)
+    ThemeSelector,
+    /// Launch text editor (F3)
+    LaunchEditor,
+    /// Launch menu editor (F4)
+    EditMenu,
+    /// Request menu and config reload (F5)
     Reload,
+    /// Toggle menu shortcuts (F6)
+    ToggleShortcuts,
+    /// Configure status gutter format (F7)
+    ConfigureGutter,
+    /// Launch theme editor (F8)
+    LaunchThemeEditor,
     /// Exit the menu application
     Exit,
 }
@@ -40,6 +51,7 @@ pub struct MenuView {
     styles: ResolvedThemeStyles,
     use_nerd_fonts: bool,
     status_gutter: String,
+    show_shortcuts: bool,
     plugin_rows: Vec<PluginDisplayRow>,
 }
 
@@ -63,10 +75,48 @@ impl MenuView {
             styles,
             use_nerd_fonts,
             status_gutter,
+            show_shortcuts: true,
             plugin_rows: Vec::new(),
         };
         view.ensure_selectable();
         view
+    }
+
+    /// Update theme styles
+    pub fn set_styles(&mut self, styles: ResolvedThemeStyles) {
+        self.styles = styles;
+    }
+
+    /// Update status gutter template or value
+    pub fn set_status_gutter(&mut self, gutter: String) {
+        self.status_gutter = gutter;
+    }
+
+    /// Sets whether shortcut numbers/letters are displayed
+    pub fn set_show_shortcuts(&mut self, show: bool) {
+        self.show_shortcuts = show;
+    }
+
+    /// Toggles shortcut display on/off
+    pub fn toggle_shortcuts(&mut self) -> bool {
+        self.show_shortcuts = !self.show_shortcuts;
+        self.show_shortcuts
+    }
+
+    /// Whether shortcuts are currently visible
+    pub fn show_shortcuts(&self) -> bool {
+        self.show_shortcuts
+    }
+
+    /// Reload the menu with a new schema
+    pub fn reload_menu(&mut self, menu: MenuSchema) {
+        self.stack = vec![MenuLevel {
+            title: menu.title,
+            items: menu.items,
+            selected_idx: 0,
+            scroll_offset: 0,
+        }];
+        self.ensure_selectable();
     }
 
     /// Update plugin rows rendered below menu items
@@ -183,8 +233,19 @@ impl MenuView {
                 let target_num = (c as u8 - b'0') as usize;
                 self.activate_shortcut_index(target_num)
             }
+            KeyCode::Char(c) if self.show_shortcuts && c.is_ascii_lowercase() => {
+                // Letter shortcuts a..z
+                let target_num = 10 + (c as u8 - b'a') as usize;
+                self.activate_shortcut_index(target_num)
+            }
             KeyCode::F(1) => MenuAction::Help,
+            KeyCode::F(2) => MenuAction::ThemeSelector,
+            KeyCode::F(3) => MenuAction::LaunchEditor,
+            KeyCode::F(4) => MenuAction::EditMenu,
             KeyCode::F(5) => MenuAction::Reload,
+            KeyCode::F(6) => MenuAction::ToggleShortcuts,
+            KeyCode::F(7) => MenuAction::ConfigureGutter,
+            KeyCode::F(8) => MenuAction::LaunchThemeEditor,
             _ => MenuAction::None,
         }
     }
@@ -202,10 +263,11 @@ impl MenuView {
                     && row > area.y
                     && row < area.y + area.height - 1
                 {
-                    let item_start_y = area.y + 2; // Below border and title
+                    let item_start_y = area.y + 2; // Below border and margin
                     if row >= item_start_y {
-                        let item_idx = (row - item_start_y) as usize;
+                        let row_idx = (row - item_start_y) as usize;
                         let level = self.current_level();
+                        let item_idx = level.scroll_offset + row_idx;
                         if item_idx < level.items.len() && !level.items[item_idx].is_divider() {
                             self.current_level_mut().selected_idx = item_idx;
                             return self.activate_selected();
@@ -262,7 +324,19 @@ impl MenuView {
                 MenuAction::None
             }
             MenuItemType::Exit => MenuAction::Exit,
-            _ => MenuAction::Execute(Box::new(item)),
+            MenuItemType::ThemeSelector => MenuAction::ThemeSelector,
+            MenuItemType::Other(ref s) if s == "theme_selector" => MenuAction::ThemeSelector,
+            _ => {
+                if let Some(ref act) = item.action {
+                    if act == "themeedit" {
+                        return MenuAction::LaunchThemeEditor;
+                    }
+                    if act == "menuedit" {
+                        return MenuAction::EditMenu;
+                    }
+                }
+                MenuAction::Execute(Box::new(item))
+            }
         }
     }
 
@@ -281,43 +355,154 @@ impl MenuView {
             return;
         }
 
+        let w = area.width as usize;
+        let b = self.styles.borders.clone();
+        let border_style = ratatui::style::Style::default().fg(self.styles.border);
+
+        // Clear background
+        for y in area.y..area.y + area.height {
+            for x in area.x..area.x + area.width {
+                buf[(x, y)].set_style(ratatui::style::Style::default().bg(self.styles.background));
+            }
+        }
+
+        // 1. Calculate gutter dimensions and layout
+        let avail_both = (w.saturating_sub(11)).max(4);
+        let left_gutter_w = avail_both / 2;
+        let right_gutter_w = avail_both - left_gutter_w;
+        let sep_x = (left_gutter_w + 5).min(w.saturating_sub(2));
+        let left_seg_len = sep_x.saturating_sub(1);
+        let right_seg_len = w.saturating_sub(2 + sep_x);
+
+        let help_raw = if self.show_shortcuts {
+            "[UP/DN]: Nav | [0-9/a-z]: Direct | [F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [F8]: ThemeEdit | [ESC]: Back"
+        } else {
+            "[UP/DN]: Nav | [ENTER]: Select | [F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [F8]: ThemeEdit | [ESC]: Back"
+        };
+        let help_tokens: Vec<&str> = help_raw
+            .split('|')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .collect();
+        let help_lines = wrap_gutter_tokens(&help_tokens, left_gutter_w, 2);
+
+        let status_tokens: Vec<&str> = if self.status_gutter.is_empty() {
+            Vec::new()
+        } else {
+            self.status_gutter
+                .split('|')
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .collect()
+        };
+        let status_lines = wrap_gutter_tokens(&status_tokens, right_gutter_w, 2);
+
+        let gutter_rows = (help_lines.len().max(status_lines.len())).clamp(1, 2);
+        let gutter_border_y = area.y + area.height.saturating_sub(2 + gutter_rows as u16);
+
+        // 2. Render Header (Top Border) at area.y
         let level = self.current_level();
-        let title_text = format!(" [ {} ] ", level.title);
+        let title_body = format!(" {} ", level.title);
+        let title_cap_len = b.title_left_cap.chars().count() + b.title_right_cap.chars().count();
+        let max_body_w = w.saturating_sub(6 + title_cap_len);
+        let display_title_body: String = title_body.chars().take(max_body_w).collect();
+        let title_len = title_cap_len + display_title_body.chars().count();
 
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .border_style(ratatui::style::Style::default().fg(self.styles.border))
-            .style(ratatui::style::Style::default().bg(self.styles.background))
-            .title(title_text);
+        let left_b = 2.max((w.saturating_sub(title_len)) / 2);
+        let right_b = w.saturating_sub(left_b + title_len);
 
-        block.render(area, buf);
+        let left_fill = left_b.saturating_sub(1);
+        let right_fill = right_b.saturating_sub(1);
+        let top_line = format!(
+            "{}{}{}{}{}{}{}",
+            b.border_top_left,
+            b.border_horizontal_top.repeat(left_fill),
+            b.title_left_cap,
+            display_title_body,
+            b.title_right_cap,
+            b.border_horizontal_top.repeat(right_fill),
+            b.border_top_right
+        );
+        buf.set_string(area.x, area.y, &top_line, border_style);
+        let title_start_x = area.x + 1 + left_fill as u16 + b.title_left_cap.chars().count() as u16;
+        buf.set_string(
+            title_start_x,
+            area.y,
+            &display_title_body,
+            self.styles.text.add_modifier(Modifier::BOLD),
+        );
 
-        let inner_x = area.x + 2;
-        let inner_y = area.y + 2;
-        let avail_w = area.width.saturating_sub(4) as usize;
-        let avail_h = area.height.saturating_sub(4) as usize;
+        // 3. Render Blank Margin row (area.y + 1)
+        let margin_y = area.y + 1;
+        if margin_y < gutter_border_y {
+            buf.set_string(area.x, margin_y, &b.border_vertical_left, border_style);
+            buf.set_string(
+                area.x + area.width - 1,
+                margin_y,
+                &b.border_vertical_right,
+                border_style,
+            );
+        }
 
-        // Calculate scroll window
+        // 4. Content Area: menu items and plugins
+        let content_start_y = area.y + 2;
+        let content_avail_h = gutter_border_y.saturating_sub(content_start_y) as usize;
+
+        // Render side borders for all rows in content area
+        for cy in 0..content_avail_h {
+            let row_y = content_start_y + cy as u16;
+            buf.set_string(area.x, row_y, &b.border_vertical_left, border_style);
+            buf.set_string(
+                area.x + area.width - 1,
+                row_y,
+                &b.border_vertical_right,
+                border_style,
+            );
+        }
+
+        let inner_x = area.x + 3;
+        let avail_w = w.saturating_sub(6);
+
+        // Calculate scroll offset
         let selected = level.selected_idx;
         let mut offset = level.scroll_offset;
         if selected < offset {
             offset = selected;
-        } else if selected >= offset + avail_h {
-            offset = selected.saturating_sub(avail_h - 1);
+        } else if selected >= offset + content_avail_h {
+            offset = selected.saturating_sub(content_avail_h.saturating_sub(1));
         }
         self.current_level_mut().scroll_offset = offset;
 
         let level = self.current_level();
         let mut selectable_num = 0;
 
-        for (idx, item) in level.items.iter().enumerate().skip(offset).take(avail_h) {
-            let row_y = inner_y + (idx - offset) as u16;
-            if row_y >= area.y + area.height - 2 {
+        // Reserve space for plugins if height permits (menu priority over plugins invariant)
+        let menu_needed_h = level
+            .items
+            .len()
+            .saturating_sub(offset)
+            .min(content_avail_h);
+        let remaining_h = content_avail_h.saturating_sub(menu_needed_h);
+        let active_plugin_rows = if remaining_h > 0 && !self.plugin_rows.is_empty() {
+            remaining_h.min(self.plugin_rows.len())
+        } else {
+            0
+        };
+        let menu_display_h = content_avail_h.saturating_sub(active_plugin_rows);
+
+        for (idx, item) in level
+            .items
+            .iter()
+            .enumerate()
+            .skip(offset)
+            .take(menu_display_h)
+        {
+            let row_y = content_start_y + (idx - offset) as u16;
+            if row_y >= gutter_border_y {
                 break;
             }
 
             if item.is_divider() {
-                // Render divider rule
                 let div_char = "─";
                 let div_line = div_char.repeat(avail_w);
                 buf.set_line(
@@ -332,21 +517,23 @@ impl MenuView {
             selectable_num += 1;
             let is_active = idx == level.selected_idx;
 
-            // 1. Cursor Indicator
             let indicator = if is_active {
                 &self.styles.indicator_symbol
             } else {
                 "  "
             };
 
-            // 2. Icon slot (4 columns invariant)
             let icon_slot = format_icon_slot(item.icon.as_deref(), self.use_nerd_fonts);
 
-            // 3. Shortcut badge (e.g. "1. ")
-            let shortcut = if selectable_num <= 9 {
-                format!("{}. ", selectable_num)
+            let shortcut = if self.show_shortcuts {
+                if selectable_num <= 9 {
+                    format!("{}. ", selectable_num)
+                } else {
+                    let ch = (b'a' + (selectable_num - 10) as u8) as char;
+                    format!("{}. ", ch)
+                }
             } else {
-                "   ".to_string()
+                String::new()
             };
 
             let item_style = if is_active {
@@ -365,11 +552,12 @@ impl MenuView {
                     },
                 ),
                 Span::styled(icon_slot, item_style),
-                Span::styled(shortcut, self.styles.shortcut_key),
-                Span::styled(&item.label, item_style),
             ];
+            if !shortcut.is_empty() {
+                spans.push(Span::styled(shortcut, self.styles.shortcut_key));
+            }
+            spans.push(Span::styled(&item.label, item_style));
 
-            // If submenu, add indicator badge at the end
             if item.r#type == MenuItemType::Submenu {
                 spans.push(Span::styled("  »", self.styles.accent));
             }
@@ -377,14 +565,11 @@ impl MenuView {
             buf.set_line(inner_x, row_y, &Line::from(spans), avail_w as u16);
         }
 
-        // Render plugins pinned above the gutter if remaining space permits
-        let menu_needed_h = level.items.len().min(avail_h);
-        let remaining_h = avail_h.saturating_sub(menu_needed_h);
-        if remaining_h > 0 && !self.plugin_rows.is_empty() {
-            let max_plugin_rows = remaining_h.min(self.plugin_rows.len());
-            let plugin_start_y = (inner_y + avail_h as u16) - max_plugin_rows as u16;
-
-            for (p_idx, prow) in self.plugin_rows.iter().take(max_plugin_rows).enumerate() {
+        // Render plugins pinned at the bottom of the content area
+        if active_plugin_rows > 0 {
+            let plugin_start_y =
+                (content_start_y + content_avail_h as u16) - active_plugin_rows as u16;
+            for (p_idx, prow) in self.plugin_rows.iter().take(active_plugin_rows).enumerate() {
                 let py = plugin_start_y + p_idx as u16;
                 let style = if prow.is_divider {
                     self.styles.divider
@@ -400,21 +585,120 @@ impl MenuView {
             }
         }
 
-        // Render Status Gutter at bottom border row
-        let gutter_y = area.y + area.height - 1;
-        let nav_help = " [↑/↓] Navigate  [Enter] Select  [Esc] Back ";
-        buf.set_string(
-            area.x + 2,
-            gutter_y,
-            nav_help,
-            self.styles.gutter.add_modifier(Modifier::DIM),
+        // 5. Render Gutter Top Border at gutter_border_y
+        let gt_line = format!(
+            "{}{}{}{}{}",
+            b.gutter_left_tee,
+            b.gutter_border.repeat(left_seg_len),
+            b.gutter_top_tee,
+            b.gutter_border.repeat(right_seg_len),
+            b.gutter_right_tee
         );
+        buf.set_string(area.x, gutter_border_y, &gt_line, border_style);
 
-        if !self.status_gutter.is_empty() {
-            let max_stat_w = (area.width / 2) as usize;
-            let stat_str: String = self.status_gutter.chars().take(max_stat_w).collect();
-            let stat_x = (area.x + area.width).saturating_sub(stat_str.len() as u16 + 2);
-            buf.set_string(stat_x, gutter_y, &stat_str, self.styles.gutter);
+        // 6. Render Gutter Content Rows
+        let status_offset = gutter_rows - status_lines.len();
+        for r in 0..gutter_rows {
+            let gy = gutter_border_y + 1 + r as u16;
+            buf.set_string(area.x, gy, &b.border_vertical_left, border_style);
+
+            let h_text = help_lines.get(r).map(|s| s.as_str()).unwrap_or("");
+            let h_formatted = format!("{:<width$}", h_text, width = left_gutter_w);
+            let h_truncated: String = h_formatted.chars().take(left_gutter_w).collect();
+            buf.set_string(area.x + 3, gy, &h_truncated, self.styles.help_text);
+
+            buf.set_string(area.x + sep_x as u16, gy, &b.gutter_separator, border_style);
+
+            let s_idx = r as isize - status_offset as isize;
+            let s_text = if s_idx >= 0 {
+                status_lines
+                    .get(s_idx as usize)
+                    .map(|s| s.as_str())
+                    .unwrap_or("")
+            } else {
+                ""
+            };
+            let s_formatted = format!("{:>width$}", s_text, width = right_gutter_w);
+            let s_truncated: String = s_formatted.chars().take(right_gutter_w).collect();
+            buf.set_string(
+                area.x + sep_x as u16 + 3,
+                gy,
+                &s_truncated,
+                self.styles.gutter,
+            );
+
+            buf.set_string(
+                area.x + area.width - 1,
+                gy,
+                &b.border_vertical_right,
+                border_style,
+            );
+        }
+
+        // 7. Render Window Bottom Border at area.y + area.height - 1
+        let bot_y = area.y + area.height - 1;
+        let bot_line = format!(
+            "{}{}{}{}{}",
+            b.border_bottom_left,
+            b.border_horizontal_bottom.repeat(left_seg_len),
+            b.gutter_bottom_tee,
+            b.border_horizontal_bottom.repeat(right_seg_len),
+            b.border_bottom_right
+        );
+        buf.set_string(area.x, bot_y, &bot_line, border_style);
+    }
+}
+
+/// Helper to wrap gutter tokens into at most `max_lines` within `max_w`
+fn wrap_gutter_tokens(tokens: &[&str], max_w: usize, max_lines: usize) -> Vec<String> {
+    if tokens.is_empty() || max_w == 0 {
+        return Vec::new();
+    }
+    let cleaned: Vec<&str> = tokens
+        .iter()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
+    if cleaned.is_empty() {
+        return Vec::new();
+    }
+
+    if max_lines == 2 && cleaned.len() > 1 {
+        let mid = cleaned.len().div_ceil(2);
+        let l1 = cleaned[..mid].join(" | ");
+        let l2 = cleaned[mid..].join(" | ");
+        if l1.chars().count() <= max_w && l2.chars().count() <= max_w {
+            return vec![l1, l2];
         }
     }
+
+    let mut lines = Vec::new();
+    let mut current_line = String::new();
+
+    for token in cleaned {
+        if current_line.is_empty() {
+            current_line.push_str(token);
+        } else {
+            let candidate_len = current_line.chars().count() + 3 + token.chars().count();
+            if candidate_len <= max_w {
+                current_line.push_str(" | ");
+                current_line.push_str(token);
+            } else {
+                lines.push(std::mem::take(&mut current_line));
+                if lines.len() == max_lines {
+                    break;
+                }
+                current_line.push_str(token);
+            }
+        }
+    }
+    if !current_line.is_empty() && lines.len() < max_lines {
+        lines.push(current_line);
+    }
+    for line in &mut lines {
+        if line.chars().count() > max_w {
+            *line = line.chars().take(max_w).collect();
+        }
+    }
+    lines
 }

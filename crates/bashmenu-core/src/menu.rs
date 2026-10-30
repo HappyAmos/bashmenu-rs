@@ -37,6 +37,9 @@ pub enum MenuItemType {
     /// Executes Python script
     #[serde(rename = "python")]
     Python,
+    /// Opens the interactive theme selector modal
+    #[serde(rename = "theme_selector")]
+    ThemeSelector,
     /// Exits BashMenu
     #[serde(rename = "exit")]
     Exit,
