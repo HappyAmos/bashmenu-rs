@@ -35,3 +35,12 @@
 - [x] Implemented immediate `MouseDown` left-click activation without waiting for `MouseUp` or `Click`.
 - [x] Built interactive `bashmenu` executable in `crates/bashmenu-cli/src/main.rs`.
 - [x] Added unit and integration test suite `menu_navigation_test.rs` covering navigation, divider jumping, submenu push/pop, immediate mouse click activation, and buffer rendering. Verified zero Clippy warnings across the workspace.
+
+## Phase 5: Modal Dialogs & Pickers (`crates/bashmenu-tui`)
+- [x] Implemented `render_modal_frame` in `modals/frame.rs` rendering centered dialog viewports with classic 2-column right and 1-row bottom `░` drop shadows and 80-column bounds clamping.
+- [x] Implemented `ConfirmModal` (Yes/No) with keyboard toggles (`Tab`, arrows, `y`/`n`) and immediate mouse click activation.
+- [x] Implemented `MessageModal` for alert notifications and help messages.
+- [x] Implemented `InputModal` for interactive prompt strings with cursor navigation, inline editing, and Enter/Esc handling.
+- [x] Implemented `FilePickerModal` for directory and file browsing with directory sorting, parent traversal (`..`), and file selection.
+- [x] Implemented `ColorGridModal` (16x16 2D grid for 256 colors) and `AsciiGridModal` (16x16 2D grid for CP437 ASCII codes 0..=255) with keyboard navigation (±1, ±16, ±64) and direct mouse cell click support.
+- [x] Added comprehensive integration test suite `modals_test.rs`. Verified zero Clippy warnings across the workspace.

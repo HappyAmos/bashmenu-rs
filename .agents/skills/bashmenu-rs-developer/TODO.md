@@ -32,10 +32,10 @@
 - [x] Subprocess execution with terminal raw mode suspension and recovery.
 
 ## Phase 5: Modal Dialogs & Pickers (`crates/bashmenu-tui`)
-- [ ] Classic drop-shadow frame widget (`ModalFrame`, `ShadowWidget`).
-- [ ] Message, Confirm, Input, Toggle, and Radio modals.
-- [ ] File and directory picker modal.
-- [ ] 16x16 2D color picker and CP437 ASCII character picker.
+- [x] Classic drop-shadow frame widget (`render_modal_frame`, `░` drop shadow).
+- [x] Message, Confirm, and Input modals.
+- [x] File and directory picker modal (`FilePickerModal`).
+- [x] 16x16 2D color picker (`ColorGridModal`) and CP437 ASCII character picker (`AsciiGridModal`).
 
 ## Phase 6: Background Plugin Engine (`crates/bashmenu-core`)
 - [ ] Periodic background plugin runner with caching and non-blocking status bar updates.

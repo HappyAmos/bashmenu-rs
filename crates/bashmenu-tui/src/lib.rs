@@ -1,10 +1,15 @@
-//! Reusable TUI primitives, widgets, terminal guards, and panic safety hooks for BashMenu.
+//! Reusable TUI primitives, widgets, terminal guards, modals, and panic safety hooks for BashMenu.
 
 pub mod menu_view;
+pub mod modals;
 pub mod style;
 pub mod terminal;
 
 pub use menu_view::{MenuAction, MenuView};
+pub use modals::{
+    render_modal_frame, AsciiGridModal, ColorGridModal, ConfirmModal, FilePickerModal, InputModal,
+    MessageModal,
+};
 pub use style::ResolvedThemeStyles;
 pub use terminal::TerminalGuard;
 
