@@ -14,11 +14,11 @@
 - [x] Colocate unit and integration tests reading actual `bashmenu.yml`, `bashmenu.mnu`, and `bashmenu.themes` files to ensure 100% schema parity.
 
 ## Phase 2: Macro & Interpolation Engine (`bashmenu-core`)
-- [ ] Implement 6-tier macro placeholder interpolation engine (`{env:...}`, `{home}`, `{bashmenu_dir}`, `{user.<key>}`, `{theme}`, etc.).
-- [ ] Implement `{nf:[char]:[nerd]:[emoji]}` adaptive glyph resolver.
-- [ ] Implement 4-column icon padding formatter using `unicode-width`.
-- [ ] Implement CP437 ASCII `{ascii:NNN}` macro translation.
-- [ ] Unit tests for all macro syntax variations.
+- [x] Implement 6-tier macro placeholder interpolation engine (`{env:...}`, `{home}`, `{bashmenu_dir}`, `{user.<key>}`, `{theme}`, etc.).
+- [x] Implement `{nf:[char]:[nerd]:[emoji]}` adaptive glyph resolver.
+- [x] Implement 4-column icon padding formatter using `unicode-width`.
+- [x] Implement CP437 ASCII `{ascii:NNN}` macro translation.
+- [x] Unit tests for all macro syntax variations.
 
 ## Phase 3: The `ymlcheck` CLI Tool (`crates/ymlcheck-cli`)
 - [ ] Port `ymlcheck.py` to `ymlcheck` binary using `clap` and `bashmenu-core`.
