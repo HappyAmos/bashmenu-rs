@@ -1,0 +1,57 @@
+# ==============================================================================
+# BashMenu Configuration (bashmenu.yml)
+# All keys defined in this file can be referenced via placeholders using the
+# '{app.<key>}' namespace (e.g. {app.theme}, {app.settings.tabstop}, {app.user.postal_code}),
+# or shorthand shortcuts ({theme}, {user.<key>}, {settings.<key>}).
+# ==============================================================================
+version: 0.0.1
+theme: alaska-mountain
+user:
+  example_boolean: true
+  example_filepath: '{bashmenu_dir}'
+  example_string: A string of text
+  localip: '[b]{localip}[/b]'
+  postal_code: 49079
+  antigravity: cd {dir_picker} && agy -c
+settings:
+  cache_dir: '{home}/.cache/bashmenu'
+  check_for_updates: false
+  plugins:
+    type: table
+    width: 100%
+    entries: 4
+    headers: ''
+    divider: true
+    weather:
+      script: "curl -s 'wttr.in/{user.postal_code}?format=4'"
+      sleep: 10000
+    alienware:
+      sleep: 15000
+      script: '{scripts_dir}/serverup.sh 192.168.4.46 [b]Alienware[/b]'
+    pi3b:
+      sleep: 20000
+      script: '{scripts_dir}/serverup.sh 192.168.4.47 [b]Pi3b[/b]'
+    halftop:
+      sleep: 25000
+      script: '{scripts_dir}/serverup.sh 192.168.4.96 [b]Halftop[/b]'
+    otd:
+      script: otd.sh
+      sleep: 40000
+      standalone: true
+      pretext: '{divider}'
+      posttext: '{divider}'
+  templates_dir: '{bashmenu_dir}/templates'
+  scripts_dir: '{bashmenu_dir}/scripts'
+  ping_target: 1.1.1.1
+  tab_to_spaces: true
+  tabstop: 4
+  show_menu_shortcuts: true
+  use_nerd_fonts: true
+  nerd_font_width: auto
+  status_gutter: '| Theme: {theme} | {user} | Battery: {battery} ({battery_stat})
+    | {user.localip} | [b]{date_time_24_short}[/b]'
+  inactivity_timeout:
+    milliseconds: 300000
+    command: cmatrix -s
+  refresh_interval: 10
+  pager_editor: vim

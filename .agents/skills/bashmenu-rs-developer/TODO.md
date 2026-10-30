@@ -1,9 +1,10 @@
 # BashMenu-RS Porting Tasks (TODO)
 
 ## Phase 0: Workspace & Toolchain Setup
-- [ ] Initialize Cargo workspace `Cargo.toml` with `crates/bashmenu-core`, `crates/bashmenu-tui`, `crates/bashmenu-cli`, `crates/menuedit-cli`, `crates/themeedit-cli`, `crates/bashedit-cli`, `crates/ymlcheck-cli`.
-- [ ] Set up rustfmt (`rustfmt.toml`), Clippy linter flags, and initial GitHub Actions CI workflow (`.github/workflows/rust-app.yml`).
-- [ ] Copy shared asset and configuration fixtures from Python repo (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`) into a `fixtures/` or root directory for testing.
+- [x] Initialize Cargo workspace `Cargo.toml` with `crates/bashmenu-core`, `crates/bashmenu-tui`, `crates/bashmenu-cli`, `crates/ymlcheck-cli`.
+- [x] Set up rustfmt (`rustfmt.toml`), Clippy linter flags, and initial GitHub Actions CI workflow (`.github/workflows/rust-app.yml`).
+- [x] Copy shared asset and configuration fixtures from Python repo (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`) into `tests/fixtures/`.
+- [ ] Initialize stubs for `crates/menuedit-cli`, `crates/themeedit-cli`, `crates/bashedit-cli`.
 
 ## Phase 1: Core Data Models & Serialization (`bashmenu-core`)
 - [ ] Implement Serde YAML schemas for `bashmenu.yml` (`BashMenuConfig`).

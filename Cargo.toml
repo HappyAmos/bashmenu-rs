@@ -1,0 +1,35 @@
+[workspace]
+members = [
+    "crates/bashmenu-core",
+    "crates/bashmenu-tui",
+    "crates/bashmenu-cli",
+    "crates/ymlcheck-cli",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["Andrew <adiamond1978@gmail.com>"]
+repository = "https://github.com/HappyAmos/bashmenu-rs"
+
+[workspace.dependencies]
+bashmenu-core = { path = "crates/bashmenu-core" }
+bashmenu-tui = { path = "crates/bashmenu-tui" }
+
+# TUI & Terminal
+ratatui = "0.29"
+crossterm = "0.28"
+
+# Serialization & Data
+serde = { version = "1.0", features = ["derive"] }
+serde_yml = "0.0.12"
+serde_json = "1.0"
+
+# CLI & Formatting
+clap = { version = "4.5", features = ["derive"] }
+unicode-width = "0.2"
+regex = "1.11"
+thiserror = "2.0"
+anyhow = "1.0"
