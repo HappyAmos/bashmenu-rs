@@ -25,11 +25,11 @@
 - [x] Verify validation flags: `--themes`, `--config`, `--menu`, and bare file syntax.
 
 ## Phase 4: Core Ratatui TUI Menu (`crates/bashmenu-tui`, `crates/bashmenu-cli`)
-- [ ] Terminal initialization, alternate screen buffer, raw mode, and panic hook setup.
-- [ ] Custom window border renderer and theme color applicator.
-- [ ] Main menu item rendering with 4-column icon alignment and 50/50 dual marquee scrolling.
-- [ ] Immediate `MouseDown` mouse event handler and zero-delay keyboard navigation (`j`/`k`, arrows, shortcuts).
-- [ ] Subprocess execution with terminal raw mode suspension and recovery.
+- [x] Terminal initialization, alternate screen buffer, raw mode, and panic hook setup.
+- [x] Custom window border renderer and theme color applicator.
+- [x] Main menu item rendering with 4-column icon alignment and status gutter.
+- [x] Immediate `MouseDown` mouse event handler and zero-delay keyboard navigation (`j`/`k`, arrows, shortcuts).
+- [x] Subprocess execution with terminal raw mode suspension and recovery.
 
 ## Phase 5: Modal Dialogs & Pickers (`crates/bashmenu-tui`)
 - [ ] Classic drop-shadow frame widget (`ModalFrame`, `ShadowWidget`).

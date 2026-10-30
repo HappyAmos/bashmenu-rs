@@ -13,3 +13,4 @@ crossterm = { workspace = true }
 unicode-width = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
+serde_yml = { workspace = true }

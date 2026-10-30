@@ -107,6 +107,7 @@ dependencies = [
  "bashmenu-core",
  "crossterm",
  "ratatui",
+ "serde_yml",
  "thiserror",
  "unicode-width 0.2.0",
 ]

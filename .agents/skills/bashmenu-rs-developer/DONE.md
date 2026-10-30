@@ -26,3 +26,12 @@
 - [x] Ported `ymlcheck.py` to compiled Rust executable `ymlcheck` with `clap` arguments (`--themes`, `--config`, `--menu`, and bare YAML syntax check).
 - [x] Configured binary aliases in `crates/ymlcheck-cli/Cargo.toml` and `crates/bashmenu-cli/Cargo.toml` so built executables match canonical names (`ymlcheck` and `bashmenu`).
 - [x] Verified successful validation against all production fixtures with exit code 0. Zero Clippy warnings.
+
+## Phase 4: Core Ratatui TUI Menu (`crates/bashmenu-tui`, `crates/bashmenu-cli`)
+- [x] Implemented `ResolvedThemeStyles` in `style.rs` mapping theme color tokens (256, 16, TrueColor hex, named ANSI) to Ratatui `Color` and `Style`.
+- [x] Implemented `TerminalGuard` in `terminal.rs` managing raw mode, alternate screen buffer, mouse capture, and safe RAII restoration on drop.
+- [x] Implemented `suspend()` method on `TerminalGuard` enabling seamless child process execution (`/bin/bash -c ...`) and full terminal re-initialization upon child termination.
+- [x] Implemented `MenuView` in `menu_view.rs` featuring multi-level submenu navigation stacks, viewport scroll clamping, 4-column icon slots, divider skipping, and bottom status gutter.
+- [x] Implemented immediate `MouseDown` left-click activation without waiting for `MouseUp` or `Click`.
+- [x] Built interactive `bashmenu` executable in `crates/bashmenu-cli/src/main.rs`.
+- [x] Added unit and integration test suite `menu_navigation_test.rs` covering navigation, divider jumping, submenu push/pop, immediate mouse click activation, and buffer rendering. Verified zero Clippy warnings across the workspace.

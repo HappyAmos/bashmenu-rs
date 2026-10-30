@@ -1,4 +1,12 @@
-//! Reusable TUI primitives, widgets, and panic safety hooks for BashMenu.
+//! Reusable TUI primitives, widgets, terminal guards, and panic safety hooks for BashMenu.
+
+pub mod menu_view;
+pub mod style;
+pub mod terminal;
+
+pub use menu_view::{MenuAction, MenuView};
+pub use style::ResolvedThemeStyles;
+pub use terminal::TerminalGuard;
 
 use std::panic;
 
@@ -23,7 +31,6 @@ mod tests {
 
     #[test]
     fn test_panic_hook_registration() {
-        // Verifies the hook can be registered without panicking
         install_panic_hook();
     }
 }
