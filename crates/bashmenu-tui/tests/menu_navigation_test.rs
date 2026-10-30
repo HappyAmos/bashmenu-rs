@@ -1,4 +1,4 @@
-use bashmenu_core::{MenuItem, MenuItemType, MenuSchema, Submenu};
+use bashmenu_core::{MenuItem, MenuItemType, MenuSchema, PluginDisplayRow, Submenu};
 use bashmenu_tui::{MenuAction, MenuView, ResolvedThemeStyles};
 use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
@@ -147,4 +147,68 @@ fn test_render_into_buffer() {
     // Verify title was rendered
     let content = format!("{:?}", buf);
     assert!(content.contains("Test Menu"));
+}
+
+#[test]
+fn test_menu_priority_over_plugins_rendering() {
+    let schema = create_sample_menu();
+    let mut view = MenuView::new(
+        schema,
+        ResolvedThemeStyles::default(),
+        true,
+        "Status".to_string(),
+    );
+
+    view.set_plugin_rows(vec![
+        PluginDisplayRow {
+            text: "Plugin Row 1".to_string(),
+            is_divider: false,
+        },
+        PluginDisplayRow {
+            text: "Plugin Row 2".to_string(),
+            is_divider: false,
+        },
+    ]);
+
+    // Case 1: Large terminal (24 rows) -> space for menu items and plugins
+    let area_large = Rect::new(0, 0, 80, 24);
+    let mut buf_large = Buffer::empty(area_large);
+    view.render(area_large, &mut buf_large);
+
+    let mut found_plugin = false;
+    for y in 0..24 {
+        let mut line_str = String::new();
+        for x in 0..80 {
+            line_str.push(buf_large[(x, y)].symbol().chars().next().unwrap_or(' '));
+        }
+        if line_str.contains("Plugin Row 1") {
+            found_plugin = true;
+            break;
+        }
+    }
+    assert!(
+        found_plugin,
+        "Plugin Row 1 should be rendered in large terminal"
+    );
+
+    // Case 2: Constrained terminal (6 rows) -> all rows taken by menu/borders, plugins dropped
+    let area_small = Rect::new(0, 0, 80, 6);
+    let mut buf_small = Buffer::empty(area_small);
+    view.render(area_small, &mut buf_small);
+
+    let mut found_plugin_small = false;
+    for y in 0..6 {
+        let mut line_str = String::new();
+        for x in 0..80 {
+            line_str.push(buf_small[(x, y)].symbol().chars().next().unwrap_or(' '));
+        }
+        if line_str.contains("Plugin Row 1") {
+            found_plugin_small = true;
+            break;
+        }
+    }
+    assert!(
+        !found_plugin_small,
+        "Plugin should be dropped when terminal height is constrained"
+    );
 }

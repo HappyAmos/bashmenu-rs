@@ -38,7 +38,7 @@
 - [x] 16x16 2D color picker (`ColorGridModal`) and CP437 ASCII character picker (`AsciiGridModal`).
 
 ## Phase 6: Background Plugin Engine (`crates/bashmenu-core`)
-- [ ] Periodic background plugin runner with caching and non-blocking status bar updates.
+- [x] Periodic background plugin runner with caching and non-blocking status bar updates.
 
 ## Phase 7: Visual Editors Porting
 - [ ] Port `menuedit` using `tui-tree-widget`.

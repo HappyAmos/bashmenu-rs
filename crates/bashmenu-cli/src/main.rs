@@ -3,14 +3,15 @@
 use anyhow::Result;
 use bashmenu_core::{
     interpolate_placeholders, load_config, load_menu, load_themes, BashMenuConfig, MacroContext,
-    MenuSchema,
+    MenuSchema, PluginEngine,
 };
 use bashmenu_tui::{install_panic_hook, MenuAction, MenuView, ResolvedThemeStyles, TerminalGuard};
 use clap::Parser;
 use crossterm::event::{self, Event};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::Duration;
+use std::sync::mpsc;
+use std::time::{Duration, Instant};
 
 #[derive(Parser, Debug)]
 #[command(
@@ -95,17 +96,40 @@ fn main() -> Result<()> {
         .map(|tmpl| interpolate_placeholders(tmpl, &macro_ctx))
         .unwrap_or_default();
 
-    // 5. Initialize Terminal Guard
+    // 5. Initialize Plugin Engine
+    let (plugin_tx, plugin_rx) = mpsc::channel();
+    let plugin_engine = PluginEngine::new().with_sender(plugin_tx);
+    plugin_engine.trigger_refresh(&config, false);
+
+    // 6. Initialize Terminal Guard
     let mut guard = TerminalGuard::init()?;
     let mut menu_view = MenuView::new(menu, styles, use_nerd, status_gutter);
+    let mut last_plugin_check = Instant::now();
 
-    // 6. Interactive Event Loop
+    // 7. Interactive Event Loop
     loop {
         let size = guard.terminal_mut().size()?;
         let area = ratatui::layout::Rect::new(0, 0, size.width, size.height);
         macro_ctx.window_width = size.width as usize;
         macro_ctx.window_height = size.height as usize;
         macro_ctx.screen_width = size.width as usize;
+
+        // Drain plugin background updates
+        let mut plugins_updated = false;
+        while plugin_rx.try_recv().is_ok() {
+            plugins_updated = true;
+        }
+        if plugins_updated {
+            let avail_w = size.width.saturating_sub(4) as usize;
+            let rows = plugin_engine.format_display_rows(&config, avail_w, '─');
+            menu_view.set_plugin_rows(rows);
+        }
+
+        // Periodic check to trigger expired plugins
+        if last_plugin_check.elapsed() >= Duration::from_secs(1) {
+            plugin_engine.trigger_refresh(&config, false);
+            last_plugin_check = Instant::now();
+        }
 
         guard.terminal_mut().draw(|f| {
             menu_view.render(f.area(), f.buffer_mut());

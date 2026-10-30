@@ -44,3 +44,12 @@
 - [x] Implemented `FilePickerModal` for directory and file browsing with directory sorting, parent traversal (`..`), and file selection.
 - [x] Implemented `ColorGridModal` (16x16 2D grid for 256 colors) and `AsciiGridModal` (16x16 2D grid for CP437 ASCII codes 0..=255) with keyboard navigation (±1, ±16, ±64) and direct mouse cell click support.
 - [x] Added comprehensive integration test suite `modals_test.rs`. Verified zero Clippy warnings across the workspace.
+
+## Phase 6: Background Plugin Engine (`crates/bashmenu-core`)
+- [x] Implemented `PluginDef`, `PluginLayout`, `PluginConfig`, and `PluginCacheEntry` in `plugin.rs`.
+- [x] Implemented thread-safe `PluginEngine` running periodic background worker threads with child process execution timeout (5s) and cached stdout lines.
+- [x] Implemented output sanitization: null bytes removed, tabs expanded to 4 spaces, variation selectors stripped.
+- [x] Implemented table and list layout formatting with column width distribution, standalone plugin handling, and 10-line display limit clamping.
+- [x] Connected MPSC channel notifications to Ratatui event loop in `bashmenu-cli` for non-blocking dynamic UI updates.
+- [x] Implemented menu priority over plugins invariant: plugin rows are automatically truncated or dropped first when viewport height is constrained.
+- [x] Added comprehensive integration test suites in `plugin_engine_test.rs` and `menu_navigation_test.rs`. Verified zero Clippy warnings across the workspace.

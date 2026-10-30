@@ -1,7 +1,7 @@
 //! Main menu view rendering, viewport management, and keyboard/mouse interaction.
 
 use crate::style::ResolvedThemeStyles;
-use bashmenu_core::{format_icon_slot, MenuItem, MenuItemType, MenuSchema};
+use bashmenu_core::{format_icon_slot, MenuItem, MenuItemType, MenuSchema, PluginDisplayRow};
 use crossterm::event::{KeyCode, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -40,6 +40,7 @@ pub struct MenuView {
     styles: ResolvedThemeStyles,
     use_nerd_fonts: bool,
     status_gutter: String,
+    plugin_rows: Vec<PluginDisplayRow>,
 }
 
 impl MenuView {
@@ -62,9 +63,15 @@ impl MenuView {
             styles,
             use_nerd_fonts,
             status_gutter,
+            plugin_rows: Vec::new(),
         };
         view.ensure_selectable();
         view
+    }
+
+    /// Update plugin rows rendered below menu items
+    pub fn set_plugin_rows(&mut self, rows: Vec<PluginDisplayRow>) {
+        self.plugin_rows = rows;
     }
 
     /// Current active menu items
@@ -368,6 +375,29 @@ impl MenuView {
             }
 
             buf.set_line(inner_x, row_y, &Line::from(spans), avail_w as u16);
+        }
+
+        // Render plugins pinned above the gutter if remaining space permits
+        let menu_needed_h = level.items.len().min(avail_h);
+        let remaining_h = avail_h.saturating_sub(menu_needed_h);
+        if remaining_h > 0 && !self.plugin_rows.is_empty() {
+            let max_plugin_rows = remaining_h.min(self.plugin_rows.len());
+            let plugin_start_y = (inner_y + avail_h as u16) - max_plugin_rows as u16;
+
+            for (p_idx, prow) in self.plugin_rows.iter().take(max_plugin_rows).enumerate() {
+                let py = plugin_start_y + p_idx as u16;
+                let style = if prow.is_divider {
+                    self.styles.divider
+                } else {
+                    self.styles.text
+                };
+                buf.set_line(
+                    inner_x,
+                    py,
+                    &Line::from(vec![Span::styled(&prow.text, style)]),
+                    avail_w as u16,
+                );
+            }
         }
 
         // Render Status Gutter at bottom border row
