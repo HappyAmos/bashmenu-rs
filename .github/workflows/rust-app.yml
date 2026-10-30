@@ -36,3 +36,6 @@ jobs:
 
       - name: Clippy Linter
         run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Shellcheck Lint
+        run: shellcheck *.sh

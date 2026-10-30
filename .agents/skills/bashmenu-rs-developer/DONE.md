@@ -71,3 +71,9 @@
   - Clean exit removes swap files; read-only mode protects other users' swap files and disallows saving.
   - Keystroke counter auto-flush (every 20 keystrokes) and manual save (`<Ctrl+S>`).
   - Added comprehensive test suite `bashedit_test.rs` covering swap file lifecycle, hashing, process PID checks, and read-only protection. Zero Clippy warnings.
+
+## Phase 8: Shell Integration & Installer
+- [x] Ported `bashmenu.sh` launcher trampoline with POSIX `/bin/sh` elevation to Bash, symlink resolution, UTF-8 locale normalization, automatic binary discovery (`target/release`, `~/.local/bin`, `target/debug`), and on-demand `cargo build --release` fallback.
+- [x] Implemented `install.sh` for multi-crate release workspace compilation, copying all 5 binaries (`bashmenu`, `ymlcheck`, `menuedit`, `themeedit`, `bashedit`) plus `bm` shortcut to `$HOME/.local/bin`, deploying default config fixtures to `~/.config/bashmenu/`, and updating user shell RC files (`.bashrc`, `.zshrc`, `.profile`).
+- [x] Implemented `uninstall.sh` removing all installed binaries, shortcuts, and cleanly cleaning configuration/cache directories with interactive or `-y` confirmation.
+- [x] Added `shellcheck` verification to GitHub Actions CI workflow (`.github/workflows/rust-app.yml`). All shell scripts pass Shellcheck with 0 warnings.

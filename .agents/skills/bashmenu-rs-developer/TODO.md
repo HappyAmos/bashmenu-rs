@@ -4,7 +4,7 @@
 - [x] Initialize Cargo workspace `Cargo.toml` with `crates/bashmenu-core`, `crates/bashmenu-tui`, `crates/bashmenu-cli`, `crates/ymlcheck-cli`.
 - [x] Set up rustfmt (`rustfmt.toml`), Clippy linter flags, and initial GitHub Actions CI workflow (`.github/workflows/rust-app.yml`).
 - [x] Copy shared asset and configuration fixtures from Python repo (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`) into `tests/fixtures/`.
-- [ ] Initialize stubs for `crates/menuedit-cli`, `crates/themeedit-cli`, `crates/bashedit-cli`.
+- [x] Initialize stubs for `crates/menuedit-cli`, `crates/themeedit-cli`, `crates/bashedit-cli`.
 
 ## Phase 1: Core Data Models & Serialization (`bashmenu-core`)
 - [x] Implement Serde YAML schemas for `bashmenu.yml` (`BashMenuConfig`).
@@ -46,4 +46,7 @@
 - [x] Port `bashedit` (`crates/bashedit-cli`) text editor with colocated `.<filename>.swp` swap files, crash recovery prompt, and read-only mode.
 
 ## Phase 8: Shell Integration & Installer
-- [ ] Port launcher `bashmenu.sh` and installer `install.sh`.
+- [x] Port launcher trampoline `bashmenu.sh` with binary discovery, on-demand compilation, and locale handling.
+- [x] Implement `install.sh` for release compilation and user installation to `$HOME/.local/bin`.
+- [x] Implement `uninstall.sh` with automated cleanups and config removal confirmation.
+- [x] Add Shellcheck linting to GitHub Actions CI workflow.
