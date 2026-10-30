@@ -1,14 +1,11 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+//! Core domain models, configuration loaders, and serializers for BashMenu.
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub mod config;
+pub mod error;
+pub mod menu;
+pub mod theme;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub use config::{load_config, save_config, BashMenuConfig, Settings, CONFIG_HEADER};
+pub use error::{BashMenuError, Result};
+pub use menu::{load_menu, save_menu, MenuItem, MenuItemType, MenuSchema, Submenu};
+pub use theme::{load_themes, save_themes, Theme, ThemeCollection};

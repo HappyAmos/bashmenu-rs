@@ -7,11 +7,11 @@
 - [ ] Initialize stubs for `crates/menuedit-cli`, `crates/themeedit-cli`, `crates/bashedit-cli`.
 
 ## Phase 1: Core Data Models & Serialization (`bashmenu-core`)
-- [ ] Implement Serde YAML schemas for `bashmenu.yml` (`BashMenuConfig`).
-- [ ] Implement Serde YAML schemas for `bashmenu.mnu` (`MenuSchema`, `MenuItem`).
-- [ ] Implement Serde YAML schemas for `bashmenu.themes` (`ThemeDefinitions`, `WindowBorders`, `ThemeColors`).
-- [ ] Implement `save_config()` with `CONFIG_HEADER` comment preservation invariant.
-- [ ] Colocate unit tests reading actual `bashmenu.yml`, `bashmenu.mnu`, and `bashmenu.themes` files to ensure 100% schema parity.
+- [x] Implement Serde YAML schemas for `bashmenu.yml` (`BashMenuConfig`).
+- [x] Implement Serde YAML schemas for `bashmenu.mnu` (`MenuSchema`, `MenuItem`).
+- [x] Implement Serde YAML schemas for `bashmenu.themes` (`ThemeCollection`, `Theme`, `WindowBorders`).
+- [x] Implement `save_config()` with `CONFIG_HEADER` comment preservation invariant.
+- [x] Colocate unit and integration tests reading actual `bashmenu.yml`, `bashmenu.mnu`, and `bashmenu.themes` files to ensure 100% schema parity.
 
 ## Phase 2: Macro & Interpolation Engine (`bashmenu-core`)
 - [ ] Implement 6-tier macro placeholder interpolation engine (`{env:...}`, `{home}`, `{bashmenu_dir}`, `{user.<key>}`, `{theme}`, etc.).
