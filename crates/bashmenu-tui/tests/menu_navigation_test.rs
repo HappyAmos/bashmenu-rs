@@ -288,3 +288,90 @@ fn test_gutter_border_rendering() {
         "Gutter top border (├ ... ┬ ... ┤) must be rendered above gutter content"
     );
 }
+
+#[test]
+fn test_bbcode_placeholder_and_right_aligned_brackets() {
+    let mut schema = create_sample_menu();
+    schema.items.push(MenuItem {
+        label: "Notes [{notebooks_dir}/notes.yml]".to_string(),
+        r#type: MenuItemType::Command,
+        ..Default::default()
+    });
+    schema.items.push(MenuItem {
+        label: "[b]Styled Option[/b] [tag]".to_string(),
+        r#type: MenuItemType::Command,
+        ..Default::default()
+    });
+
+    let mut view = MenuView::new(
+        schema,
+        ResolvedThemeStyles::default(),
+        true,
+        "Status".to_string(),
+    );
+
+    view.set_plugin_rows(vec![PluginDisplayRow {
+        text: "[b]Alienware[/b] [green]ONLINE[/green]".to_string(),
+        is_divider: false,
+    }]);
+
+    let area = Rect::new(0, 0, 100, 24);
+    let mut buf = Buffer::empty(area);
+    view.render(area, &mut buf);
+
+    // Verify row with Notes [{notebooks_dir}/notes.yml]
+    let mut found_notes_line = false;
+    for y in 2..20 {
+        let mut line_str = String::new();
+        for x in 0..100 {
+            line_str.push(buf[(x, y)].symbol().chars().next().unwrap_or(' '));
+        }
+        if line_str.contains("Notes") {
+            // Verify placeholder {notebooks_dir} was expanded (does NOT contain '{notebooks_dir}')
+            assert!(
+                !line_str.contains("{notebooks_dir}"),
+                "Placeholder {{notebooks_dir}} must be expanded in label: {}",
+                line_str
+            );
+            assert!(
+                line_str.contains("notes.yml]"),
+                "Expanded path must be present in label: {}",
+                line_str
+            );
+            // Verify bracket is right-aligned: ends near column 98 (before border at 99)
+            let trimmed = line_str[..99].trim_end();
+            assert!(
+                trimmed.ends_with(']'),
+                "Square bracket must be right-aligned near the right margin: {}",
+                line_str
+            );
+            found_notes_line = true;
+            break;
+        }
+    }
+    assert!(found_notes_line, "Notes line must be rendered");
+
+    // Verify BBCode in plugin row: raw tags [b], [/b], [green], [/green] stripped, content rendered
+    let mut found_plugin_line = false;
+    for y in 2..20 {
+        let mut line_str = String::new();
+        for x in 0..100 {
+            line_str.push(buf[(x, y)].symbol().chars().next().unwrap_or(' '));
+        }
+        if line_str.contains("Alienware") {
+            assert!(
+                !line_str.contains("[b]") && !line_str.contains("[green]"),
+                "BBCode tags must be parsed and stripped from display: {}",
+                line_str
+            );
+            assert!(
+                line_str.contains("ONLINE"),
+                "Plugin text must be present: {}",
+                line_str
+            );
+            found_plugin_line = true;
+            break;
+        }
+    }
+    assert!(found_plugin_line, "Plugin row must be rendered");
+}

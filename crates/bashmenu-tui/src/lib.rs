@@ -1,11 +1,16 @@
 //! Reusable TUI primitives, widgets, terminal guards, modals, and panic safety hooks for BashMenu.
 
+pub mod bbcode;
 pub mod borders;
 pub mod menu_view;
 pub mod modals;
 pub mod style;
 pub mod terminal;
 
+pub use bbcode::{
+    is_bbcode_tag, parse_bbcode_spans, parse_color, split_label_brackets, strip_bbcode,
+    truncate_to_width, visible_text_len,
+};
 pub use borders::ResolvedWindowBorders;
 pub use menu_view::{MenuAction, MenuView};
 pub use modals::{

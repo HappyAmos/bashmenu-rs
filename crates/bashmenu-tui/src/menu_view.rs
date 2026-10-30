@@ -1,7 +1,13 @@
 //! Main menu view rendering, viewport management, and keyboard/mouse interaction.
 
+use crate::bbcode::{
+    parse_bbcode_spans, split_label_brackets, truncate_to_width, visible_text_len,
+};
 use crate::style::ResolvedThemeStyles;
-use bashmenu_core::{format_icon_slot, MenuItem, MenuItemType, MenuSchema, PluginDisplayRow};
+use bashmenu_core::{
+    format_icon_slot, interpolate_placeholders, BashMenuConfig, MacroContext, MenuItem,
+    MenuItemType, MenuSchema, PluginDisplayRow,
+};
 use crossterm::event::{KeyCode, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -53,6 +59,7 @@ pub struct MenuView {
     status_gutter: String,
     show_shortcuts: bool,
     plugin_rows: Vec<PluginDisplayRow>,
+    pub config: BashMenuConfig,
 }
 
 impl MenuView {
@@ -70,6 +77,9 @@ impl MenuView {
             scroll_offset: 0,
         };
 
+        let mut config = BashMenuConfig::default();
+        config.settings.use_nerd_fonts = Some(use_nerd_fonts);
+
         let mut view = Self {
             stack: vec![initial_level],
             styles,
@@ -77,9 +87,21 @@ impl MenuView {
             status_gutter,
             show_shortcuts: true,
             plugin_rows: Vec::new(),
+            config,
         };
         view.ensure_selectable();
         view
+    }
+
+    /// Sets the application configuration
+    pub fn with_config(mut self, config: BashMenuConfig) -> Self {
+        self.config = config;
+        self
+    }
+
+    /// Updates configuration
+    pub fn set_config(&mut self, config: BashMenuConfig) {
+        self.config = config;
     }
 
     /// Update theme styles
@@ -401,8 +423,15 @@ impl MenuView {
         let gutter_border_y = area.y + area.height.saturating_sub(2 + gutter_rows as u16);
 
         // 2. Render Header (Top Border) at area.y
+        let cfg = self.config.clone();
+        let mut macro_ctx = MacroContext::new(&cfg);
+        macro_ctx.window_width = w;
+        macro_ctx.screen_width = w;
+        macro_ctx.window_height = area.height as usize;
+
         let level = self.current_level();
-        let title_body = format!(" {} ", level.title);
+        let title_raw = interpolate_placeholders(&level.title, &macro_ctx);
+        let title_body = format!(" {} ", title_raw);
         let title_cap_len = b.title_left_cap.chars().count() + b.title_right_cap.chars().count();
         let max_body_w = w.saturating_sub(6 + title_cap_len);
         let display_title_body: String = title_body.chars().take(max_body_w).collect();
@@ -523,7 +552,11 @@ impl MenuView {
                 "  "
             };
 
-            let icon_slot = format_icon_slot(item.icon.as_deref(), self.use_nerd_fonts);
+            let resolved_icon = item
+                .icon
+                .as_deref()
+                .map(|ic| interpolate_placeholders(ic, &macro_ctx));
+            let icon_slot = format_icon_slot(resolved_icon.as_deref(), self.use_nerd_fonts);
 
             let shortcut = if self.show_shortcuts {
                 if selectable_num <= 9 {
@@ -554,9 +587,60 @@ impl MenuView {
                 Span::styled(icon_slot, item_style),
             ];
             if !shortcut.is_empty() {
-                spans.push(Span::styled(shortcut, self.styles.shortcut_key));
+                spans.push(Span::styled(shortcut.clone(), self.styles.shortcut_key));
             }
-            spans.push(Span::styled(&item.label, item_style));
+
+            // Expand placeholders in item label
+            let raw_label = interpolate_placeholders(&item.label, &macro_ctx);
+            let (left_label, right_bracket) = split_label_brackets(&raw_label);
+            let prefix_w = 2 + 4 + shortcut.chars().count();
+            let submenu_w = if item.r#type == MenuItemType::Submenu {
+                3
+            } else {
+                0
+            };
+            let avail_for_content = avail_w.saturating_sub(prefix_w + submenu_w);
+
+            if right_bracket.is_empty() {
+                let left_vis = visible_text_len(left_label);
+                let text_to_parse = if left_vis > avail_for_content {
+                    truncate_to_width(left_label, avail_for_content)
+                } else {
+                    left_label.to_string()
+                };
+                let mut parsed_spans = parse_bbcode_spans(&text_to_parse, item_style);
+                spans.append(&mut parsed_spans);
+            } else {
+                let left_vis = visible_text_len(left_label);
+                let right_vis = visible_text_len(right_bracket);
+
+                if left_vis + right_vis < avail_for_content {
+                    let spacer_len = avail_for_content.saturating_sub(left_vis + right_vis);
+                    let mut parsed_left = parse_bbcode_spans(left_label, item_style);
+                    spans.append(&mut parsed_left);
+                    spans.push(Span::styled(" ".repeat(spacer_len), item_style));
+                    let mut parsed_right = parse_bbcode_spans(right_bracket, item_style);
+                    spans.append(&mut parsed_right);
+                } else {
+                    let half = avail_for_content / 2;
+                    let max_left = left_vis.min(half).max(1);
+                    let max_right = avail_for_content.saturating_sub(max_left + 1);
+
+                    let trunc_left = truncate_to_width(left_label, max_left);
+                    let trunc_right = truncate_to_width(right_bracket, max_right);
+                    let trunc_left_vis = visible_text_len(&trunc_left);
+                    let trunc_right_vis = visible_text_len(&trunc_right);
+                    let spacer_len = avail_for_content
+                        .saturating_sub(trunc_left_vis + trunc_right_vis)
+                        .max(1);
+
+                    let mut parsed_left = parse_bbcode_spans(&trunc_left, item_style);
+                    spans.append(&mut parsed_left);
+                    spans.push(Span::styled(" ".repeat(spacer_len), item_style));
+                    let mut parsed_right = parse_bbcode_spans(&trunc_right, item_style);
+                    spans.append(&mut parsed_right);
+                }
+            }
 
             if item.r#type == MenuItemType::Submenu {
                 spans.push(Span::styled("  »", self.styles.accent));
@@ -571,17 +655,17 @@ impl MenuView {
                 (content_start_y + content_avail_h as u16) - active_plugin_rows as u16;
             for (p_idx, prow) in self.plugin_rows.iter().take(active_plugin_rows).enumerate() {
                 let py = plugin_start_y + p_idx as u16;
-                let style = if prow.is_divider {
-                    self.styles.divider
+                if prow.is_divider {
+                    buf.set_line(
+                        inner_x,
+                        py,
+                        &Line::from(vec![Span::styled(&prow.text, self.styles.divider)]),
+                        avail_w as u16,
+                    );
                 } else {
-                    self.styles.text
-                };
-                buf.set_line(
-                    inner_x,
-                    py,
-                    &Line::from(vec![Span::styled(&prow.text, style)]),
-                    avail_w as u16,
-                );
+                    let spans = parse_bbcode_spans(&prow.text, self.styles.text);
+                    buf.set_line(inner_x, py, &Line::from(spans), avail_w as u16);
+                }
             }
         }
 
@@ -603,9 +687,8 @@ impl MenuView {
             buf.set_string(area.x, gy, &b.border_vertical_left, border_style);
 
             let h_text = help_lines.get(r).map(|s| s.as_str()).unwrap_or("");
-            let h_formatted = format!("{:<width$}", h_text, width = left_gutter_w);
-            let h_truncated: String = h_formatted.chars().take(left_gutter_w).collect();
-            buf.set_string(area.x + 3, gy, &h_truncated, self.styles.help_text);
+            let h_spans = parse_bbcode_spans(h_text, self.styles.help_text);
+            buf.set_line(area.x + 3, gy, &Line::from(h_spans), left_gutter_w as u16);
 
             buf.set_string(area.x + sep_x as u16, gy, &b.gutter_separator, border_style);
 
@@ -618,13 +701,15 @@ impl MenuView {
             } else {
                 ""
             };
-            let s_formatted = format!("{:>width$}", s_text, width = right_gutter_w);
-            let s_truncated: String = s_formatted.chars().take(right_gutter_w).collect();
-            buf.set_string(
+            let s_vis = visible_text_len(s_text);
+            let s_pad = right_gutter_w.saturating_sub(s_vis);
+            let mut s_spans = vec![Span::styled(" ".repeat(s_pad), self.styles.gutter)];
+            s_spans.append(&mut parse_bbcode_spans(s_text, self.styles.gutter));
+            buf.set_line(
                 area.x + sep_x as u16 + 3,
                 gy,
-                &s_truncated,
-                self.styles.gutter,
+                &Line::from(s_spans),
+                right_gutter_w as u16,
             );
 
             buf.set_string(

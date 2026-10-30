@@ -157,7 +157,8 @@ fn main() -> Result<()> {
 
     // 6. Initialize Terminal Guard
     let mut guard = TerminalGuard::init()?;
-    let mut menu_view = MenuView::new(menu, styles.clone(), use_nerd, status_gutter);
+    let mut menu_view =
+        MenuView::new(menu, styles.clone(), use_nerd, status_gutter).with_config(config.clone());
     if let Some(show) = config.settings.show_menu_shortcuts {
         menu_view.set_show_shortcuts(show);
     }
@@ -226,6 +227,7 @@ fn main() -> Result<()> {
                         if let Some(new_theme) = opt_theme {
                             config.theme = new_theme;
                             let _ = save_config(&config_path, &config);
+                            menu_view.set_config(config.clone());
                             if let Some(t) = themes.get(&config.theme) {
                                 styles = ResolvedThemeStyles::from_theme(t, use_nerd);
                                 menu_view.set_styles(styles.clone());
@@ -244,6 +246,7 @@ fn main() -> Result<()> {
                         if let Some(new_gutter) = opt_val {
                             config.settings.status_gutter = Some(new_gutter.clone());
                             let _ = save_config(&config_path, &config);
+                            menu_view.set_config(config.clone());
                             let mut ctx = MacroContext::new(&config);
                             ctx.window_width = size.width as usize;
                             ctx.window_height = size.height as usize;
@@ -300,6 +303,7 @@ fn main() -> Result<()> {
                         MenuAction::Reload => {
                             if let Ok(new_config) = load_config(&config_path) {
                                 config = new_config;
+                                menu_view.set_config(config.clone());
                             }
                             if let Ok(new_menu) = load_menu(&menu_path) {
                                 menu_view.reload_menu(new_menu);
@@ -317,6 +321,7 @@ fn main() -> Result<()> {
                             let show = menu_view.toggle_shortcuts();
                             config.settings.show_menu_shortcuts = Some(show);
                             let _ = save_config(&config_path, &config);
+                            menu_view.set_config(config.clone());
                         }
                         MenuAction::ConfigureGutter => {
                             let current_gutter = config
