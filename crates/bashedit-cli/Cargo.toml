@@ -1,0 +1,23 @@
+[package]
+name = "bashedit-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "bashedit"
+path = "src/main.rs"
+
+[dependencies]
+bashmenu-core = { workspace = true }
+bashmenu-tui = { workspace = true }
+ratatui = { workspace = true }
+crossterm = { workspace = true }
+clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+libc = { workspace = true }
+sha2 = { workspace = true }

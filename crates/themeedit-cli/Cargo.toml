@@ -1,0 +1,20 @@
+[package]
+name = "themeedit-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "themeedit"
+path = "src/main.rs"
+
+[dependencies]
+bashmenu-core = { workspace = true }
+bashmenu-tui = { workspace = true }
+ratatui = { workspace = true }
+crossterm = { workspace = true }
+clap = { workspace = true }
+anyhow = { workspace = true }
+serde_yml = { workspace = true }

@@ -53,3 +53,21 @@
 - [x] Connected MPSC channel notifications to Ratatui event loop in `bashmenu-cli` for non-blocking dynamic UI updates.
 - [x] Implemented menu priority over plugins invariant: plugin rows are automatically truncated or dropped first when viewport height is constrained.
 - [x] Added comprehensive integration test suites in `plugin_engine_test.rs` and `menu_navigation_test.rs`. Verified zero Clippy warnings across the workspace.
+
+## Phase 7: Visual Editors Porting
+- [x] Ported `themeedit` (`crates/themeedit-cli`):
+  - Split-screen live preview canvas showing changes in real time.
+  - Interactive 2D color picker (`ColorGridModal`) for 256 colors and CP437 ASCII character picker (`AsciiGridModal`) for window border glyphs.
+  - Enforced `<Ctrl+S>` direct disk save invariant (only untitled themes divert to Save As) and `<Ctrl+A>` Save As.
+  - Added integration test suite `themeedit_test.rs` verifying state modifications and direct disk saving. Zero Clippy warnings.
+- [x] Ported `menuedit` (`crates/menuedit-cli`):
+  - Multi-level menu hierarchy navigation and editing with submenu dive and return.
+  - Add item, edit label/command, delete item, and move item up/down (`swap_up`/`swap_down`).
+  - Persistence to `bashmenu.mnu` via `save_menu()`.
+  - Added integration test suite `menuedit_test.rs` covering navigation, reordering, adding, editing, deleting, and submenu unwinding. Zero Clippy warnings.
+- [x] Ported `bashedit` (`crates/bashedit-cli`):
+  - Colocated swap files `.<filename>.swp` in the exact directory of the target file with JSON header metadata (`BASHEDIT-SWAP-v1`, PID, user, host, SHA-256).
+  - Startup crash recovery prompt (`[R]ecover`, `[D]elete`, `[O]pen read-only`, `[Q]uit`) and active PID collision warning.
+  - Clean exit removes swap files; read-only mode protects other users' swap files and disallows saving.
+  - Keystroke counter auto-flush (every 20 keystrokes) and manual save (`<Ctrl+S>`).
+  - Added comprehensive test suite `bashedit_test.rs` covering swap file lifecycle, hashing, process PID checks, and read-only protection. Zero Clippy warnings.

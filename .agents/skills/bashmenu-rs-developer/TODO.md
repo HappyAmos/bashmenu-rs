@@ -41,9 +41,9 @@
 - [x] Periodic background plugin runner with caching and non-blocking status bar updates.
 
 ## Phase 7: Visual Editors Porting
-- [ ] Port `menuedit` using `tui-tree-widget`.
-- [ ] Port `themeedit` with 2D palette picker and live preview canvas.
-- [ ] Port `bashedit` text editor with `ropey` and colocated `.<filename>.swp` swap files.
+- [x] Port `menuedit` (`crates/menuedit-cli`) menu tree and hierarchy editor with add/edit/delete/move actions.
+- [x] Port `themeedit` (`crates/themeedit-cli`) with 2D palette picker, CP437 ASCII picker, live preview canvas, and Ctrl+S direct save invariant.
+- [x] Port `bashedit` (`crates/bashedit-cli`) text editor with colocated `.<filename>.swp` swap files, crash recovery prompt, and read-only mode.
 
 ## Phase 8: Shell Integration & Installer
 - [ ] Port launcher `bashmenu.sh` and installer `install.sh`.

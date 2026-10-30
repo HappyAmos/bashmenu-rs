@@ -19,4 +19,4 @@ pub use menu::{load_menu, save_menu, MenuItem, MenuItemType, MenuSchema, Submenu
 pub use plugin::{
     PluginCacheEntry, PluginConfig, PluginDef, PluginDisplayRow, PluginEngine, PluginLayout,
 };
-pub use theme::{load_themes, save_themes, Theme, ThemeCollection};
+pub use theme::{load_themes, save_themes, Theme, ThemeCollection, WindowBorders};
