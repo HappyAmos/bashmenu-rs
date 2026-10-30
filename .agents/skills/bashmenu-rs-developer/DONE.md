@@ -21,3 +21,8 @@
 - [x] Implemented 4-column icon padding invariant (`vis_w + pad_w = 4`) and variation selector normalization.
 - [x] Implemented recursive 6-tier macro placeholder interpolation engine in `macro_engine.rs` supporting environment variables, runtime paths (`{bashmenu_dir}`, `{scripts_dir}`, `{cache_dir}`), system time/date badges, and dot notation config paths (`{user.<key>}`, `{settings.<key>}`).
 - [x] Added integration test suite `crates/bashmenu-core/tests/macro_engine_test.rs` testing icon column alignment and status gutter expansion. Zero Clippy warnings.
+
+## Phase 3: The `ymlcheck` CLI Tool (`crates/ymlcheck-cli`)
+- [x] Ported `ymlcheck.py` to compiled Rust executable `ymlcheck` with `clap` arguments (`--themes`, `--config`, `--menu`, and bare YAML syntax check).
+- [x] Configured binary aliases in `crates/ymlcheck-cli/Cargo.toml` and `crates/bashmenu-cli/Cargo.toml` so built executables match canonical names (`ymlcheck` and `bashmenu`).
+- [x] Verified successful validation against all production fixtures with exit code 0. Zero Clippy warnings.

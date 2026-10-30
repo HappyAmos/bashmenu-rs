@@ -21,8 +21,8 @@
 - [x] Unit tests for all macro syntax variations.
 
 ## Phase 3: The `ymlcheck` CLI Tool (`crates/ymlcheck-cli`)
-- [ ] Port `ymlcheck.py` to `ymlcheck` binary using `clap` and `bashmenu-core`.
-- [ ] Verify validation flags: `--themes`, `--config`, `--menu`.
+- [x] Port `ymlcheck.py` to `ymlcheck` binary using `clap` and `bashmenu-core`.
+- [x] Verify validation flags: `--themes`, `--config`, `--menu`, and bare file syntax.
 
 ## Phase 4: Core Ratatui TUI Menu (`crates/bashmenu-tui`, `crates/bashmenu-cli`)
 - [ ] Terminal initialization, alternate screen buffer, raw mode, and panic hook setup.

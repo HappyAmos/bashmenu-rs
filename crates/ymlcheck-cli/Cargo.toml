@@ -6,7 +6,12 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 
+[[bin]]
+name = "ymlcheck"
+path = "src/main.rs"
+
 [dependencies]
 bashmenu-core = { workspace = true }
 clap = { workspace = true }
 anyhow = { workspace = true }
+serde_yml = { workspace = true }

@@ -6,6 +6,10 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 
+[[bin]]
+name = "bashmenu"
+path = "src/main.rs"
+
 [dependencies]
 bashmenu-core = { workspace = true }
 bashmenu-tui = { workspace = true }

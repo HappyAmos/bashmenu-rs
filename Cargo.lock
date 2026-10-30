@@ -915,6 +915,7 @@ dependencies = [
  "anyhow",
  "bashmenu-core",
  "clap",
+ "serde_yml",
 ]
 
 [[package]]
