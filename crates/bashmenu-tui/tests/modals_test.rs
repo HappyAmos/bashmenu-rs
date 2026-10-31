@@ -136,3 +136,78 @@ fn test_file_picker_navigation() {
     assert!(content.contains("Pick Configuration"));
     assert!(content.contains("bashmenu.yml"));
 }
+
+#[test]
+fn test_note_viewer_footer_wrapping() {
+    use bashmenu_tui::{NoteViewerAction, NoteViewerModal};
+
+    let mut viewer = NoteViewerModal::new(
+        "Meeting Notes",
+        "/tmp/notes.yml",
+        "Discussion on architecture and next steps for BashMenu.",
+    );
+    let styles = ResolvedThemeStyles::default();
+    let area = Rect::new(0, 0, 70, 20);
+
+    // Render into narrow area to trigger wrapping
+    let mut buf = Buffer::empty(area);
+    let inner = viewer.render(area, &styles, &mut buf);
+    assert!(inner.width > 0);
+    assert!(inner.height > 0);
+
+    // Verify key bindings
+    assert_eq!(
+        viewer.handle_key(KeyCode::Char('e')),
+        NoteViewerAction::Edit
+    );
+    assert_eq!(
+        viewer.handle_key(KeyCode::Char('m')),
+        NoteViewerAction::Rename
+    );
+    assert_eq!(
+        viewer.handle_key(KeyCode::Char('d')),
+        NoteViewerAction::Delete
+    );
+    assert_eq!(viewer.handle_key(KeyCode::Esc), NoteViewerAction::Close);
+}
+
+#[test]
+fn test_note_editor_modal_typing_and_saving() {
+    use bashmenu_tui::{NoteEditorAction, NoteEditorModal};
+    use crossterm::event::KeyModifiers;
+
+    let mut editor = NoteEditorModal::new("Shopping List", "/tmp/shopping.yml", "- [ ] Apples");
+
+    let styles = ResolvedThemeStyles::default();
+    let area = Rect::new(0, 0, 80, 24);
+
+    // Move cursor to end of first line
+    editor.cursor_col = editor.lines[0].len();
+
+    // Press Enter: should auto-continue bullet "- [ ] " on next line
+    editor.handle_key(KeyCode::Enter, KeyModifiers::NONE);
+    assert_eq!(editor.lines.len(), 2);
+    assert_eq!(editor.lines[1], "- [ ] ");
+
+    // Type "Bananas"
+    for c in "Bananas".chars() {
+        editor.handle_key(KeyCode::Char(c), KeyModifiers::NONE);
+    }
+    assert_eq!(editor.lines[1], "- [ ] Bananas");
+
+    // Render editor modal
+    let mut buf = Buffer::empty(area);
+    let inner = editor.render(area, &styles, &mut buf);
+    assert!(inner.width > 0);
+
+    // Save with Ctrl+S
+    let act = editor.handle_key(KeyCode::Char('s'), KeyModifiers::CONTROL);
+    match act {
+        NoteEditorAction::Save(content) => {
+            assert_eq!(editor.title, "Shopping List");
+            assert!(content.contains("- [ ] Apples"));
+            assert!(content.contains("- [ ] Bananas"));
+        }
+        _ => panic!("Expected Save action on Ctrl+S"),
+    }
+}

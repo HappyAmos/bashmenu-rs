@@ -9,7 +9,8 @@ use bashmenu_core::{
 };
 use bashmenu_tui::{
     install_panic_hook, ConfirmModal, HelpModal, InputModal, MenuAction, MenuView,
-    NoteViewerAction, NoteViewerModal, ResolvedThemeStyles, TerminalGuard, ThemePickerModal,
+    NoteEditorAction, NoteEditorModal, NoteViewerAction, NoteViewerModal, ResolvedThemeStyles,
+    TerminalGuard, ThemePickerModal,
 };
 use clap::Parser;
 use crossterm::event::{self, Event};
@@ -45,6 +46,7 @@ enum ActiveModal {
     ThemePicker(ThemePickerModal),
     Input(InputModal),
     NoteViewer(NoteViewerModal),
+    NoteEditor(NoteEditorModal),
     NewNoteTitle(String, InputModal),
     RenameNoteTitle(String, String, InputModal),
     ConfirmDeleteNote(String, String, ConfirmModal),
@@ -220,6 +222,9 @@ fn main() -> Result<()> {
                 ActiveModal::NoteViewer(modal) => {
                     modal.render(f.area(), &styles, f.buffer_mut());
                 }
+                ActiveModal::NoteEditor(modal) => {
+                    modal.render(f.area(), &styles, f.buffer_mut());
+                }
                 ActiveModal::NewNoteTitle(_, modal) => {
                     modal.render(f.area(), &styles, f.buffer_mut());
                 }
@@ -311,39 +316,11 @@ fn main() -> Result<()> {
                             }
                         }
                         NoteViewerAction::Edit => {
-                            let clean_name = modal
-                                .title
-                                .chars()
-                                .map(|c| if c.is_alphanumeric() { c } else { '_' })
-                                .collect::<String>();
-                            let tmp_file = std::env::temp_dir().join(format!(
-                                "note_{}_{}.md",
-                                std::process::id(),
-                                clean_name
+                            active_modal = ActiveModal::NoteEditor(NoteEditorModal::new(
+                                &modal.title,
+                                &modal.filepath,
+                                &modal.content,
                             ));
-                            let _ = std::fs::write(&tmp_file, &modal.content);
-                            let editor_bin = locate_tool("bashedit");
-                            let _ = guard.suspend(|| {
-                                let _ = Command::new(&editor_bin).arg(&tmp_file).status();
-                                Ok(())
-                            });
-                            if let Ok(updated) = std::fs::read_to_string(&tmp_file) {
-                                if updated != modal.content {
-                                    modal.content = updated.clone();
-                                    if let Ok(mut nb) = load_notebook(&modal.filepath) {
-                                        add_or_update_note(
-                                            &mut nb,
-                                            NoteItem {
-                                                title: modal.title.clone(),
-                                                content: updated,
-                                                ..Default::default()
-                                            },
-                                        );
-                                        let _ = save_notebook(&modal.filepath, &nb);
-                                    }
-                                }
-                            }
-                            let _ = std::fs::remove_file(&tmp_file);
                         }
                         NoteViewerAction::Rename => {
                             active_modal = ActiveModal::RenameNoteTitle(
@@ -372,6 +349,44 @@ fn main() -> Result<()> {
                         NoteViewerAction::None => {}
                     }
                 }
+                ActiveModal::NoteEditor(modal) => {
+                    let action = match ev {
+                        Event::Key(key) => modal.handle_key(key.code, key.modifiers),
+                        Event::Mouse(mouse) => modal.handle_mouse(mouse, area),
+                        _ => NoteEditorAction::None,
+                    };
+                    match action {
+                        NoteEditorAction::Save(saved_content) => {
+                            if let Ok(mut nb) = load_notebook(modal.filepath.as_str()) {
+                                add_or_update_note(
+                                    &mut nb,
+                                    NoteItem {
+                                        title: modal.title.clone(),
+                                        content: saved_content.clone(),
+                                        ..Default::default()
+                                    },
+                                );
+                                let _ = save_notebook(modal.filepath.as_str(), &nb);
+                                let sub = build_notebook_submenu(modal.filepath.as_str(), &nb);
+                                menu_view
+                                    .reload_current_notebook(sub.items, Some(modal.title.as_str()));
+                            }
+                            active_modal = ActiveModal::NoteViewer(NoteViewerModal::new(
+                                &modal.title,
+                                &modal.filepath,
+                                &saved_content,
+                            ));
+                        }
+                        NoteEditorAction::Cancel => {
+                            active_modal = ActiveModal::NoteViewer(NoteViewerModal::new(
+                                &modal.title,
+                                &modal.filepath,
+                                &modal.lines.join("\n"),
+                            ));
+                        }
+                        NoteEditorAction::None => {}
+                    }
+                }
                 ActiveModal::NewNoteTitle(filepath, modal) => {
                     let submitted = match ev {
                         Event::Key(key) => modal.handle_key(key.code),
@@ -382,30 +397,12 @@ fn main() -> Result<()> {
                         if let Some(title) = opt_val {
                             let trimmed = title.trim();
                             if !trimmed.is_empty() {
-                                let tmp_file = std::env::temp_dir()
-                                    .join(format!("note_new_{}.md", std::process::id()));
-                                let _ = std::fs::write(&tmp_file, "");
-                                let editor_bin = locate_tool("bashedit");
-                                let _ = guard.suspend(|| {
-                                    let _ = Command::new(&editor_bin).arg(&tmp_file).status();
-                                    Ok(())
-                                });
-                                let content =
-                                    std::fs::read_to_string(&tmp_file).unwrap_or_default();
-                                let _ = std::fs::remove_file(&tmp_file);
-                                if let Ok(mut nb) = load_notebook(filepath.as_str()) {
-                                    add_or_update_note(
-                                        &mut nb,
-                                        NoteItem {
-                                            title: trimmed.to_string(),
-                                            content,
-                                            ..Default::default()
-                                        },
-                                    );
-                                    let _ = save_notebook(filepath.as_str(), &nb);
-                                    let sub = build_notebook_submenu(filepath.as_str(), &nb);
-                                    menu_view.reload_current_notebook(sub.items, Some(trimmed));
-                                }
+                                active_modal = ActiveModal::NoteEditor(NoteEditorModal::new(
+                                    trimmed,
+                                    filepath.as_str(),
+                                    "",
+                                ));
+                                continue;
                             }
                         }
                         active_modal = ActiveModal::None;

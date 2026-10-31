@@ -144,7 +144,32 @@ impl NoteViewerModal {
 
         let modal_title = format!(" [ Note: {} ] ", self.title);
         let inner = render_modal_frame(area, dialog_w, dialog_h, &modal_title, styles, buf);
-        let content_h = inner.height.saturating_sub(3) as usize;
+
+        let toggle_action = if self.show_completed {
+            "[H] Hide Done"
+        } else {
+            "[H] Show Done"
+        };
+        let footer_tokens = [
+            "[SPACE] Toggle",
+            "|",
+            toggle_action,
+            "|",
+            "[E] Edit",
+            "|",
+            "[M] Rename",
+            "|",
+            "[D] Delete",
+            "|",
+            "[C] Copy",
+            "|",
+            "[ESC] Close",
+        ];
+        let max_footer_w = inner.width.saturating_sub(4) as usize;
+        let footer_lines = wrap_footer_tokens(&footer_tokens, max_footer_w);
+        let footer_h = footer_lines.len().max(1);
+
+        let content_h = inner.height.saturating_sub(1 + footer_h as u16 + 1) as usize;
 
         let raw_lines: Vec<&str> = self.content.lines().collect();
         let avail_w = inner.width.saturating_sub(4) as usize;
@@ -190,27 +215,66 @@ impl NoteViewerModal {
             buf.set_string(inner.x + 2, y, line_text, line_style);
         }
 
-        // Footer help bar
-        let footer_y = inner.y + inner.height - 2;
-        let toggle_action = if self.show_completed {
-            "Hide Done"
-        } else {
-            "Show Done"
-        };
-        let footer_text = format!(
-            " [SPACE] Toggle | [H] {} | [E] Edit | [M] Rename | [D] Delete | [ESC] Close ",
-            toggle_action
-        );
-        let footer_x = inner.x + (inner.width.saturating_sub(footer_text.len() as u16) / 2);
-        buf.set_string(
-            footer_x,
-            footer_y,
-            &footer_text,
-            Style::default().fg(Color::DarkGray),
-        );
+        // Render wrapped footer help lines with equal spacing
+        let footer_start_y = inner.y + inner.height.saturating_sub(1 + footer_h as u16);
+        for (idx, line) in footer_lines.iter().enumerate() {
+            let footer_x = inner.x + (inner.width.saturating_sub(line.len() as u16) / 2);
+            buf.set_string(
+                footer_x,
+                footer_start_y + idx as u16,
+                line,
+                Style::default().fg(Color::DarkGray),
+            );
+        }
 
         inner
     }
+}
+
+/// Wraps footer tokens across lines with equal spacing, treating "|" as a word.
+pub fn wrap_footer_tokens(tokens: &[&str], max_w: usize) -> Vec<String> {
+    if max_w == 0 {
+        return Vec::new();
+    }
+    let mut lines = Vec::new();
+    let mut current_tokens: Vec<&str> = Vec::new();
+    let mut current_len = 0;
+
+    for &tok in tokens {
+        let needed = if current_tokens.is_empty() {
+            tok.len()
+        } else {
+            1 + tok.len()
+        };
+
+        if current_len + needed <= max_w {
+            current_tokens.push(tok);
+            current_len += needed;
+        } else {
+            if current_tokens.last() == Some(&"|") {
+                current_tokens.pop();
+            }
+            if !current_tokens.is_empty() {
+                lines.push(current_tokens.join(" "));
+            }
+            current_tokens.clear();
+            if tok != "|" {
+                current_tokens.push(tok);
+                current_len = tok.len();
+            } else {
+                current_len = 0;
+            }
+        }
+    }
+
+    if current_tokens.last() == Some(&"|") {
+        current_tokens.pop();
+    }
+    if !current_tokens.is_empty() {
+        lines.push(current_tokens.join(" "));
+    }
+
+    lines
 }
 
 /// Checks whether a line contains a completed task list item `- [x]` or `- [X]`

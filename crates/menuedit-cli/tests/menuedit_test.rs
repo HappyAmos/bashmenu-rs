@@ -317,3 +317,35 @@ fn test_menuedit_mutate_item_type() {
     assert_eq!(item.label, "{divider}");
     assert!(item.submenu.is_none());
 }
+
+#[test]
+fn test_menuedit_inspector_placeholders_and_preview() {
+    use bashmenu_core::BashMenuConfig;
+    use menuedit_cli::format_inspector_text;
+
+    let cfg = BashMenuConfig::default();
+    let item = MenuItem {
+        label: "Notes [{notebooks_dir}/notes.yml]".to_string(),
+        r#type: MenuItemType::Notebook,
+        file: Some("{notebooks_dir}/notes.yml".to_string()),
+        icon: Some("{nf:N:f02d:📓}".to_string()),
+        ..Default::default()
+    };
+
+    let lines = format_inspector_text(&item, Some(&cfg), 60);
+    let joined = lines.join("\n");
+
+    assert!(joined.contains("Title/Label: Notes [{notebooks_dir}/notes.yml]"));
+    assert!(joined.contains("Expanded Title: Notes ["));
+    assert!(joined.contains("Action/Target: {notebooks_dir}/notes.yml"));
+    assert!(joined.contains("Expanded Action:"));
+    assert!(joined.contains("Preview:"));
+    assert!(joined.contains("1."));
+
+    // Test divider preview
+    let div = MenuItem::divider();
+    let div_lines = format_inspector_text(&div, Some(&cfg), 40);
+    let div_joined = div_lines.join("\n");
+    assert!(div_joined.contains("[DIV] DIVIDER"));
+    assert!(div_joined.contains('─'));
+}

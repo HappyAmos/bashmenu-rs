@@ -11,6 +11,7 @@ use menuedit_cli::{
     delete_item, find_item_mut, flatten_tree, format_inspector_text, get_type_badge, indent_item,
     insert_item_after, move_down_sibling, move_up_sibling, mutate_item_type, outdent_item,
     toggle_all_nodes, ItemEditModal, ItemTypePickerModal, ITEM_EDIT_HELP_TEXT,
+    PLACEHOLDER_HELP_TEXT,
 };
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
@@ -243,11 +244,14 @@ fn main() -> Result<()> {
                         Style::default()
                             .fg(Color::Magenta)
                             .add_modifier(Modifier::BOLD)
-                    } else if line.starts_with("Title/Label:") {
+                    } else if line.starts_with("Title/Label:") || line.starts_with("Expanded Title:")
+                    {
                         Style::default().fg(Color::White)
-                    } else if line.starts_with("Icon/Glyph:") {
+                    } else if line.starts_with("Icon/Glyph:") || line.starts_with("Expanded Icon:") {
                         Style::default().fg(Color::Cyan)
-                    } else if line.starts_with("Action/Target:") {
+                    } else if line.starts_with("Action/Target:")
+                        || line.starts_with("Expanded Action:")
+                    {
                         Style::default().fg(Color::Yellow)
                     } else if line.starts_with("Preview:") {
                         Style::default()
@@ -456,7 +460,7 @@ fn main() -> Result<()> {
                                 KeyCode::Char('p') => {
                                     active_modal = ActiveModal::Help(HelpModal::new(
                                         "Placeholders & Macros",
-                                        ITEM_EDIT_HELP_TEXT,
+                                        PLACEHOLDER_HELP_TEXT,
                                     ));
                                     continue;
                                 }
@@ -626,7 +630,7 @@ fn main() -> Result<()> {
                             KeyCode::F(5) => {
                                 active_modal = ActiveModal::Help(HelpModal::new(
                                     "Placeholders & Macros",
-                                    ITEM_EDIT_HELP_TEXT,
+                                    PLACEHOLDER_HELP_TEXT,
                                 ));
                             }
                             KeyCode::Char('s') => {
