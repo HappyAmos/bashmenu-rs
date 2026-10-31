@@ -6,6 +6,7 @@ use crossterm::event::{KeyCode, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Line, Span};
 
 /// Action triggered by user within the note viewer
 #[derive(Debug, Clone, PartialEq)]
@@ -137,7 +138,7 @@ impl NoteViewerModal {
         }
     }
 
-    /// Renders note viewer modal
+    /// Renders note viewer modal with rendered markdown and code blocks
     pub fn render(&self, area: Rect, styles: &ResolvedThemeStyles, buf: &mut Buffer) -> Rect {
         let dialog_w = (area.width.saturating_sub(4)).min(78);
         let dialog_h = (area.height.saturating_sub(4)).clamp(14, 28);
@@ -170,49 +171,257 @@ impl NoteViewerModal {
         let footer_h = footer_lines.len().max(1);
 
         let content_h = inner.height.saturating_sub(1 + footer_h as u16 + 1) as usize;
-
-        let raw_lines: Vec<&str> = self.content.lines().collect();
         let avail_w = inner.width.saturating_sub(4) as usize;
 
-        // Collect visible lines (filtering completed checkboxes if requested)
-        let mut visible_entries: Vec<(usize, String)> = Vec::new();
-        for (idx, line) in raw_lines.iter().enumerate() {
-            if !self.show_completed && is_completed_checkbox(line) {
-                continue;
-            }
-            // Word wrap line to avail_w
-            let wrapped = textwrap_simple(line, avail_w);
-            for w_line in wrapped {
-                visible_entries.push((idx, w_line));
+        // Build rendered visual lines
+        let mut visible_entries: Vec<(usize, Line<'static>)> = Vec::new();
+
+        if self.content.trim().is_empty() {
+            let empty_span = Span::styled(
+                "*(Empty note — press 'e' to edit content)*",
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::ITALIC),
+            );
+            visible_entries.push((0, Line::from(vec![empty_span])));
+        } else {
+            let raw_lines: Vec<&str> = self.content.lines().collect();
+            let mut in_code_block = false;
+
+            for (idx, line) in raw_lines.iter().enumerate() {
+                let trimmed = line.trim();
+
+                // 1. Fenced Code Block Markers
+                if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+                    if !in_code_block {
+                        in_code_block = true;
+                        let lang = trimmed.trim_start_matches(['`', '~']).trim();
+                        let label = if lang.is_empty() { "Code" } else { lang };
+                        let bar_len = avail_w.saturating_sub(label.len() + 7);
+                        let top_str = format!("┌─ [{}] {}", label, "─".repeat(bar_len));
+                        visible_entries.push((
+                            idx,
+                            Line::from(vec![Span::styled(
+                                top_str,
+                                Style::default().fg(Color::Cyan).add_modifier(Modifier::DIM),
+                            )]),
+                        ));
+                    } else {
+                        in_code_block = false;
+                        let bot_str = format!("└{}", "─".repeat(avail_w.saturating_sub(1)));
+                        visible_entries.push((
+                            idx,
+                            Line::from(vec![Span::styled(
+                                bot_str,
+                                Style::default().fg(Color::Cyan).add_modifier(Modifier::DIM),
+                            )]),
+                        ));
+                    }
+                    continue;
+                }
+
+                // 2. Lines Inside Fenced Code Block
+                if in_code_block {
+                    let code_w = avail_w.saturating_sub(3).max(10);
+                    let chars: Vec<char> = line.chars().collect();
+                    if chars.is_empty() {
+                        let border_span = Span::styled(
+                            "│",
+                            Style::default().fg(Color::Cyan).add_modifier(Modifier::DIM),
+                        );
+                        visible_entries.push((idx, Line::from(vec![border_span])));
+                    } else {
+                        let mut start = 0;
+                        while start < chars.len() {
+                            let end = (start + code_w).min(chars.len());
+                            let chunk: String = chars[start..end].iter().collect();
+                            let border_span = Span::styled(
+                                "│ ",
+                                Style::default().fg(Color::Cyan).add_modifier(Modifier::DIM),
+                            );
+                            let code_span = Span::styled(chunk, Style::default().fg(Color::Yellow));
+                            visible_entries.push((idx, Line::from(vec![border_span, code_span])));
+                            start = end;
+                        }
+                    }
+                    continue;
+                }
+
+                // 3. Skip completed checkboxes if hide-completed is active
+                if !self.show_completed && is_completed_checkbox(line) {
+                    continue;
+                }
+
+                // 4. Horizontal Rules
+                if trimmed == "---" || trimmed == "***" || trimmed == "___" {
+                    visible_entries.push((
+                        idx,
+                        Line::from(vec![Span::styled("─".repeat(avail_w), styles.divider)]),
+                    ));
+                    continue;
+                }
+
+                // 5. Headings
+                if let Some(h1) = trimmed.strip_prefix("# ") {
+                    for wl in textwrap_simple(h1, avail_w.saturating_sub(2)) {
+                        visible_entries.push((
+                            idx,
+                            Line::from(vec![Span::styled(
+                                format!("# {}", wl),
+                                Style::default()
+                                    .fg(Color::Cyan)
+                                    .add_modifier(Modifier::BOLD),
+                            )]),
+                        ));
+                    }
+                    continue;
+                }
+                if let Some(h2) = trimmed.strip_prefix("## ") {
+                    for wl in textwrap_simple(h2, avail_w.saturating_sub(3)) {
+                        visible_entries.push((
+                            idx,
+                            Line::from(vec![Span::styled(
+                                format!("## {}", wl),
+                                styles.highlight.add_modifier(Modifier::BOLD),
+                            )]),
+                        ));
+                    }
+                    continue;
+                }
+                if let Some(h3) = trimmed.strip_prefix("### ") {
+                    for wl in textwrap_simple(h3, avail_w.saturating_sub(4)) {
+                        visible_entries.push((
+                            idx,
+                            Line::from(vec![Span::styled(
+                                format!("### {}", wl),
+                                styles.text.add_modifier(Modifier::BOLD),
+                            )]),
+                        ));
+                    }
+                    continue;
+                }
+
+                // 6. Blockquotes
+                if let Some(bq) = trimmed.strip_prefix("> ") {
+                    for wl in textwrap_simple(bq, avail_w.saturating_sub(3)) {
+                        let bar = Span::styled(
+                            "│ ",
+                            Style::default().fg(Color::Cyan).add_modifier(Modifier::DIM),
+                        );
+                        let mut spans = vec![bar];
+                        spans.extend(parse_markdown_spans(
+                            &wl,
+                            styles.text.add_modifier(Modifier::ITALIC),
+                        ));
+                        visible_entries.push((idx, Line::from(spans)));
+                    }
+                    continue;
+                }
+
+                // 7. Checkboxes
+                if let Some((is_checked, rest)) = parse_checkbox_line(line) {
+                    let (check_box_span, base_st) = if is_checked {
+                        (
+                            Span::styled("- [x] ", Style::default().fg(Color::Green)),
+                            Style::default()
+                                .fg(Color::DarkGray)
+                                .add_modifier(Modifier::DIM),
+                        )
+                    } else {
+                        (
+                            Span::styled(
+                                "- [ ] ",
+                                Style::default()
+                                    .fg(Color::Yellow)
+                                    .add_modifier(Modifier::BOLD),
+                            ),
+                            styles.text,
+                        )
+                    };
+
+                    let wrapped = textwrap_simple(rest, avail_w.saturating_sub(6));
+                    if wrapped.is_empty() {
+                        visible_entries.push((idx, Line::from(vec![check_box_span])));
+                    } else {
+                        for (w_idx, wl) in wrapped.iter().enumerate() {
+                            let mut spans = Vec::new();
+                            if w_idx == 0 {
+                                spans.push(check_box_span.clone());
+                            } else {
+                                spans.push(Span::styled("      ", base_st));
+                            }
+                            spans.extend(parse_markdown_spans(wl, base_st));
+                            visible_entries.push((idx, Line::from(spans)));
+                        }
+                    }
+                    continue;
+                }
+
+                // 8. Bullet Lists (- , * , + )
+                if let Some(bullet_rest) = parse_bullet_line(line) {
+                    let wrapped = textwrap_simple(bullet_rest, avail_w.saturating_sub(3));
+                    if wrapped.is_empty() {
+                        visible_entries.push((
+                            idx,
+                            Line::from(vec![Span::styled("• ", Style::default().fg(Color::Cyan))]),
+                        ));
+                    } else {
+                        for (w_idx, wl) in wrapped.iter().enumerate() {
+                            let mut spans = Vec::new();
+                            if w_idx == 0 {
+                                spans.push(Span::styled("• ", Style::default().fg(Color::Cyan)));
+                            } else {
+                                spans.push(Span::styled("  ", styles.text));
+                            }
+                            spans.extend(parse_markdown_spans(wl, styles.text));
+                            visible_entries.push((idx, Line::from(spans)));
+                        }
+                    }
+                    continue;
+                }
+
+                // 9. Standard Text Lines with Inline Markdown
+                let wrapped = textwrap_simple(line, avail_w);
+                if wrapped.is_empty() {
+                    visible_entries.push((idx, Line::from(vec![Span::styled("", styles.text)])));
+                } else {
+                    for wl in wrapped {
+                        let spans = parse_markdown_spans(&wl, styles.text);
+                        visible_entries.push((idx, Line::from(spans)));
+                    }
+                }
             }
         }
 
-        for (i, (raw_idx, line_text)) in visible_entries
+        let max_scroll = visible_entries.len().saturating_sub(content_h);
+        let eff_scroll = self.scroll_offset.min(max_scroll);
+
+        // Render visible entries
+        for (i, (raw_idx, line_obj)) in visible_entries
             .iter()
-            .skip(self.scroll_offset)
+            .skip(eff_scroll)
             .take(content_h)
             .enumerate()
         {
             let y = inner.y + 1 + i as u16;
             let is_sel = *raw_idx == self.selected_line;
 
-            let line_style = if is_sel {
-                styles.highlight.add_modifier(Modifier::BOLD)
-            } else if is_completed_checkbox(line_text) {
-                Style::default()
-                    .fg(Color::DarkGray)
-                    .add_modifier(Modifier::DIM)
-            } else if line_text.contains("- [ ]") {
-                Style::default().fg(Color::Yellow)
-            } else if line_text.starts_with('#') {
-                Style::default()
-                    .fg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD)
+            let final_line = if is_sel {
+                Line::from(
+                    line_obj
+                        .spans
+                        .iter()
+                        .map(|s| {
+                            let st = s.style.patch(styles.highlight);
+                            Span::styled(s.content.clone(), st)
+                        })
+                        .collect::<Vec<_>>(),
+                )
             } else {
-                styles.text
+                line_obj.clone()
             };
 
-            buf.set_string(inner.x + 2, y, line_text, line_style);
+            buf.set_line(inner.x + 2, y, &final_line, avail_w as u16);
         }
 
         // Render wrapped footer help lines with equal spacing
@@ -229,6 +438,82 @@ impl NoteViewerModal {
 
         inner
     }
+}
+
+/// Parses inline code backticks (`` `code` ``) and bold markers (`**bold**`) into styled spans
+fn parse_markdown_spans(text: &str, base_style: Style) -> Vec<Span<'static>> {
+    let mut spans = Vec::new();
+    let parts: Vec<&str> = text.split('`').collect();
+
+    for (idx, part) in parts.iter().enumerate() {
+        if part.is_empty() {
+            continue;
+        }
+        if idx % 2 == 1 {
+            // Inline code inside backticks
+            spans.push(Span::styled(
+                part.to_string(),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ));
+        } else if part.contains("**") {
+            let bold_parts: Vec<&str> = part.split("**").collect();
+            for (b_idx, b_part) in bold_parts.iter().enumerate() {
+                if b_part.is_empty() {
+                    continue;
+                }
+                if b_idx % 2 == 1 {
+                    spans.push(Span::styled(
+                        b_part.to_string(),
+                        base_style.add_modifier(Modifier::BOLD),
+                    ));
+                } else {
+                    spans.push(Span::styled(b_part.to_string(), base_style));
+                }
+            }
+        } else {
+            spans.push(Span::styled(part.to_string(), base_style));
+        }
+    }
+
+    if spans.is_empty() {
+        spans.push(Span::styled(String::new(), base_style));
+    }
+    spans
+}
+
+fn parse_checkbox_line(line: &str) -> Option<(bool, &str)> {
+    let trimmed = line.trim_start();
+    if let Some(rest) = trimmed
+        .strip_prefix("- [ ] ")
+        .or_else(|| trimmed.strip_prefix("* [ ] "))
+    {
+        Some((false, rest))
+    } else if let Some(rest) = trimmed
+        .strip_prefix("- [x] ")
+        .or_else(|| trimmed.strip_prefix("- [X] "))
+        .or_else(|| trimmed.strip_prefix("* [x] "))
+        .or_else(|| trimmed.strip_prefix("* [X] "))
+    {
+        Some((true, rest))
+    } else {
+        None
+    }
+}
+
+fn parse_bullet_line(line: &str) -> Option<&str> {
+    let trimmed = line.trim_start();
+    if let Some(rest) = trimmed
+        .strip_prefix("- ")
+        .or_else(|| trimmed.strip_prefix("* "))
+        .or_else(|| trimmed.strip_prefix("+ "))
+    {
+        if !rest.starts_with("[ ]") && !rest.starts_with("[x]") && !rest.starts_with("[X]") {
+            return Some(rest);
+        }
+    }
+    None
 }
 
 /// Wraps footer tokens across lines with equal spacing, treating "|" as a word.

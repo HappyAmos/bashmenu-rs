@@ -19,6 +19,15 @@ pub enum NoteEditorAction {
     Cancel,
 }
 
+/// A single visual row produced by soft-wrapping a logical line
+#[derive(Debug, Clone)]
+pub struct VisualLine {
+    pub logical_row: usize,
+    pub start_col: usize,
+    pub chars: Vec<char>,
+    pub cursor_col_in_chunk: Option<usize>,
+}
+
 /// In-modal note editor
 #[derive(Debug, Clone)]
 pub struct NoteEditorModal {
@@ -29,6 +38,7 @@ pub struct NoteEditorModal {
     pub cursor_col: usize,
     pub scroll_offset: usize,
     pub is_modified: bool,
+    pub last_inner_w: usize,
 }
 
 impl NoteEditorModal {
@@ -51,7 +61,78 @@ impl NoteEditorModal {
             cursor_col: 0,
             scroll_offset: 0,
             is_modified: false,
+            last_inner_w: 76,
         }
+    }
+
+    /// Computes soft-wrapped visual lines for the current logical lines
+    pub fn compute_visual_lines(&self, width: usize) -> (Vec<VisualLine>, usize) {
+        let mut visual_lines = Vec::new();
+        let mut cursor_vis_idx = 0;
+        let w = width.max(10);
+
+        for (l_idx, line) in self.lines.iter().enumerate() {
+            let chars: Vec<char> = line.chars().collect();
+            let is_active_row = l_idx == self.cursor_row;
+
+            if chars.is_empty() {
+                if is_active_row {
+                    cursor_vis_idx = visual_lines.len();
+                }
+                visual_lines.push(VisualLine {
+                    logical_row: l_idx,
+                    start_col: 0,
+                    chars: Vec::new(),
+                    cursor_col_in_chunk: if is_active_row { Some(0) } else { None },
+                });
+            } else {
+                let mut start = 0;
+                while start < chars.len() {
+                    let end = (start + w).min(chars.len());
+                    let chunk = chars[start..end].to_vec();
+
+                    let cursor_here = if is_active_row {
+                        if self.cursor_col >= start
+                            && (self.cursor_col < end
+                                || (end == chars.len() && self.cursor_col == end))
+                        {
+                            cursor_vis_idx = visual_lines.len();
+                            Some(self.cursor_col - start)
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+
+                    visual_lines.push(VisualLine {
+                        logical_row: l_idx,
+                        start_col: start,
+                        chars: chunk,
+                        cursor_col_in_chunk: cursor_here,
+                    });
+
+                    start = end;
+                }
+
+                // If cursor is at exact end of line where chars.len() % w == 0 and chars.len() > 0
+                if is_active_row
+                    && self.cursor_col == chars.len()
+                    && !chars.is_empty()
+                    && chars.len().is_multiple_of(w)
+                {
+                    cursor_vis_idx = visual_lines.len();
+                    visual_lines.push(VisualLine {
+                        logical_row: l_idx,
+                        start_col: chars.len(),
+                        chars: Vec::new(),
+                        cursor_col_in_chunk: Some(0),
+                    });
+                }
+            }
+        }
+
+        (visual_lines, cursor_vis_idx)
     }
 
     /// Handles keyboard input
@@ -95,56 +176,78 @@ impl NoteEditorModal {
                     self.cursor_col -= 1;
                 } else if self.cursor_row > 0 {
                     self.cursor_row -= 1;
-                    self.cursor_col = self.lines[self.cursor_row].len();
+                    self.cursor_col = self.lines[self.cursor_row].chars().count();
                 }
-                self.ensure_cursor_visible(20);
                 NoteEditorAction::None
             }
             KeyCode::Right => {
-                let cur_len = self.current_line().len();
+                let cur_len = self.current_line().chars().count();
                 if self.cursor_col < cur_len {
                     self.cursor_col += 1;
                 } else if self.cursor_row + 1 < self.lines.len() {
                     self.cursor_row += 1;
                     self.cursor_col = 0;
                 }
-                self.ensure_cursor_visible(20);
                 NoteEditorAction::None
             }
             KeyCode::Up => {
-                if self.cursor_row > 0 {
-                    self.cursor_row -= 1;
-                    self.clamp_cursor_col();
+                let (vlines, cur_vidx) = self.compute_visual_lines(self.last_inner_w);
+                if cur_vidx > 0 {
+                    let cur_offset = vlines[cur_vidx].cursor_col_in_chunk.unwrap_or(0);
+                    let target = &vlines[cur_vidx - 1];
+                    self.cursor_row = target.logical_row;
+                    let target_line_len = self.lines[target.logical_row].chars().count();
+                    self.cursor_col = (target.start_col + cur_offset)
+                        .min(target.start_col + target.chars.len())
+                        .min(target_line_len);
                 }
-                self.ensure_cursor_visible(20);
                 NoteEditorAction::None
             }
             KeyCode::Down => {
-                if self.cursor_row + 1 < self.lines.len() {
-                    self.cursor_row += 1;
-                    self.clamp_cursor_col();
+                let (vlines, cur_vidx) = self.compute_visual_lines(self.last_inner_w);
+                if cur_vidx + 1 < vlines.len() {
+                    let cur_offset = vlines[cur_vidx].cursor_col_in_chunk.unwrap_or(0);
+                    let target = &vlines[cur_vidx + 1];
+                    self.cursor_row = target.logical_row;
+                    let target_line_len = self.lines[target.logical_row].chars().count();
+                    self.cursor_col = (target.start_col + cur_offset)
+                        .min(target.start_col + target.chars.len())
+                        .min(target_line_len);
                 }
-                self.ensure_cursor_visible(20);
                 NoteEditorAction::None
             }
             KeyCode::Home => {
-                self.cursor_col = 0;
+                let (vlines, cur_vidx) = self.compute_visual_lines(self.last_inner_w);
+                self.cursor_col = vlines[cur_vidx].start_col;
                 NoteEditorAction::None
             }
             KeyCode::End => {
-                self.cursor_col = self.current_line().len();
+                let (vlines, cur_vidx) = self.compute_visual_lines(self.last_inner_w);
+                self.cursor_col = vlines[cur_vidx].start_col + vlines[cur_vidx].chars.len();
                 NoteEditorAction::None
             }
             KeyCode::PageUp => {
-                self.cursor_row = self.cursor_row.saturating_sub(15);
-                self.clamp_cursor_col();
-                self.ensure_cursor_visible(20);
+                let (vlines, cur_vidx) = self.compute_visual_lines(self.last_inner_w);
+                let target_vidx = cur_vidx.saturating_sub(10);
+                let cur_offset = vlines[cur_vidx].cursor_col_in_chunk.unwrap_or(0);
+                let target = &vlines[target_vidx];
+                self.cursor_row = target.logical_row;
+                let target_line_len = self.lines[target.logical_row].chars().count();
+                self.cursor_col = (target.start_col + cur_offset)
+                    .min(target.start_col + target.chars.len())
+                    .min(target_line_len);
                 NoteEditorAction::None
             }
             KeyCode::PageDown => {
-                self.cursor_row = (self.cursor_row + 15).min(self.lines.len().saturating_sub(1));
-                self.clamp_cursor_col();
-                self.ensure_cursor_visible(20);
+                let (vlines, cur_vidx) = self.compute_visual_lines(self.last_inner_w);
+                let target_vidx = (cur_vidx + 10).min(vlines.len().saturating_sub(1));
+                let cur_offset = vlines[cur_vidx].cursor_col_in_chunk.unwrap_or(0);
+                let target = &vlines[target_vidx];
+                self.cursor_row = target.logical_row;
+                let target_line_len = self.lines[target.logical_row].chars().count();
+                self.cursor_col = (target.start_col + cur_offset)
+                    .min(target.start_col + target.chars.len())
+                    .min(target_line_len);
                 NoteEditorAction::None
             }
             KeyCode::Tab => {
@@ -168,7 +271,8 @@ impl NoteEditorModal {
     pub fn handle_mouse(&mut self, mouse: MouseEvent, _area: Rect) -> NoteEditorAction {
         match mouse.kind {
             MouseEventKind::ScrollDown => {
-                if self.scroll_offset + 2 < self.lines.len() {
+                let (vlines, _) = self.compute_visual_lines(self.last_inner_w);
+                if self.scroll_offset + 2 < vlines.len() {
                     self.scroll_offset += 2;
                 }
                 NoteEditorAction::None
@@ -186,21 +290,6 @@ impl NoteEditorModal {
             &self.lines[self.cursor_row]
         } else {
             ""
-        }
-    }
-
-    fn clamp_cursor_col(&mut self) {
-        let max_len = self.current_line().len();
-        if self.cursor_col > max_len {
-            self.cursor_col = max_len;
-        }
-    }
-
-    fn ensure_cursor_visible(&mut self, view_h: usize) {
-        if self.cursor_row < self.scroll_offset {
-            self.scroll_offset = self.cursor_row;
-        } else if self.cursor_row >= self.scroll_offset + view_h {
-            self.scroll_offset = self.cursor_row.saturating_sub(view_h.saturating_sub(1));
         }
     }
 
@@ -261,27 +350,51 @@ impl NoteEditorModal {
         let trimmed_prefix = prefix.trim_start();
         let indent = &prefix[..prefix.len() - trimmed_prefix.len()];
 
-        if trimmed_prefix == "- [ ]" || trimmed_prefix == "- [x]" || trimmed_prefix == "- [X]" {
-            // De-escalate empty checkbox
-            self.lines[self.cursor_row] = indent.to_string();
-            self.cursor_col = indent.len();
-            de_escalated = true;
-        } else if trimmed_prefix.starts_with("- [ ] ")
+        if trimmed_prefix.starts_with("- [ ] ")
             || trimmed_prefix.starts_with("- [x] ")
             || trimmed_prefix.starts_with("- [X] ")
         {
-            continuation = format!("{}- [ ] ", indent);
-        } else if trimmed_prefix == "- " || trimmed_prefix == "* " || trimmed_prefix == "+ " {
-            // De-escalate empty bullet
-            self.lines[self.cursor_row] = indent.to_string();
-            self.cursor_col = indent.len();
-            de_escalated = true;
+            let item_text = &trimmed_prefix[6..];
+            if item_text.trim().is_empty() && suffix.trim().is_empty() {
+                // Empty checkbox item: de-escalate to plain indent
+                self.lines[self.cursor_row] = indent.to_string();
+                self.cursor_col = indent.len();
+                de_escalated = true;
+            } else {
+                continuation = format!("{}- [ ] ", indent);
+            }
         } else if trimmed_prefix.starts_with("- ")
             || trimmed_prefix.starts_with("* ")
             || trimmed_prefix.starts_with("+ ")
         {
-            let bullet = &trimmed_prefix[..2];
-            continuation = format!("{}{}", indent, bullet);
+            let item_text = &trimmed_prefix[2..];
+            if item_text.trim().is_empty() && suffix.trim().is_empty() {
+                // Empty bullet: de-escalate
+                self.lines[self.cursor_row] = indent.to_string();
+                self.cursor_col = indent.len();
+                de_escalated = true;
+            } else {
+                let bullet = &trimmed_prefix[..2];
+                continuation = format!("{}{}", indent, bullet);
+            }
+        } else if let Some(cap) = parse_ordered_list(trimmed_prefix) {
+            let (num_str, rest) = cap;
+            if rest.trim().is_empty() && suffix.trim().is_empty() {
+                // Empty numbered item: de-escalate
+                self.lines[self.cursor_row] = indent.to_string();
+                self.cursor_col = indent.len();
+                de_escalated = true;
+            } else if let Ok(num) = num_str.parse::<usize>() {
+                continuation = format!("{}{}. ", indent, num + 1);
+            }
+        } else if let Some(quote_text) = trimmed_prefix.strip_prefix("> ") {
+            if quote_text.trim().is_empty() && suffix.trim().is_empty() {
+                self.lines[self.cursor_row] = indent.to_string();
+                self.cursor_col = indent.len();
+                de_escalated = true;
+            } else {
+                continuation = format!("{}> ", indent);
+            }
         }
 
         if !de_escalated {
@@ -294,7 +407,7 @@ impl NoteEditorModal {
         }
     }
 
-    /// Renders note editor modal
+    /// Renders note editor modal with soft-wrapping and no line numbers
     pub fn render(&mut self, area: Rect, styles: &ResolvedThemeStyles, buf: &mut Buffer) -> Rect {
         let dialog_w = (area.width.saturating_sub(4)).clamp(20, 84);
         let dialog_h = (area.height.saturating_sub(4)).clamp(14, 28);
@@ -308,61 +421,63 @@ impl NoteEditorModal {
         let footer_h = footer_lines.len().max(1);
 
         let content_h = inner.height.saturating_sub(1 + footer_h as u16 + 1) as usize;
-        self.ensure_cursor_visible(content_h);
+        let inner_w = inner.width.saturating_sub(4) as usize;
+        self.last_inner_w = inner_w;
 
-        let inner_w = inner.width.saturating_sub(6) as usize;
+        let (visual_lines, cursor_vis_idx) = self.compute_visual_lines(inner_w);
 
-        // Render editor lines
-        for (i, line_idx) in
-            (self.scroll_offset..self.lines.len().min(self.scroll_offset + content_h)).enumerate()
+        // Ensure cursor is visible in scroll window
+        if cursor_vis_idx < self.scroll_offset {
+            self.scroll_offset = cursor_vis_idx;
+        } else if cursor_vis_idx >= self.scroll_offset + content_h {
+            self.scroll_offset = cursor_vis_idx + 1 - content_h;
+        }
+
+        // Render editor lines without line numbers
+        for (i, vline) in visual_lines
+            .iter()
+            .skip(self.scroll_offset)
+            .take(content_h)
+            .enumerate()
         {
             let y = inner.y + 1 + i as u16;
-            let line_num_str = format!("{:2} ", line_idx + 1);
-            buf.set_string(
-                inner.x + 2,
-                y,
-                &line_num_str,
+            let line_start_x = inner.x + 2;
+            let raw_line = &self.lines[vline.logical_row];
+
+            let line_style = if raw_line.starts_with("- [x]") || raw_line.starts_with("- [X]") {
                 Style::default()
                     .fg(Color::DarkGray)
-                    .add_modifier(Modifier::DIM),
-            );
+                    .add_modifier(Modifier::DIM)
+            } else if raw_line.contains("- [ ]") {
+                Style::default().fg(Color::Yellow)
+            } else if raw_line.starts_with('#') {
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                styles.text
+            };
 
-            let line = &self.lines[line_idx];
-            let line_start_x = inner.x + 5;
-            let display_chars: Vec<char> = line.chars().take(inner_w).collect();
-
-            // Print line text
-            for (col_idx, &c) in display_chars.iter().enumerate() {
-                let is_cursor = line_idx == self.cursor_row && col_idx == self.cursor_col;
+            for (col_idx, &c) in vline.chars.iter().enumerate() {
+                let is_cursor = vline.cursor_col_in_chunk == Some(col_idx);
                 let cell_style = if is_cursor {
                     styles.highlight.add_modifier(Modifier::BOLD)
-                } else if line.starts_with("- [x]") || line.starts_with("- [X]") {
-                    Style::default()
-                        .fg(Color::DarkGray)
-                        .add_modifier(Modifier::DIM)
-                } else if line.contains("- [ ]") {
-                    Style::default().fg(Color::Yellow)
-                } else if line.starts_with('#') {
-                    Style::default()
-                        .fg(Color::Cyan)
-                        .add_modifier(Modifier::BOLD)
                 } else {
-                    styles.text
+                    line_style
                 };
                 buf.set_string(line_start_x + col_idx as u16, y, c.to_string(), cell_style);
             }
 
-            // If cursor is at or beyond end of line
-            if line_idx == self.cursor_row
-                && self.cursor_col >= display_chars.len()
-                && self.cursor_col < inner_w
-            {
-                buf.set_string(
-                    line_start_x + self.cursor_col as u16,
-                    y,
-                    " ",
-                    styles.highlight.add_modifier(Modifier::BOLD),
-                );
+            // If cursor is at or beyond end of line chunk
+            if let Some(c_col) = vline.cursor_col_in_chunk {
+                if c_col >= vline.chars.len() && c_col < inner_w {
+                    buf.set_string(
+                        line_start_x + c_col as u16,
+                        y,
+                        " ",
+                        styles.highlight.add_modifier(Modifier::BOLD),
+                    );
+                }
             }
         }
 
@@ -382,24 +497,33 @@ impl NoteEditorModal {
     }
 }
 
-/// Simple Base64 encoder for OSC 52 clipboard strings
+fn parse_ordered_list(text: &str) -> Option<(&str, &str)> {
+    let dot_idx = text.find(". ")?;
+    let num_part = &text[..dot_idx];
+    if !num_part.is_empty() && num_part.chars().all(|c| c.is_ascii_digit()) {
+        Some((num_part, &text[dot_idx + 2..]))
+    } else {
+        None
+    }
+}
+
 fn base64_encode(bytes: &[u8]) -> String {
-    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const B64_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
     for chunk in bytes.chunks(3) {
         let b0 = chunk[0];
         let b1 = if chunk.len() > 1 { chunk[1] } else { 0 };
         let b2 = if chunk.len() > 2 { chunk[2] } else { 0 };
 
-        out.push(TABLE[(b0 >> 2) as usize] as char);
-        out.push(TABLE[(((b0 & 0x03) << 4) | (b1 >> 4)) as usize] as char);
+        out.push(B64_CHARS[(b0 >> 2) as usize] as char);
+        out.push(B64_CHARS[(((b0 & 0x03) << 4) | (b1 >> 4)) as usize] as char);
         if chunk.len() > 1 {
-            out.push(TABLE[(((b1 & 0x0F) << 2) | (b2 >> 6)) as usize] as char);
+            out.push(B64_CHARS[(((b1 & 0x0f) << 2) | (b2 >> 6)) as usize] as char);
         } else {
             out.push('=');
         }
         if chunk.len() > 2 {
-            out.push(TABLE[(b2 & 0x3F) as usize] as char);
+            out.push(B64_CHARS[(b2 & 0x3f) as usize] as char);
         } else {
             out.push('=');
         }
