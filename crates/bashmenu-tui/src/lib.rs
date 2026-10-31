@@ -17,7 +17,8 @@ pub use menu_view::{MenuAction, MenuView};
 pub use modals::{
     compute_modal_inner, is_close_button_clicked, render_modal_frame, AsciiGridModal,
     ColorGridModal, ConfirmModal, FilePickerModal, HelpModal, InputModal, MessageModal,
-    NoteEditorAction, NoteEditorModal, NoteViewerAction, NoteViewerModal, ThemePickerModal,
+    NoteEditorAction, NoteEditorModal, NoteViewerAction, NoteViewerModal, RadioModal,
+    ThemePickerModal, ToggleChoice, ToggleModal,
 };
 pub use style::ResolvedThemeStyles;
 pub use terminal::TerminalGuard;

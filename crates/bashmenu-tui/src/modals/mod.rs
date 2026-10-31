@@ -9,7 +9,9 @@ pub mod input;
 pub mod message;
 pub mod note_editor;
 pub mod note_viewer;
+pub mod radio;
 pub mod theme_picker;
+pub mod toggle;
 
 pub use confirm::ConfirmModal;
 pub use file_picker::FilePickerModal;
@@ -20,4 +22,6 @@ pub use input::InputModal;
 pub use message::MessageModal;
 pub use note_editor::{NoteEditorAction, NoteEditorModal};
 pub use note_viewer::{wrap_footer_tokens, NoteViewerAction, NoteViewerModal};
+pub use radio::RadioModal;
 pub use theme_picker::ThemePickerModal;
+pub use toggle::{ToggleChoice, ToggleModal};

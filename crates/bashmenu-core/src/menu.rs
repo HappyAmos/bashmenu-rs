@@ -109,6 +109,71 @@ impl MenuItem {
     pub fn is_divider(&self) -> bool {
         self.r#type == MenuItemType::Divider || self.label == "{divider}"
     }
+
+    /// Configuration key associated with this item (e.g. `settings.use_nerd_fonts`)
+    pub fn key(&self) -> Option<&str> {
+        self.extra.get("key").and_then(|v| v.as_str())
+    }
+
+    /// Display title for dialogs or inspector
+    pub fn title(&self) -> Option<&str> {
+        self.extra
+            .get("title")
+            .and_then(|v| v.as_str())
+            .or(self.prompt.as_deref())
+    }
+
+    /// Prompt or descriptive message for dialogs
+    pub fn message(&self) -> Option<&str> {
+        self.extra
+            .get("message")
+            .and_then(|v| v.as_str())
+            .or_else(|| self.extra.get("text").and_then(|v| v.as_str()))
+            .or(self.prompt.as_deref())
+    }
+
+    /// Picker mode if specified ("file" or "dir")
+    pub fn picker(&self) -> Option<&str> {
+        self.extra.get("picker").and_then(|v| v.as_str())
+    }
+
+    /// Radio selection options as (value, label) pairs
+    pub fn options(&self) -> Vec<(String, String)> {
+        let mut list = Vec::new();
+        if let Some(serde_yml::Value::Sequence(seq)) = self.extra.get("options") {
+            for item in seq {
+                match item {
+                    serde_yml::Value::Mapping(map) => {
+                        let val = map
+                            .get("value")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or_default()
+                            .to_string();
+                        let lbl = map
+                            .get("label")
+                            .or_else(|| map.get("title"))
+                            .and_then(|v| v.as_str())
+                            .unwrap_or(&val)
+                            .to_string();
+                        list.push((val, lbl));
+                    }
+                    serde_yml::Value::Sequence(pair) if pair.len() >= 2 => {
+                        let val = pair[0].as_str().unwrap_or_default().to_string();
+                        let lbl = pair[1].as_str().unwrap_or(&val).to_string();
+                        list.push((val, lbl));
+                    }
+                    serde_yml::Value::String(s) => {
+                        list.push((s.clone(), s.clone()));
+                    }
+                    other => {
+                        let s = format!("{:?}", other);
+                        list.push((s.clone(), s));
+                    }
+                }
+            }
+        }
+        list
+    }
 }
 
 /// Submenu container holding child items

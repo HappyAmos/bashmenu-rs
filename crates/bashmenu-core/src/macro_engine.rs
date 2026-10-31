@@ -160,7 +160,7 @@ fn get_battery_status() -> String {
     "N/A".to_string()
 }
 
-fn resolve_config_dot_path(config_val: &serde_json::Value, path: &str) -> Option<String> {
+pub fn resolve_config_dot_path(config_val: &serde_json::Value, path: &str) -> Option<String> {
     let parts: Vec<&str> = path.split('.').collect();
     if parts.is_empty() {
         return None;

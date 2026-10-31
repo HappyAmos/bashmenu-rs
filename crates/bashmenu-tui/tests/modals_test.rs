@@ -1,6 +1,6 @@
 use bashmenu_tui::{
     AsciiGridModal, ColorGridModal, ConfirmModal, FilePickerModal, InputModal, MessageModal,
-    ResolvedThemeStyles,
+    RadioModal, ResolvedThemeStyles, ToggleChoice, ToggleModal,
 };
 use crossterm::event::KeyCode;
 use ratatui::buffer::Buffer;
@@ -588,4 +588,107 @@ fn test_modal_no_triangle_indicator() {
     grid_picker.render(area, &styles, &mut buf3);
     let s3 = format!("{:?}", buf3);
     assert!(!s3.contains('►'), "ColorGridModal must not render '►'");
+}
+
+#[test]
+fn test_toggle_modal_interaction() {
+    let mut modal = ToggleModal::new(
+        "Toggle Nerd Fonts",
+        "Enable colorful menu emojis and Nerd Fonts?",
+    );
+    let styles = ResolvedThemeStyles::default();
+    let area = Rect::new(0, 0, 80, 24);
+
+    // Initial focus is True (0)
+    assert_eq!(modal.focused_idx, 0);
+
+    // Tab moves to False (1)
+    modal.handle_key(KeyCode::Tab);
+    assert_eq!(modal.focused_idx, 1);
+
+    // Tab moves to Cancel (2)
+    modal.handle_key(KeyCode::Tab);
+    assert_eq!(modal.focused_idx, 2);
+
+    // Tab wraps to True (0)
+    modal.handle_key(KeyCode::Tab);
+    assert_eq!(modal.focused_idx, 0);
+
+    // Enter returns Some(ToggleChoice::True)
+    assert_eq!(modal.handle_key(KeyCode::Enter), Some(ToggleChoice::True));
+
+    // Direct key shortcuts: 'f' returns False, 't' returns True, 'c' returns Cancel
+    assert_eq!(
+        modal.handle_key(KeyCode::Char('f')),
+        Some(ToggleChoice::False)
+    );
+    assert_eq!(
+        modal.handle_key(KeyCode::Char('t')),
+        Some(ToggleChoice::True)
+    );
+    assert_eq!(
+        modal.handle_key(KeyCode::Char('c')),
+        Some(ToggleChoice::Cancel)
+    );
+    assert_eq!(modal.handle_key(KeyCode::Esc), Some(ToggleChoice::Cancel));
+
+    // Rendering test
+    let mut buf = Buffer::empty(area);
+    modal.render(area, &styles, &mut buf);
+    let s = format!("{:?}", buf);
+    assert!(s.contains("Toggle Nerd Fonts"));
+    assert!(s.contains("True"));
+    assert!(s.contains("False"));
+    assert!(s.contains("Cancel"));
+}
+
+#[test]
+fn test_radio_modal_interaction() {
+    let options = vec![
+        ("default".to_string(), "Default ($EDITOR)".to_string()),
+        ("builtin".to_string(), "Built-in (BashEdit)".to_string()),
+        ("vim".to_string(), "Vim".to_string()),
+    ];
+    let mut modal = RadioModal::new(
+        "Pager Text Editor",
+        "Select editor launched when pressing [e] in pager:",
+        options,
+        "default",
+    );
+    let styles = ResolvedThemeStyles::default();
+    let area = Rect::new(0, 0, 80, 24);
+
+    assert_eq!(modal.selected_val, "default");
+    assert_eq!(modal.cursor_idx, 0);
+
+    // Down key moves cursor to option 1 ("builtin")
+    modal.handle_key(KeyCode::Down);
+    assert_eq!(modal.cursor_idx, 1);
+
+    // Space key selects current cursor option ("builtin")
+    modal.handle_key(KeyCode::Char(' '));
+    assert_eq!(modal.selected_val, "builtin");
+
+    // Number key '3' immediately selects option 3 ("vim")
+    modal.handle_key(KeyCode::Char('3'));
+    assert_eq!(modal.selected_val, "vim");
+
+    // Enter confirms selection
+    assert_eq!(
+        modal.handle_key(KeyCode::Enter),
+        Some(Some("vim".to_string()))
+    );
+
+    // Esc cancels
+    assert_eq!(modal.handle_key(KeyCode::Esc), Some(None));
+
+    // Rendering test
+    let mut buf = Buffer::empty(area);
+    modal.render(area, &styles, &mut buf);
+    let s = format!("{:?}", buf);
+    assert!(s.contains("Pager Text Editor"));
+    assert!(s.contains("Default ($EDITOR)"));
+    assert!(s.contains("Built-in (BashEdit)"));
+    assert!(s.contains("Vim"));
+    assert!(s.contains("●"));
 }

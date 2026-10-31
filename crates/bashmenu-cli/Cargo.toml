@@ -17,3 +17,4 @@ clap = { workspace = true }
 ratatui = { workspace = true }
 crossterm = { workspace = true }
 anyhow = { workspace = true }
+serde_yml = { workspace = true }

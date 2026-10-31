@@ -140,6 +140,11 @@ impl MenuView {
         self.styles = styles;
     }
 
+    /// Update nerd fonts rendering mode
+    pub fn set_use_nerd_fonts(&mut self, use_nerd: bool) {
+        self.use_nerd_fonts = use_nerd;
+    }
+
     /// Update status gutter template or value
     pub fn set_status_gutter(&mut self, gutter: String) {
         self.status_gutter = gutter;
@@ -488,10 +493,10 @@ impl MenuView {
             MenuItemType::Other(ref s) if s == "back" => self.go_back(),
             _ => {
                 if let Some(ref act) = item.action {
-                    if act == "themeedit" {
+                    if act == "themeedit" || act == "action_theme_editor" {
                         return MenuAction::LaunchThemeEditor;
                     }
-                    if act == "menuedit" {
+                    if act == "menuedit" || act == "menuedit.py" {
                         return MenuAction::EditMenu;
                     }
                 }

@@ -129,3 +129,81 @@ fn test_parse_production_bashmenu_themes() {
         );
     }
 }
+
+#[test]
+fn test_config_get_set_value_and_menu_item_helpers() {
+    let fixture = fixture_path("bashmenu.yml");
+    let mut config = load_config(&fixture).expect("Failed to parse production bashmenu.yml");
+
+    // Test get_value
+    assert_eq!(
+        config.get_value("theme"),
+        Some("alaska-mountain".to_string())
+    );
+    assert_eq!(
+        config.get_value("settings.use_nerd_fonts"),
+        Some("true".to_string())
+    );
+    assert_eq!(
+        config.get_value("app.settings.tabstop"),
+        Some("4".to_string())
+    );
+
+    // Test set_value
+    config.set_value("settings.use_nerd_fonts", serde_yml::Value::Bool(false));
+    assert_eq!(config.settings.use_nerd_fonts, Some(false));
+    assert_eq!(
+        config.get_value("settings.use_nerd_fonts"),
+        Some("false".to_string())
+    );
+
+    config.set_value(
+        "settings.ping_target",
+        serde_yml::Value::String("8.8.4.4".to_string()),
+    );
+    assert_eq!(config.settings.ping_target, Some("8.8.4.4".to_string()));
+    assert_eq!(
+        config.get_value("settings.ping_target"),
+        Some("8.8.4.4".to_string())
+    );
+
+    config.set_value(
+        "settings.pager_editor",
+        serde_yml::Value::String("nano".to_string()),
+    );
+    assert_eq!(config.settings.pager_editor, Some("nano".to_string()));
+
+    // Test MenuItem helpers
+    let menu = load_menu(fixture_path("bashmenu.mnu")).expect("load menu");
+    let mut found_nerd = false;
+    let mut found_pager = false;
+
+    fn check_items(
+        items: &[bashmenu_core::MenuItem],
+        found_nerd: &mut bool,
+        found_pager: &mut bool,
+    ) {
+        for it in items {
+            if let Some(key) = it.key() {
+                if key == "settings.use_nerd_fonts" {
+                    *found_nerd = true;
+                    assert!(it.title().is_some() || it.message().is_some());
+                } else if key == "settings.pager_editor" {
+                    *found_pager = true;
+                    let opts = it.options();
+                    assert!(
+                        !opts.is_empty(),
+                        "Options must not be empty for pager_editor"
+                    );
+                }
+            }
+            if let Some(sub) = &it.submenu {
+                check_items(&sub.items, found_nerd, found_pager);
+            }
+        }
+    }
+
+    check_items(&menu.items, &mut found_nerd, &mut found_pager);
+    assert!(found_nerd, "Enable Nerd Fonts item with key must be found");
+    assert!(found_pager, "Pager editor item with options must be found");
+}

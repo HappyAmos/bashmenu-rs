@@ -197,6 +197,122 @@ impl BashMenuConfig {
             (None, None) => None,
         }
     }
+
+    /// Retrieve value from nested configuration using dot-notation string.
+    pub fn get_value(&self, key_path: &str) -> Option<String> {
+        let val = serde_json::to_value(self).ok()?;
+        crate::macro_engine::resolve_config_dot_path(&val, key_path)
+    }
+
+    /// Set value in configuration using dot-notation string.
+    pub fn set_value(&mut self, key_path: &str, value: serde_yml::Value) -> bool {
+        let norm = if let Some(stripped) = key_path.strip_prefix("app.") {
+            stripped
+        } else if let Some(stripped) = key_path.strip_prefix("bashmenu.") {
+            stripped
+        } else {
+            key_path
+        };
+
+        match norm {
+            "settings.use_nerd_fonts" => {
+                self.settings.use_nerd_fonts = match &value {
+                    serde_yml::Value::Bool(b) => Some(*b),
+                    serde_yml::Value::String(s) => Some(s.eq_ignore_ascii_case("true")),
+                    _ => None,
+                };
+            }
+            "settings.check_for_updates" => {
+                self.settings.check_for_updates = match &value {
+                    serde_yml::Value::Bool(b) => Some(*b),
+                    serde_yml::Value::String(s) => Some(s.eq_ignore_ascii_case("true")),
+                    _ => None,
+                };
+            }
+            "settings.tab_to_spaces" => {
+                self.settings.tab_to_spaces = match &value {
+                    serde_yml::Value::Bool(b) => Some(*b),
+                    serde_yml::Value::String(s) => Some(s.eq_ignore_ascii_case("true")),
+                    _ => None,
+                };
+            }
+            "settings.show_menu_shortcuts" => {
+                self.settings.show_menu_shortcuts = match &value {
+                    serde_yml::Value::Bool(b) => Some(*b),
+                    serde_yml::Value::String(s) => Some(s.eq_ignore_ascii_case("true")),
+                    _ => None,
+                };
+            }
+            "settings.nerd_font_width" => {
+                self.settings.nerd_font_width = match &value {
+                    serde_yml::Value::String(s) => Some(s.clone()),
+                    serde_yml::Value::Number(n) => Some(n.to_string()),
+                    _ => None,
+                };
+            }
+            "settings.tabstop" => {
+                self.settings.tabstop = match &value {
+                    serde_yml::Value::Number(n) => n.as_u64().map(|v| v as usize),
+                    serde_yml::Value::String(s) => s.parse::<usize>().ok(),
+                    _ => None,
+                };
+            }
+            "settings.pager_editor" => {
+                self.settings.pager_editor = match &value {
+                    serde_yml::Value::String(s) => Some(s.clone()),
+                    _ => None,
+                };
+            }
+            "settings.ping_target" => {
+                self.settings.ping_target = match &value {
+                    serde_yml::Value::String(s) => Some(s.clone()),
+                    _ => None,
+                };
+            }
+            "settings.status_gutter" => {
+                self.settings.status_gutter = match &value {
+                    serde_yml::Value::String(s) => Some(s.clone()),
+                    _ => None,
+                };
+            }
+            "settings.refresh_interval" => {
+                self.settings.refresh_interval = Some(value);
+            }
+            "settings.cache_dir" => {
+                self.settings.cache_dir = match &value {
+                    serde_yml::Value::String(s) => Some(s.clone()),
+                    _ => None,
+                };
+            }
+            "settings.scripts_dir" => {
+                self.settings.scripts_dir = match &value {
+                    serde_yml::Value::String(s) => Some(s.clone()),
+                    _ => None,
+                };
+            }
+            "settings.templates_dir" => {
+                self.settings.templates_dir = match &value {
+                    serde_yml::Value::String(s) => Some(s.clone()),
+                    _ => None,
+                };
+            }
+            "theme" => {
+                if let serde_yml::Value::String(s) = value {
+                    self.theme = s;
+                }
+            }
+            _ => {
+                if let Some(key) = norm.strip_prefix("settings.") {
+                    self.settings.extra.insert(key.to_string(), value);
+                } else if let Some(key) = norm.strip_prefix("user.") {
+                    self.user.insert(key.to_string(), value);
+                } else {
+                    self.extra.insert(norm.to_string(), value);
+                }
+            }
+        }
+        true
+    }
 }
 
 /// Loads and parses `bashmenu.yml` from the specified path.
