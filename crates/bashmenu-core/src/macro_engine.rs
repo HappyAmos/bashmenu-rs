@@ -41,7 +41,19 @@ impl<'a> MacroContext<'a> {
             .unwrap_or_else(|_| PathBuf::from("/"));
         let bashmenu_dir = std::env::var("BASHMENU_DIR")
             .map(PathBuf::from)
-            .unwrap_or_else(|_| std::env::current_dir().unwrap_or_else(|_| home_dir.clone()));
+            .unwrap_or_else(|_| {
+                let cur = std::env::current_dir().unwrap_or_else(|_| home_dir.clone());
+                if cur.join("bashmenu.mnu").exists() || cur.join("bashmenu.yml").exists() {
+                    cur
+                } else {
+                    let user_cfg = home_dir.join(".config/bashmenu");
+                    if user_cfg.exists() {
+                        user_cfg
+                    } else {
+                        cur
+                    }
+                }
+            });
 
         Self {
             config,

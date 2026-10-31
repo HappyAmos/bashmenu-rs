@@ -129,4 +129,9 @@
   - Implemented `ItemTypePickerModal` with 16 menu item types.
   - Implemented `ItemEditModal` with schema field inputs, execution mode checkboxes (`alt_buffer`, `no_formatting`, etc.), live preview, and ASCII table picker modal integration.
   - Added tests in `crates/menuedit-cli/tests/menuedit_test.rs` verifying property inspector formatting, tree nesting, indent/outdent, and type mutation.
+- [x] **Notebook File Path Resolution & Installation Parity:**
+  - Repaired truncated `notebooks/notes.yml` and verified valid YAML structure.
+  - Enhanced `resolve_notebook_path` and `MacroContext::new` with fallbacks for user config directory (`~/.config/bashmenu/notebooks/notes.yml`).
+  - Updated `install.sh` to initialize `$CONFIG_DIR/notebooks` with default notebooks fixtures.
+  - Added user-facing error modal reporting on notebook load failures instead of silent dismissal.
 - [x] Verified zero Clippy warnings across the entire workspace with `-D warnings`, full `cargo fmt` compliance, and 100% test pass rate.

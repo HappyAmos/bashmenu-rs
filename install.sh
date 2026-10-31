@@ -71,6 +71,20 @@ for cfg in bashmenu.yml bashmenu.mnu bashmenu.themes; do
     fi
 done
 
+# Initialize user notebooks directory if missing
+if [ -d "$SCRIPT_DIR/notebooks" ]; then
+    mkdir -p "$CONFIG_DIR/notebooks"
+    for nb in "$SCRIPT_DIR/notebooks"/*.yml; do
+        if [ -f "$nb" ]; then
+            nb_name="$(basename "$nb")"
+            if [ ! -f "$CONFIG_DIR/notebooks/$nb_name" ]; then
+                cp "$nb" "$CONFIG_DIR/notebooks/$nb_name"
+                echo "  [+] Initialized user notebook: $CONFIG_DIR/notebooks/$nb_name"
+            fi
+        fi
+    done
+fi
+
 # Verify PATH
 case ":$PATH:" in
     *":$BIN_DIR:"*) ;;

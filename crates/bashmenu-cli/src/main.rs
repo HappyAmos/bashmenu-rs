@@ -548,20 +548,33 @@ fn main() -> Result<()> {
                             ctx.screen_width = size.width as usize;
                             let raw_path = item.file.as_deref().or(item.action.as_deref());
                             let resolved = resolve_notebook_path(raw_path, &ctx);
-                            if let Ok(nb) = load_notebook(&resolved) {
-                                let sub = build_notebook_submenu(&resolved.to_string_lossy(), &nb);
-                                menu_view.push_notebook(
-                                    sub.title,
-                                    sub.items,
-                                    resolved.to_string_lossy().to_string(),
-                                );
+                            match load_notebook(&resolved) {
+                                Ok(nb) => {
+                                    let sub =
+                                        build_notebook_submenu(&resolved.to_string_lossy(), &nb);
+                                    menu_view.push_notebook(
+                                        sub.title,
+                                        sub.items,
+                                        resolved.to_string_lossy().to_string(),
+                                    );
+                                }
+                                Err(e) => {
+                                    active_modal = ActiveModal::Help(HelpModal::new(
+                                        "Notebook Error",
+                                        &format!(
+                                            "Failed to load notebook '{}':\n\n{}",
+                                            resolved.display(),
+                                            e
+                                        ),
+                                    ));
+                                }
                             }
                         }
                         MenuAction::ViewNote {
                             filepath,
                             note_title,
-                        } => {
-                            if let Ok(nb) = load_notebook(&filepath) {
+                        } => match load_notebook(&filepath) {
+                            Ok(nb) => {
                                 if let Some(note) = get_note_by_title(&nb, &note_title) {
                                     active_modal = ActiveModal::NoteViewer(NoteViewerModal::new(
                                         &note.title,
@@ -570,7 +583,13 @@ fn main() -> Result<()> {
                                     ));
                                 }
                             }
-                        }
+                            Err(e) => {
+                                active_modal = ActiveModal::Help(HelpModal::new(
+                                    "Note Error",
+                                    &format!("Failed to load note file '{}':\n\n{}", filepath, e),
+                                ));
+                            }
+                        },
                         MenuAction::NewNote(filepath) => {
                             active_modal = ActiveModal::NewNoteTitle(
                                 filepath,

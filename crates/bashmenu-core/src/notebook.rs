@@ -75,7 +75,7 @@ pub fn resolve_notebook_path(raw_path: Option<&str>, ctx: &MacroContext) -> Path
     };
     let p = PathBuf::from(&expanded);
 
-    if p.is_absolute() {
+    if p.is_absolute() && p.exists() {
         return p;
     }
 
@@ -86,6 +86,25 @@ pub fn resolve_notebook_path(raw_path: Option<&str>, ctx: &MacroContext) -> Path
     let cand2 = ctx.bashmenu_dir.join(&p);
     if cand2.exists() {
         return cand2;
+    }
+
+    // Check user config directory fallback (~/.config/bashmenu/notebooks/...)
+    if let Some(file_name) = p.file_name() {
+        let user_cfg_nb = ctx
+            .home_dir
+            .join(".config/bashmenu/notebooks")
+            .join(file_name);
+        if user_cfg_nb.exists() {
+            return user_cfg_nb;
+        }
+        let user_cfg_root = ctx.home_dir.join(".config/bashmenu").join(file_name);
+        if user_cfg_root.exists() {
+            return user_cfg_root;
+        }
+    }
+
+    if p.is_absolute() {
+        return p;
     }
 
     cand1
