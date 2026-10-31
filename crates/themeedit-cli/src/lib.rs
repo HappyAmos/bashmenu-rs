@@ -69,7 +69,30 @@ impl ThemeEditorState {
 
         let initial_name = target_theme
             .filter(|n| !n.trim().is_empty())
-            .or_else(|| themes.keys().next().cloned())
+            .or_else(|| {
+                // Try reading active theme from bashmenu.yml if available
+                if let Ok(home) = std::env::var("HOME") {
+                    let cfg_path = PathBuf::from(home).join(".config/bashmenu/bashmenu.yml");
+                    if let Ok(cfg) = bashmenu_core::load_config(&cfg_path) {
+                        if themes.contains_key(&cfg.theme) {
+                            return Some(cfg.theme);
+                        }
+                    }
+                }
+                let cur_cfg = PathBuf::from("bashmenu.yml");
+                if let Ok(cfg) = bashmenu_core::load_config(&cur_cfg) {
+                    if themes.contains_key(&cfg.theme) {
+                        return Some(cfg.theme);
+                    }
+                }
+                if themes.contains_key("dracula") {
+                    Some("dracula".to_string())
+                } else {
+                    let mut sorted: Vec<_> = themes.keys().cloned().collect();
+                    sorted.sort();
+                    sorted.into_iter().next()
+                }
+            })
             .unwrap_or_else(|| "dracula".to_string());
 
         let current_theme = themes

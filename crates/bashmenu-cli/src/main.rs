@@ -657,6 +657,8 @@ fn main() -> Result<()> {
                                 let _ = Command::new(&themeedit_bin)
                                     .arg("-f")
                                     .arg(&themes_path)
+                                    .arg("-t")
+                                    .arg(&config.theme)
                                     .status();
                                 Ok(())
                             });
@@ -858,7 +860,12 @@ fn main() -> Result<()> {
                                 {
                                     let themeedit_bin = locate_tool("themeedit");
                                     let _ = guard.suspend(|| {
-                                        let _ = Command::new(&themeedit_bin).status();
+                                        let _ = Command::new(&themeedit_bin)
+                                            .arg("-f")
+                                            .arg(&themes_path)
+                                            .arg("-t")
+                                            .arg(&config.theme)
+                                            .status();
                                         Ok(())
                                     });
                                     if let Ok(new_themes) = load_themes(&themes_path) {

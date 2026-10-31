@@ -86,6 +86,11 @@ fn main() -> Result<()> {
     let mut guard = TerminalGuard::init()?;
     let mut active_modal = ActiveModal::None;
     let mut last_grid_origin = (0, 0);
+    let mut wp_compositor = state
+        .current_theme
+        .wallpaper_config()
+        .map(WallpaperCompositor::new);
+    let mut need_redraw = true;
 
     loop {
         let size = guard.terminal_mut().size()?;
@@ -94,7 +99,16 @@ fn main() -> Result<()> {
         // Derive resolved styles from current edited theme for live preview
         let preview_styles = ResolvedThemeStyles::from_theme(&state.current_theme, true);
 
-        guard.terminal_mut().draw(|f| {
+        if need_redraw {
+            let wp_cfg = state.current_theme.wallpaper_config();
+            match (&mut wp_compositor, wp_cfg) {
+                (Some(c), Some(cfg)) => c.set_config(cfg),
+                (None, Some(cfg)) => wp_compositor = Some(WallpaperCompositor::new(cfg)),
+                (Some(_), None) => wp_compositor = None,
+                (None, None) => {}
+            }
+
+            guard.terminal_mut().draw(|f| {
             let buf = f.buffer_mut();
 
             // Background fill
@@ -259,10 +273,6 @@ fn main() -> Result<()> {
                     );
 
                     // Wallpaper overlay
-                    let mut wp_compositor = state
-                        .current_theme
-                        .wallpaper_config()
-                        .map(WallpaperCompositor::new);
                     if let Some(comp) = &mut wp_compositor {
                         if let Some(grid) = comp.get_grid(
                             right_area.width as usize,
@@ -515,9 +525,20 @@ fn main() -> Result<()> {
                 ActiveModal::None => {}
             }
         })?;
+            need_redraw = false;
+        }
 
         if event::poll(Duration::from_millis(50))? {
             let ev = event::read()?;
+
+            // Ignore pure mouse movement events to avoid event queue flooding and latency
+            if let Event::Mouse(m) = ev {
+                if m.kind == MouseEventKind::Moved {
+                    continue;
+                }
+            }
+
+            need_redraw = true;
 
             // Modal interaction handles events first
             match &mut active_modal {
