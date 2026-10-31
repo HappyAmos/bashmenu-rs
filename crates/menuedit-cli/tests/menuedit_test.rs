@@ -349,3 +349,169 @@ fn test_menuedit_inspector_placeholders_and_preview() {
     assert!(div_joined.contains("[DIV] DIVIDER"));
     assert!(div_joined.contains('─'));
 }
+
+#[test]
+fn test_item_edit_modal_standard_item_parity() {
+    use bashmenu_tui::ResolvedThemeStyles;
+    use crossterm::event::{KeyCode, KeyModifiers};
+    use menuedit_cli::{FocusControl, ItemEditModal};
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+
+    let item = MenuItem {
+        label: "Edit Configuration".to_string(),
+        r#type: MenuItemType::Editor,
+        file: Some("bashmenu.yml".to_string()),
+        icon: Some("{nf:*:f013:⚙️}".to_string()),
+        prompt: Some("Open editor".to_string()),
+        ..Default::default()
+    };
+
+    let mut modal = ItemEditModal::new(&item);
+    assert_eq!(modal.current_type, "editor");
+    assert!(!modal.is_divider());
+    assert_eq!(modal.title_input.as_string(), "Edit Configuration");
+    assert_eq!(modal.action_input.as_string(), "bashmenu.yml");
+    assert_eq!(modal.get_action_label_text(), "File to Edit (file):");
+
+    // Test text editing on Title input
+    modal.active_control_idx = modal
+        .focus_controls()
+        .iter()
+        .position(|&c| c == FocusControl::TitleInput)
+        .unwrap();
+    modal.handle_key(KeyCode::End, KeyModifiers::NONE);
+    modal.handle_key(KeyCode::Char('!'), KeyModifiers::NONE);
+    assert_eq!(modal.title_input.as_string(), "Edit Configuration!");
+
+    // Test toggling execution mode
+    modal.active_control_idx = modal
+        .focus_controls()
+        .iter()
+        .position(|&c| c == FocusControl::ExecModeSelector)
+        .unwrap();
+    // Initially mode = 2 (Standard)
+    assert_eq!(modal.exec_mode, 2);
+    modal.handle_key(KeyCode::Char('1'), KeyModifiers::NONE);
+    assert_eq!(modal.exec_mode, 0); // Streaming
+    modal.handle_key(KeyCode::Right, KeyModifiers::NONE);
+    assert_eq!(modal.exec_mode, 1); // Interactive
+
+    // Test saving
+    let updated = modal.build_updated_item();
+    assert_eq!(updated.label, "Edit Configuration!");
+    assert_eq!(updated.file.as_deref(), Some("bashmenu.yml"));
+    assert_eq!(
+        updated.extra.get("stream").and_then(|v| v.as_bool()),
+        Some(false)
+    );
+    assert_eq!(updated.interactive, Some(true));
+
+    // Test rendering
+    let area = Rect::new(0, 0, 100, 35);
+    let mut buf = Buffer::empty(area);
+    let styles = ResolvedThemeStyles::default();
+    let inner = modal.render(area, &styles, &mut buf);
+    assert!(inner.width > 0);
+    assert!(inner.height > 0);
+}
+
+#[test]
+fn test_item_edit_modal_divider_parity() {
+    use bashmenu_tui::ResolvedThemeStyles;
+    use menuedit_cli::{FocusControl, ItemEditModal};
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+
+    let div = MenuItem::divider();
+    let mut modal = ItemEditModal::new(&div);
+    assert!(modal.is_divider());
+    assert_eq!(modal.current_type, "{divider}");
+    assert_eq!(modal.char_input.as_string(), "{ascii:196}");
+    assert_eq!(modal.length_input.as_string(), "{window_width}");
+
+    // Edit repeating character
+    modal.active_control_idx = modal
+        .focus_controls()
+        .iter()
+        .position(|&c| c == FocusControl::CharInput)
+        .unwrap();
+    modal.char_input.set_text("{ascii:205}");
+
+    let updated = modal.build_updated_item();
+    assert!(updated.is_divider());
+    assert_eq!(
+        updated.extra.get("char").and_then(|v| v.as_str()),
+        Some("{ascii:205}")
+    );
+
+    // Test rendering
+    let area = Rect::new(0, 0, 90, 30);
+    let mut buf = Buffer::empty(area);
+    let styles = ResolvedThemeStyles::default();
+    let inner = modal.render(area, &styles, &mut buf);
+    assert!(inner.width > 0);
+}
+
+#[test]
+fn test_item_edit_modal_keyboard_shortcuts_and_mouse() {
+    use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+    use menuedit_cli::{BrowseTarget, ItemEditModal, ItemEditResult};
+    use ratatui::layout::Rect;
+
+    let item = MenuItem {
+        label: "Test Item".to_string(),
+        r#type: MenuItemType::Command,
+        command: Some("echo test".to_string()),
+        ..Default::default()
+    };
+
+    let mut modal = ItemEditModal::new(&item);
+
+    // Test Ctrl+S save
+    let res = modal.handle_key(KeyCode::Char('s'), KeyModifiers::CONTROL);
+    assert!(matches!(res, ItemEditResult::Save(_)));
+
+    // Test Ctrl+T change type
+    let res = modal.handle_key(KeyCode::Char('t'), KeyModifiers::CONTROL);
+    assert_eq!(res, ItemEditResult::ChangeType);
+
+    // Test F1 help
+    let res = modal.handle_key(KeyCode::F(1), KeyModifiers::NONE);
+    assert_eq!(res, ItemEditResult::ShowHelp);
+
+    // Test F3 ASCII
+    let res = modal.handle_key(KeyCode::F(3), KeyModifiers::NONE);
+    assert_eq!(res, ItemEditResult::ShowAscii);
+
+    // Test F4 Glyphs
+    let res = modal.handle_key(KeyCode::F(4), KeyModifiers::NONE);
+    assert_eq!(res, ItemEditResult::ShowGlyphs);
+
+    // Test F5 Placeholders
+    let res = modal.handle_key(KeyCode::F(5), KeyModifiers::NONE);
+    assert_eq!(res, ItemEditResult::ShowPlaceholders);
+
+    // Test Esc Cancel
+    let res = modal.handle_key(KeyCode::Esc, KeyModifiers::NONE);
+    assert_eq!(res, ItemEditResult::Cancel);
+
+    // Test Browse result
+    modal.set_browse_result(BrowseTarget::Action, "/path/to/my_script.sh");
+    assert_eq!(modal.action_input.as_string(), "/path/to/my_script.sh");
+
+    // Test Mouse click on [X] (top right corner)
+    let area = Rect::new(0, 0, 100, 35);
+    let inner = bashmenu_tui::compute_modal_inner(area, 86, 32);
+    let close_x = inner.x + inner.width - 2;
+    let close_y = inner.y.saturating_sub(1);
+
+    let mouse_ev = MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: close_x,
+        row: close_y,
+        modifiers: KeyModifiers::NONE,
+    };
+    let res = modal.handle_mouse(mouse_ev, area);
+    assert_eq!(res, ItemEditResult::Cancel);
+}

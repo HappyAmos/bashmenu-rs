@@ -13,7 +13,9 @@ use bashmenu_tui::{split_label_brackets, strip_bbcode, visible_text_len};
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-pub use item_edit::ItemEditModal;
+pub use item_edit::{
+    render_item_preview_line, BrowseTarget, FocusControl, ItemEditModal, ItemEditResult, TextInput,
+};
 pub use tree::{
     delete_item, find_item, find_item_mut, flatten_tree, indent_item, insert_item_after,
     move_down_sibling, move_up_sibling, mutate_item_type, outdent_item, toggle_all_nodes,
