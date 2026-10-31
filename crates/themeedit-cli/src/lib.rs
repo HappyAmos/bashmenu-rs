@@ -127,6 +127,10 @@ impl ThemeEditorState {
                 kind: TokenKind::Color("shortcut_key".to_string()),
             },
             TokenItem {
+                label: "Help Text Color".to_string(),
+                kind: TokenKind::Color("help_text".to_string()),
+            },
+            TokenItem {
                 label: "Gutter Color".to_string(),
                 kind: TokenKind::Color("gutter".to_string()),
             },
@@ -159,6 +163,30 @@ impl ThemeEditorState {
             TokenItem {
                 label: "Bottom Right Corner".to_string(),
                 kind: TokenKind::Border("border_bottom_right".to_string()),
+            },
+            TokenItem {
+                label: "Gutter Border".to_string(),
+                kind: TokenKind::Border("gutter_border".to_string()),
+            },
+            TokenItem {
+                label: "Gutter Separator".to_string(),
+                kind: TokenKind::Border("gutter_separator".to_string()),
+            },
+            TokenItem {
+                label: "Gutter Left Tee".to_string(),
+                kind: TokenKind::Border("gutter_left_tee".to_string()),
+            },
+            TokenItem {
+                label: "Gutter Right Tee".to_string(),
+                kind: TokenKind::Border("gutter_right_tee".to_string()),
+            },
+            TokenItem {
+                label: "Gutter Top Tee".to_string(),
+                kind: TokenKind::Border("gutter_top_tee".to_string()),
+            },
+            TokenItem {
+                label: "Gutter Bottom Tee".to_string(),
+                kind: TokenKind::Border("gutter_bottom_tee".to_string()),
             },
         ];
 
@@ -270,6 +298,12 @@ impl ThemeEditorState {
                         "border_top_right" => win.border_top_right.as_deref(),
                         "border_bottom_left" => win.border_bottom_left.as_deref(),
                         "border_bottom_right" => win.border_bottom_right.as_deref(),
+                        "gutter_border" => win.gutter_border.as_deref(),
+                        "gutter_separator" => win.gutter_separator.as_deref(),
+                        "gutter_left_tee" => win.gutter_left_tee.as_deref(),
+                        "gutter_right_tee" => win.gutter_right_tee.as_deref(),
+                        "gutter_top_tee" => win.gutter_top_tee.as_deref(),
+                        "gutter_bottom_tee" => win.gutter_bottom_tee.as_deref(),
                         _ => None,
                     };
                     if let Some(ch) = s {
@@ -317,6 +351,12 @@ impl ThemeEditorState {
                 "border_top_right" => win.border_top_right = str_val,
                 "border_bottom_left" => win.border_bottom_left = str_val,
                 "border_bottom_right" => win.border_bottom_right = str_val,
+                "gutter_border" => win.gutter_border = str_val,
+                "gutter_separator" => win.gutter_separator = str_val,
+                "gutter_left_tee" => win.gutter_left_tee = str_val,
+                "gutter_right_tee" => win.gutter_right_tee = str_val,
+                "gutter_top_tee" => win.gutter_top_tee = str_val,
+                "gutter_bottom_tee" => win.gutter_bottom_tee = str_val,
                 _ => {}
             }
             self.is_modified = true;

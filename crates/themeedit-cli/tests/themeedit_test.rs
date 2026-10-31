@@ -108,3 +108,40 @@ fn test_themeedit_preview_mode_cycling() {
     state.preview_mode = state.preview_mode.next();
     assert_eq!(state.preview_mode, PreviewMode::Menu);
 }
+
+#[test]
+fn test_themeedit_help_text_and_gutter_tokens() {
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(fixture_path, Some("dracula".to_string()));
+
+    // Verify Help Text Color token exists and can be updated
+    let help_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Help Text Color")
+        .cloned()
+        .expect("Help Text Color token must exist");
+    assert_eq!(help_token.label, "Help Text Color");
+
+    state.set_color_token("help_text", 45);
+    assert_eq!(state.get_token_value_display(&help_token), "Color 45");
+
+    // Verify gutter border tokens exist and can be updated
+    let gutter_sep_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Gutter Separator")
+        .cloned()
+        .expect("Gutter Separator token must exist");
+    state.set_border_token("gutter_separator", '│');
+    assert_eq!(state.get_token_value_display(&gutter_sep_token), "'│'");
+
+    let gutter_top_tee_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Gutter Top Tee")
+        .cloned()
+        .expect("Gutter Top Tee token must exist");
+    state.set_border_token("gutter_top_tee", '┬');
+    assert_eq!(state.get_token_value_display(&gutter_top_tee_token), "'┬'");
+}

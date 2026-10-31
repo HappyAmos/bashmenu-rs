@@ -216,6 +216,89 @@ fn main() -> Result<()> {
 
             match state.preview_mode {
                 PreviewMode::Menu => {
+                    let b = &preview_styles.borders;
+                    let border_style = Style::default().fg(preview_styles.border);
+                    let w = right_area.width as usize;
+
+                    // 1. Gutter layout calculation
+                    let avail_both = (w.saturating_sub(6)).max(4);
+                    let left_gutter_w = avail_both / 2;
+                    let sep_x = (left_gutter_w + 2).min(w.saturating_sub(2));
+                    let left_seg_len = sep_x.saturating_sub(1);
+                    let right_seg_len = w.saturating_sub(2 + sep_x);
+
+                    let bot_y = right_area.y + right_area.height - 1;
+                    let gy = bot_y.saturating_sub(1);
+                    let gt_y = gy.saturating_sub(1);
+
+                    // 2. Window Bottom Border with gutter bottom tee
+                    let bot_line = format!(
+                        "{}{}{}{}{}",
+                        b.border_bottom_left,
+                        b.border_horizontal_bottom.repeat(left_seg_len),
+                        b.gutter_bottom_tee,
+                        b.border_horizontal_bottom.repeat(right_seg_len),
+                        b.border_bottom_right,
+                    );
+                    buf.set_string(right_area.x, bot_y, &bot_line, border_style);
+
+                    // 3. Gutter Content Row (Pseudo Help Gutter on left, Pseudo Status Gutter on right)
+                    buf.set_string(right_area.x, gy, &b.border_vertical_left, border_style);
+                    buf.set_string(
+                        right_area.x + sep_x as u16,
+                        gy,
+                        &b.gutter_separator,
+                        border_style,
+                    );
+                    buf.set_string(
+                        right_area.x + right_area.width - 1,
+                        gy,
+                        &b.border_vertical_right,
+                        border_style,
+                    );
+
+                    let help_text = "[UP/DN]: Nav | [ENTER]: Run | [F1]: Help | [F2]: Themes";
+                    let help_spans =
+                        bashmenu_tui::parse_bbcode_spans(help_text, preview_styles.help_text);
+                    buf.set_line(
+                        right_area.x + 2,
+                        gy,
+                        &Line::from(help_spans),
+                        (sep_x.saturating_sub(3)) as u16,
+                    );
+
+                    let status_text = "16:56:00 | 49079 | Host: desktop";
+                    let status_vis = bashmenu_tui::visible_text_len(status_text);
+                    let status_avail = right_seg_len.saturating_sub(2);
+                    let status_pad = status_avail.saturating_sub(status_vis);
+                    let mut s_spans =
+                        vec![Span::styled(" ".repeat(status_pad), preview_styles.gutter)];
+                    s_spans.append(&mut bashmenu_tui::parse_bbcode_spans(
+                        status_text,
+                        preview_styles.gutter,
+                    ));
+                    buf.set_line(
+                        right_area.x + sep_x as u16 + 2,
+                        gy,
+                        &Line::from(s_spans),
+                        status_avail as u16,
+                    );
+
+                    // 4. Gutter Top Border
+                    let gt_line = format!(
+                        "{}{}{}{}{}",
+                        b.gutter_left_tee,
+                        b.gutter_border.repeat(left_seg_len),
+                        b.gutter_top_tee,
+                        b.gutter_border.repeat(right_seg_len),
+                        b.gutter_right_tee,
+                    );
+                    buf.set_string(right_area.x, gt_y, &gt_line, border_style);
+
+                    // 5. Menu Items
+                    let content_start_y = p_inner_y;
+                    let content_avail_h = gt_y.saturating_sub(content_start_y) as usize;
+
                     // Active item
                     let ind = &preview_styles.indicator_symbol;
                     let mut active_spans = vec![
@@ -233,9 +316,9 @@ fn main() -> Result<()> {
                             preview_styles.highlight,
                         ));
                     }
-                    buf.set_line(p_inner_x, p_inner_y, &Line::from(active_spans), p_avail_w);
+                    buf.set_line(p_inner_x, content_start_y, &Line::from(active_spans), p_avail_w);
 
-                    // Inactive item
+                    // Inactive item 2
                     let normal_line = Line::from(vec![
                         Span::raw("  "),
                         Span::styled("  📁 ", preview_styles.text),
@@ -243,13 +326,23 @@ fn main() -> Result<()> {
                         Span::styled("Browse Directory", preview_styles.text),
                         Span::styled("  »", preview_styles.accent),
                     ]);
-                    buf.set_line(p_inner_x, p_inner_y + 1, &normal_line, p_avail_w);
+                    buf.set_line(p_inner_x, content_start_y + 1, &normal_line, p_avail_w);
+
+                    // Inactive item 3
+                    let note_line = Line::from(vec![
+                        Span::raw("  "),
+                        Span::styled("  📝 ", preview_styles.text),
+                        Span::styled("3. ", preview_styles.shortcut_key),
+                        Span::styled("Notes & Tasks", preview_styles.text),
+                        Span::styled("  [notes.yml]", preview_styles.gutter),
+                    ]);
+                    buf.set_line(p_inner_x, content_start_y + 2, &note_line, p_avail_w);
 
                     // Divider rule
                     let div_str = "─".repeat(p_avail_w as usize);
                     buf.set_line(
                         p_inner_x,
-                        p_inner_y + 2,
+                        content_start_y + 3,
                         &Line::from(vec![Span::styled(div_str, preview_styles.divider)]),
                         p_avail_w,
                     );
@@ -258,21 +351,51 @@ fn main() -> Result<()> {
                     let exit_line = Line::from(vec![
                         Span::raw("  "),
                         Span::styled("  ❌ ", preview_styles.text),
-                        Span::styled("3. ", preview_styles.shortcut_key),
+                        Span::styled("4. ", preview_styles.shortcut_key),
                         Span::styled("Exit to Terminal", preview_styles.text),
                     ]);
-                    buf.set_line(p_inner_x, p_inner_y + 3, &exit_line, p_avail_w);
+                    buf.set_line(p_inner_x, content_start_y + 4, &exit_line, p_avail_w);
 
-                    // Gutter sample
-                    let p_gutter_y = right_area.y + right_area.height - 1;
-                    buf.set_string(
-                        p_inner_x,
-                        p_gutter_y,
-                        "[Esc] Back | [Ctrl+S] Save",
-                        preview_styles.gutter,
-                    );
+                    // 6. Pseudo Plugins pinned above gutter
+                    if content_avail_h >= 8 {
+                        let plugin_start_y = gt_y.saturating_sub(3);
+                        let p_div = "─".repeat(p_avail_w as usize);
+                        buf.set_line(
+                            p_inner_x,
+                            plugin_start_y,
+                            &Line::from(vec![Span::styled(p_div, preview_styles.divider)]),
+                            p_avail_w,
+                        );
 
-                    // Wallpaper overlay
+                        let plugin_row1 = Line::from(vec![
+                            Span::styled(" ☁️  Weather: ", preview_styles.accent),
+                            Span::styled("+59°F Overcast", preview_styles.text),
+                            Span::styled("  │  Alienware: ", preview_styles.divider),
+                            Span::styled("Online", preview_styles.accent),
+                        ]);
+                        buf.set_line(p_inner_x, plugin_start_y + 1, &plugin_row1, p_avail_w);
+
+                        let plugin_row2 = Line::from(vec![
+                            Span::styled(" 🖥️  CPU: ", preview_styles.accent),
+                            Span::styled("12%", preview_styles.text),
+                            Span::styled("  │  Mem: ", preview_styles.divider),
+                            Span::styled("3.8G/16G", preview_styles.text),
+                            Span::styled("  │  Pi-3B: ", preview_styles.divider),
+                            Span::styled("Online", preview_styles.accent),
+                        ]);
+                        buf.set_line(p_inner_x, plugin_start_y + 2, &plugin_row2, p_avail_w);
+                    } else if content_avail_h >= 6 {
+                        let plugin_y = gt_y.saturating_sub(1);
+                        let plugin_row = Line::from(vec![
+                            Span::styled(" ☁️  Weather: ", preview_styles.accent),
+                            Span::styled("+59°F Overcast", preview_styles.text),
+                            Span::styled("  │  Alienware: ", preview_styles.divider),
+                            Span::styled("Online", preview_styles.accent),
+                        ]);
+                        buf.set_line(p_inner_x, plugin_y, &plugin_row, p_avail_w);
+                    }
+
+                    // 7. Wallpaper overlay
                     if let Some(comp) = &mut wp_compositor {
                         if let Some(grid) = comp.get_grid(
                             right_area.width as usize,
