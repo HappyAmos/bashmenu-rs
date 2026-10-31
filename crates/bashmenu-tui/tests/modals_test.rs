@@ -293,3 +293,118 @@ cargo test --workspace
     // Blockquote rendered
     assert!(content.contains("│ Documentation note"));
 }
+
+#[test]
+fn test_note_editor_word_wrapping_and_end_key_enter() {
+    use bashmenu_tui::NoteEditorModal;
+    use crossterm::event::KeyModifiers;
+
+    let text = "- [ ] Appears to be some conflict with the autocomplete in the notes editors. Pressing enter at the end of an existing checkbox line, seems to grab characters from the beginning of the line and appending them to the new autocreated checkbox";
+    let mut editor = NoteEditorModal::new("Bug Repro", "/tmp/repro.yml", text);
+    editor.last_inner_w = 40;
+
+    // Word wrap check: no word split
+    let (vlines, _) = editor.compute_visual_lines(40);
+    for vl in &vlines {
+        let chunk: String = vl.chars.iter().collect();
+        assert!(chunk.len() <= 40);
+    }
+
+    // Press End key: cursor MUST jump to the logical end of the line
+    editor.handle_key(KeyCode::End, KeyModifiers::NONE);
+    assert_eq!(editor.cursor_col, text.chars().count());
+
+    // Press Enter at the end of the line: must create clean empty new checkbox
+    editor.handle_key(KeyCode::Enter, KeyModifiers::NONE);
+    assert_eq!(editor.lines.len(), 2);
+    assert_eq!(editor.lines[0], text);
+    assert_eq!(editor.lines[1], "- [ ] ");
+    assert_eq!(editor.cursor_col, 6);
+}
+
+#[test]
+fn test_note_editor_mouse_click_places_cursor() {
+    use bashmenu_tui::NoteEditorModal;
+    use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
+
+    let text = "Line 0: First note row\nLine 1: Second note row with some words";
+    let mut editor = NoteEditorModal::new("Mouse Test", "/tmp/mouse.yml", text);
+    editor.last_inner_w = 60;
+
+    let area = Rect::new(0, 0, 80, 24);
+    let styles = ResolvedThemeStyles::default();
+    let mut buf = Buffer::empty(area);
+    let inner = editor.render(area, &styles, &mut buf);
+
+    // Initial cursor at (0, 0)
+    assert_eq!(editor.cursor_row, 0);
+    assert_eq!(editor.cursor_col, 0);
+
+    // Click on row 1, col 10
+    let click_ev = MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: inner.x + 2 + 10,
+        row: inner.y + 1 + 1,
+        modifiers: crossterm::event::KeyModifiers::NONE,
+    };
+    editor.handle_mouse(click_ev, area);
+    assert_eq!(editor.cursor_row, 1);
+    assert_eq!(editor.cursor_col, 10);
+}
+
+#[test]
+fn test_headings_and_viewer_no_background_artifact() {
+    use bashmenu_tui::{HelpModal, NoteViewerModal};
+    use ratatui::style::Color;
+
+    let styles = ResolvedThemeStyles::default();
+    // Default highlight style has bg: Cyan
+    assert_eq!(styles.highlight.bg, Some(Color::Cyan));
+
+    // 1. HelpModal ## and ### headings must NOT have highlight background
+    let help_text = "## Secondary Section\n### Sub Section";
+    let help = HelpModal::new("Help Test", help_text);
+    let area = Rect::new(0, 0, 80, 24);
+    let mut buf = Buffer::empty(area);
+    help.render(area, &styles, &mut buf);
+
+    // Search cells for 'Secondary Section' and verify none have bg: Cyan
+    for y in 0..area.height {
+        for x in 0..area.width {
+            let cell = buf.cell((x, y)).unwrap();
+            if cell.symbol() == "S" && cell.style().bg == Some(Color::Cyan) {
+                // If this cell is part of "Secondary Section", fail
+                let mut row_chars = String::new();
+                for dx in 0..20 {
+                    if x + dx < area.width {
+                        row_chars.push_str(buf.cell((x + dx, y)).unwrap().symbol());
+                    }
+                }
+                assert!(
+                    !row_chars.starts_with("Secondary"),
+                    "Header text must not have background highlight"
+                );
+            }
+        }
+    }
+
+    // 2. NoteViewerModal ## headings and selected line must NOT wash background over text
+    let note = "## Task Heading\n- [ ] Yellow item with text";
+    let mut viewer = NoteViewerModal::new("Viewer Test", "/tmp/v.yml", note);
+    viewer.selected_line = 1;
+    let mut buf2 = Buffer::empty(area);
+    viewer.render(area, &styles, &mut buf2);
+
+    for y in 0..area.height {
+        for x in 0..area.width {
+            let cell = buf2.cell((x, y)).unwrap();
+            if cell.symbol() == "Y" {
+                assert_ne!(
+                    cell.style().bg,
+                    Some(Color::Cyan),
+                    "Item text must not have background patched"
+                );
+            }
+        }
+    }
+}

@@ -3,7 +3,7 @@
 use super::frame::render_modal_frame;
 use super::note_viewer::wrap_footer_tokens;
 use crate::style::ResolvedThemeStyles;
-use crossterm::event::{KeyCode, KeyModifiers, MouseEvent, MouseEventKind};
+use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
@@ -39,6 +39,7 @@ pub struct NoteEditorModal {
     pub scroll_offset: usize,
     pub is_modified: bool,
     pub last_inner_w: usize,
+    pub last_inner_rect: Rect,
 }
 
 impl NoteEditorModal {
@@ -62,6 +63,7 @@ impl NoteEditorModal {
             scroll_offset: 0,
             is_modified: false,
             last_inner_w: 76,
+            last_inner_rect: Rect::default(),
         }
     }
 
@@ -86,15 +88,16 @@ impl NoteEditorModal {
                     cursor_col_in_chunk: if is_active_row { Some(0) } else { None },
                 });
             } else {
-                let mut start = 0;
-                while start < chars.len() {
-                    let end = (start + w).min(chars.len());
-                    let chunk = chars[start..end].to_vec();
+                let chunks = wrap_chars_by_word(&chars, w);
+                let num_chunks = chunks.len();
+
+                for (chunk_idx, (start, chunk)) in chunks.into_iter().enumerate() {
+                    let end = start + chunk.len();
+                    let is_last_chunk = chunk_idx + 1 == num_chunks;
 
                     let cursor_here = if is_active_row {
                         if self.cursor_col >= start
-                            && (self.cursor_col < end
-                                || (end == chars.len() && self.cursor_col == end))
+                            && (self.cursor_col < end || (is_last_chunk && self.cursor_col >= end))
                         {
                             cursor_vis_idx = visual_lines.len();
                             Some(self.cursor_col - start)
@@ -110,23 +113,6 @@ impl NoteEditorModal {
                         start_col: start,
                         chars: chunk,
                         cursor_col_in_chunk: cursor_here,
-                    });
-
-                    start = end;
-                }
-
-                // If cursor is at exact end of line where chars.len() % w == 0 and chars.len() > 0
-                if is_active_row
-                    && self.cursor_col == chars.len()
-                    && !chars.is_empty()
-                    && chars.len().is_multiple_of(w)
-                {
-                    cursor_vis_idx = visual_lines.len();
-                    visual_lines.push(VisualLine {
-                        logical_row: l_idx,
-                        start_col: chars.len(),
-                        chars: Vec::new(),
-                        cursor_col_in_chunk: Some(0),
                     });
                 }
             }
@@ -217,13 +203,11 @@ impl NoteEditorModal {
                 NoteEditorAction::None
             }
             KeyCode::Home => {
-                let (vlines, cur_vidx) = self.compute_visual_lines(self.last_inner_w);
-                self.cursor_col = vlines[cur_vidx].start_col;
+                self.cursor_col = 0;
                 NoteEditorAction::None
             }
             KeyCode::End => {
-                let (vlines, cur_vidx) = self.compute_visual_lines(self.last_inner_w);
-                self.cursor_col = vlines[cur_vidx].start_col + vlines[cur_vidx].chars.len();
+                self.cursor_col = self.lines[self.cursor_row].chars().count();
                 NoteEditorAction::None
             }
             KeyCode::PageUp => {
@@ -268,7 +252,7 @@ impl NoteEditorModal {
     }
 
     /// Handles mouse events
-    pub fn handle_mouse(&mut self, mouse: MouseEvent, _area: Rect) -> NoteEditorAction {
+    pub fn handle_mouse(&mut self, mouse: MouseEvent, area: Rect) -> NoteEditorAction {
         match mouse.kind {
             MouseEventKind::ScrollDown => {
                 let (vlines, _) = self.compute_visual_lines(self.last_inner_w);
@@ -279,6 +263,52 @@ impl NoteEditorModal {
             }
             MouseEventKind::ScrollUp => {
                 self.scroll_offset = self.scroll_offset.saturating_sub(2);
+                NoteEditorAction::None
+            }
+            MouseEventKind::Down(MouseButton::Left) => {
+                let inner = if self.last_inner_rect.width > 0 {
+                    self.last_inner_rect
+                } else {
+                    let dialog_w = (area.width.saturating_sub(4)).clamp(20, 84);
+                    let dialog_h = (area.height.saturating_sub(4)).clamp(14, 28);
+                    let w = dialog_w.min(area.width.saturating_sub(4)).min(78);
+                    let h = dialog_h.min(area.height.saturating_sub(2)).min(28);
+                    let start_x = area.x + (area.width.saturating_sub(w + 2)) / 2;
+                    let start_y = area.y + (area.height.saturating_sub(h + 1)) / 2;
+                    Rect::new(
+                        start_x + 1,
+                        start_y + 1,
+                        w.saturating_sub(2),
+                        h.saturating_sub(2),
+                    )
+                };
+                let x = inner.x.saturating_sub(1);
+                let y = inner.y.saturating_sub(1);
+                let w = inner.width + 2;
+
+                // Check if close [X] clicked (top right: x + w - 3)
+                if mouse.row == y
+                    && mouse.column >= x + w.saturating_sub(3)
+                    && mouse.column <= x + w.saturating_sub(2)
+                {
+                    return NoteEditorAction::Cancel;
+                }
+
+                let content_start_y = inner.y + 1;
+                let (vlines, _) = self.compute_visual_lines(self.last_inner_w);
+
+                if mouse.row >= content_start_y && mouse.column >= inner.x + 2 {
+                    let vidx_rel = (mouse.row - content_start_y) as usize;
+                    let target_vidx = self.scroll_offset + vidx_rel;
+                    if target_vidx < vlines.len() {
+                        let target = &vlines[target_vidx];
+                        self.cursor_row = target.logical_row;
+                        let col_click = (mouse.column.saturating_sub(inner.x + 2)) as usize;
+                        let target_line_len = self.lines[target.logical_row].chars().count();
+                        self.cursor_col = (target.start_col + col_click.min(target.chars.len()))
+                            .min(target_line_len);
+                    }
+                }
                 NoteEditorAction::None
             }
             _ => NoteEditorAction::None,
@@ -298,12 +328,11 @@ impl NoteEditorModal {
             self.lines.push(String::new());
             self.cursor_row = self.lines.len() - 1;
         }
-        let line = &mut self.lines[self.cursor_row];
-        if self.cursor_col > line.len() {
-            self.cursor_col = line.len();
-        }
-        line.insert(self.cursor_col, c);
-        self.cursor_col += 1;
+        let mut chars: Vec<char> = self.lines[self.cursor_row].chars().collect();
+        let col = self.cursor_col.min(chars.len());
+        chars.insert(col, c);
+        self.lines[self.cursor_row] = chars.into_iter().collect();
+        self.cursor_col = col + 1;
     }
 
     fn insert_str(&mut self, s: &str) {
@@ -314,13 +343,16 @@ impl NoteEditorModal {
 
     fn handle_backspace(&mut self) {
         if self.cursor_col > 0 {
-            let line = &mut self.lines[self.cursor_row];
-            line.remove(self.cursor_col - 1);
-            self.cursor_col -= 1;
+            let mut chars: Vec<char> = self.lines[self.cursor_row].chars().collect();
+            if self.cursor_col <= chars.len() {
+                chars.remove(self.cursor_col - 1);
+                self.lines[self.cursor_row] = chars.into_iter().collect();
+                self.cursor_col -= 1;
+            }
         } else if self.cursor_row > 0 {
             let cur_line = self.lines.remove(self.cursor_row);
             self.cursor_row -= 1;
-            let prev_len = self.lines[self.cursor_row].len();
+            let prev_len = self.lines[self.cursor_row].chars().count();
             self.lines[self.cursor_row].push_str(&cur_line);
             self.cursor_col = prev_len;
         }
@@ -328,9 +360,10 @@ impl NoteEditorModal {
 
     fn handle_delete(&mut self) {
         if self.cursor_row < self.lines.len() {
-            let cur_len = self.lines[self.cursor_row].len();
-            if self.cursor_col < cur_len {
-                self.lines[self.cursor_row].remove(self.cursor_col);
+            let mut chars: Vec<char> = self.lines[self.cursor_row].chars().collect();
+            if self.cursor_col < chars.len() {
+                chars.remove(self.cursor_col);
+                self.lines[self.cursor_row] = chars.into_iter().collect();
             } else if self.cursor_row + 1 < self.lines.len() {
                 let next_line = self.lines.remove(self.cursor_row + 1);
                 self.lines[self.cursor_row].push_str(&next_line);
@@ -339,9 +372,10 @@ impl NoteEditorModal {
     }
 
     fn handle_enter(&mut self) {
-        let cur_line = self.current_line().to_string();
-        let prefix = &cur_line[..self.cursor_col.min(cur_line.len())];
-        let suffix = &cur_line[self.cursor_col.min(cur_line.len())..];
+        let chars: Vec<char> = self.current_line().chars().collect();
+        let col = self.cursor_col.min(chars.len());
+        let prefix: String = chars[..col].iter().collect();
+        let suffix: String = chars[col..].iter().collect();
 
         // Checkbox continuation / de-escalation
         let mut continuation = String::new();
@@ -358,7 +392,7 @@ impl NoteEditorModal {
             if item_text.trim().is_empty() && suffix.trim().is_empty() {
                 // Empty checkbox item: de-escalate to plain indent
                 self.lines[self.cursor_row] = indent.to_string();
-                self.cursor_col = indent.len();
+                self.cursor_col = indent.chars().count();
                 de_escalated = true;
             } else {
                 continuation = format!("{}- [ ] ", indent);
@@ -371,7 +405,7 @@ impl NoteEditorModal {
             if item_text.trim().is_empty() && suffix.trim().is_empty() {
                 // Empty bullet: de-escalate
                 self.lines[self.cursor_row] = indent.to_string();
-                self.cursor_col = indent.len();
+                self.cursor_col = indent.chars().count();
                 de_escalated = true;
             } else {
                 let bullet = &trimmed_prefix[..2];
@@ -382,7 +416,7 @@ impl NoteEditorModal {
             if rest.trim().is_empty() && suffix.trim().is_empty() {
                 // Empty numbered item: de-escalate
                 self.lines[self.cursor_row] = indent.to_string();
-                self.cursor_col = indent.len();
+                self.cursor_col = indent.chars().count();
                 de_escalated = true;
             } else if let Ok(num) = num_str.parse::<usize>() {
                 continuation = format!("{}{}. ", indent, num + 1);
@@ -390,7 +424,7 @@ impl NoteEditorModal {
         } else if let Some(quote_text) = trimmed_prefix.strip_prefix("> ") {
             if quote_text.trim().is_empty() && suffix.trim().is_empty() {
                 self.lines[self.cursor_row] = indent.to_string();
-                self.cursor_col = indent.len();
+                self.cursor_col = indent.chars().count();
                 de_escalated = true;
             } else {
                 continuation = format!("{}> ", indent);
@@ -398,12 +432,12 @@ impl NoteEditorModal {
         }
 
         if !de_escalated {
-            let left_part = prefix.to_string();
+            let left_part = prefix;
             let right_part = format!("{}{}", continuation, suffix);
             self.lines[self.cursor_row] = left_part;
             self.cursor_row += 1;
             self.lines.insert(self.cursor_row, right_part);
-            self.cursor_col = continuation.len();
+            self.cursor_col = continuation.chars().count();
         }
     }
 
@@ -414,6 +448,7 @@ impl NoteEditorModal {
 
         let modal_title = format!(" [ Edit Note: {} ] ", self.title);
         let inner = render_modal_frame(area, dialog_w, dialog_h, &modal_title, styles, buf);
+        self.last_inner_rect = inner;
 
         let footer_tokens = ["[Ctrl+S] Save", "|", "[Ctrl+C] Copy", "|", "[ESC] Cancel"];
         let max_footer_w = inner.width.saturating_sub(4) as usize;
@@ -529,4 +564,30 @@ fn base64_encode(bytes: &[u8]) -> String {
         }
     }
     out
+}
+
+fn wrap_chars_by_word(chars: &[char], w: usize) -> Vec<(usize, Vec<char>)> {
+    let mut result = Vec::new();
+    let mut start = 0;
+    while start < chars.len() {
+        if chars.len() - start <= w {
+            result.push((start, chars[start..].to_vec()));
+            break;
+        }
+        let candidate_end = start + w;
+        let mut split_at = None;
+        for i in (start + 1..=candidate_end).rev() {
+            if chars[i - 1].is_whitespace() {
+                split_at = Some(i);
+                break;
+            }
+        }
+        let end = match split_at {
+            Some(idx) => idx,
+            None => candidate_end,
+        };
+        result.push((start, chars[start..end].to_vec()));
+        start = end;
+    }
+    result
 }

@@ -135,3 +135,19 @@
   - Updated `install.sh` to initialize `$CONFIG_DIR/notebooks` with default notebooks fixtures.
   - Added user-facing error modal reporting on notebook load failures instead of silent dismissal.
 - [x] Verified zero Clippy warnings across the entire workspace with `-D warnings`, full `cargo fmt` compliance, and 100% test pass rate.
+
+## Phase 13: Notebook Note Editor Parity & Rendering Artifact Fixes
+- [x] **Word-Boundary Text Wrapping in Note Editor and Note Viewer:**
+  - Implemented word-boundary soft-wrapping (`wrap_chars_by_word`) in `NoteEditorModal` (`compute_visual_lines`), ensuring words are not sliced across visual rows.
+  - Enhanced `textwrap_simple` in `NoteViewerModal` with word-level wrapping and graceful handling of continuous strings exceeding viewport width.
+- [x] **Autocomplete & End-of-Line Enter Fixes (`NoteEditorModal`):**
+  - Resolved autocomplete conflict where pressing <kbd>Enter</kbd> at the end of a checkbox line sliced characters incorrectly.
+  - Converted string slicing and cursor indexing in `insert_char`, `handle_backspace`, `handle_delete`, and `handle_enter` to character-safe Unicode operations.
+  - Fixed `<End>` key to navigate to the logical line end, enabling clean continuation creation on subsequent rows.
+  - Added left-click mouse interaction (`MouseEventKind::Down(MouseButton::Left)`) in `handle_mouse`, accurately mapping mouse coordinates to target line and column.
+- [x] **Theme Background Color Artifact Elimination:**
+  - Replaced `styles.highlight` background application on markdown `## ` and `### ` headers with `styles.accent.add_modifier(Modifier::BOLD)` in both `HelpModal` and `NoteViewerModal`.
+  - Replaced full-row background washing on selected lines in `NoteViewerModal` with a dedicated `►` margin indicator, preserving crisp markdown rendering.
+- [x] **Tests & Invariants Verification:**
+  - Added unit and integration tests in `crates/bashmenu-tui/tests/modals_test.rs` covering word-boundary wrapping, End-key navigation, autocomplete enter continuation, mouse-click cursor positioning, and heading style background isolation.
+  - Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` (all 61 tests passing).

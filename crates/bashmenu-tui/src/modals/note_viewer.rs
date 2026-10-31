@@ -282,7 +282,7 @@ impl NoteViewerModal {
                             idx,
                             Line::from(vec![Span::styled(
                                 format!("## {}", wl),
-                                styles.highlight.add_modifier(Modifier::BOLD),
+                                styles.accent.add_modifier(Modifier::BOLD),
                             )]),
                         ));
                     }
@@ -406,22 +406,15 @@ impl NoteViewerModal {
             let y = inner.y + 1 + i as u16;
             let is_sel = *raw_idx == self.selected_line;
 
-            let final_line = if is_sel {
-                Line::from(
-                    line_obj
-                        .spans
-                        .iter()
-                        .map(|s| {
-                            let st = s.style.patch(styles.highlight);
-                            Span::styled(s.content.clone(), st)
-                        })
-                        .collect::<Vec<_>>(),
-                )
-            } else {
-                line_obj.clone()
-            };
-
-            buf.set_line(inner.x + 2, y, &final_line, avail_w as u16);
+            if is_sel {
+                buf.set_string(
+                    inner.x + 1,
+                    y,
+                    "►",
+                    styles.accent.add_modifier(Modifier::BOLD),
+                );
+            }
+            buf.set_line(inner.x + 2, y, line_obj, avail_w as u16);
         }
 
         // Render wrapped footer help lines with equal spacing
@@ -599,15 +592,35 @@ fn textwrap_simple(text: &str, max_w: usize) -> Vec<String> {
     let mut result = Vec::new();
     let mut current = String::new();
 
+    let push_word = |result: &mut Vec<String>, current: &mut String, word: &str| {
+        if word.len() <= max_w {
+            current.push_str(word);
+        } else {
+            let chars: Vec<char> = word.chars().collect();
+            let mut start = 0;
+            while start < chars.len() {
+                let end = (start + max_w).min(chars.len());
+                let chunk: String = chars[start..end].iter().collect();
+                if end < chars.len() {
+                    result.push(chunk);
+                } else {
+                    current.push_str(&chunk);
+                }
+                start = end;
+            }
+        }
+    };
+
     for word in text.split_whitespace() {
         if current.is_empty() {
-            current.push_str(word);
+            push_word(&mut result, &mut current, word);
         } else if current.len() + 1 + word.len() <= max_w {
             current.push(' ');
             current.push_str(word);
         } else {
             result.push(current);
-            current = word.to_string();
+            current = String::new();
+            push_word(&mut result, &mut current, word);
         }
     }
     if !current.is_empty() {

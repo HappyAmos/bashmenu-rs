@@ -139,7 +139,7 @@ impl HelpModal {
             } else if trimmed.starts_with("## ") || trimmed.starts_with("### ") {
                 let wrapped = wrap_help_text(line, avail_w);
                 for wl in wrapped {
-                    wrapped_lines.push((wl, Some(styles.highlight.add_modifier(Modifier::BOLD))));
+                    wrapped_lines.push((wl, Some(styles.accent.add_modifier(Modifier::BOLD))));
                 }
             } else if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
                 let wrapped = wrap_help_text(line, avail_w);
