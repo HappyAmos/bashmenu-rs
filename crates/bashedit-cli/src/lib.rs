@@ -262,6 +262,70 @@ impl EditorBuffer {
         }
     }
 
+    pub fn move_word_left(&mut self) {
+        if self.cursor_col == 0 {
+            if self.cursor_row > 0 {
+                self.cursor_row -= 1;
+                self.cursor_col = self.lines[self.cursor_row].chars().count();
+            }
+            return;
+        }
+
+        let chars: Vec<char> = self.lines[self.cursor_row].chars().collect();
+        let mut i = self.cursor_col.min(chars.len());
+
+        while i > 0 && chars[i - 1].is_whitespace() {
+            i -= 1;
+        }
+
+        if i > 0 {
+            let is_alnum = chars[i - 1].is_alphanumeric() || chars[i - 1] == '_';
+            while i > 0 && !chars[i - 1].is_whitespace() {
+                if (chars[i - 1].is_alphanumeric() || chars[i - 1] == '_') == is_alnum {
+                    i -= 1;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        self.cursor_col = i;
+    }
+
+    pub fn move_word_right(&mut self) {
+        if self.cursor_row >= self.lines.len() {
+            return;
+        }
+
+        let chars: Vec<char> = self.lines[self.cursor_row].chars().collect();
+        let len = chars.len();
+
+        if self.cursor_col >= len {
+            if self.cursor_row + 1 < self.lines.len() {
+                self.cursor_row += 1;
+                self.cursor_col = 0;
+            }
+            return;
+        }
+
+        let mut i = self.cursor_col;
+        let is_alnum = chars[i].is_alphanumeric() || chars[i] == '_';
+
+        while i < len && !chars[i].is_whitespace() {
+            if (chars[i].is_alphanumeric() || chars[i] == '_') == is_alnum {
+                i += 1;
+            } else {
+                break;
+            }
+        }
+
+        while i < len && chars[i].is_whitespace() {
+            i += 1;
+        }
+
+        self.cursor_col = i;
+    }
+
     pub fn move_right(&mut self) {
         if self.cursor_row < self.lines.len() {
             let line_len = self.lines[self.cursor_row].chars().count();

@@ -332,11 +332,10 @@ fn main() -> Result<()> {
                             }
                         }
                         NoteViewerAction::Edit => {
-                            active_modal = ActiveModal::NoteEditor(NoteEditorModal::new(
-                                &modal.title,
-                                &modal.filepath,
-                                &modal.content,
-                            ));
+                            active_modal = ActiveModal::NoteEditor(
+                                NoteEditorModal::new(&modal.title, &modal.filepath, &modal.content)
+                                    .with_cursor(modal.selected_line, 0),
+                            );
                         }
                         NoteViewerAction::Rename => {
                             active_modal = ActiveModal::RenameNoteTitle(

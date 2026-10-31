@@ -160,3 +160,32 @@ fn test_editor_buffer_empty_and_save_as() {
     buf.cleanup_swap();
     let _ = fs::remove_dir_all(&tmp_dir);
 }
+
+#[test]
+fn test_editor_buffer_word_navigation() {
+    let mut buf = EditorBuffer::new_empty();
+    buf.lines = vec![
+        "The quick brown fox jumps.".to_string(),
+        "Second line here.".to_string(),
+    ];
+
+    // Initial position: row 0, col 0
+    assert_eq!(buf.cursor_row, 0);
+    assert_eq!(buf.cursor_col, 0);
+
+    // Move word right -> "quick" (index 4)
+    buf.move_word_right();
+    assert_eq!(buf.cursor_col, 4);
+
+    // Move word right -> "brown" (index 10)
+    buf.move_word_right();
+    assert_eq!(buf.cursor_col, 10);
+
+    // Move word left -> "quick" (index 4)
+    buf.move_word_left();
+    assert_eq!(buf.cursor_col, 4);
+
+    // Move word left -> "The" (index 0)
+    buf.move_word_left();
+    assert_eq!(buf.cursor_col, 0);
+}

@@ -394,6 +394,12 @@ fn main() -> Result<()> {
                                     break;
                                 }
                             }
+                            KeyCode::Left if k.modifiers.contains(KeyModifiers::CONTROL) => {
+                                buffer.move_word_left()
+                            }
+                            KeyCode::Right if k.modifiers.contains(KeyModifiers::CONTROL) => {
+                                buffer.move_word_right()
+                            }
                             KeyCode::Left => buffer.move_left(),
                             KeyCode::Right => buffer.move_right(),
                             KeyCode::Up => buffer.move_up(),

@@ -1,6 +1,7 @@
 use bashmenu_tui::{
     AsciiGridModal, ColorGridModal, ConfirmModal, FilePickerModal, InputModal, MessageModal,
-    RadioModal, ResolvedThemeStyles, ToggleChoice, ToggleModal,
+    NoteEditorAction, NoteEditorModal, NoteViewerModal, RadioModal, ResolvedThemeStyles,
+    ToggleChoice, ToggleModal,
 };
 use crossterm::event::KeyCode;
 use ratatui::buffer::Buffer;
@@ -173,7 +174,6 @@ fn test_note_viewer_footer_wrapping() {
 
 #[test]
 fn test_note_editor_modal_typing_and_saving() {
-    use bashmenu_tui::{NoteEditorAction, NoteEditorModal};
     use crossterm::event::KeyModifiers;
 
     let mut editor = NoteEditorModal::new("Shopping List", "/tmp/shopping.yml", "- [ ] Apples");
@@ -214,7 +214,6 @@ fn test_note_editor_modal_typing_and_saving() {
 
 #[test]
 fn test_note_editor_soft_wrapping_and_no_line_numbers() {
-    use bashmenu_tui::NoteEditorModal;
     use crossterm::event::KeyModifiers;
 
     // Create a note with a long line (70 characters)
@@ -296,7 +295,6 @@ cargo test --workspace
 
 #[test]
 fn test_note_editor_word_wrapping_and_end_key_enter() {
-    use bashmenu_tui::NoteEditorModal;
     use crossterm::event::KeyModifiers;
 
     let text = "- [ ] Appears to be some conflict with the autocomplete in the notes editors. Pressing enter at the end of an existing checkbox line, seems to grab characters from the beginning of the line and appending them to the new autocreated checkbox";
@@ -324,7 +322,6 @@ fn test_note_editor_word_wrapping_and_end_key_enter() {
 
 #[test]
 fn test_note_editor_mouse_click_places_cursor() {
-    use bashmenu_tui::NoteEditorModal;
     use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 
     let text = "Line 0: First note row\nLine 1: Second note row with some words";
@@ -510,8 +507,6 @@ fn test_note_viewer_hidden_completed_items_not_selectable() {
 
 #[test]
 fn test_note_viewer_and_editor_checkbox_margin_wrapping() {
-    use bashmenu_tui::{NoteEditorModal, NoteViewerModal};
-
     let styles = ResolvedThemeStyles::default();
     let area = Rect::new(0, 0, 40, 20);
 
@@ -691,4 +686,32 @@ fn test_radio_modal_interaction() {
     assert!(s.contains("Built-in (BashEdit)"));
     assert!(s.contains("Vim"));
     assert!(s.contains("●"));
+}
+
+#[test]
+fn test_note_editor_initial_cursor_and_ctrl_word_navigation() {
+    use crossterm::event::KeyModifiers;
+
+    let content = "First line content.\nSecond line here.\nThird line ends.";
+    let mut editor = NoteEditorModal::new("Test Note", "/tmp/n.yml", content).with_cursor(1, 0);
+
+    // Initial position matches view mode selected_line (row 1, col 0)
+    assert_eq!(editor.cursor_row, 1);
+    assert_eq!(editor.cursor_col, 0);
+
+    // Ctrl+Right moves word right -> "line" (col 7)
+    editor.handle_key(KeyCode::Right, KeyModifiers::CONTROL);
+    assert_eq!(editor.cursor_col, 7);
+
+    // Ctrl+Right moves word right -> "here." (col 12)
+    editor.handle_key(KeyCode::Right, KeyModifiers::CONTROL);
+    assert_eq!(editor.cursor_col, 12);
+
+    // Ctrl+Left moves word left -> "line" (col 7)
+    editor.handle_key(KeyCode::Left, KeyModifiers::CONTROL);
+    assert_eq!(editor.cursor_col, 7);
+
+    // Ctrl+Left moves word left -> "Second" (col 0)
+    editor.handle_key(KeyCode::Left, KeyModifiers::CONTROL);
+    assert_eq!(editor.cursor_col, 0);
 }
