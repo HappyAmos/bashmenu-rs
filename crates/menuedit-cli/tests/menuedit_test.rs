@@ -515,3 +515,166 @@ fn test_item_edit_modal_keyboard_shortcuts_and_mouse() {
     let res = modal.handle_mouse(mouse_ev, area);
     assert_eq!(res, ItemEditResult::Cancel);
 }
+
+#[test]
+fn test_item_edit_modal_radio_multiline_editor() {
+    use bashmenu_tui::ResolvedThemeStyles;
+    use crossterm::event::{KeyCode, KeyModifiers};
+    use menuedit_cli::{FocusControl, ItemEditModal, MultiLineInput};
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use std::collections::HashMap;
+
+    // 1. Direct MultiLineInput testing
+    let mut input = MultiLineInput::new("Option A = 1\nOption B = 2");
+    assert_eq!(input.line_count(), 2);
+    assert_eq!(input.cursor_row, 0);
+    assert_eq!(input.cursor_col, 0);
+
+    // Move cursor to end of line 0, then press Enter to start a new line between line 0 and line 1
+    input.cursor_col = input.lines[0].len();
+    input.handle_key(KeyCode::Enter);
+    assert_eq!(input.line_count(), 3);
+    assert_eq!(input.cursor_row, 1);
+    assert_eq!(input.cursor_col, 0);
+
+    // Type into new line
+    for c in "New Option = 3".chars() {
+        input.handle_key(KeyCode::Char(c));
+    }
+    assert_eq!(input.lines[1].iter().collect::<String>(), "New Option = 3");
+    assert_eq!(input.lines[0].iter().collect::<String>(), "Option A = 1");
+    assert_eq!(input.lines[2].iter().collect::<String>(), "Option B = 2");
+
+    // Move down and up
+    assert!(input.move_down());
+    assert_eq!(input.cursor_row, 2);
+    assert!(!input.move_down()); // At bottom, returns false
+    assert!(input.move_up());
+    assert_eq!(input.cursor_row, 1);
+    assert!(input.move_up());
+    assert_eq!(input.cursor_row, 0);
+    assert!(!input.move_up()); // At top, returns false
+
+    // Backspace merging
+    let mut merge_input = MultiLineInput::new("First\nSecond");
+    assert_eq!(merge_input.line_count(), 2);
+    merge_input.cursor_row = 1;
+    merge_input.cursor_col = 0;
+    merge_input.handle_key(KeyCode::Backspace);
+    assert_eq!(merge_input.line_count(), 1);
+    assert_eq!(merge_input.as_string(), "FirstSecond");
+    assert_eq!(merge_input.cursor_col, 5);
+
+    // Delete merging
+    let mut del_input = MultiLineInput::new("Alpha\nBeta");
+    del_input.cursor_row = 0;
+    del_input.cursor_col = 5;
+    del_input.handle_key(KeyCode::Delete);
+    assert_eq!(del_input.line_count(), 1);
+    assert_eq!(del_input.as_string(), "AlphaBeta");
+
+    // 2. ItemEditModal with Radio Item
+    let mut extra = HashMap::new();
+    let mut opt1 = serde_yml::Mapping::new();
+    opt1.insert(
+        serde_yml::Value::String("label".to_string()),
+        serde_yml::Value::String("Theme 1".to_string()),
+    );
+    opt1.insert(
+        serde_yml::Value::String("value".to_string()),
+        serde_yml::Value::String("alaska-train".to_string()),
+    );
+    let mut opt2 = serde_yml::Mapping::new();
+    opt2.insert(
+        serde_yml::Value::String("label".to_string()),
+        serde_yml::Value::String("Theme 2".to_string()),
+    );
+    opt2.insert(
+        serde_yml::Value::String("value".to_string()),
+        serde_yml::Value::String("alaska-mountain".to_string()),
+    );
+    extra.insert(
+        "options".to_string(),
+        serde_yml::Value::Sequence(vec![
+            serde_yml::Value::Mapping(opt1),
+            serde_yml::Value::Mapping(opt2),
+        ]),
+    );
+
+    let item = MenuItem {
+        label: "Select Theme".to_string(),
+        r#type: MenuItemType::Radio,
+        action: Some("app.theme".to_string()),
+        extra,
+        ..Default::default()
+    };
+
+    let mut modal = ItemEditModal::new(&item);
+    assert!(modal.is_radio());
+    assert_eq!(modal.radio_options_input.line_count(), 2);
+    assert_eq!(
+        modal.radio_options_input.as_string(),
+        "Theme 1 = alaska-train\nTheme 2 = alaska-mountain"
+    );
+
+    // Focus on RadioOptionsInput
+    modal.active_control_idx = modal
+        .focus_controls()
+        .iter()
+        .position(|&c| c == FocusControl::RadioOptionsInput)
+        .unwrap();
+
+    // Down moves to next line within multiline editor
+    modal.handle_key(KeyCode::Down, KeyModifiers::NONE);
+    assert_eq!(modal.radio_options_input.cursor_row, 1);
+    assert_eq!(modal.current_control(), FocusControl::RadioOptionsInput);
+
+    // End to move to end of line 1
+    modal.handle_key(KeyCode::End, KeyModifiers::NONE);
+
+    // Enter adds a new line
+    modal.handle_key(KeyCode::Enter, KeyModifiers::NONE);
+    assert_eq!(modal.radio_options_input.line_count(), 3);
+    assert_eq!(modal.radio_options_input.cursor_row, 2);
+
+    // Type a 3rd option
+    for c in "Theme 3: matrix".chars() {
+        modal.handle_key(KeyCode::Char(c), KeyModifiers::NONE);
+    }
+    assert_eq!(
+        modal.radio_options_input.lines[2]
+            .iter()
+            .collect::<String>(),
+        "Theme 3: matrix"
+    );
+
+    // Save and verify options are parsed into sequence
+    let updated = modal.build_updated_item();
+    let saved_opts = updated
+        .extra
+        .get("options")
+        .and_then(|v| v.as_sequence())
+        .expect("options sequence expected");
+    assert_eq!(saved_opts.len(), 3);
+
+    let opt3 = saved_opts[2].as_mapping().unwrap();
+    assert_eq!(
+        opt3.get(serde_yml::Value::String("label".to_string()))
+            .and_then(|v| v.as_str()),
+        Some("Theme 3")
+    );
+    assert_eq!(
+        opt3.get(serde_yml::Value::String("value".to_string()))
+            .and_then(|v| v.as_str()),
+        Some("matrix")
+    );
+
+    // Render modal to verify buffer draws 5-row multiline box
+    let area = Rect::new(0, 0, 100, 35);
+    let mut buf = Buffer::empty(area);
+    let styles = ResolvedThemeStyles::default();
+    let inner = modal.render(area, &styles, &mut buf);
+    assert!(inner.width > 0);
+    assert!(inner.height > 0);
+}

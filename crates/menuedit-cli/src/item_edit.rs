@@ -92,6 +92,202 @@ impl TextInput {
     }
 }
 
+/// Interactive Unicode multi-line text input state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MultiLineInput {
+    pub lines: Vec<Vec<char>>,
+    pub cursor_row: usize,
+    pub cursor_col: usize,
+    pub scroll_row: usize,
+}
+
+impl Default for MultiLineInput {
+    fn default() -> Self {
+        Self {
+            lines: vec![Vec::new()],
+            cursor_row: 0,
+            cursor_col: 0,
+            scroll_row: 0,
+        }
+    }
+}
+
+impl MultiLineInput {
+    pub fn new(s: &str) -> Self {
+        let lines: Vec<Vec<char>> = if s.is_empty() {
+            vec![Vec::new()]
+        } else {
+            let l: Vec<Vec<char>> = s.split('\n').map(|line| line.chars().collect()).collect();
+            if l.is_empty() {
+                vec![Vec::new()]
+            } else {
+                l
+            }
+        };
+        Self {
+            lines,
+            cursor_row: 0,
+            cursor_col: 0,
+            scroll_row: 0,
+        }
+    }
+
+    pub fn as_string(&self) -> String {
+        self.lines
+            .iter()
+            .map(|chars| chars.iter().collect::<String>())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    pub fn set_text(&mut self, s: &str) {
+        *self = Self::new(s);
+    }
+
+    pub fn line_count(&self) -> usize {
+        self.lines.len()
+    }
+
+    pub fn ensure_cursor_visible(&mut self, v_rows: usize) {
+        if self.cursor_row < self.scroll_row {
+            self.scroll_row = self.cursor_row;
+        } else if self.cursor_row >= self.scroll_row + v_rows && v_rows > 0 {
+            self.scroll_row = self.cursor_row.saturating_sub(v_rows - 1);
+        }
+    }
+
+    pub fn move_up(&mut self) -> bool {
+        if self.cursor_row > 0 {
+            self.cursor_row -= 1;
+            let len = self.lines[self.cursor_row].len();
+            if self.cursor_col > len {
+                self.cursor_col = len;
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn move_down(&mut self) -> bool {
+        if self.cursor_row + 1 < self.lines.len() {
+            self.cursor_row += 1;
+            let len = self.lines[self.cursor_row].len();
+            if self.cursor_col > len {
+                self.cursor_col = len;
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn handle_key(&mut self, code: KeyCode) -> bool {
+        match code {
+            KeyCode::Char(c) => {
+                if self.cursor_row >= self.lines.len() {
+                    self.lines.push(Vec::new());
+                    self.cursor_row = self.lines.len() - 1;
+                }
+                let line_len = self.lines[self.cursor_row].len();
+                if self.cursor_col > line_len {
+                    self.cursor_col = line_len;
+                }
+                self.lines[self.cursor_row].insert(self.cursor_col, c);
+                self.cursor_col += 1;
+                true
+            }
+            KeyCode::Enter => {
+                if self.cursor_row >= self.lines.len() {
+                    self.lines.push(Vec::new());
+                    self.cursor_row = self.lines.len() - 1;
+                }
+                let line_len = self.lines[self.cursor_row].len();
+                if self.cursor_col > line_len {
+                    self.cursor_col = line_len;
+                }
+                let remainder: Vec<char> = self.lines[self.cursor_row]
+                    .drain(self.cursor_col..)
+                    .collect();
+                self.lines.insert(self.cursor_row + 1, remainder);
+                self.cursor_row += 1;
+                self.cursor_col = 0;
+                true
+            }
+            KeyCode::Backspace => {
+                if self.cursor_col > 0 {
+                    self.cursor_col -= 1;
+                    if self.cursor_row < self.lines.len()
+                        && self.cursor_col < self.lines[self.cursor_row].len()
+                    {
+                        self.lines[self.cursor_row].remove(self.cursor_col);
+                    }
+                    true
+                } else if self.cursor_row > 0 {
+                    let current = self.lines.remove(self.cursor_row);
+                    self.cursor_row -= 1;
+                    self.cursor_col = self.lines[self.cursor_row].len();
+                    self.lines[self.cursor_row].extend(current);
+                    true
+                } else {
+                    false
+                }
+            }
+            KeyCode::Delete => {
+                if self.cursor_row < self.lines.len()
+                    && self.cursor_col < self.lines[self.cursor_row].len()
+                {
+                    self.lines[self.cursor_row].remove(self.cursor_col);
+                    true
+                } else if self.cursor_row + 1 < self.lines.len() {
+                    let next = self.lines.remove(self.cursor_row + 1);
+                    self.lines[self.cursor_row].extend(next);
+                    true
+                } else {
+                    false
+                }
+            }
+            KeyCode::Left => {
+                if self.cursor_col > 0 {
+                    self.cursor_col -= 1;
+                    true
+                } else if self.cursor_row > 0 {
+                    self.cursor_row -= 1;
+                    self.cursor_col = self.lines[self.cursor_row].len();
+                    true
+                } else {
+                    false
+                }
+            }
+            KeyCode::Right => {
+                if self.cursor_row < self.lines.len()
+                    && self.cursor_col < self.lines[self.cursor_row].len()
+                {
+                    self.cursor_col += 1;
+                    true
+                } else if self.cursor_row + 1 < self.lines.len() {
+                    self.cursor_row += 1;
+                    self.cursor_col = 0;
+                    true
+                } else {
+                    false
+                }
+            }
+            KeyCode::Home => {
+                self.cursor_col = 0;
+                true
+            }
+            KeyCode::End => {
+                if self.cursor_row < self.lines.len() {
+                    self.cursor_col = self.lines[self.cursor_row].len();
+                }
+                true
+            }
+            _ => false,
+        }
+    }
+}
+
 /// Target destination for file browser dialog.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BrowseTarget {
@@ -165,7 +361,7 @@ pub struct ItemEditModal {
     pub icon_input: TextInput,
     pub action_input: TextInput,
     pub prompt_input: TextInput,
-    pub radio_options_input: TextInput,
+    pub radio_options_input: MultiLineInput,
     pub template_input: TextInput,
     pub target_input: TextInput,
     pub block_id_input: TextInput,
@@ -322,7 +518,7 @@ impl ItemEditModal {
             icon_input: TextInput::new(icon_val),
             action_input: TextInput::new(action_val),
             prompt_input: TextInput::new(prompt_val),
-            radio_options_input: TextInput::new(&radio_lines),
+            radio_options_input: MultiLineInput::new(&radio_lines),
             template_input: TextInput::new(template_val),
             target_input: TextInput::new(target_val),
             block_id_input: TextInput::new(block_id_val),
@@ -649,17 +845,42 @@ impl ItemEditModal {
                     return ItemEditResult::Continue;
                 }
             }
+            FocusControl::RadioOptionsInput if code == KeyCode::Enter => {
+                self.radio_options_input.handle_key(KeyCode::Enter);
+                self.radio_options_input.ensure_cursor_visible(5);
+                return ItemEditResult::Continue;
+            }
             _ => {}
         }
 
         // Field navigation
         let controls = self.focus_controls();
         match code {
-            KeyCode::Tab | KeyCode::Down => {
+            KeyCode::Tab => {
                 self.active_control_idx = (self.active_control_idx + 1) % controls.len();
                 return ItemEditResult::Continue;
             }
-            KeyCode::BackTab | KeyCode::Up => {
+            KeyCode::BackTab => {
+                if self.active_control_idx == 0 {
+                    self.active_control_idx = controls.len() - 1;
+                } else {
+                    self.active_control_idx -= 1;
+                }
+                return ItemEditResult::Continue;
+            }
+            KeyCode::Down => {
+                if ctrl == FocusControl::RadioOptionsInput && self.radio_options_input.move_down() {
+                    self.radio_options_input.ensure_cursor_visible(5);
+                    return ItemEditResult::Continue;
+                }
+                self.active_control_idx = (self.active_control_idx + 1) % controls.len();
+                return ItemEditResult::Continue;
+            }
+            KeyCode::Up => {
+                if ctrl == FocusControl::RadioOptionsInput && self.radio_options_input.move_up() {
+                    self.radio_options_input.ensure_cursor_visible(5);
+                    return ItemEditResult::Continue;
+                }
                 if self.active_control_idx == 0 {
                     self.active_control_idx = controls.len() - 1;
                 } else {
@@ -670,6 +891,12 @@ impl ItemEditModal {
             _ => {}
         }
 
+        // Multi-line radio options editing
+        if ctrl == FocusControl::RadioOptionsInput && self.radio_options_input.handle_key(code) {
+            self.radio_options_input.ensure_cursor_visible(5);
+            return ItemEditResult::Continue;
+        }
+
         // Text input editing
         let input_ref = match ctrl {
             FocusControl::CharInput => Some(&mut self.char_input),
@@ -678,7 +905,6 @@ impl ItemEditModal {
             FocusControl::IconInput => Some(&mut self.icon_input),
             FocusControl::ActionInput => Some(&mut self.action_input),
             FocusControl::PromptInput => Some(&mut self.prompt_input),
-            FocusControl::RadioOptionsInput => Some(&mut self.radio_options_input),
             FocusControl::TemplateInput => Some(&mut self.template_input),
             FocusControl::TargetInput => Some(&mut self.target_input),
             FocusControl::BlockIdInput => Some(&mut self.block_id_input),
@@ -913,6 +1139,15 @@ impl ItemEditModal {
                         serde_yml::Value::String("value".to_string()),
                         serde_yml::Value::String(val.trim().to_string()),
                     );
+                } else if let Some((lbl, val)) = line.split_once(':') {
+                    map.insert(
+                        serde_yml::Value::String("label".to_string()),
+                        serde_yml::Value::String(lbl.trim().to_string()),
+                    );
+                    map.insert(
+                        serde_yml::Value::String("value".to_string()),
+                        serde_yml::Value::String(val.trim().to_string()),
+                    );
                 } else {
                     map.insert(
                         serde_yml::Value::String("label".to_string()),
@@ -925,8 +1160,12 @@ impl ItemEditModal {
                 }
                 opts.push(serde_yml::Value::Mapping(map));
             }
-            item.extra
-                .insert("options".to_string(), serde_yml::Value::Sequence(opts));
+            if !opts.is_empty() {
+                item.extra
+                    .insert("options".to_string(), serde_yml::Value::Sequence(opts));
+            } else {
+                item.extra.remove("options");
+            }
         }
 
         // Execution mode
@@ -1093,11 +1332,36 @@ impl ItemEditModal {
                 form_lines.push(FormRow::Label(
                     "Radio Options (one per line, e.g. 'Label = value' or 'value'):",
                 ));
-                form_lines.push(FormRow::Input {
-                    ctrl: FocusControl::RadioOptionsInput,
-                    text: self.radio_options_input.as_string(),
-                    cursor: self.radio_options_input.cursor,
-                });
+                let v_rows = 5;
+                let scroll_r = self.radio_options_input.scroll_row;
+                let total_lines = self.radio_options_input.lines.len();
+                for i in 0..v_rows {
+                    let actual_line_idx = scroll_r + i;
+                    let text = if actual_line_idx < total_lines {
+                        self.radio_options_input.lines[actual_line_idx]
+                            .iter()
+                            .collect()
+                    } else {
+                        String::new()
+                    };
+                    let is_cursor_row = actual_line_idx == self.radio_options_input.cursor_row;
+                    let cursor = if is_cursor_row && cur_ctrl == FocusControl::RadioOptionsInput {
+                        Some(self.radio_options_input.cursor_col)
+                    } else {
+                        None
+                    };
+                    let has_more_above = i == 0 && scroll_r > 0;
+                    let has_more_below = i == v_rows - 1 && scroll_r + v_rows < total_lines;
+
+                    form_lines.push(FormRow::MultiLineInputRow {
+                        ctrl: FocusControl::RadioOptionsInput,
+                        text,
+                        cursor,
+                        is_focused_line: is_cursor_row,
+                        has_more_above,
+                        has_more_below,
+                    });
+                }
             }
 
             form_lines.push(FormRow::Label("Template Path (inject_block):"));
@@ -1281,6 +1545,14 @@ enum FormRow {
         text: String,
         cursor: usize,
     },
+    MultiLineInputRow {
+        ctrl: FocusControl,
+        text: String,
+        cursor: Option<usize>,
+        is_focused_line: bool,
+        has_more_above: bool,
+        has_more_below: bool,
+    },
     InputWithBrowse {
         input_ctrl: FocusControl,
         text: String,
@@ -1303,6 +1575,11 @@ impl FormRow {
     fn has_ctrl(&self, ctrl: FocusControl) -> bool {
         match self {
             FormRow::Input { ctrl: c, .. } => *c == ctrl,
+            FormRow::MultiLineInputRow {
+                ctrl: c,
+                is_focused_line,
+                ..
+            } => *c == ctrl && *is_focused_line,
             FormRow::InputWithBrowse {
                 input_ctrl,
                 btn_ctrl,
@@ -1351,6 +1628,62 @@ impl FormRow {
                                 .bg(Color::White)
                                 .add_modifier(Modifier::REVERSED),
                         );
+                    }
+                }
+            }
+            FormRow::MultiLineInputRow {
+                ctrl,
+                text,
+                cursor,
+                is_focused_line,
+                has_more_above,
+                has_more_below,
+                ..
+            } => {
+                let is_ctrl_active = *ctrl == active_ctrl;
+                let line_active = is_ctrl_active && *is_focused_line;
+                let box_style = if line_active {
+                    styles.highlight.add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default().fg(Color::White).bg(Color::DarkGray)
+                };
+
+                let content_w = avail_w.saturating_sub(4);
+                let mut chars: Vec<char> = text.chars().collect();
+                if chars.len() > content_w {
+                    chars.truncate(content_w);
+                }
+                while chars.len() < content_w {
+                    chars.push(' ');
+                }
+
+                if *has_more_above && chars.len() >= 3 {
+                    let len = chars.len();
+                    chars[len - 3] = ' ';
+                    chars[len - 2] = '▲';
+                    chars[len - 1] = ' ';
+                } else if *has_more_below && chars.len() >= 3 {
+                    let len = chars.len();
+                    chars[len - 3] = ' ';
+                    chars[len - 2] = '▼';
+                    chars[len - 1] = ' ';
+                }
+
+                let line_content: String = chars.into_iter().collect();
+                let display_str = format!(" {} ", line_content);
+                buf.set_string(inner.x + 2, y, &display_str, box_style);
+
+                if line_active {
+                    if let Some(col) = cursor {
+                        let cur_x = inner.x + 3 + *col as u16;
+                        if cur_x < inner.x + 2 + content_w as u16 + 1 {
+                            buf[(cur_x, y)].set_style(
+                                Style::default()
+                                    .fg(Color::Black)
+                                    .bg(Color::White)
+                                    .add_modifier(Modifier::REVERSED),
+                            );
+                        }
                     }
                 }
             }

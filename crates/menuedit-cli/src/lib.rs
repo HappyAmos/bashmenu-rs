@@ -14,7 +14,8 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 
 pub use item_edit::{
-    render_item_preview_line, BrowseTarget, FocusControl, ItemEditModal, ItemEditResult, TextInput,
+    render_item_preview_line, BrowseTarget, FocusControl, ItemEditModal, ItemEditResult,
+    MultiLineInput, TextInput,
 };
 pub use tree::{
     delete_item, find_item, find_item_mut, flatten_tree, indent_item, insert_item_after,
