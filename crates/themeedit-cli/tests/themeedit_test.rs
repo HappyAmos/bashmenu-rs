@@ -82,3 +82,29 @@ fn test_themeedit_ctrl_s_direct_save_invariant() {
 
     let _ = fs::remove_dir_all(&tmp_dir);
 }
+
+#[test]
+fn test_themeedit_preview_mode_cycling() {
+    use themeedit_cli::PreviewMode;
+
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(fixture_path, Some("dracula".to_string()));
+
+    assert_eq!(state.preview_mode, PreviewMode::Menu);
+    assert_eq!(state.preview_mode.title(), "Main Menu");
+
+    state.preview_mode = state.preview_mode.next();
+    assert_eq!(state.preview_mode, PreviewMode::TextEditor);
+    assert_eq!(state.preview_mode.title(), "Text Editor");
+
+    state.preview_mode = state.preview_mode.next();
+    assert_eq!(state.preview_mode, PreviewMode::Modals);
+    assert_eq!(state.preview_mode.title(), "Popup Windows / Modals");
+
+    state.preview_mode = state.preview_mode.next();
+    assert_eq!(state.preview_mode, PreviewMode::MenuEditor);
+    assert_eq!(state.preview_mode.title(), "Visual Menu Editor");
+
+    state.preview_mode = state.preview_mode.next();
+    assert_eq!(state.preview_mode, PreviewMode::Menu);
+}

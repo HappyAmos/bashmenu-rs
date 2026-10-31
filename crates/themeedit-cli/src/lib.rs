@@ -18,6 +18,35 @@ pub struct TokenItem {
     pub kind: TokenKind,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PreviewMode {
+    #[default]
+    Menu,
+    TextEditor,
+    Modals,
+    MenuEditor,
+}
+
+impl PreviewMode {
+    pub fn next(self) -> Self {
+        match self {
+            PreviewMode::Menu => PreviewMode::TextEditor,
+            PreviewMode::TextEditor => PreviewMode::Modals,
+            PreviewMode::Modals => PreviewMode::MenuEditor,
+            PreviewMode::MenuEditor => PreviewMode::Menu,
+        }
+    }
+
+    pub fn title(self) -> &'static str {
+        match self {
+            PreviewMode::Menu => "Main Menu",
+            PreviewMode::TextEditor => "Text Editor",
+            PreviewMode::Modals => "Popup Windows / Modals",
+            PreviewMode::MenuEditor => "Visual Menu Editor",
+        }
+    }
+}
+
 pub struct ThemeEditorState {
     pub themes: ThemeCollection,
     pub themes_path: PathBuf,
@@ -27,6 +56,7 @@ pub struct ThemeEditorState {
     pub tokens: Vec<TokenItem>,
     pub selected_idx: usize,
     pub status_message: String,
+    pub preview_mode: PreviewMode,
 }
 
 impl ThemeEditorState {
@@ -118,6 +148,7 @@ impl ThemeEditorState {
             tokens,
             selected_idx: 0,
             status_message: "Ready".to_string(),
+            preview_mode: PreviewMode::default(),
         }
     }
 
