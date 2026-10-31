@@ -3,6 +3,7 @@ use bashmenu_tui::{MenuAction, MenuView, ResolvedThemeStyles};
 use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
+use ratatui::style::Color;
 
 fn create_sample_menu() -> MenuSchema {
     MenuSchema {
@@ -376,4 +377,87 @@ fn test_bbcode_placeholder_and_right_aligned_brackets() {
         }
     }
     assert!(found_plugin_line, "Plugin row must be rendered");
+}
+
+#[test]
+fn test_menu_highlight_bar_unbroken_full_width() {
+    let schema = create_sample_menu();
+    let styles = ResolvedThemeStyles {
+        background: Color::Indexed(235),
+        highlight: ratatui::style::Style::default()
+            .fg(Color::Black)
+            .bg(Color::Cyan)
+            .add_modifier(ratatui::style::Modifier::BOLD),
+        shortcut_key: ratatui::style::Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(ratatui::style::Modifier::BOLD),
+        ..Default::default()
+    };
+
+    let mut view = MenuView::new(schema, styles, true, "Status".to_string());
+
+    let area = Rect::new(0, 0, 80, 24);
+    let mut buf = Buffer::empty(area);
+    view.render(area, &mut buf);
+
+    // In create_sample_menu(), item 0 is a divider, so item 1 ("First Command") is the selected active item at row 3
+    let row_y = 3;
+    let inner_x = 3;
+    let avail_w = 80 - 6; // 74
+
+    // 1. Margins outside inner_x must not have highlight background
+    assert_ne!(
+        buf[(1, row_y)].bg,
+        Color::Cyan,
+        "Left margin must not have highlight bg"
+    );
+    assert_ne!(
+        buf[(2, row_y)].bg,
+        Color::Cyan,
+        "Left margin must not have highlight bg"
+    );
+    assert_ne!(
+        buf[(77, row_y)].bg,
+        Color::Cyan,
+        "Right margin must not have highlight bg"
+    );
+    assert_ne!(
+        buf[(78, row_y)].bg,
+        Color::Cyan,
+        "Right margin must not have highlight bg"
+    );
+
+    // 2. The highlight bar must extend entirely across inner_x to inner_x + avail_w (unbroken)
+    for x in inner_x..(inner_x + avail_w) {
+        assert_eq!(
+            buf[(x, row_y)].bg,
+            Color::Cyan,
+            "Cell at x={} on active row must have highlight background (unbroken full-width highlight bar)",
+            x
+        );
+    }
+
+    // 3. Specifically verify shortcut keys (e.g. x=9..11, "1. ") are highlighted and not broken
+    assert_eq!(
+        buf[(9, row_y)].bg,
+        Color::Cyan,
+        "Shortcut key number '1' must be highlighted"
+    );
+    assert_eq!(
+        buf[(10, row_y)].bg,
+        Color::Cyan,
+        "Shortcut key dot '.' must be highlighted"
+    );
+    assert_eq!(
+        buf[(11, row_y)].bg,
+        Color::Cyan,
+        "Shortcut key space ' ' must be highlighted"
+    );
+
+    // 4. Verify padding cells all the way to right margin are highlighted
+    assert_eq!(
+        buf[(inner_x + avail_w - 1, row_y)].bg,
+        Color::Cyan,
+        "Last cell within right margin must be highlighted"
+    );
 }

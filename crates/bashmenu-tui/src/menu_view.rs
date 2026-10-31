@@ -598,16 +598,23 @@ impl MenuView {
                         self.styles.text
                     },
                 ),
-                Span::styled(icon_slot, item_style),
+                Span::styled(icon_slot.clone(), item_style),
             ];
             if !shortcut.is_empty() {
-                spans.push(Span::styled(shortcut.clone(), self.styles.shortcut_key));
+                let sc_style = if is_active {
+                    item_style
+                } else {
+                    self.styles.shortcut_key
+                };
+                spans.push(Span::styled(shortcut.clone(), sc_style));
             }
 
             // Expand placeholders in item label
             let raw_label = interpolate_placeholders(&item.label, &macro_ctx);
             let (left_label, right_bracket) = split_label_brackets(&raw_label);
-            let prefix_w = 2 + 4 + shortcut.chars().count();
+            let prefix_w = visible_text_len(indicator)
+                + visible_text_len(&icon_slot)
+                + visible_text_len(&shortcut);
             let submenu_w = if item.r#type == MenuItemType::Submenu {
                 3
             } else {
@@ -657,10 +664,33 @@ impl MenuView {
             }
 
             if item.r#type == MenuItemType::Submenu {
-                spans.push(Span::styled("  »", self.styles.accent));
+                let submenu_style = if is_active {
+                    item_style
+                } else {
+                    self.styles.accent
+                };
+                spans.push(Span::styled("  »", submenu_style));
+            }
+
+            // Pad remaining row width with item_style spaces so highlight extends entirely across avail_w
+            let used_w: usize = spans.iter().map(|s| visible_text_len(&s.content)).sum();
+            let pad_end = avail_w.saturating_sub(used_w);
+            if pad_end > 0 {
+                spans.push(Span::styled(" ".repeat(pad_end), item_style));
             }
 
             buf.set_line(inner_x, row_y, &Line::from(spans), avail_w as u16);
+
+            // Ensure unbroken highlight bar across all cells (including wide glyph continuation cells)
+            if is_active {
+                if let Some(bg) = item_style.bg {
+                    for x in inner_x..(inner_x + avail_w as u16) {
+                        if buf[(x, row_y)].bg == ratatui::style::Color::Reset {
+                            buf[(x, row_y)].bg = bg;
+                        }
+                    }
+                }
+            }
         }
 
         // Render plugins pinned at the bottom of the content area

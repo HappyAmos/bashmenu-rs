@@ -100,3 +100,12 @@
   - Non-space characters (text labels, box borders, icons) preserve their glyph and foreground style while their background color is set to the underlying cell's blended average color.
 - [x] Connected wallpaper engine into `MenuView::render` and `themeedit-cli` live preview canvas.
 - [x] Colocated comprehensive unit and integration test suite `crates/bashmenu-tui/tests/wallpaper_test.rs` validating RGB conversions, path resolution, scaling modes, cache hit rates, padding space conversion, and user configuration overrides. Verified zero Clippy warnings and 100% test pass rate.
+
+## Phase 11: Menu Selection & Highlight Bar Alignment
+- [x] Implemented unbroken full-width menu highlight bar extending entirely across the window (within margins):
+  - Ensured active item shortcut keys are styled with `item_style` (`self.styles.highlight`), removing the unhighlighted gap.
+  - Submenu arrows (`»`) on active items use `item_style` (`self.styles.highlight`).
+  - Added trailing padding with `item_style` spaces extending the highlight bar across the entire inner width (`inner_x` to `inner_x + avail_w`).
+  - Preserved wide character (emojis, Nerd Fonts) continuation cells so background wallpaper compositing keeps active selection rows intact.
+  - Updated `themeedit` live preview to render unbroken full-width active item highlight bars.
+  - Added integration test `test_menu_highlight_bar_unbroken_full_width` in `crates/bashmenu-tui/tests/menu_navigation_test.rs` and active row highlight checks in `wallpaper_test.rs`. Zero Clippy warnings.

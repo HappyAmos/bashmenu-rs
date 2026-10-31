@@ -156,13 +156,21 @@ fn main() -> Result<()> {
 
             // Active item
             let ind = &preview_styles.indicator_symbol;
-            let active_line = Line::from(vec![
+            let mut active_spans = vec![
                 Span::styled(ind, preview_styles.highlight),
                 Span::styled("  🚀 ", preview_styles.highlight),
-                Span::styled("1. ", preview_styles.shortcut_key),
+                Span::styled("1. ", preview_styles.highlight),
                 Span::styled("Launch Application", preview_styles.highlight),
-            ]);
-            buf.set_line(p_inner_x, p_inner_y, &active_line, p_avail_w);
+            ];
+            let active_vis: usize = active_spans.iter().map(|s| s.content.chars().count()).sum();
+            let pad_active = (p_avail_w as usize).saturating_sub(active_vis);
+            if pad_active > 0 {
+                active_spans.push(Span::styled(
+                    " ".repeat(pad_active),
+                    preview_styles.highlight,
+                ));
+            }
+            buf.set_line(p_inner_x, p_inner_y, &Line::from(active_spans), p_avail_w);
 
             // Inactive item
             let normal_line = Line::from(vec![

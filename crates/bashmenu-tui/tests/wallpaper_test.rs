@@ -176,8 +176,8 @@ fn test_menu_view_renders_with_wallpaper() {
         extra: Default::default(),
     };
 
-    let mut menu_view =
-        MenuView::new(menu, styles, true, "Status | Gutter".to_string()).with_wallpaper(wp_config);
+    let mut menu_view = MenuView::new(menu, styles.clone(), true, "Status | Gutter".to_string())
+        .with_wallpaper(wp_config);
 
     let area = Rect::new(0, 0, 80, 24);
     let mut buf = Buffer::empty(area);
@@ -199,6 +199,23 @@ fn test_menu_view_renders_with_wallpaper() {
         "Buffer must contain halfblock TrueColor wallpaper cells (found {})",
         halfblock_count
     );
+
+    // Verify active row (row 2) has unbroken highlight background across inner_x..inner_x+avail_w
+    let hl_bg = styles.highlight.bg.unwrap();
+    for x in 3..77 {
+        assert_ne!(
+            buf[(x, 2)].symbol(),
+            "▀",
+            "Active row cell at x={} must not be replaced by wallpaper halfblock",
+            x
+        );
+        assert_eq!(
+            buf[(x, 2)].bg,
+            hl_bg,
+            "Active row cell at x={} must have highlight background",
+            x
+        );
+    }
 }
 
 #[test]

@@ -2,6 +2,7 @@
 
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::Span;
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 /// Parses standard and extended color names or hex codes into `ratatui::style::Color`
 pub fn parse_color(name: &str) -> Option<Color> {
@@ -241,7 +242,7 @@ pub fn strip_bbcode(text: &str) -> String {
 
 /// Visible character length excluding BBCode markup
 pub fn visible_text_len(text: &str) -> usize {
-    strip_bbcode(text).chars().count()
+    strip_bbcode(text).width()
 }
 
 /// Truncates a string to at most `max_w` visible characters, preserving BBCode formatting tags
@@ -278,11 +279,12 @@ pub fn truncate_to_width(text: &str, max_w: usize) -> String {
             }
         }
 
-        if vis + 1 > max_w {
+        let cw = chars[i].width().unwrap_or(1);
+        if vis + cw > max_w {
             break;
         }
         out.push(chars[i]);
-        vis += 1;
+        vis += cw;
         i += 1;
     }
 
