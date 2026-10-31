@@ -15,9 +15,9 @@ pub use bbcode::{
 pub use borders::ResolvedWindowBorders;
 pub use menu_view::{MenuAction, MenuView};
 pub use modals::{
-    render_modal_frame, AsciiGridModal, ColorGridModal, ConfirmModal, FilePickerModal, HelpModal,
-    InputModal, MessageModal, NoteEditorAction, NoteEditorModal, NoteViewerAction, NoteViewerModal,
-    ThemePickerModal,
+    compute_modal_inner, is_close_button_clicked, render_modal_frame, AsciiGridModal,
+    ColorGridModal, ConfirmModal, FilePickerModal, HelpModal, InputModal, MessageModal,
+    NoteEditorAction, NoteEditorModal, NoteViewerAction, NoteViewerModal, ThemePickerModal,
 };
 pub use style::ResolvedThemeStyles;
 pub use terminal::TerminalGuard;

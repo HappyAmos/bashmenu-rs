@@ -78,10 +78,22 @@ impl InputModal {
     }
 
     /// Handles mouse clicks on OK or Cancel buttons
-    pub fn handle_mouse(&mut self, mouse: MouseEvent, inner_area: Rect) -> Option<Option<String>> {
+    pub fn handle_mouse(&mut self, mouse: MouseEvent, area: Rect) -> Option<Option<String>> {
         if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
             let row = mouse.row;
             let col = mouse.column;
+
+            let dialog_w = 60.min(area.width.saturating_sub(4));
+            let inner_area = if area.width <= dialog_w {
+                area
+            } else {
+                super::frame::compute_modal_inner(area, dialog_w, 9)
+            };
+
+            if super::frame::is_close_button_clicked(inner_area, row, col) {
+                return Some(None);
+            }
+
             let btn_y = inner_area.y + inner_area.height.saturating_sub(2);
 
             if row == btn_y {

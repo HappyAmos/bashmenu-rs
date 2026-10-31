@@ -26,6 +26,7 @@ pub struct VisualLine {
     pub start_col: usize,
     pub chars: Vec<char>,
     pub cursor_col_in_chunk: Option<usize>,
+    pub indent_margin: usize,
 }
 
 /// In-modal note editor
@@ -86,14 +87,25 @@ impl NoteEditorModal {
                     start_col: 0,
                     chars: Vec::new(),
                     cursor_col_in_chunk: if is_active_row { Some(0) } else { None },
+                    indent_margin: 0,
                 });
             } else {
-                let chunks = wrap_chars_by_word(&chars, w);
+                let margin = detect_checkbox_margin(line);
+                let chunks = if let Some(m) = margin {
+                    wrap_chars_by_word_with_margin(&chars, w, w.saturating_sub(m).max(10))
+                } else {
+                    wrap_chars_by_word(&chars, w)
+                };
                 let num_chunks = chunks.len();
 
                 for (chunk_idx, (start, chunk)) in chunks.into_iter().enumerate() {
                     let end = start + chunk.len();
                     let is_last_chunk = chunk_idx + 1 == num_chunks;
+                    let chunk_margin = if chunk_idx > 0 {
+                        margin.unwrap_or(0)
+                    } else {
+                        0
+                    };
 
                     let cursor_here = if is_active_row {
                         if self.cursor_col >= start
@@ -113,6 +125,7 @@ impl NoteEditorModal {
                         start_col: start,
                         chars: chunk,
                         cursor_col_in_chunk: cursor_here,
+                        indent_margin: chunk_margin,
                     });
                 }
             }
@@ -282,15 +295,8 @@ impl NoteEditorModal {
                         h.saturating_sub(2),
                     )
                 };
-                let x = inner.x.saturating_sub(1);
-                let y = inner.y.saturating_sub(1);
-                let w = inner.width + 2;
-
-                // Check if close [X] clicked (top right: x + w - 3)
-                if mouse.row == y
-                    && mouse.column >= x + w.saturating_sub(3)
-                    && mouse.column <= x + w.saturating_sub(2)
-                {
+                // Check if close [X] clicked
+                if super::frame::is_close_button_clicked(inner, mouse.row, mouse.column) {
                     return NoteEditorAction::Cancel;
                 }
 
@@ -303,7 +309,8 @@ impl NoteEditorModal {
                     if target_vidx < vlines.len() {
                         let target = &vlines[target_vidx];
                         self.cursor_row = target.logical_row;
-                        let col_click = (mouse.column.saturating_sub(inner.x + 2)) as usize;
+                        let line_x = inner.x + 2 + target.indent_margin as u16;
+                        let col_click = (mouse.column.saturating_sub(line_x)) as usize;
                         let target_line_len = self.lines[target.logical_row].chars().count();
                         self.cursor_col = (target.start_col + col_click.min(target.chars.len()))
                             .min(target_line_len);
@@ -476,7 +483,7 @@ impl NoteEditorModal {
             .enumerate()
         {
             let y = inner.y + 1 + i as u16;
-            let line_start_x = inner.x + 2;
+            let line_start_x = inner.x + 2 + vline.indent_margin as u16;
             let raw_line = &self.lines[vline.logical_row];
 
             let mut line_style = if raw_line.starts_with("- [x]") || raw_line.starts_with("- [X]") {
@@ -496,6 +503,10 @@ impl NoteEditorModal {
                 line_style = line_style.bg(styles.background);
             }
 
+            if vline.indent_margin > 0 {
+                buf.set_string(inner.x + 2, y, " ".repeat(vline.indent_margin), line_style);
+            }
+
             for (col_idx, &c) in vline.chars.iter().enumerate() {
                 let is_cursor = vline.cursor_col_in_chunk == Some(col_idx);
                 let cell_style = if is_cursor {
@@ -508,7 +519,7 @@ impl NoteEditorModal {
 
             // If cursor is at or beyond end of line chunk
             if let Some(c_col) = vline.cursor_col_in_chunk {
-                if c_col >= vline.chars.len() && c_col < inner_w {
+                if c_col >= vline.chars.len() && vline.indent_margin + c_col < inner_w {
                     buf.set_string(
                         line_start_x + c_col as u16,
                         y,
@@ -567,6 +578,55 @@ fn base64_encode(bytes: &[u8]) -> String {
         }
     }
     out
+}
+
+fn detect_checkbox_margin(line: &str) -> Option<usize> {
+    let indent_len = line.chars().take_while(|c| c.is_whitespace()).count();
+    let trimmed = line.trim_start();
+    if trimmed.starts_with("- [ ] ")
+        || trimmed.starts_with("- [x] ")
+        || trimmed.starts_with("- [X] ")
+        || trimmed.starts_with("* [ ] ")
+        || trimmed.starts_with("* [x] ")
+        || trimmed.starts_with("* [X] ")
+    {
+        Some(indent_len + 6)
+    } else {
+        None
+    }
+}
+
+fn wrap_chars_by_word_with_margin(
+    chars: &[char],
+    first_w: usize,
+    cont_w: usize,
+) -> Vec<(usize, Vec<char>)> {
+    let mut result = Vec::new();
+    let mut start = 0;
+    let mut is_first = true;
+    while start < chars.len() {
+        let w = if is_first { first_w } else { cont_w };
+        if chars.len() - start <= w {
+            result.push((start, chars[start..].to_vec()));
+            break;
+        }
+        let candidate_end = start + w;
+        let mut split_at = None;
+        for i in (start + 1..=candidate_end).rev() {
+            if chars[i - 1].is_whitespace() {
+                split_at = Some(i);
+                break;
+            }
+        }
+        let end = match split_at {
+            Some(idx) => idx,
+            None => candidate_end,
+        };
+        result.push((start, chars[start..end].to_vec()));
+        start = end;
+        is_first = false;
+    }
+    result
 }
 
 fn wrap_chars_by_word(chars: &[char], w: usize) -> Vec<(usize, Vec<char>)> {

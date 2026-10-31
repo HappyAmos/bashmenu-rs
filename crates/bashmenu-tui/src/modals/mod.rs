@@ -13,7 +13,7 @@ pub mod theme_picker;
 
 pub use confirm::ConfirmModal;
 pub use file_picker::FilePickerModal;
-pub use frame::render_modal_frame;
+pub use frame::{compute_modal_inner, is_close_button_clicked, render_modal_frame};
 pub use grid_picker::{AsciiGridModal, ColorGridModal};
 pub use help::HelpModal;
 pub use input::InputModal;

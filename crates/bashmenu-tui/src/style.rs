@@ -19,6 +19,7 @@ pub struct ResolvedThemeStyles {
     pub selection: Style,
     pub shortcut_key: Style,
     pub divider: Style,
+    pub window_close_button: Style,
     pub indicator_symbol: String,
     pub borders: ResolvedWindowBorders,
 }
@@ -45,6 +46,7 @@ impl Default for ResolvedThemeStyles {
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
             divider: Style::default().fg(Color::Cyan),
+            window_close_button: Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
             indicator_symbol: "► ".to_string(),
             borders: ResolvedWindowBorders::default(),
         }
@@ -199,6 +201,9 @@ impl ResolvedThemeStyles {
             }
             if let Some(st) = parse_style_pair(p.get("divider")) {
                 resolved.divider = st;
+            }
+            if let Some(st) = parse_style_pair(p.get("window_close_button")) {
+                resolved.window_close_button = st.add_modifier(Modifier::BOLD);
             }
         }
 

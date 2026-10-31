@@ -239,9 +239,15 @@ impl<'de> Deserialize<'de> for MenuItem {
                 let raw_props: RawItemProperties =
                     serde_yml::from_value(serde_yml::Value::Mapping(map.clone()))
                         .map_err(serde::de::Error::custom)?;
+                let item_type =
+                    if raw_props.submenu.is_some() && raw_props.r#type == MenuItemType::Command {
+                        MenuItemType::Submenu
+                    } else {
+                        raw_props.r#type
+                    };
                 return Ok(MenuItem {
                     label,
-                    r#type: raw_props.r#type,
+                    r#type: item_type,
                     icon: raw_props.icon,
                     command: raw_props.command,
                     action: raw_props.action,
@@ -276,9 +282,16 @@ impl<'de> Deserialize<'de> for MenuItem {
                 if let serde_yml::Value::Mapping(_) = v {
                     let raw_props: RawItemProperties =
                         serde_yml::from_value(v.clone()).map_err(serde::de::Error::custom)?;
+                    let item_type = if raw_props.submenu.is_some()
+                        && raw_props.r#type == MenuItemType::Command
+                    {
+                        MenuItemType::Submenu
+                    } else {
+                        raw_props.r#type
+                    };
                     return Ok(MenuItem {
                         label,
-                        r#type: raw_props.r#type,
+                        r#type: item_type,
                         icon: raw_props.icon,
                         command: raw_props.command,
                         action: raw_props.action,

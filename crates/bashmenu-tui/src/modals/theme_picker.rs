@@ -76,7 +76,15 @@ impl ThemePickerModal {
     }
 
     /// Handles mouse event
-    pub fn handle_mouse(&mut self, mouse: MouseEvent, inner_area: Rect) -> Option<Option<String>> {
+    pub fn handle_mouse(&mut self, mouse: MouseEvent, area: Rect) -> Option<Option<String>> {
+        let dialog_w = 40.min(area.width.saturating_sub(4));
+        let dialog_h = 16.min(area.height.saturating_sub(2));
+        let inner_area = if area.width <= dialog_w {
+            area
+        } else {
+            super::frame::compute_modal_inner(area, dialog_w, dialog_h)
+        };
+
         match mouse.kind {
             MouseEventKind::ScrollDown => {
                 if self.selected_idx + 1 < self.themes.len() {
@@ -90,6 +98,10 @@ impl ThemePickerModal {
             }
             MouseEventKind::Down(MouseButton::Left) => {
                 let row = mouse.row;
+                let col = mouse.column;
+                if super::frame::is_close_button_clicked(inner_area, row, col) {
+                    return Some(None);
+                }
                 if row > inner_area.y && row < inner_area.y + inner_area.height.saturating_sub(1) {
                     let clicked_row = (row - (inner_area.y + 1)) as usize;
                     let target_idx = self.scroll_offset + clicked_row;
@@ -128,7 +140,7 @@ impl ThemePickerModal {
         {
             let y = inner.y + 1 + (i - self.scroll_offset) as u16;
             let is_sel = i == self.selected_idx;
-            let marker = if is_sel { " ► " } else { "   " };
+            let marker = "   ";
             let row_style = if is_sel {
                 styles.highlight.add_modifier(Modifier::BOLD)
             } else {

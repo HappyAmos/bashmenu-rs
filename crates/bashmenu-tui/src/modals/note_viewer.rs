@@ -48,6 +48,18 @@ impl NoteViewerModal {
         }
     }
 
+    fn get_selectable_lines(&self) -> Vec<usize> {
+        let raw_lines: Vec<&str> = self.content.lines().collect();
+        let mut selectable = Vec::new();
+        for (idx, line) in raw_lines.iter().enumerate() {
+            if !self.show_completed && is_completed_checkbox(line) {
+                continue;
+            }
+            selectable.push(idx);
+        }
+        selectable
+    }
+
     /// Handles keyboard input
     pub fn handle_key(&mut self, code: KeyCode) -> NoteViewerAction {
         match code {
@@ -57,6 +69,12 @@ impl NoteViewerModal {
             KeyCode::Char('d') | KeyCode::Char('D') => NoteViewerAction::Delete,
             KeyCode::Char('h') | KeyCode::Char('H') => {
                 self.show_completed = !self.show_completed;
+                let selectable = self.get_selectable_lines();
+                if !selectable.contains(&self.selected_line) {
+                    if let Some(&first) = selectable.first() {
+                        self.selected_line = first;
+                    }
+                }
                 NoteViewerAction::None
             }
             KeyCode::Char('c') | KeyCode::Char('C') => {
@@ -66,23 +84,33 @@ impl NoteViewerModal {
                 NoteViewerAction::None
             }
             KeyCode::Char(' ') => {
-                // Toggle checkbox on the active line
-                let lines: Vec<&str> = self.content.lines().collect();
-                if self.selected_line < lines.len() {
-                    let line = lines[self.selected_line];
-                    if let Some(toggled) = toggle_checkbox_line(line) {
-                        let mut new_lines: Vec<String> =
-                            lines.iter().map(|s| s.to_string()).collect();
-                        new_lines[self.selected_line] = toggled;
-                        self.content = new_lines.join("\n");
-                        return NoteViewerAction::ContentModified(self.content.clone());
+                // Toggle checkbox on the active line if selectable
+                let selectable = self.get_selectable_lines();
+                if selectable.contains(&self.selected_line) {
+                    let lines: Vec<&str> = self.content.lines().collect();
+                    if self.selected_line < lines.len() {
+                        let line = lines[self.selected_line];
+                        if let Some(toggled) = toggle_checkbox_line(line) {
+                            let mut new_lines: Vec<String> =
+                                lines.iter().map(|s| s.to_string()).collect();
+                            new_lines[self.selected_line] = toggled;
+                            self.content = new_lines.join("\n");
+                            return NoteViewerAction::ContentModified(self.content.clone());
+                        }
                     }
                 }
                 NoteViewerAction::None
             }
             KeyCode::Up | KeyCode::Char('k') => {
-                if self.selected_line > 0 {
-                    self.selected_line -= 1;
+                let selectable = self.get_selectable_lines();
+                if !selectable.is_empty() {
+                    let cur_pos = selectable
+                        .iter()
+                        .position(|&x| x == self.selected_line)
+                        .unwrap_or(0);
+                    if cur_pos > 0 {
+                        self.selected_line = selectable[cur_pos - 1];
+                    }
                 }
                 if self.selected_line < self.scroll_offset {
                     self.scroll_offset = self.selected_line;
@@ -90,30 +118,52 @@ impl NoteViewerModal {
                 NoteViewerAction::None
             }
             KeyCode::Down | KeyCode::Char('j') => {
-                let total_lines = self.content.lines().count();
-                if self.selected_line + 1 < total_lines {
-                    self.selected_line += 1;
+                let selectable = self.get_selectable_lines();
+                if !selectable.is_empty() {
+                    let cur_pos = selectable
+                        .iter()
+                        .position(|&x| x == self.selected_line)
+                        .unwrap_or(0);
+                    if cur_pos + 1 < selectable.len() {
+                        self.selected_line = selectable[cur_pos + 1];
+                    }
                 }
                 NoteViewerAction::None
             }
             KeyCode::PageUp => {
-                self.selected_line = self.selected_line.saturating_sub(15);
+                let selectable = self.get_selectable_lines();
+                if !selectable.is_empty() {
+                    let cur_pos = selectable
+                        .iter()
+                        .position(|&x| x == self.selected_line)
+                        .unwrap_or(0);
+                    let target_pos = cur_pos.saturating_sub(15);
+                    self.selected_line = selectable[target_pos];
+                }
                 self.scroll_offset = self.scroll_offset.saturating_sub(15);
                 NoteViewerAction::None
             }
             KeyCode::PageDown => {
-                let total_lines = self.content.lines().count();
-                self.selected_line = (self.selected_line + 15).min(total_lines.saturating_sub(1));
+                let selectable = self.get_selectable_lines();
+                if !selectable.is_empty() {
+                    let cur_pos = selectable
+                        .iter()
+                        .position(|&x| x == self.selected_line)
+                        .unwrap_or(0);
+                    let target_pos = (cur_pos + 15).min(selectable.len().saturating_sub(1));
+                    self.selected_line = selectable[target_pos];
+                }
                 NoteViewerAction::None
             }
             KeyCode::Home => {
-                self.selected_line = 0;
+                let selectable = self.get_selectable_lines();
+                self.selected_line = selectable.first().copied().unwrap_or(0);
                 self.scroll_offset = 0;
                 NoteViewerAction::None
             }
             KeyCode::End => {
-                let total_lines = self.content.lines().count();
-                self.selected_line = total_lines.saturating_sub(1);
+                let selectable = self.get_selectable_lines();
+                self.selected_line = selectable.last().copied().unwrap_or(0);
                 NoteViewerAction::None
             }
             _ => NoteViewerAction::None,
@@ -121,7 +171,7 @@ impl NoteViewerModal {
     }
 
     /// Handles mouse events
-    pub fn handle_mouse(&mut self, mouse: MouseEvent, _inner_area: Rect) -> NoteViewerAction {
+    pub fn handle_mouse(&mut self, mouse: MouseEvent, area: Rect) -> NoteViewerAction {
         match mouse.kind {
             MouseEventKind::ScrollDown => {
                 let total_lines = self.content.lines().count();
@@ -133,6 +183,20 @@ impl NoteViewerModal {
             MouseEventKind::ScrollUp => {
                 self.scroll_offset = self.scroll_offset.saturating_sub(2);
                 NoteViewerAction::None
+            }
+            MouseEventKind::Down(crossterm::event::MouseButton::Left) => {
+                let dialog_w = (area.width.saturating_sub(4)).min(78);
+                let dialog_h = (area.height.saturating_sub(4)).clamp(14, 28);
+                let inner = if area.width <= dialog_w {
+                    area
+                } else {
+                    super::frame::compute_modal_inner(area, dialog_w, dialog_h)
+                };
+                if super::frame::is_close_button_clicked(inner, mouse.row, mouse.column) {
+                    NoteViewerAction::Close
+                } else {
+                    NoteViewerAction::None
+                }
             }
             _ => NoteViewerAction::None,
         }
@@ -319,36 +383,52 @@ impl NoteViewerModal {
                 }
 
                 // 7. Checkboxes
-                if let Some((is_checked, rest)) = parse_checkbox_line(line) {
+                if let Some((indent_len, is_checked, rest)) = parse_checkbox_line(line) {
+                    let margin = indent_len + 6;
+                    let is_sel = idx == self.selected_line;
                     let (check_box_span, base_st) = if is_checked {
+                        let cb_style = if is_sel {
+                            Style::default()
+                                .fg(Color::DarkGray)
+                                .add_modifier(Modifier::DIM)
+                        } else {
+                            Style::default().fg(Color::Green)
+                        };
                         (
-                            Span::styled("- [x] ", Style::default().fg(Color::Green)),
+                            Span::styled("- [x] ", cb_style),
                             Style::default()
                                 .fg(Color::DarkGray)
                                 .add_modifier(Modifier::DIM),
                         )
                     } else {
-                        (
-                            Span::styled(
-                                "- [ ] ",
-                                Style::default()
-                                    .fg(Color::Yellow)
-                                    .add_modifier(Modifier::BOLD),
-                            ),
-                            styles.text,
-                        )
+                        let cb_style = if is_sel {
+                            styles.text
+                        } else {
+                            Style::default()
+                                .fg(Color::Yellow)
+                                .add_modifier(Modifier::BOLD)
+                        };
+                        (Span::styled("- [ ] ", cb_style), styles.text)
                     };
 
-                    let wrapped = textwrap_simple(rest, avail_w.saturating_sub(6));
+                    let wrapped = textwrap_simple(rest, avail_w.saturating_sub(margin));
                     if wrapped.is_empty() {
-                        visible_entries.push((idx, Line::from(vec![check_box_span])));
+                        let mut spans = Vec::new();
+                        if indent_len > 0 {
+                            spans.push(Span::styled(" ".repeat(indent_len), base_st));
+                        }
+                        spans.push(check_box_span);
+                        visible_entries.push((idx, Line::from(spans)));
                     } else {
                         for (w_idx, wl) in wrapped.iter().enumerate() {
                             let mut spans = Vec::new();
                             if w_idx == 0 {
+                                if indent_len > 0 {
+                                    spans.push(Span::styled(" ".repeat(indent_len), base_st));
+                                }
                                 spans.push(check_box_span.clone());
                             } else {
-                                spans.push(Span::styled("      ", base_st));
+                                spans.push(Span::styled(" ".repeat(margin), base_st));
                             }
                             spans.extend(parse_markdown_spans(wl, base_st));
                             visible_entries.push((idx, Line::from(spans)));
@@ -485,20 +565,21 @@ fn parse_markdown_spans(text: &str, base_style: Style) -> Vec<Span<'static>> {
     spans
 }
 
-fn parse_checkbox_line(line: &str) -> Option<(bool, &str)> {
+fn parse_checkbox_line(line: &str) -> Option<(usize, bool, &str)> {
+    let indent_len = line.chars().take_while(|c| c.is_whitespace()).count();
     let trimmed = line.trim_start();
     if let Some(rest) = trimmed
         .strip_prefix("- [ ] ")
         .or_else(|| trimmed.strip_prefix("* [ ] "))
     {
-        Some((false, rest))
+        Some((indent_len, false, rest))
     } else if let Some(rest) = trimmed
         .strip_prefix("- [x] ")
         .or_else(|| trimmed.strip_prefix("- [X] "))
         .or_else(|| trimmed.strip_prefix("* [x] "))
         .or_else(|| trimmed.strip_prefix("* [X] "))
     {
-        Some((true, rest))
+        Some((indent_len, true, rest))
     } else {
         None
     }

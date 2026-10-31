@@ -6,6 +6,22 @@ use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::{Block, Borders, Clear, Widget};
 
+/// Calculates the inner `Rect` for a modal dialog given the viewport and target dimensions
+pub fn compute_modal_inner(area: Rect, dialog_w: u16, dialog_h: u16) -> Rect {
+    let w = dialog_w.min(area.width.saturating_sub(4));
+    let h = dialog_h.min(area.height.saturating_sub(2)).min(28);
+
+    let start_x = area.x + (area.width.saturating_sub(w + 2)) / 2;
+    let start_y = area.y + (area.height.saturating_sub(h + 1)) / 2;
+
+    Rect::new(
+        start_x + 1,
+        start_y + 1,
+        w.saturating_sub(2),
+        h.saturating_sub(2),
+    )
+}
+
 /// Renders a centered modal dialog box with classic drop-shadow frame into `buf`.
 /// Returns the inner `Rect` available for modal content.
 ///
@@ -66,5 +82,31 @@ pub fn render_modal_frame(
     let inner = block.inner(dialog_rect);
     block.render(dialog_rect, buf);
 
+    // 4. Render Close Button [X] just to the left of top-right border corner
+    if w >= 8 {
+        let close_x = start_x + w - 4;
+        let border_st = Style::default().fg(styles.border).bg(styles.background);
+        let mut close_st = styles.window_close_button;
+        if close_st.bg.is_none() || close_st.bg == Some(Color::Reset) {
+            close_st = close_st.bg(styles.background);
+        }
+        buf[(close_x, start_y)].set_char('[').set_style(border_st);
+        buf[(close_x + 1, start_y)]
+            .set_char('X')
+            .set_style(close_st);
+        buf[(close_x + 2, start_y)]
+            .set_char(']')
+            .set_style(border_st);
+    }
+
     inner
+}
+
+/// Returns true if the mouse click was on the [X] close button for a modal dialog with inner rect `inner`
+pub fn is_close_button_clicked(inner: Rect, mouse_row: u16, mouse_col: u16) -> bool {
+    let top_y = inner.y.saturating_sub(1);
+    let right_x = inner.x + inner.width;
+    mouse_row == top_y
+        && mouse_col >= right_x.saturating_sub(3)
+        && mouse_col <= right_x.saturating_sub(1)
 }

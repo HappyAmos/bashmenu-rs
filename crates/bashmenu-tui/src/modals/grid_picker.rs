@@ -121,7 +121,7 @@ impl ColorGridModal {
                     Style::default().bg(Color::Indexed(code)).fg(Color::Reset)
                 };
 
-                let cell_str = if is_selected { "► " } else { "  " };
+                let cell_str = "  ";
                 buf.set_string(px, py, cell_str, cell_style);
             }
         }

@@ -100,6 +100,53 @@ fn test_submenu_push_and_pop() {
 }
 
 #[test]
+fn test_nested_submenu_without_explicit_type() {
+    // Invariant: An item with `submenu:` but without `type: submenu` must activate as a submenu
+    let yaml = r#"
+version: 0.0.1
+title: Test Menu
+items:
+  - Options & Settings:
+      submenu:
+        title: Options & Settings
+        items:
+          - '[b]Bashmenu Settings[/b]':
+              submenu:
+                title: Bashmenu Settings
+                items:
+                  - Change Theme:
+                      type: theme_selector
+"#;
+    let menu: MenuSchema = serde_yml::from_str(yaml).expect("Failed to deserialize menu");
+    let mut view = MenuView::new(
+        menu,
+        ResolvedThemeStyles::default(),
+        true,
+        "Status".to_string(),
+    );
+
+    // Enter "Options & Settings"
+    let action = view.handle_key(KeyCode::Enter);
+    assert_eq!(action, MenuAction::None);
+    assert_eq!(view.current_items().len(), 1);
+    assert_eq!(view.current_items()[0].label, "[b]Bashmenu Settings[/b]");
+
+    // Enter "Bashmenu Settings"
+    let action2 = view.handle_key(KeyCode::Enter);
+    assert_eq!(action2, MenuAction::None);
+    assert_eq!(view.current_items().len(), 1);
+    assert_eq!(view.current_items()[0].label, "Change Theme");
+
+    // Pop back to Options & Settings
+    view.handle_key(KeyCode::Esc);
+    assert_eq!(view.current_items()[0].label, "[b]Bashmenu Settings[/b]");
+
+    // Pop back to root
+    view.handle_key(KeyCode::Esc);
+    assert_eq!(view.current_items()[0].label, "Options & Settings");
+}
+
+#[test]
 fn test_immediate_mouse_click_activation() {
     let schema = create_sample_menu();
     let mut view = MenuView::new(

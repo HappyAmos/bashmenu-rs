@@ -44,10 +44,22 @@ impl ConfirmModal {
     }
 
     /// Handles immediate mouse click
-    pub fn handle_mouse(&mut self, mouse: MouseEvent, inner_area: Rect) -> Option<bool> {
+    pub fn handle_mouse(&mut self, mouse: MouseEvent, area: Rect) -> Option<bool> {
         if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
             let row = mouse.row;
             let col = mouse.column;
+
+            let dialog_w = (self.message.len() as u16 + 8).clamp(32, 70);
+            let inner_area = if area.width <= dialog_w {
+                area
+            } else {
+                super::frame::compute_modal_inner(area, dialog_w, 8)
+            };
+
+            if super::frame::is_close_button_clicked(inner_area, row, col) {
+                return Some(false);
+            }
+
             let btn_y = inner_area.y + inner_area.height.saturating_sub(2);
 
             if row == btn_y {

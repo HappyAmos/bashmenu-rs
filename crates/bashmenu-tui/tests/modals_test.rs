@@ -432,3 +432,160 @@ fn test_help_modal_renders_at_90_percent_width() {
     // 90% of 120 is 108. Inner width is 108 - 2 borders = 106.
     assert_eq!(inner.width, 106);
 }
+
+#[test]
+fn test_modal_frame_close_button_rendering_and_clicking() {
+    use bashmenu_tui::{is_close_button_clicked, render_modal_frame, HelpModal};
+    use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
+    use ratatui::style::{Color, Style};
+
+    let styles = ResolvedThemeStyles {
+        border: Color::Cyan,
+        window_close_button: Style::default().fg(Color::Red),
+        ..Default::default()
+    };
+    let area = Rect::new(0, 0, 80, 24);
+    let mut buf = Buffer::empty(area);
+
+    let inner = render_modal_frame(area, 60, 15, "Close Test", &styles, &mut buf);
+
+    // Top-right corner character is at inner.x + inner.width.
+    // Close button [X] is at inner.x + inner.width - 3 .. -1.
+    let close_start = inner.x + inner.width - 3;
+    let top_y = inner.y - 1;
+
+    let cell_bracket_open = buf.cell((close_start, top_y)).unwrap();
+    assert_eq!(cell_bracket_open.symbol(), "[");
+    assert_eq!(cell_bracket_open.style().fg, Some(Color::Cyan));
+
+    let cell_x = buf.cell((close_start + 1, top_y)).unwrap();
+    assert_eq!(cell_x.symbol(), "X");
+    assert_eq!(cell_x.style().fg, Some(Color::Red));
+
+    let cell_bracket_close = buf.cell((close_start + 2, top_y)).unwrap();
+    assert_eq!(cell_bracket_close.symbol(), "]");
+    assert_eq!(cell_bracket_close.style().fg, Some(Color::Cyan));
+
+    // Verify click detection
+    assert!(is_close_button_clicked(inner, top_y, close_start + 1));
+    assert!(!is_close_button_clicked(inner, top_y + 1, close_start + 1));
+
+    // Verify HelpModal mouse click on close button dismisses modal
+    let mut help = HelpModal::new("Help", "Content");
+    let help_inner = help.render(area, &styles, &mut buf);
+    let help_close_x = help_inner.x + help_inner.width - 2; // 'X' position
+    let help_top_y = help_inner.y - 1;
+    let mouse_ev = MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: help_close_x,
+        row: help_top_y,
+        modifiers: crossterm::event::KeyModifiers::empty(),
+    };
+    assert!(help.handle_mouse(mouse_ev, area));
+}
+
+#[test]
+fn test_note_viewer_hidden_completed_items_not_selectable() {
+    use bashmenu_tui::NoteViewerModal;
+    use crossterm::event::KeyCode;
+
+    let note = "- [x] Done item 1\n- [ ] Todo item 2\n- [x] Done item 3\n- [ ] Todo item 4";
+    let mut viewer = NoteViewerModal::new("Viewer", "/tmp/v.yml", note);
+    // Initially show_completed is false, so items 0 and 2 are hidden
+    assert!(!viewer.show_completed);
+
+    // Initial navigation should only step between index 1 and 3
+    viewer.handle_key(KeyCode::Home);
+    assert_eq!(viewer.selected_line, 1, "First visible item is index 1");
+
+    viewer.handle_key(KeyCode::Down);
+    assert_eq!(
+        viewer.selected_line, 3,
+        "Next visible item is index 3, skipping hidden index 2"
+    );
+
+    viewer.handle_key(KeyCode::Up);
+    assert_eq!(viewer.selected_line, 1, "Previous visible item is index 1");
+}
+
+#[test]
+fn test_note_viewer_and_editor_checkbox_margin_wrapping() {
+    use bashmenu_tui::{NoteEditorModal, NoteViewerModal};
+
+    let styles = ResolvedThemeStyles::default();
+    let area = Rect::new(0, 0, 40, 20);
+
+    // 1. NoteViewerModal wraps checkbox items with margin
+    let note =
+        "- [ ] This is a very long checkbox note item that will wrap onto multiple visual lines";
+    let viewer = NoteViewerModal::new("Viewer", "/tmp/v.yml", note);
+    let mut buf = Buffer::empty(area);
+    viewer.render(area, &styles, &mut buf);
+
+    // Line 1 should have "- [ ] This is a"
+    // Line 2 should have "      very long" (prefixed with 6 spaces margin)
+    let mut found_continuation_with_margin = false;
+    for y in 0..area.height {
+        let line_chars: String = (0..area.width)
+            .map(|x| buf.cell((x, y)).unwrap().symbol().to_string())
+            .collect();
+        if line_chars.contains("      ")
+            && (line_chars.contains("very")
+                || line_chars.contains("checkbox")
+                || line_chars.contains("wrap"))
+        {
+            found_continuation_with_margin = true;
+            break;
+        }
+    }
+    assert!(
+        found_continuation_with_margin,
+        "NoteViewer must prepend continuation lines with margin spaces"
+    );
+
+    // 2. NoteEditorModal compute_visual_lines wraps checkbox items with margin
+    let editor = NoteEditorModal::new("Editor", "/tmp/e.yml", note);
+    let (vlines, _) = editor.compute_visual_lines(30);
+    assert!(
+        vlines.len() >= 2,
+        "Long line must wrap into multiple visual lines"
+    );
+    assert_eq!(
+        vlines[0].indent_margin, 0,
+        "First chunk has no extra indent margin"
+    );
+    assert_eq!(
+        vlines[1].indent_margin, 6,
+        "Continuation chunk must have 6 spaces margin"
+    );
+}
+
+#[test]
+fn test_modal_no_triangle_indicator() {
+    use bashmenu_tui::{ColorGridModal, FilePickerModal, ThemePickerModal};
+
+    let styles = ResolvedThemeStyles::default();
+    let area = Rect::new(0, 0, 80, 24);
+
+    // 1. ThemePickerModal
+    let mut theme_picker =
+        ThemePickerModal::new(vec!["theme1".to_string(), "theme2".to_string()], "theme1");
+    let mut buf1 = Buffer::empty(area);
+    theme_picker.render(area, &styles, &mut buf1);
+    let s1 = format!("{:?}", buf1);
+    assert!(!s1.contains('►'), "ThemePickerModal must not render '►'");
+
+    // 2. FilePickerModal
+    let mut file_picker = FilePickerModal::new("Pick File", &std::path::PathBuf::from("/"), false);
+    let mut buf2 = Buffer::empty(area);
+    file_picker.render(area, &styles, &mut buf2);
+    let s2 = format!("{:?}", buf2);
+    assert!(!s2.contains('►'), "FilePickerModal must not render '►'");
+
+    // 3. ColorGridModal
+    let grid_picker = ColorGridModal::new("Color Grid", 10);
+    let mut buf3 = Buffer::empty(area);
+    grid_picker.render(area, &styles, &mut buf3);
+    let s3 = format!("{:?}", buf3);
+    assert!(!s3.contains('►'), "ColorGridModal must not render '►'");
+}

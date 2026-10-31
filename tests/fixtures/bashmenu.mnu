@@ -502,6 +502,7 @@ items:
         items:
           - '{divider}':
           - '[b]Bashmenu Settings[/b]':
+              type: submenu
               submenu:
                 title: Bashmenu Settings
                 items:

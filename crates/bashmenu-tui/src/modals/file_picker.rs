@@ -116,9 +116,21 @@ impl FilePickerModal {
     }
 
     /// Handles immediate mouse interaction
-    pub fn handle_mouse(&mut self, mouse: MouseEvent, inner_area: Rect) -> Option<Option<PathBuf>> {
+    pub fn handle_mouse(&mut self, mouse: MouseEvent, area: Rect) -> Option<Option<PathBuf>> {
+        let dialog_w = 60.min(area.width.saturating_sub(4));
+        let dialog_h = 18.min(area.height.saturating_sub(2));
+        let inner_area = if area.width <= dialog_w {
+            area
+        } else {
+            super::frame::compute_modal_inner(area, dialog_w, dialog_h)
+        };
+
         if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
             let row = mouse.row;
+            let col = mouse.column;
+            if super::frame::is_close_button_clicked(inner_area, row, col) {
+                return Some(None);
+            }
             let list_start_y = inner_area.y + 2;
             let list_h = inner_area.height.saturating_sub(4);
 
@@ -200,7 +212,7 @@ impl FilePickerModal {
 
             let line = Line::from(vec![
                 Span::styled(
-                    if is_selected { "► " } else { "  " },
+                    "  ",
                     if is_selected {
                         styles.highlight
                     } else {

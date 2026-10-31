@@ -61,7 +61,7 @@ impl HelpModal {
     }
 
     /// Handles mouse event
-    pub fn handle_mouse(&mut self, mouse: MouseEvent, _inner_area: Rect) -> bool {
+    pub fn handle_mouse(&mut self, mouse: MouseEvent, area: Rect) -> bool {
         match mouse.kind {
             MouseEventKind::ScrollDown => {
                 self.scroll_offset += 2;
@@ -70,6 +70,18 @@ impl HelpModal {
             MouseEventKind::ScrollUp => {
                 self.scroll_offset = self.scroll_offset.saturating_sub(2);
                 false
+            }
+            MouseEventKind::Down(crossterm::event::MouseButton::Left) => {
+                let dialog_w = ((area.width as f32 * 0.90) as u16)
+                    .min(area.width.saturating_sub(4))
+                    .max(20);
+                let dialog_h = (area.height.saturating_sub(2)).max(10);
+                let inner = if area.width <= dialog_w {
+                    area
+                } else {
+                    super::frame::compute_modal_inner(area, dialog_w, dialog_h)
+                };
+                super::frame::is_close_button_clicked(inner, mouse.row, mouse.column)
             }
             _ => false,
         }

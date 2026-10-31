@@ -436,21 +436,23 @@ impl MenuView {
         }
 
         let item = level.items[level.selected_idx].clone();
-        match item.r#type {
-            MenuItemType::Submenu => {
-                if let Some(sub) = item.submenu {
-                    self.stack.push(MenuLevel {
-                        title: sub.title,
-                        items: sub.items,
-                        selected_idx: 0,
-                        scroll_offset: 0,
-                        is_notebook: false,
-                        notebook_file: None,
-                    });
-                    self.ensure_selectable();
-                }
-                MenuAction::None
+        if item.r#type == MenuItemType::Submenu || item.submenu.is_some() {
+            if let Some(sub) = item.submenu {
+                self.stack.push(MenuLevel {
+                    title: sub.title,
+                    items: sub.items,
+                    selected_idx: 0,
+                    scroll_offset: 0,
+                    is_notebook: false,
+                    notebook_file: None,
+                });
+                self.ensure_selectable();
             }
+            return MenuAction::None;
+        }
+
+        match item.r#type {
+            MenuItemType::Submenu => MenuAction::None,
             MenuItemType::Notebook => MenuAction::OpenNotebook(Box::new(item)),
             MenuItemType::NotebookNote => {
                 let filepath = item.file.unwrap_or_default();
@@ -739,11 +741,8 @@ impl MenuView {
             let prefix_w = visible_text_len(indicator)
                 + visible_text_len(&icon_slot)
                 + visible_text_len(&shortcut);
-            let submenu_w = if item.r#type == MenuItemType::Submenu {
-                3
-            } else {
-                0
-            };
+            let is_submenu = item.r#type == MenuItemType::Submenu || item.submenu.is_some();
+            let submenu_w = if is_submenu { 3 } else { 0 };
             let avail_for_content = avail_w.saturating_sub(prefix_w + submenu_w);
 
             if right_bracket.is_empty() {
@@ -787,7 +786,7 @@ impl MenuView {
                 }
             }
 
-            if item.r#type == MenuItemType::Submenu {
+            if is_submenu {
                 let submenu_style = if is_active {
                     item_style
                 } else {
