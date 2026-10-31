@@ -40,6 +40,19 @@ pub enum MenuAction {
     ConfigureGutter,
     /// Launch theme editor (F8)
     LaunchThemeEditor,
+    /// Open a notebook menu
+    OpenNotebook(Box<MenuItem>),
+    /// View/read a notebook note
+    ViewNote {
+        filepath: String,
+        note_title: String,
+    },
+    /// Create a new note inside current notebook
+    NewNote(String),
+    /// Rename selected note inside current notebook
+    RenameNote(String),
+    /// Delete selected note inside current notebook
+    DeleteNote(String),
     /// Exit the menu application
     Exit,
 }
@@ -50,6 +63,8 @@ struct MenuLevel {
     items: Vec<MenuItem>,
     selected_idx: usize,
     scroll_offset: usize,
+    is_notebook: bool,
+    notebook_file: Option<String>,
 }
 
 /// The interactive menu widget and state machine
@@ -77,6 +92,8 @@ impl MenuView {
             items: menu.items,
             selected_idx: 0,
             scroll_offset: 0,
+            is_notebook: false,
+            notebook_file: None,
         };
 
         let mut config = BashMenuConfig::default();
@@ -151,7 +168,47 @@ impl MenuView {
             items: menu.items,
             selected_idx: 0,
             scroll_offset: 0,
+            is_notebook: false,
+            notebook_file: None,
         }];
+        self.ensure_selectable();
+    }
+
+    /// Whether the currently displayed menu level is a notebook notes collection
+    pub fn is_current_notebook(&self) -> bool {
+        self.current_level().is_notebook
+    }
+
+    /// Notebook file path if currently inside a notebook
+    pub fn current_notebook_file(&self) -> Option<&str> {
+        self.current_level().notebook_file.as_deref()
+    }
+
+    /// Pushes a dynamic notebook notes submenu onto the stack
+    pub fn push_notebook(&mut self, title: String, items: Vec<MenuItem>, filepath: String) {
+        self.stack.push(MenuLevel {
+            title,
+            items,
+            selected_idx: 0,
+            scroll_offset: 0,
+            is_notebook: true,
+            notebook_file: Some(filepath),
+        });
+        self.ensure_selectable();
+    }
+
+    /// Reloads current notebook menu items and keeps or updates target selection
+    pub fn reload_current_notebook(&mut self, items: Vec<MenuItem>, select_title: Option<&str>) {
+        let level = self.current_level_mut();
+        level.items = items;
+        if let Some(target) = select_title {
+            for (idx, it) in level.items.iter().enumerate() {
+                if it.label == target {
+                    level.selected_idx = idx;
+                    break;
+                }
+            }
+        }
         self.ensure_selectable();
     }
 
@@ -264,6 +321,39 @@ impl MenuView {
             }
             KeyCode::Enter => self.activate_selected(),
             KeyCode::Esc | KeyCode::Backspace | KeyCode::Char('q') => self.go_back(),
+            KeyCode::Char('n') | KeyCode::Char('N') if self.is_current_notebook() => {
+                if let Some(fp) = self.current_notebook_file() {
+                    MenuAction::NewNote(fp.to_string())
+                } else {
+                    MenuAction::None
+                }
+            }
+            KeyCode::Char('m') | KeyCode::Char('M') if self.is_current_notebook() => {
+                let level = self.current_level();
+                if level.selected_idx < level.items.len() {
+                    let sel = &level.items[level.selected_idx];
+                    if sel.r#type == MenuItemType::NotebookNote {
+                        MenuAction::RenameNote(sel.label.clone())
+                    } else {
+                        MenuAction::None
+                    }
+                } else {
+                    MenuAction::None
+                }
+            }
+            KeyCode::Char('d') | KeyCode::Char('D') if self.is_current_notebook() => {
+                let level = self.current_level();
+                if level.selected_idx < level.items.len() {
+                    let sel = &level.items[level.selected_idx];
+                    if sel.r#type == MenuItemType::NotebookNote {
+                        MenuAction::DeleteNote(sel.label.clone())
+                    } else {
+                        MenuAction::None
+                    }
+                } else {
+                    MenuAction::None
+                }
+            }
             KeyCode::Char(c) if c.is_ascii_digit() && c != '0' => {
                 // Number shortcuts 1..9
                 let target_num = (c as u8 - b'0') as usize;
@@ -354,14 +444,46 @@ impl MenuView {
                         items: sub.items,
                         selected_idx: 0,
                         scroll_offset: 0,
+                        is_notebook: false,
+                        notebook_file: None,
                     });
                     self.ensure_selectable();
                 }
                 MenuAction::None
             }
+            MenuItemType::Notebook => MenuAction::OpenNotebook(Box::new(item)),
+            MenuItemType::NotebookNote => {
+                let filepath = item.file.unwrap_or_default();
+                let note_title = item.action.unwrap_or(item.label);
+                MenuAction::ViewNote {
+                    filepath,
+                    note_title,
+                }
+            }
+            MenuItemType::NotebookEmpty => {
+                let filepath = item.file.unwrap_or_default();
+                MenuAction::NewNote(filepath)
+            }
+            MenuItemType::Back => self.go_back(),
             MenuItemType::Exit => MenuAction::Exit,
             MenuItemType::ThemeSelector => MenuAction::ThemeSelector,
+            MenuItemType::Other(ref s) if s == "notebook" => {
+                MenuAction::OpenNotebook(Box::new(item))
+            }
+            MenuItemType::Other(ref s) if s == "notebook_note" => {
+                let filepath = item.file.unwrap_or_default();
+                let note_title = item.action.unwrap_or(item.label);
+                MenuAction::ViewNote {
+                    filepath,
+                    note_title,
+                }
+            }
+            MenuItemType::Other(ref s) if s == "notebook_empty" => {
+                let filepath = item.file.unwrap_or_default();
+                MenuAction::NewNote(filepath)
+            }
             MenuItemType::Other(ref s) if s == "theme_selector" => MenuAction::ThemeSelector,
+            MenuItemType::Other(ref s) if s == "back" => self.go_back(),
             _ => {
                 if let Some(ref act) = item.action {
                     if act == "themeedit" {
@@ -410,7 +532,9 @@ impl MenuView {
         let left_seg_len = sep_x.saturating_sub(1);
         let right_seg_len = w.saturating_sub(2 + sep_x);
 
-        let help_raw = if self.show_shortcuts {
+        let help_raw = if self.is_current_notebook() {
+            "[N]: New Note | [ENTER]: Read | [M]: Rename | [D]: Delete | [UP/DN]: Nav | [F1]: Help | [F2]: Themes | [F7]: Gutter | [F8]: ThemeEdit | [ESC]: Back"
+        } else if self.show_shortcuts {
             "[UP/DN]: Nav | [0-9/a-z]: Direct | [F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [F8]: ThemeEdit | [ESC]: Back"
         } else {
             "[UP/DN]: Nav | [ENTER]: Select | [F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [F8]: ThemeEdit | [ESC]: Back"

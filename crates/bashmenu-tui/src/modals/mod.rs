@@ -7,6 +7,7 @@ pub mod grid_picker;
 pub mod help;
 pub mod input;
 pub mod message;
+pub mod note_viewer;
 pub mod theme_picker;
 
 pub use confirm::ConfirmModal;
@@ -16,4 +17,5 @@ pub use grid_picker::{AsciiGridModal, ColorGridModal};
 pub use help::HelpModal;
 pub use input::InputModal;
 pub use message::MessageModal;
+pub use note_viewer::{NoteViewerAction, NoteViewerModal};
 pub use theme_picker::ThemePickerModal;

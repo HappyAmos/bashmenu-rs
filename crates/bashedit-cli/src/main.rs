@@ -4,7 +4,9 @@ use anyhow::Result;
 use bashedit_cli::{
     get_swap_path, is_pid_running, read_swap_file, remove_swap_file, EditorBuffer, SwapHeader,
 };
-use bashmenu_tui::{install_panic_hook, ConfirmModal, ResolvedThemeStyles, TerminalGuard};
+use bashmenu_tui::{
+    install_panic_hook, ConfirmModal, InputModal, ResolvedThemeStyles, TerminalGuard,
+};
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use ratatui::layout::Rect;
@@ -21,9 +23,9 @@ use std::time::Duration;
     about = "Terminal text editor with crash recovery and colocated swap files"
 )]
 struct Cli {
-    /// File to edit
+    /// File to edit (leave blank for empty unsaved buffer)
     #[arg(value_name = "FILE")]
-    file: PathBuf,
+    file: Option<PathBuf>,
 
     /// Open in read-only mode
     #[arg(short, long)]
@@ -34,31 +36,32 @@ enum ActiveModal {
     None,
     SwapRecovery(SwapHeader, Vec<String>),
     ConfirmExit(ConfirmModal),
+    SaveAs(InputModal),
 }
 
 fn main() -> Result<()> {
     install_panic_hook();
 
     let cli = Cli::parse();
-    let file_path = cli.file;
 
     let mut guard = TerminalGuard::init()?;
     let styles = ResolvedThemeStyles::default();
 
-    // Check for existing swap file before opening buffer
-    let swp_path = get_swap_path(&file_path);
-    let mut initial_recovery = None;
-
-    if swp_path.exists() {
-        if let Some((header, lines)) = read_swap_file(&swp_path) {
-            initial_recovery = Some((header, lines));
+    let (mut buffer, initial_recovery) = if let Some(ref path) = cli.file {
+        let swp_path = get_swap_path(path);
+        let recovery = if swp_path.exists() {
+            read_swap_file(&swp_path)
+        } else {
+            None
+        };
+        let mut buf = EditorBuffer::open(path)?;
+        if cli.read_only {
+            buf.is_read_only = true;
         }
-    }
-
-    let mut buffer = EditorBuffer::open(&file_path)?;
-    if cli.read_only {
-        buffer.is_read_only = true;
-    }
+        (buf, recovery)
+    } else {
+        (EditorBuffer::new_empty(), None)
+    };
 
     let mut active_modal = if let Some((header, lines)) = initial_recovery {
         ActiveModal::SwapRecovery(header, lines)
@@ -99,9 +102,15 @@ fn main() -> Result<()> {
                 "[Clean]"
             };
 
+            let display_name = buffer
+                .file_path
+                .as_ref()
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|| "[Untitled]".to_string());
+
             let title = format!(
                 " BashEdit: {}  Ln {}, Col {}  Total: {} lines  {} ",
-                buffer.file_path.display(),
+                display_name,
                 buffer.cursor_row + 1,
                 buffer.cursor_col + 1,
                 buffer.lines.len(),
@@ -182,7 +191,7 @@ fn main() -> Result<()> {
 
             // Footer bar
             let footer_y = area.y + area.height - 1;
-            let footer_text = " [Ctrl+S] Save | [Ctrl+Q] Exit | [F12] Help ";
+            let footer_text = " [Ctrl+S] Save | [Ctrl+A] Save As | [Ctrl+Q] Exit ";
             buf.set_string(
                 inner_x,
                 footer_y,
@@ -222,10 +231,13 @@ fn main() -> Result<()> {
                         buf,
                     );
 
-                    let info_line1 = format!(
-                        "A swap file exists: ./{}.swp",
-                        buffer.file_path.file_name().unwrap().to_string_lossy()
-                    );
+                    let file_display = buffer
+                        .file_path
+                        .as_ref()
+                        .and_then(|p| p.file_name())
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_else(|| "buffer".to_string());
+                    let info_line1 = format!("A swap file exists: ./{}.swp", file_display);
                     let info_line2 = format!(
                         "Created by PID: {} (Process is {})",
                         header.pid,
@@ -253,6 +265,9 @@ fn main() -> Result<()> {
                     );
                 }
                 ActiveModal::ConfirmExit(modal) => {
+                    modal.render(area, &styles, buf);
+                }
+                ActiveModal::SaveAs(modal) => {
                     modal.render(area, &styles, buf);
                 }
                 ActiveModal::None => {}
@@ -306,13 +321,49 @@ fn main() -> Result<()> {
                         }
                     }
                 }
+                ActiveModal::SaveAs(modal) => {
+                    if let Event::Key(k) = ev {
+                        if let Some(res) = modal.handle_key(k.code) {
+                            if let Some(path_str) = res {
+                                let trimmed = path_str.trim();
+                                if !trimmed.is_empty() {
+                                    let new_path = PathBuf::from(trimmed);
+                                    buffer.set_file_path(new_path);
+                                    let _ = buffer.save_to_disk();
+                                }
+                            }
+                            active_modal = ActiveModal::None;
+                        }
+                    }
+                }
                 ActiveModal::None => {
                     if let Event::Key(k) = ev {
                         // Check for Ctrl shortcuts
                         if k.modifiers.contains(KeyModifiers::CONTROL) {
                             match k.code {
                                 KeyCode::Char('s') => {
-                                    let _ = buffer.save_to_disk();
+                                    if buffer.file_path.is_none() {
+                                        active_modal = ActiveModal::SaveAs(InputModal::new(
+                                            "Save File As",
+                                            "Enter destination file path:",
+                                            "",
+                                        ));
+                                    } else {
+                                        let _ = buffer.save_to_disk();
+                                    }
+                                    continue;
+                                }
+                                KeyCode::Char('a') => {
+                                    let default_path = buffer
+                                        .file_path
+                                        .as_ref()
+                                        .map(|p| p.to_string_lossy().to_string())
+                                        .unwrap_or_default();
+                                    active_modal = ActiveModal::SaveAs(InputModal::new(
+                                        "Save File As",
+                                        "Enter destination file path:",
+                                        &default_path,
+                                    ));
                                     continue;
                                 }
                                 KeyCode::Char('q') => {

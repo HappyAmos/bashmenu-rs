@@ -10,7 +10,7 @@ pub use swap::*;
 
 /// Text editing document buffer with cursor tracking, dirty state, and swap persistence.
 pub struct EditorBuffer {
-    pub file_path: PathBuf,
+    pub file_path: Option<PathBuf>,
     pub swap_path: PathBuf,
     pub lines: Vec<String>,
     pub cursor_row: usize,
@@ -26,6 +26,32 @@ pub struct EditorBuffer {
 }
 
 impl EditorBuffer {
+    /// Creates a new empty buffer (untitled, unsaved).
+    pub fn new_empty() -> Self {
+        Self {
+            file_path: None,
+            swap_path: PathBuf::new(),
+            lines: vec![String::new()],
+            cursor_row: 0,
+            cursor_col: 0,
+            scroll_row: 0,
+            scroll_col: 0,
+            is_modified: false,
+            is_read_only: false,
+            base_mtime: 0.0,
+            base_sha256: String::new(),
+            keystroke_counter: 0,
+            status_message: "New Buffer".to_string(),
+        }
+    }
+
+    /// Associates the buffer with a destination file path.
+    pub fn set_file_path(&mut self, path: PathBuf) {
+        self.swap_path = get_swap_path(&path);
+        self.file_path = Some(path);
+        self.flush_swap();
+    }
+
     pub fn open(file_path: impl AsRef<Path>) -> Result<Self> {
         let path = file_path.as_ref().to_path_buf();
         let swap_path = get_swap_path(&path);
@@ -50,7 +76,7 @@ impl EditorBuffer {
         };
 
         let mut buf = Self {
-            file_path: path,
+            file_path: Some(path),
             swap_path,
             lines,
             cursor_row: 0,
@@ -75,18 +101,23 @@ impl EditorBuffer {
         if self.is_read_only {
             return false;
         }
-        write_swap_file(
-            &self.swap_path,
-            &self.file_path,
-            &self.lines,
-            self.base_mtime,
-            &self.base_sha256,
-        )
+        if let Some(fp) = &self.file_path {
+            if !self.swap_path.as_os_str().is_empty() {
+                return write_swap_file(
+                    &self.swap_path,
+                    fp,
+                    &self.lines,
+                    self.base_mtime,
+                    &self.base_sha256,
+                );
+            }
+        }
+        true
     }
 
     /// Removes the swap file upon clean buffer exit or discard
     pub fn cleanup_swap(&self) {
-        if !self.is_read_only {
+        if !self.is_read_only && !self.swap_path.as_os_str().is_empty() {
             remove_swap_file(&self.swap_path);
         }
     }
@@ -96,19 +127,22 @@ impl EditorBuffer {
         if self.is_read_only {
             anyhow::bail!("Cannot save: File is open in Read-Only mode");
         }
+        let Some(path) = &self.file_path else {
+            anyhow::bail!("Cannot save: No file path set");
+        };
         let payload = self.lines.join("\n");
-        fs::write(&self.file_path, payload)?;
+        fs::write(path, payload)?;
 
-        self.base_mtime = fs::metadata(&self.file_path)
+        self.base_mtime = fs::metadata(path)
             .and_then(|m| m.modified())
             .ok()
             .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
             .map(|d| d.as_secs_f64())
             .unwrap_or(0.0);
-        self.base_sha256 = compute_file_sha256(&self.file_path);
+        self.base_sha256 = compute_file_sha256(path);
         self.is_modified = false;
         self.status_message = format!("Saved {} lines to disk", self.lines.len());
-        self.flush_swap();
+        self.cleanup_swap();
         Ok(())
     }
 

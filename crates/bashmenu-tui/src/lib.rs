@@ -16,7 +16,7 @@ pub use borders::ResolvedWindowBorders;
 pub use menu_view::{MenuAction, MenuView};
 pub use modals::{
     render_modal_frame, AsciiGridModal, ColorGridModal, ConfirmModal, FilePickerModal, HelpModal,
-    InputModal, MessageModal, ThemePickerModal,
+    InputModal, MessageModal, NoteViewerAction, NoteViewerModal, ThemePickerModal,
 };
 pub use style::ResolvedThemeStyles;
 pub use terminal::TerminalGuard;

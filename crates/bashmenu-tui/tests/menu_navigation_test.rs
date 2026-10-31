@@ -461,3 +461,98 @@ fn test_menu_highlight_bar_unbroken_full_width() {
         "Last cell within right margin must be highlighted"
     );
 }
+
+#[test]
+fn test_notebook_menu_interaction() {
+    let schema = MenuSchema {
+        version: "0.0.1".to_string(),
+        title: "Main".to_string(),
+        items: vec![
+            MenuItem::divider(),
+            MenuItem {
+                label: "Notes [notes.yml]".to_string(),
+                r#type: MenuItemType::Notebook,
+                file: Some("/path/to/notes.yml".to_string()),
+                ..Default::default()
+            },
+        ],
+        extra: Default::default(),
+    };
+
+    let mut view = MenuView::new(
+        schema,
+        ResolvedThemeStyles::default(),
+        true,
+        "Status".to_string(),
+    );
+
+    // Initial item is Notes
+    assert_eq!(view.selected_index(), 1);
+
+    // Press Enter to activate notebook
+    let action = view.handle_key(KeyCode::Enter);
+    match action {
+        MenuAction::OpenNotebook(item) => {
+            assert_eq!(item.r#type, MenuItemType::Notebook);
+            assert_eq!(item.file.as_deref(), Some("/path/to/notes.yml"));
+        }
+        other => panic!("Expected OpenNotebook, got {:?}", other),
+    }
+
+    // Simulate pushing the notebook submenu
+    let notebook_items = vec![
+        MenuItem::divider(),
+        MenuItem {
+            label: "TODO".to_string(),
+            r#type: MenuItemType::NotebookNote,
+            file: Some("/path/to/notes.yml".to_string()),
+            action: Some("TODO".to_string()),
+            ..Default::default()
+        },
+        MenuItem::divider(),
+        MenuItem {
+            label: "Back".to_string(),
+            r#type: MenuItemType::Back,
+            ..Default::default()
+        },
+    ];
+    view.push_notebook(
+        "Notes".to_string(),
+        notebook_items,
+        "/path/to/notes.yml".to_string(),
+    );
+
+    assert!(view.is_current_notebook());
+    assert_eq!(view.current_notebook_file(), Some("/path/to/notes.yml"));
+    assert_eq!(view.selected_index(), 1); // Landed on "TODO"
+
+    // Press Enter on note to view it
+    let action = view.handle_key(KeyCode::Enter);
+    assert_eq!(
+        action,
+        MenuAction::ViewNote {
+            filepath: "/path/to/notes.yml".to_string(),
+            note_title: "TODO".to_string(),
+        }
+    );
+
+    // Press 'n' for new note
+    let action = view.handle_key(KeyCode::Char('n'));
+    assert_eq!(
+        action,
+        MenuAction::NewNote("/path/to/notes.yml".to_string())
+    );
+
+    // Press 'm' to rename
+    let action = view.handle_key(KeyCode::Char('m'));
+    assert_eq!(action, MenuAction::RenameNote("TODO".to_string()));
+
+    // Press 'd' to delete
+    let action = view.handle_key(KeyCode::Char('d'));
+    assert_eq!(action, MenuAction::DeleteNote("TODO".to_string()));
+
+    // Press Esc to exit notebook
+    let action = view.handle_key(KeyCode::Esc);
+    assert_eq!(action, MenuAction::None);
+    assert!(!view.is_current_notebook());
+}

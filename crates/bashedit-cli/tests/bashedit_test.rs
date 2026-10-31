@@ -129,3 +129,34 @@ fn test_read_only_mode_prevents_saving() {
 
     let _ = fs::remove_dir_all(&tmp_dir);
 }
+
+#[test]
+fn test_editor_buffer_empty_and_save_as() {
+    let mut buf = EditorBuffer::new_empty();
+    assert!(buf.file_path.is_none());
+    assert_eq!(buf.lines.len(), 1);
+    assert_eq!(buf.lines[0], "");
+
+    // Saving without path fails
+    assert!(buf.save_to_disk().is_err());
+
+    // Type text
+    for ch in "hello empty buffer".chars() {
+        buf.insert_char(ch);
+    }
+    assert!(buf.is_modified);
+
+    let tmp_dir = std::env::temp_dir().join(format!("bashedit_empty_{}", std::process::id()));
+    let _ = fs::create_dir_all(&tmp_dir);
+    let target = tmp_dir.join("save_as.txt");
+
+    buf.set_file_path(target.clone());
+    assert!(buf.file_path.is_some());
+    assert!(buf.save_to_disk().is_ok());
+
+    let disk_content = fs::read_to_string(&target).unwrap();
+    assert_eq!(disk_content, "hello empty buffer");
+
+    buf.cleanup_swap();
+    let _ = fs::remove_dir_all(&tmp_dir);
+}

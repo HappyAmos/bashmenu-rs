@@ -109,3 +109,24 @@
   - Preserved wide character (emojis, Nerd Fonts) continuation cells so background wallpaper compositing keeps active selection rows intact.
   - Updated `themeedit` live preview to render unbroken full-width active item highlight bars.
   - Added integration test `test_menu_highlight_bar_unbroken_full_width` in `crates/bashmenu-tui/tests/menu_navigation_test.rs` and active row highlight checks in `wallpaper_test.rs`. Zero Clippy warnings.
+
+## Phase 12: 1:1 Parity for Notebooks, Text Editor, and Menu Editor
+- [x] **Text Editor (`bashedit`) Empty Buffer Support:**
+  - Added support for empty unsaved buffers (`[Untitled]`) when launching `bashedit` with no arguments.
+  - Implemented `<Ctrl+A>` and `<Ctrl+S>` Save As workflow with `InputModal` to save untitled buffers directly to disk.
+  - Updated `bashmenu-cli` to launch `bashedit` without args for blank documents rather than loading `bashmenu.yml`.
+  - Added test `test_editor_buffer_empty_and_save_as` in `crates/bashedit-cli/tests/bashedit_test.rs`.
+- [x] **Dynamic Notebooks & Notes Engine:**
+  - Added `MenuItemType::Notebook`, `NotebookNote`, `NotebookEmpty`, and `Back` variants in `bashmenu-core`.
+  - Implemented notebook file parsing and CRUD operations in `crates/bashmenu-core/src/notebook.rs` (`load_notebook`, `save_notebook`, `get_notes`, `add_or_update_note`, `rename_note`, `delete_note`, `build_notebook_submenu`).
+  - Implemented `NoteViewerModal` with word-wrapping, dynamic interactive checkbox toggling (`[SPACE]`), show/hide completed (`[H]`), in-place editing with `bashedit` (`[E]`), rename (`[M]`), delete (`[D]`), and OSC 52 clipboard copy (`[C]`).
+  - Added notebook management shortcuts (`[N]` New Note, `[M]` Rename, `[D]` Delete) and dynamic help gutter in `MenuView`.
+  - Connected notebook modals and lifecycle actions in `bashmenu-cli`.
+  - Added integration test `test_notebook_menu_interaction` in `crates/bashmenu-tui/tests/menu_navigation_test.rs` and unit test `test_notebook_crud_roundtrip` in `crates/bashmenu-core`.
+- [x] **Visual Menu Editor (`menuedit`) 1:1 Tree & Inspector Hierarchy:**
+  - Rebuilt `menuedit` with 50/50 side-by-side split screen matching Python original (`#tree_panel` on left, `#inspector_panel` on right).
+  - Implemented collapsible tree hierarchy (`tree.rs`) with type badges (`[DIR]`, `[CMD]`, `[SCR]`, `[CFG]`, `[TGL]`, `[RAD]`, `[EDT]`, `[NBK]`, `[DIV]`), expand/collapse toggling (`[e]`), indent (`>`), outdent (`<`), move up/down (`M`/`m`), insert (`a`), delete (`d`), and live Property Inspector.
+  - Implemented `ItemTypePickerModal` with 16 menu item types.
+  - Implemented `ItemEditModal` with schema field inputs, execution mode checkboxes (`alt_buffer`, `no_formatting`, etc.), live preview, and ASCII table picker modal integration.
+  - Added tests in `crates/menuedit-cli/tests/menuedit_test.rs` verifying property inspector formatting, tree nesting, indent/outdent, and type mutation.
+- [x] Verified zero Clippy warnings across the entire workspace with `-D warnings`, full `cargo fmt` compliance, and 100% test pass rate.

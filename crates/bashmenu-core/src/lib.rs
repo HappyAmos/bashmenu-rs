@@ -5,6 +5,7 @@ pub mod error;
 pub mod glyph;
 pub mod macro_engine;
 pub mod menu;
+pub mod notebook;
 pub mod plugin;
 pub mod theme;
 
@@ -16,6 +17,11 @@ pub use glyph::{
 };
 pub use macro_engine::{interpolate_placeholders, MacroContext};
 pub use menu::{load_menu, save_menu, MenuItem, MenuItemType, MenuSchema, Submenu};
+pub use notebook::{
+    add_or_update_note, build_notebook_submenu, delete_note, get_note_by_title, get_notes,
+    load_notebook, rename_note, resolve_notebook_path, save_notebook, NoteItem, NotebookData,
+    NotebookSchema,
+};
 pub use plugin::{
     PluginCacheEntry, PluginConfig, PluginDef, PluginDisplayRow, PluginEngine, PluginLayout,
 };

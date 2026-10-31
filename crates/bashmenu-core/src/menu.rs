@@ -43,6 +43,18 @@ pub enum MenuItemType {
     /// Exits BashMenu
     #[serde(rename = "exit")]
     Exit,
+    /// Opens a notebook
+    #[serde(rename = "notebook")]
+    Notebook,
+    /// Notebook note item
+    #[serde(rename = "notebook_note")]
+    NotebookNote,
+    /// Empty notebook notice
+    #[serde(rename = "notebook_empty")]
+    NotebookEmpty,
+    /// Returns to parent menu
+    #[serde(rename = "back")]
+    Back,
     /// Custom user-defined type
     #[serde(untagged)]
     Other(String),

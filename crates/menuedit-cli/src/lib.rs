@@ -1,8 +1,287 @@
 //! Library module for MenuEdit core tree navigation and menu manipulation.
 
+pub mod item_edit;
+pub mod tree;
+pub mod type_picker;
+
 use anyhow::Result;
-use bashmenu_core::{load_menu, save_menu, MenuItem, MenuItemType, MenuSchema, Submenu};
+use bashmenu_core::{
+    load_menu, save_menu, BashMenuConfig, MenuItem, MenuItemType, MenuSchema, Submenu,
+};
+use std::collections::HashSet;
 use std::path::PathBuf;
+
+pub use item_edit::ItemEditModal;
+pub use tree::{
+    delete_item, find_item, find_item_mut, flatten_tree, indent_item, insert_item_after,
+    move_down_sibling, move_up_sibling, mutate_item_type, outdent_item, toggle_all_nodes,
+    VisibleNode,
+};
+pub use type_picker::{ItemTypePickerModal, ITEM_TYPES};
+
+pub const ITEM_EDIT_HELP_TEXT: &str = "\
+BashMenu Item Properties (Editor Help)
+
+── 1. Text Fields ──
+
+Title / Label (title | label)
+  Visible text of the menu entry, aligned at column 11
+  after the fixed 4-column icon slot.
+
+Icon / Glyph (icon | glyph)
+  Leading glyph drawn in a 4-column slot.
+  Adaptive form {nf:<char>:<nerd_hex>:<emoji>}.
+  Press F4 / CTRL+N to search Nerd Font & Emoji glyphs.
+
+Action / Command / Script / File / Key
+  Payload executed when the entry is selected.
+  Type-specific key: command->command, script->script,
+  editor->file, notebook->file, toggle/config->key, python->python.
+  Can embed dynamic directives: {file_picker}, {param}, {dir_picker}.
+
+Notebook File Path (file) [notebook]
+  Path to YAML notebook notes file. Defaults to {notebooks_dir}/notes.yml.
+
+Message / Prompt Text (message | prompt)
+  Text shown to user, or prompt displayed for input/confirm modals.
+
+Radio Options (options) [radio]
+  Selectable choices presented in a radio dialog modal.
+
+Template Path (template) [inject_block]
+  Source file whose contents are injected.
+
+Target Path (target) [inject_block]
+  Destination file edited on install or removal.
+
+── 2. Execution Flags ──
+
+Alt Buffer: Run command inside alternate screen buffer (alt_buffer=true)
+No Formatting: Disable BBCode parsing in title/message (no_formatting=true)
+Quiet: Suppress stdout output (quiet=true)
+Interactive: Attach full interactive terminal stdin/stdout (interactive=true)
+Show Whitespace: Display visible tabs and spaces in editor (show_whitespace=true)
+External: Execute outside terminal sandbox (external=true)
+";
+
+/// Returns the 5-character badge identifying an item's type
+pub fn get_type_badge(item: &MenuItem) -> &'static str {
+    if item.is_divider() {
+        return "[DIV]";
+    }
+    match &item.r#type {
+        MenuItemType::Submenu => "[DIR]",
+        MenuItemType::Command => "[CMD]",
+        MenuItemType::Script => "[SCR]",
+        MenuItemType::Config => "[CFG]",
+        MenuItemType::Toggle => "[TGL]",
+        MenuItemType::Radio => "[RAD]",
+        MenuItemType::Editor => "[EDT]",
+        MenuItemType::Notebook => "[NBK]",
+        MenuItemType::NotebookNote => "[NOT]",
+        MenuItemType::NotebookEmpty => "[EMP]",
+        MenuItemType::Exit => "[EXT]",
+        MenuItemType::Back => "[BCK]",
+        MenuItemType::ThemeSelector => "[THM]",
+        MenuItemType::Python => "[PY ]",
+        MenuItemType::Other(s) => match s.as_str() {
+            "confirm" => "[CNF]",
+            "message" => "[MSG]",
+            "inject_block" => "[INJ]",
+            "theme_selector" => "[THM]",
+            "notebook" => "[NBK]",
+            "back" => "[BCK]",
+            "exit" => "[EXT]",
+            _ => "[???]",
+        },
+        _ => "[???]",
+    }
+}
+
+/// Formats the property inspector panel content for a given menu item
+pub fn format_inspector_text(
+    item: &MenuItem,
+    _cfg: Option<&BashMenuConfig>,
+    _avail_w: usize,
+) -> Vec<String> {
+    if item.is_divider() {
+        return vec![
+            "[DIV] DIVIDER".to_string(),
+            "".to_string(),
+            "Repeating Char (Theme): {ascii:196}".to_string(),
+            "Length Directive (Theme): {window_width}".to_string(),
+        ];
+    }
+
+    let badge = get_type_badge(item);
+    let type_name = match &item.r#type {
+        MenuItemType::Other(s) => s.to_uppercase(),
+        t => format!("{:?}", t).to_uppercase(),
+    };
+
+    let mut lines = vec![
+        format!("{} {}", badge, type_name),
+        format!("Title/Label: {}", item.label),
+    ];
+
+    if let Some(ref icon) = item.icon {
+        lines.push(format!("Icon/Glyph: {}", icon));
+    }
+
+    let action = item
+        .action
+        .as_ref()
+        .or(item.command.as_ref())
+        .or(item.script.as_ref())
+        .or(item.file.as_ref());
+    if let Some(act) = action {
+        lines.push(format!("Action/Target: {}", act));
+    }
+
+    if let Some(val) = item.extra.get("key").and_then(|v| v.as_str()) {
+        lines.push(format!("Config Key: {}", val));
+    }
+
+    if let Some(ref prompt) = item.prompt {
+        lines.push(format!("Message/Prompt: {}", prompt));
+    } else if let Some(msg) = item.extra.get("message").and_then(|v| v.as_str()) {
+        lines.push(format!("Message/Prompt: {}", msg));
+    }
+
+    if let Some(tmpl) = item.extra.get("template").and_then(|v| v.as_str()) {
+        lines.push(format!("Template: {}", tmpl));
+    }
+
+    if let Some(tgt) = item.extra.get("target").and_then(|v| v.as_str()) {
+        lines.push(format!("Target File: {}", tgt));
+    }
+
+    if let Some(bid) = item.extra.get("block_id").and_then(|v| v.as_str()) {
+        lines.push(format!("Block ID: {}", bid));
+    }
+
+    if let Some(ref sdir) = item.start_dir {
+        lines.push(format!("Start Directory: {}", sdir));
+    }
+
+    if let Some(pkr) = item.extra.get("picker").and_then(|v| v.as_str()) {
+        lines.push(format!("Picker Type: {}", pkr));
+    }
+
+    if let Some(oy) = item.extra.get("on_yes").and_then(|v| v.as_str()) {
+        lines.push(format!("On Yes Action: {}", oy));
+    }
+
+    if let Some(on) = item.extra.get("on_no").and_then(|v| v.as_str()) {
+        lines.push(format!("On No Action: {}", on));
+    }
+
+    if let Some(alt) = item.alt_buffer {
+        lines.push(format!("Alt Buffer: {}", alt));
+    }
+
+    if let Some(nf) = item.extra.get("no_formatting").and_then(|v| v.as_bool()) {
+        lines.push(format!("No Formatting: {}", nf));
+    }
+
+    let mut flags = Vec::new();
+    if let Some(b) = item.extra.get("stream").and_then(|v| v.as_bool()) {
+        flags.push(format!("stream={}", b));
+    }
+    if let Some(b) = item.quiet {
+        flags.push(format!("quiet={}", b));
+    }
+    if let Some(b) = item.interactive {
+        flags.push(format!("interactive={}", b));
+    }
+    if let Some(b) = item.extra.get("show_whitespace").and_then(|v| v.as_bool()) {
+        flags.push(format!("show_whitespace={}", b));
+    }
+    if let Some(b) = item.extra.get("masked").and_then(|v| v.as_bool()) {
+        flags.push(format!("masked={}", b));
+    }
+    if let Some(b) = item.extra.get("refresh").and_then(|v| v.as_bool()) {
+        flags.push(format!("refresh={}", b));
+    }
+    if let Some(b) = item.extra.get("external").and_then(|v| v.as_bool()) {
+        flags.push(format!("external={}", b));
+    }
+    if let Some(ts) = item.tabstop {
+        flags.push(format!("tabstop={}", ts));
+    }
+
+    if !flags.is_empty() {
+        lines.push(format!("Flags: {}", flags.join(", ")));
+    }
+
+    if let Some(ref sub) = item.submenu {
+        lines.push(format!("Submenu Items: {} items", sub.items.len()));
+    }
+
+    // Extra properties
+    let known_keys = [
+        "type",
+        "title",
+        "label",
+        "icon",
+        "glyph",
+        "action",
+        "command",
+        "script",
+        "file",
+        "python",
+        "key",
+        "message",
+        "prompt",
+        "text",
+        "template",
+        "target",
+        "block_id",
+        "start_dir",
+        "picker",
+        "on_yes",
+        "on_no",
+        "alt_buffer",
+        "no_formatting",
+        "stream",
+        "quiet",
+        "interactive",
+        "show_whitespace",
+        "masked",
+        "refresh",
+        "external",
+        "display_theme_colors",
+        "tabstop",
+        "submenu",
+        "options",
+    ];
+    let mut extras = Vec::new();
+    for (k, v) in &item.extra {
+        if !known_keys.contains(&k.as_str()) {
+            let val_str = match v {
+                serde_yml::Value::String(s) => s.clone(),
+                serde_yml::Value::Bool(b) => b.to_string(),
+                serde_yml::Value::Number(n) => n.to_string(),
+                other => format!("{:?}", other),
+            };
+            extras.push(format!("{}={}", k, val_str));
+        }
+    }
+    if !extras.is_empty() {
+        lines.push(format!("Extra Properties: {}", extras.join(", ")));
+    }
+
+    // Live Item Preview
+    lines.push(String::new());
+    lines.push("Preview:".to_string());
+    lines.push(format!(
+        "  {} {}",
+        item.icon.as_deref().unwrap_or(""),
+        item.label
+    ));
+
+    lines
+}
 
 #[derive(Debug, Clone)]
 pub struct EditorLevel {
@@ -15,6 +294,7 @@ pub struct MenuEditorState {
     pub menu_path: PathBuf,
     pub root_menu: MenuSchema,
     pub stack: Vec<EditorLevel>,
+    pub expanded_paths: HashSet<Vec<usize>>,
     pub is_modified: bool,
     pub status_message: String,
 }
@@ -37,6 +317,7 @@ impl MenuEditorState {
             menu_path,
             root_menu,
             stack: vec![initial_level],
+            expanded_paths: HashSet::new(),
             is_modified: false,
             status_message: "Ready".to_string(),
         }
@@ -169,7 +450,6 @@ impl MenuEditorState {
             return false;
         }
         let child_level = self.stack.pop().unwrap();
-        // Sync child items back to the parent item's submenu
         let parent_level = self.stack.last_mut().unwrap();
         let idx = parent_level.selected_idx;
         if idx < parent_level.items.len() {
@@ -182,9 +462,8 @@ impl MenuEditorState {
         true
     }
 
-    /// Sync active editor tree to root_menu and persist to `bashmenu.mnu`
+    /// Persists changes to disk using `bashmenu_core::save_menu`
     pub fn save_to_disk(&mut self) -> Result<()> {
-        // Unwind child levels to sync all nested items
         while self.stack.len() > 1 {
             self.leave_submenu();
         }
