@@ -53,7 +53,16 @@ impl EditorBuffer {
     }
 
     pub fn open(file_path: impl AsRef<Path>) -> Result<Self> {
-        let path = file_path.as_ref().to_path_buf();
+        let raw = file_path.as_ref();
+        let path = if let Some(stripped) = raw.to_str().and_then(|s| s.strip_prefix("~/")) {
+            if let Ok(home) = std::env::var("HOME") {
+                PathBuf::from(home).join(stripped)
+            } else {
+                raw.to_path_buf()
+            }
+        } else {
+            raw.to_path_buf()
+        };
         let swap_path = get_swap_path(&path);
 
         let (lines, base_mtime, base_sha256) = if path.exists() {

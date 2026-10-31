@@ -136,3 +136,58 @@ fn test_right_aligned_bracket_placeholders_expansion() {
         assert_eq!(expanded, expected, "Failed for input: {}", input);
     }
 }
+
+#[test]
+fn test_profile_and_editor_placeholders_expansion() {
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/bashmenu.yml");
+    let config = load_config(fixture).expect("load config");
+
+    let mut ctx = MacroContext::new(&config);
+    ctx.home_dir = std::path::PathBuf::from("/home/testuser");
+
+    let test_cases = vec![
+        ("{bashrc}", "/home/testuser/.bashrc"),
+        ("{bash_aliases}", "/home/testuser/.bash_aliases"),
+        ("{vimrc}", "/home/testuser/.vimrc"),
+        ("{nanorc}", "/home/testuser/.nanorc"),
+        ("{zshrc}", "/home/testuser/.zshrc"),
+        ("{zprofile}", "/home/testuser/.zprofile"),
+        (
+            "Edit .bashrc [{bashrc}]",
+            "Edit .bashrc [/home/testuser/.bashrc]",
+        ),
+        (
+            "Edit .bash_aliases [{bash_aliases}]",
+            "Edit .bash_aliases [/home/testuser/.bash_aliases]",
+        ),
+        (
+            "Edit .vimrc [{vimrc}]",
+            "Edit .vimrc [/home/testuser/.vimrc]",
+        ),
+        (
+            "{termux_properties}",
+            "/home/testuser/.termux/termux.properties",
+        ),
+        ("{termux_storage}", "/home/testuser/storage"),
+    ];
+
+    for (input, expected) in test_cases {
+        let expanded = interpolate_placeholders(input, &ctx);
+        assert_eq!(expanded, expected, "Failed for input: {}", input);
+    }
+
+    // Verify 12-hour time placeholders are non-empty and expand
+    let t12 = interpolate_placeholders("{time_12}", &ctx);
+    assert!(
+        t12.contains("AM") || t12.contains("PM"),
+        "time_12 must include AM/PM: {}",
+        t12
+    );
+
+    let dt12 = interpolate_placeholders("{date_time_12_short}", &ctx);
+    assert!(
+        dt12.contains("AM") || dt12.contains("PM"),
+        "date_time_12_short must include AM/PM: {}",
+        dt12
+    );
+}

@@ -30,6 +30,10 @@ struct Cli {
     /// Open in read-only mode
     #[arg(short, long)]
     read_only: bool,
+
+    /// Tab stop width (spaces per tab)
+    #[arg(long, default_value = "4")]
+    tabstop: usize,
 }
 
 enum ActiveModal {
@@ -48,13 +52,22 @@ fn main() -> Result<()> {
     let styles = ResolvedThemeStyles::default();
 
     let (mut buffer, initial_recovery) = if let Some(ref path) = cli.file {
-        let swp_path = get_swap_path(path);
+        let actual_path = if let Some(stripped) = path.to_str().and_then(|s| s.strip_prefix("~/")) {
+            if let Ok(home) = std::env::var("HOME") {
+                PathBuf::from(home).join(stripped)
+            } else {
+                path.clone()
+            }
+        } else {
+            path.clone()
+        };
+        let swp_path = get_swap_path(&actual_path);
         let recovery = if swp_path.exists() {
             read_swap_file(&swp_path)
         } else {
             None
         };
-        let mut buf = EditorBuffer::open(path)?;
+        let mut buf = EditorBuffer::open(&actual_path)?;
         if cli.read_only {
             buf.is_read_only = true;
         }
@@ -412,7 +425,7 @@ fn main() -> Result<()> {
                             KeyCode::Delete => buffer.delete_char(),
                             KeyCode::Enter => buffer.insert_newline(),
                             KeyCode::Tab => {
-                                for _ in 0..4 {
+                                for _ in 0..cli.tabstop {
                                     buffer.insert_char(' ');
                                 }
                             }

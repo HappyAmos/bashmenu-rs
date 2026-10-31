@@ -67,7 +67,19 @@ impl<'a> MacroContext<'a> {
     }
 }
 
-fn get_local_time_strings() -> (String, String, String, String, String) {
+struct LocalTimeStrings {
+    date_time_24: String,
+    date_time_24_short: String,
+    date_time_12: String,
+    date_time_12_short: String,
+    date: String,
+    time_24: String,
+    time_24_short: String,
+    time_12: String,
+    time_12_short: String,
+}
+
+fn get_local_time_strings() -> LocalTimeStrings {
     let now = unsafe { libc::time(std::ptr::null_mut()) };
     let mut tm = std::mem::MaybeUninit::<libc::tm>::uninit();
     let tm_ptr = unsafe { libc::localtime_r(&now, tm.as_mut_ptr()) };
@@ -79,30 +91,115 @@ fn get_local_time_strings() -> (String, String, String, String, String) {
         let hour = tm.tm_hour;
         let min = tm.tm_min;
         let sec = tm.tm_sec;
+        let hour12 = if hour == 0 {
+            12
+        } else if hour > 12 {
+            hour - 12
+        } else {
+            hour
+        };
+        let ampm = if hour >= 12 { "PM" } else { "AM" };
+
         let date_time_24 = format!(
             "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
             year, month, day, hour, min, sec
         );
         let date_time_24_short =
             format!("{:04}-{:02}-{:02} {:02}:{:02}", year, month, day, hour, min);
+        let date_time_12 = format!(
+            "{:04}-{:02}-{:02} {:02}:{:02}:{:02} {}",
+            year, month, day, hour12, min, sec, ampm
+        );
+        let date_time_12_short = format!(
+            "{:04}-{:02}-{:02} {:02}:{:02} {}",
+            year, month, day, hour12, min, ampm
+        );
         let date = format!("{:04}-{:02}-{:02}", year, month, day);
         let time_24 = format!("{:02}:{:02}:{:02}", hour, min, sec);
         let time_24_short = format!("{:02}:{:02}", hour, min);
-        (
+        let time_12 = format!("{:02}:{:02}:{:02} {}", hour12, min, sec, ampm);
+        let time_12_short = format!("{:02}:{:02} {}", hour12, min, ampm);
+
+        LocalTimeStrings {
             date_time_24,
             date_time_24_short,
+            date_time_12,
+            date_time_12_short,
             date,
             time_24,
             time_24_short,
-        )
+            time_12,
+            time_12_short,
+        }
     } else {
-        (
-            String::new(),
-            String::new(),
-            String::new(),
-            String::new(),
-            String::new(),
-        )
+        LocalTimeStrings {
+            date_time_24: String::new(),
+            date_time_24_short: String::new(),
+            date_time_12: String::new(),
+            date_time_12_short: String::new(),
+            date: String::new(),
+            time_24: String::new(),
+            time_24_short: String::new(),
+            time_12: String::new(),
+            time_12_short: String::new(),
+        }
+    }
+}
+
+fn resolve_profile_path(home_dir: &std::path::Path) -> PathBuf {
+    let p = home_dir.join(".profile");
+    if p.exists() {
+        p
+    } else {
+        let bp = home_dir.join(".bash_profile");
+        if bp.exists() {
+            bp
+        } else {
+            p
+        }
+    }
+}
+
+fn resolve_bash_profile_path(home_dir: &std::path::Path) -> PathBuf {
+    let bp = home_dir.join(".bash_profile");
+    if bp.exists() {
+        bp
+    } else {
+        let p = home_dir.join(".profile");
+        if p.exists() {
+            p
+        } else {
+            bp
+        }
+    }
+}
+
+fn resolve_shell_profile(home_dir: &std::path::Path) -> PathBuf {
+    let shell = std::env::var("SHELL").unwrap_or_default();
+    if shell.ends_with("zsh") {
+        let zprof = home_dir.join(".zprofile");
+        if zprof.exists() {
+            return zprof;
+        }
+        let zshrc = home_dir.join(".zshrc");
+        if zshrc.exists() {
+            return zshrc;
+        }
+        zprof
+    } else {
+        let bp = home_dir.join(".bash_profile");
+        if bp.exists() {
+            return bp;
+        }
+        let brc = home_dir.join(".bashrc");
+        if brc.exists() {
+            return brc;
+        }
+        let prof = home_dir.join(".profile");
+        if prof.exists() {
+            return prof;
+        }
+        brc
     }
 }
 
@@ -260,7 +357,7 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
     let is_root = unsafe { libc::geteuid() } == 0;
     let user_mode = if is_root { "Root" } else { "User" };
 
-    let (dt_24, dt_24_s, d_str, t_24, t_24_s) = get_local_time_strings();
+    let times = get_local_time_strings();
 
     let mut direct_map: HashMap<&str, String> = HashMap::new();
     direct_map.insert("{home}", ctx.home_dir.to_string_lossy().to_string());
@@ -277,6 +374,66 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
     direct_map.insert("{notebooks_dir}", notebooks_dir.clone());
     direct_map.insert("{notebooks}", notebooks_dir);
 
+    // Shell profiles and editor configs
+    let bashrc = ctx.home_dir.join(".bashrc").to_string_lossy().to_string();
+    let bash_aliases = ctx
+        .home_dir
+        .join(".bash_aliases")
+        .to_string_lossy()
+        .to_string();
+    let zshrc = ctx.home_dir.join(".zshrc").to_string_lossy().to_string();
+    let profile = resolve_profile_path(&ctx.home_dir)
+        .to_string_lossy()
+        .to_string();
+    let bash_profile = resolve_bash_profile_path(&ctx.home_dir)
+        .to_string_lossy()
+        .to_string();
+    let zprofile = ctx.home_dir.join(".zprofile").to_string_lossy().to_string();
+    let shell_profile = resolve_shell_profile(&ctx.home_dir)
+        .to_string_lossy()
+        .to_string();
+    let vimrc = ctx.home_dir.join(".vimrc").to_string_lossy().to_string();
+    let nanorc = ctx.home_dir.join(".nanorc").to_string_lossy().to_string();
+
+    direct_map.insert("{bashrc}", bashrc);
+    direct_map.insert("{bash_aliases}", bash_aliases);
+    direct_map.insert("{zshrc}", zshrc);
+    direct_map.insert("{profile}", profile);
+    direct_map.insert("{bash_profile}", bash_profile);
+    direct_map.insert("{zprofile}", zprofile);
+    direct_map.insert("{shell_profile}", shell_profile);
+    direct_map.insert("{vimrc}", vimrc);
+    direct_map.insert("{nanorc}", nanorc);
+
+    // Cross-Platform Environment
+    let prefix = std::env::var("PREFIX").unwrap_or_else(|_| "/usr".to_string());
+    let termux_properties = ctx
+        .home_dir
+        .join(".termux/termux.properties")
+        .to_string_lossy()
+        .to_string();
+    let termux_storage = ctx.home_dir.join("storage").to_string_lossy().to_string();
+    let powershell_profile = std::env::var("PROFILE").unwrap_or_else(|_| {
+        ctx.home_dir
+            .join("Documents/PowerShell/Microsoft.PowerShell_profile.ps1")
+            .to_string_lossy()
+            .to_string()
+    });
+    let appdata = std::env::var("APPDATA").unwrap_or_default();
+    let userprofile =
+        std::env::var("USERPROFILE").unwrap_or_else(|_| ctx.home_dir.to_string_lossy().to_string());
+
+    direct_map.insert("{prefix}", prefix);
+    direct_map.insert("{termux_properties}", termux_properties);
+    direct_map.insert("{termux_storage}", termux_storage);
+    direct_map.insert("{powershell_profile}", powershell_profile);
+    direct_map.insert("{appdata}", appdata);
+    direct_map.insert("{userprofile}", userprofile);
+
+    // Divider
+    let div_len = ctx.window_width.max(10);
+    direct_map.insert("{divider}", "─".repeat(div_len));
+
     direct_map.insert("{user}", user_name.clone());
     direct_map.insert("{username}", user_name);
     direct_map.insert("{host}", host_name.clone());
@@ -290,11 +447,15 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
     direct_map.insert("{window_height}", ctx.window_height.to_string());
     direct_map.insert("{screen_width}", ctx.screen_width.to_string());
 
-    direct_map.insert("{date_time_24}", dt_24);
-    direct_map.insert("{date_time_24_short}", dt_24_s);
-    direct_map.insert("{date}", d_str);
-    direct_map.insert("{time_24}", t_24);
-    direct_map.insert("{time_24_short}", t_24_s);
+    direct_map.insert("{date_time_24}", times.date_time_24);
+    direct_map.insert("{date_time_24_short}", times.date_time_24_short);
+    direct_map.insert("{date_time_12}", times.date_time_12);
+    direct_map.insert("{date_time_12_short}", times.date_time_12_short);
+    direct_map.insert("{date}", times.date);
+    direct_map.insert("{time_24}", times.time_24);
+    direct_map.insert("{time_24_short}", times.time_24_short);
+    direct_map.insert("{time_12}", times.time_12);
+    direct_map.insert("{time_12_short}", times.time_12_short);
 
     if res.contains("{localip}") {
         direct_map.insert("{localip}", get_primary_ip());

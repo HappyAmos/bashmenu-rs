@@ -189,3 +189,12 @@ fn test_editor_buffer_word_navigation() {
     buf.move_word_left();
     assert_eq!(buf.cursor_col, 0);
 }
+
+#[test]
+fn test_editor_buffer_tilde_expansion() {
+    let home = std::env::var("HOME").unwrap();
+    let buf = EditorBuffer::open("~/.bashrc").expect("open ~/.bashrc");
+    assert!(buf.file_path.is_some());
+    let path = buf.file_path.unwrap();
+    assert_eq!(path, PathBuf::from(&home).join(".bashrc"));
+}
