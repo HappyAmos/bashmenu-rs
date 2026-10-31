@@ -157,3 +157,27 @@
 - [x] **Tests & Invariants Verification:**
   - Added unit and integration tests in `crates/bashmenu-tui/tests/modals_test.rs` covering word-boundary wrapping, End-key navigation, autocomplete enter continuation, mouse-click cursor positioning, and heading style background isolation.
   - Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` (all 61 tests passing).
+
+## Phase 14: Submenu Type Inference, Window Close Button [X], and Notes Navigation
+- [x] **Submenu Type Inference:**
+  - Fixed issue where `Bashmenu Settings` inside `Options & Settings` failed to open due to missing explicit `type: submenu`.
+  - Updated `crates/bashmenu-core/src/menu.rs` deserializer to automatically infer `MenuItemType::Submenu` whenever `raw_props.submenu.is_some()` and type was omitted.
+  - Updated `crates/bashmenu-tui/src/menu_view.rs` to treat items with `item.submenu.is_some()` as submenus when activating and rendering `»`.
+  - Added explicit `type: submenu` in `bashmenu.mnu` and `tests/fixtures/bashmenu.mnu`.
+  - Added integration test `test_nested_submenu_without_explicit_type` in `menu_navigation_test.rs`.
+- [x] **Universal Modal Close Button [X]:**
+  - Added `window_close_button: Style` to `ResolvedThemeStyles` in `crates/bashmenu-tui/src/style.rs` resolved from theme palettes.
+  - Updated `render_modal_frame` in `crates/bashmenu-tui/src/modals/frame.rs` to render `[X]` just to the left of the top-right border corner (`[` and `]` in border style, `X` in `styles.window_close_button`).
+  - Added `is_close_button_clicked` helper in `frame.rs` and wired close button click detection into `HelpModal`, `NoteViewerModal`, `NoteEditorModal`, `ConfirmModal`, `InputModal`, `ThemePickerModal`, and `FilePickerModal`.
+  - Added integration test `test_modal_frame_close_button_rendering_and_clicking` in `modals_test.rs`.
+- [x] **Notes Checkbox Wrapping Margin:**
+  - Updated `NoteViewerModal` and `NoteEditorModal` to prepend continuation lines of wrapped checkbox items with a matching margin (indent + 6 spaces) so wrapped text aligns under the checkbox text.
+  - Added unit tests in `modals_test.rs` validating margin indentation on continuation lines.
+- [x] **Note Viewer Navigation & Selection Fixes:**
+  - Fixed issue in `NoteViewerModal` where hidden completed checkboxes (when `show_completed` is false) remained selectable.
+  - Updated line navigation (`Up`, `Down`, `Home`, `End`, `PageUp`, `PageDown`) to step only across visible items.
+  - Updated checkbox highlight style when selected (`is_sel`) to match the text foreground and background scheme, preventing clashing color blocks.
+- [x] **Modal Indicator Cleanup:**
+  - Removed remaining `►` glyph indicators in `ThemePickerModal`, `FilePickerModal`, and `ColorGridModal`.
+  - Added integration test `test_modal_no_triangle_indicator` in `modals_test.rs`.
+- [x] Verified zero Clippy warnings, full formatting compliance, and 100% test pass rate across 70 tests.
