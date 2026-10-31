@@ -1,4 +1,6 @@
-use bashmenu_core::{MenuItem, MenuItemType, MenuSchema, PluginDisplayRow, Submenu};
+use bashmenu_core::{
+    BashMenuConfig, MenuItem, MenuItemType, MenuSchema, PluginDisplayRow, Submenu,
+};
 use bashmenu_tui::{MenuAction, MenuView, ResolvedThemeStyles};
 use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
@@ -346,17 +348,32 @@ fn test_bbcode_placeholder_and_right_aligned_brackets() {
         ..Default::default()
     });
     schema.items.push(MenuItem {
+        label: "Configure Ping Target [{settings.ping_target}]".to_string(),
+        r#type: MenuItemType::Command,
+        ..Default::default()
+    });
+    schema.items.push(MenuItem {
+        label: "Status Gutter Refresh Rate [[{app.settings.refresh_interval}] seconds]".to_string(),
+        r#type: MenuItemType::Command,
+        ..Default::default()
+    });
+    schema.items.push(MenuItem {
         label: "[b]Styled Option[/b] [tag]".to_string(),
         r#type: MenuItemType::Command,
         ..Default::default()
     });
+
+    let mut cfg = BashMenuConfig::default();
+    cfg.settings.ping_target = Some("1.1.1.1".to_string());
+    cfg.settings.refresh_interval = Some(serde_yml::Value::Number(serde_yml::Number::from(10)));
 
     let mut view = MenuView::new(
         schema,
         ResolvedThemeStyles::default(),
         true,
         "Status".to_string(),
-    );
+    )
+    .with_config(cfg);
 
     view.set_plugin_rows(vec![PluginDisplayRow {
         text: "[b]Alienware[/b] [green]ONLINE[/green]".to_string(),
@@ -400,6 +417,60 @@ fn test_bbcode_placeholder_and_right_aligned_brackets() {
         }
     }
     assert!(found_notes_line, "Notes line must be rendered");
+
+    // Verify Configure Ping Target [{settings.ping_target}] was expanded to [1.1.1.1]
+    let mut found_ping_line = false;
+    for y in 2..20 {
+        let mut line_str = String::new();
+        for x in 0..80 {
+            line_str.push(buf[(x, y)].symbol().chars().next().unwrap_or(' '));
+        }
+        if line_str.contains("Configure Ping Target") {
+            assert!(
+                !line_str.contains("{settings.ping_target}"),
+                "Placeholder {{settings.ping_target}} must be expanded in label: {}",
+                line_str
+            );
+            assert!(
+                line_str.contains("[1.1.1.1]"),
+                "Expanded ping target must be present in label: {}",
+                line_str
+            );
+            found_ping_line = true;
+            break;
+        }
+    }
+    assert!(
+        found_ping_line,
+        "Configure Ping Target line must be rendered"
+    );
+
+    // Verify Status Gutter Refresh Rate [[{app.settings.refresh_interval}] seconds]
+    let mut found_refresh_line = false;
+    for y in 2..20 {
+        let mut line_str = String::new();
+        for x in 0..80 {
+            line_str.push(buf[(x, y)].symbol().chars().next().unwrap_or(' '));
+        }
+        if line_str.contains("Status Gutter Refresh Rate") {
+            assert!(
+                !line_str.contains("{app.settings.refresh_interval}"),
+                "Placeholder {{app.settings.refresh_interval}} must be expanded: {}",
+                line_str
+            );
+            assert!(
+                line_str.contains("[[10] seconds]"),
+                "Expanded refresh interval must be present: {}",
+                line_str
+            );
+            found_refresh_line = true;
+            break;
+        }
+    }
+    assert!(
+        found_refresh_line,
+        "Status Gutter Refresh Rate line must be rendered"
+    );
 
     // Verify BBCode in plugin row: raw tags [b], [/b], [green], [/green] stripped, content rendered
     let mut found_plugin_line = false;

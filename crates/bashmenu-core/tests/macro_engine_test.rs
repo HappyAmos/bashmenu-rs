@@ -72,3 +72,67 @@ fn test_icon_slot_4_columns_strict_invariant() {
     );
     assert_eq!(empty_slot, "    ");
 }
+
+#[test]
+fn test_right_aligned_bracket_placeholders_expansion() {
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/bashmenu.yml");
+    let mut config = load_config(fixture).expect("load config");
+    config.settings.ping_target = Some("1.1.1.1".to_string());
+    config.settings.check_for_updates = Some(false);
+    config.settings.nerd_font_width = Some("auto".to_string());
+    config.settings.tab_to_spaces = Some(true);
+    config.settings.tabstop = Some(4);
+    config.settings.pager_editor = Some("vim".to_string());
+    config.settings.refresh_interval = Some(serde_yml::Value::Number(serde_yml::Number::from(10)));
+    config.user.insert(
+        "postal_code".to_string(),
+        serde_yml::Value::String("49079".to_string()),
+    );
+
+    let mut ctx = MacroContext::new(&config);
+    ctx.bashmenu_dir = std::path::PathBuf::from("/home/user/.config/bashmenu");
+
+    let test_cases = vec![
+        (
+            "Configure Ping Target [{settings.ping_target}]",
+            "Configure Ping Target [1.1.1.1]",
+        ),
+        (
+            "Enable Automatic Updates (git pull) [{settings.check_for_updates}]",
+            "Enable Automatic Updates (git pull) [false]",
+        ),
+        (
+            "Nerd Font Display Width [{settings.nerd_font_width}]",
+            "Nerd Font Display Width [auto]",
+        ),
+        (
+            "Editor Tab to Spaces Mode [{settings.tab_to_spaces}]",
+            "Editor Tab to Spaces Mode [true]",
+        ),
+        (
+            "Editor Tabstop Distance [{settings.tabstop}]",
+            "Editor Tabstop Distance [4]",
+        ),
+        (
+            "Pager Text Editor [{settings.pager_editor}]",
+            "Pager Text Editor [vim]",
+        ),
+        (
+            "Status Gutter Refresh Rate [[{app.settings.refresh_interval}] seconds]",
+            "Status Gutter Refresh Rate [[10] seconds]",
+        ),
+        (
+            "Weather Location [{user.postal_code}]",
+            "Weather Location [49079]",
+        ),
+        (
+            "Notes [{notebooks_dir}/notes.yml]",
+            "Notes [/home/user/.config/bashmenu/notebooks/notes.yml]",
+        ),
+    ];
+
+    for (input, expected) in test_cases {
+        let expanded = interpolate_placeholders(input, &ctx);
+        assert_eq!(expanded, expected, "Failed for input: {}", input);
+    }
+}

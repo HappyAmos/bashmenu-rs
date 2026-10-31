@@ -42,15 +42,15 @@ impl<'a> MacroContext<'a> {
         let bashmenu_dir = std::env::var("BASHMENU_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(|_| {
-                let cur = std::env::current_dir().unwrap_or_else(|_| home_dir.clone());
-                if cur.join("bashmenu.mnu").exists() || cur.join("bashmenu.yml").exists() {
-                    cur
+                let user_cfg = home_dir.join(".config/bashmenu");
+                if user_cfg.exists() {
+                    user_cfg
                 } else {
-                    let user_cfg = home_dir.join(".config/bashmenu");
-                    if user_cfg.exists() {
-                        user_cfg
-                    } else {
+                    let cur = std::env::current_dir().unwrap_or_else(|_| home_dir.clone());
+                    if cur.join("bashmenu.mnu").exists() || cur.join("bashmenu.yml").exists() {
                         cur
+                    } else {
+                        user_cfg
                     }
                 }
             });
@@ -103,6 +103,102 @@ fn get_local_time_strings() -> (String, String, String, String, String) {
             String::new(),
             String::new(),
         )
+    }
+}
+
+fn get_primary_ip() -> String {
+    use std::net::UdpSocket;
+    if let Ok(socket) = UdpSocket::bind("0.0.0.0:0") {
+        if socket.connect("1.1.1.1:80").is_ok() {
+            if let Ok(addr) = socket.local_addr() {
+                return addr.ip().to_string();
+            }
+        }
+    }
+    "127.0.0.1".to_string()
+}
+
+fn get_battery_info() -> String {
+    if let Ok(entries) = std::fs::read_dir("/sys/class/power_supply") {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            let is_bat = name.starts_with("BAT") || {
+                let type_path = entry.path().join("type");
+                std::fs::read_to_string(type_path)
+                    .map(|t| t.to_lowercase().contains("battery"))
+                    .unwrap_or(false)
+            };
+            if is_bat {
+                let cap_path = entry.path().join("capacity");
+                if let Ok(cap) = std::fs::read_to_string(cap_path) {
+                    return format!("{}%", cap.trim());
+                }
+            }
+        }
+    }
+    "N/A".to_string()
+}
+
+fn get_battery_status() -> String {
+    if let Ok(entries) = std::fs::read_dir("/sys/class/power_supply") {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            let is_bat = name.starts_with("BAT") || {
+                let type_path = entry.path().join("type");
+                std::fs::read_to_string(type_path)
+                    .map(|t| t.to_lowercase().contains("battery"))
+                    .unwrap_or(false)
+            };
+            if is_bat {
+                let stat_path = entry.path().join("status");
+                if let Ok(stat) = std::fs::read_to_string(stat_path) {
+                    return stat.trim().to_string();
+                }
+            }
+        }
+    }
+    "N/A".to_string()
+}
+
+fn resolve_config_dot_path(config_val: &serde_json::Value, path: &str) -> Option<String> {
+    let parts: Vec<&str> = path.split('.').collect();
+    if parts.is_empty() {
+        return None;
+    }
+
+    // Try resolving directly (e.g. settings.ping_target or user.postal_code)
+    if let Some(val) = lookup_value_path(config_val, &parts) {
+        return Some(val);
+    }
+
+    // If path starts with "app" or "bashmenu", try stripping prefix
+    if parts.len() > 1 && (parts[0] == "app" || parts[0] == "bashmenu") {
+        if let Some(val) = lookup_value_path(config_val, &parts[1..]) {
+            return Some(val);
+        }
+    }
+
+    None
+}
+
+fn lookup_value_path(mut curr: &serde_json::Value, parts: &[&str]) -> Option<String> {
+    for &part in parts {
+        match curr {
+            serde_json::Value::Object(map) => {
+                curr = map.get(part)?;
+            }
+            _ => return None,
+        }
+    }
+
+    match curr {
+        serde_json::Value::String(s) => Some(s.clone()),
+        serde_json::Value::Number(n) => Some(n.to_string()),
+        serde_json::Value::Bool(b) => Some(b.to_string()),
+        serde_json::Value::Null => None,
+        serde_json::Value::Array(_) | serde_json::Value::Object(_) => {
+            serde_json::to_string(curr).ok()
+        }
     }
 }
 
@@ -200,6 +296,18 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
     direct_map.insert("{time_24}", t_24);
     direct_map.insert("{time_24_short}", t_24_s);
 
+    if res.contains("{localip}") {
+        direct_map.insert("{localip}", get_primary_ip());
+    }
+    if res.contains("{battery}") {
+        direct_map.insert("{battery}", get_battery_info());
+    }
+    if res.contains("{battery_stat}") || res.contains("{battery_status}") {
+        let stat = get_battery_status();
+        direct_map.insert("{battery_stat}", stat.clone());
+        direct_map.insert("{battery_status}", stat);
+    }
+
     for (k, v) in direct_map {
         if res.contains(k) {
             res = res.replace(k, &v);
@@ -214,57 +322,19 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
         }
     }
 
-    // 6. Dot notation properties: {user.<key>}, {settings.<key>}, {app.<key>}
+    // 6. Dot notation properties: {user.<key>}, {settings.<key>}, {app.<key>}, etc.
     if res.contains('{') {
         let dot_re = Regex::new(r"\{([a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)+)\}").unwrap();
+        let config_val = serde_json::to_value(ctx.config).unwrap_or(serde_json::Value::Null);
+
         res = dot_re
             .replace_all(&res, |caps: &Captures| {
                 let path = &caps[1];
-                let parts: Vec<&str> = path.split('.').collect();
-                if parts.is_empty() {
-                    return caps[0].to_string();
-                }
-
-                // If path starts with "app.", strip it and look up in root config
-                let normalized_parts: Vec<&str> = if parts[0] == "app" {
-                    parts[1..].to_vec()
+                if let Some(val) = resolve_config_dot_path(&config_val, path) {
+                    val
                 } else {
-                    parts
-                };
-
-                if normalized_parts.len() == 2 && normalized_parts[0] == "user" {
-                    let key = normalized_parts[1];
-                    if let Some(val) = ctx.config.user.get(key) {
-                        return match val {
-                            serde_yml::Value::String(s) => s.clone(),
-                            serde_yml::Value::Number(n) => n.to_string(),
-                            serde_yml::Value::Bool(b) => b.to_string(),
-                            other => format!("{:?}", other),
-                        };
-                    }
+                    caps[0].to_string()
                 }
-
-                if normalized_parts.len() == 2 && normalized_parts[0] == "settings" {
-                    let key = normalized_parts[1];
-                    if key == "tabstop" {
-                        if let Some(ts) = ctx.config.settings.tabstop {
-                            return ts.to_string();
-                        }
-                    } else if key == "use_nerd_fonts" {
-                        if let Some(unf) = ctx.config.settings.use_nerd_fonts {
-                            return unf.to_string();
-                        }
-                    } else if let Some(val) = ctx.config.settings.extra.get(key) {
-                        return match val {
-                            serde_yml::Value::String(s) => s.clone(),
-                            serde_yml::Value::Number(n) => n.to_string(),
-                            serde_yml::Value::Bool(b) => b.to_string(),
-                            other => format!("{:?}", other),
-                        };
-                    }
-                }
-
-                caps[0].to_string()
             })
             .to_string();
     }

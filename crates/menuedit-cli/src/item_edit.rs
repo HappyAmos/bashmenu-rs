@@ -4,7 +4,9 @@
 //! dynamic divider / standard field layouts, 3-way execution mode selection,
 //! live item and divider preview boxes, file browse triggers, and full footer shortcut keys.
 
-use bashmenu_core::{MenuItem, MenuItemType};
+use bashmenu_core::{
+    interpolate_placeholders, BashMenuConfig, MacroContext, MenuItem, MenuItemType,
+};
 use bashmenu_tui::{
     compute_modal_inner, is_close_button_clicked, render_modal_frame, split_label_brackets,
     strip_bbcode, visible_text_len, ResolvedThemeStyles,
@@ -1437,14 +1439,20 @@ impl FormRow {
 
 /// Renders a single menu item preview line matching Python `render_menu_item_preview()`
 pub fn render_item_preview_line(item: &MenuItem, avail_w: usize) -> String {
-    let raw_title = &item.label;
-    let (left_raw, right_raw) = split_label_brackets(raw_title);
+    let cfg = BashMenuConfig::default();
+    let ctx = MacroContext::new(&cfg);
+    let expanded_title = interpolate_placeholders(&item.label, &ctx);
+    let (left_raw, right_raw) = split_label_brackets(&expanded_title);
     let left_clean = strip_bbcode(left_raw);
     let right_clean = strip_bbcode(right_raw);
 
-    let exp_icon = item.icon.as_deref().unwrap_or_default();
+    let exp_icon = item
+        .icon
+        .as_deref()
+        .map(|ic| interpolate_placeholders(ic, &ctx))
+        .unwrap_or_default();
     let icon_str = if !exp_icon.is_empty() {
-        let vis_w = visible_text_len(exp_icon);
+        let vis_w = visible_text_len(&exp_icon);
         let pad_w = 4_usize.saturating_sub(vis_w).max(1);
         format!("{}{}", exp_icon, " ".repeat(pad_w))
     } else {
