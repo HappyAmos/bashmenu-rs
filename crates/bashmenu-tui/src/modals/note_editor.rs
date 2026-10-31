@@ -479,7 +479,7 @@ impl NoteEditorModal {
             let line_start_x = inner.x + 2;
             let raw_line = &self.lines[vline.logical_row];
 
-            let line_style = if raw_line.starts_with("- [x]") || raw_line.starts_with("- [X]") {
+            let mut line_style = if raw_line.starts_with("- [x]") || raw_line.starts_with("- [X]") {
                 Style::default()
                     .fg(Color::DarkGray)
                     .add_modifier(Modifier::DIM)
@@ -492,6 +492,9 @@ impl NoteEditorModal {
             } else {
                 styles.text
             };
+            if line_style.bg.is_none() || line_style.bg == Some(Color::Reset) {
+                line_style = line_style.bg(styles.background);
+            }
 
             for (col_idx, &c) in vline.chars.iter().enumerate() {
                 let is_cursor = vline.cursor_col_in_chunk == Some(col_idx);

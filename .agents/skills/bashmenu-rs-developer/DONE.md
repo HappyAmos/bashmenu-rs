@@ -145,9 +145,11 @@
   - Converted string slicing and cursor indexing in `insert_char`, `handle_backspace`, `handle_delete`, and `handle_enter` to character-safe Unicode operations.
   - Fixed `<End>` key to navigate to the logical line end, enabling clean continuation creation on subsequent rows.
   - Added left-click mouse interaction (`MouseEventKind::Down(MouseButton::Left)`) in `handle_mouse`, accurately mapping mouse coordinates to target line and column.
-- [x] **Theme Background Color Artifact Elimination:**
-  - Replaced `styles.highlight` background application on markdown `## ` and `### ` headers with `styles.accent.add_modifier(Modifier::BOLD)` in both `HelpModal` and `NoteViewerModal`.
-  - Replaced full-row background washing on selected lines in `NoteViewerModal` with a dedicated `►` margin indicator, preserving crisp markdown rendering.
+- [x] **Theme Background Color Artifact Elimination & Inverted Selection:**
+  - Resolved black text background artifact in modals where theme color pairs with `-1` background (e.g. `[255, -1]`) were parsed as `Color::Reset` instead of inheriting the modal container's background (`styles.background`).
+  - Updated `parse_style_pair` in `crates/bashmenu-tui/src/style.rs` so `-1` leaves the background transparent/inherited instead of forcing terminal default black (`Color::Reset`).
+  - Explicitly mapped modal text backgrounds to `styles.background` in `NoteViewerModal`, `HelpModal`, and `NoteEditorModal` so text always matches the popup window's theme background.
+  - Replaced the `►` line indicator in `NoteViewerModal` with inverted text (`Modifier::REVERSED`), providing clean high-contrast highlighting of active items and links.
 - [x] **Main Menu Help Modal Width Expansion:**
   - Updated `HelpModal::render` in `crates/bashmenu-tui/src/modals/help.rs` to compute dialog width as 90% of screen width (`(area.width as f32 * 0.90)` clamped within margins).
   - Relaxed the hard-coded 78-column cap in `render_modal_frame` in `crates/bashmenu-tui/src/modals/frame.rs` to allow dialog width to scale with screen width while maintaining shadow margins.

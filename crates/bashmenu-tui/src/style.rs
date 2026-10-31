@@ -123,17 +123,27 @@ pub fn parse_style_pair(val: Option<&serde_yml::Value>) -> Option<Style> {
             let mut style = Style::default();
             if let Some(fg_val) = seq.first() {
                 if let Some(fg) = parse_color_value(fg_val) {
-                    style = style.fg(fg);
+                    if fg != Color::Reset {
+                        style = style.fg(fg);
+                    }
                 }
             }
             if let Some(bg_val) = seq.get(1) {
                 if let Some(bg) = parse_color_value(bg_val) {
-                    style = style.bg(bg);
+                    if bg != Color::Reset {
+                        style = style.bg(bg);
+                    }
                 }
             }
             Some(style)
         }
-        other => parse_color_value(other).map(|c| Style::default().fg(c)),
+        other => parse_color_value(other).and_then(|c| {
+            if c != Color::Reset {
+                Some(Style::default().fg(c))
+            } else {
+                None
+            }
+        }),
     }
 }
 

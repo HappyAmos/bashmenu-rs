@@ -406,15 +406,24 @@ impl NoteViewerModal {
             let y = inner.y + 1 + i as u16;
             let is_sel = *raw_idx == self.selected_line;
 
-            if is_sel {
-                buf.set_string(
-                    inner.x + 1,
-                    y,
-                    "►",
-                    styles.accent.add_modifier(Modifier::BOLD),
-                );
-            }
-            buf.set_line(inner.x + 2, y, line_obj, avail_w as u16);
+            let styled_line = Line::from(
+                line_obj
+                    .spans
+                    .iter()
+                    .map(|s| {
+                        let mut st = s.style;
+                        if st.bg.is_none() || st.bg == Some(Color::Reset) {
+                            st = st.bg(styles.background);
+                        }
+                        if is_sel {
+                            st = st.add_modifier(Modifier::REVERSED);
+                        }
+                        Span::styled(s.content.clone(), st)
+                    })
+                    .collect::<Vec<_>>(),
+            );
+
+            buf.set_line(inner.x + 2, y, &styled_line, avail_w as u16);
         }
 
         // Render wrapped footer help lines with equal spacing

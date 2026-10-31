@@ -166,7 +166,10 @@ impl HelpModal {
             .enumerate()
         {
             let y = inner.y + 1 + i as u16;
-            let st = opt_style.unwrap_or(styles.text);
+            let mut st = opt_style.unwrap_or(styles.text);
+            if st.bg.is_none() || st.bg == Some(Color::Reset) {
+                st = st.bg(styles.background);
+            }
             buf.set_string(inner.x + 2, y, line, st);
         }
 

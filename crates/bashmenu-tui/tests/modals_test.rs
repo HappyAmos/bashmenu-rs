@@ -355,58 +355,67 @@ fn test_note_editor_mouse_click_places_cursor() {
 #[test]
 fn test_headings_and_viewer_no_background_artifact() {
     use bashmenu_tui::{HelpModal, NoteViewerModal};
-    use ratatui::style::Color;
+    use ratatui::style::{Color, Modifier, Style};
 
-    let styles = ResolvedThemeStyles::default();
-    // Default highlight style has bg: Cyan
-    assert_eq!(styles.highlight.bg, Some(Color::Cyan));
+    // Simulate a dark theme like alaska-mountain with background 235
+    let styles = ResolvedThemeStyles {
+        background: Color::Indexed(235),
+        highlight: Style::default().bg(Color::Cyan),
+        ..Default::default()
+    };
 
-    // 1. HelpModal ## and ### headings must NOT have highlight background
-    let help_text = "## Secondary Section\n### Sub Section";
+    // 1. HelpModal ## and ### headings and text must match styles.background (not Reset/Black or Cyan)
+    let help_text = "## Secondary Section\n### Sub Section\nRegular help content line";
     let help = HelpModal::new("Help Test", help_text);
     let area = Rect::new(0, 0, 80, 24);
     let mut buf = Buffer::empty(area);
     help.render(area, &styles, &mut buf);
 
-    // Search cells for 'Secondary Section' and verify none have bg: Cyan
+    // Check cells: any cell with letters must have bg == Color::Indexed(235)
     for y in 0..area.height {
         for x in 0..area.width {
             let cell = buf.cell((x, y)).unwrap();
-            if cell.symbol() == "S" && cell.style().bg == Some(Color::Cyan) {
-                // If this cell is part of "Secondary Section", fail
-                let mut row_chars = String::new();
-                for dx in 0..20 {
-                    if x + dx < area.width {
-                        row_chars.push_str(buf.cell((x + dx, y)).unwrap().symbol());
-                    }
-                }
-                assert!(
-                    !row_chars.starts_with("Secondary"),
-                    "Header text must not have background highlight"
+            let sym = cell.symbol();
+            if sym == "S" || sym == "R" {
+                assert_eq!(
+                    cell.style().bg,
+                    Some(Color::Indexed(235)),
+                    "Text must have popup window background (235), not black/Reset"
                 );
             }
         }
     }
 
-    // 2. NoteViewerModal ## headings and selected line must NOT wash background over text
+    // 2. NoteViewerModal: no '►' indicator, selected item is inverted with Modifier::REVERSED
     let note = "## Task Heading\n- [ ] Yellow item with text";
     let mut viewer = NoteViewerModal::new("Viewer Test", "/tmp/v.yml", note);
     viewer.selected_line = 1;
     let mut buf2 = Buffer::empty(area);
     viewer.render(area, &styles, &mut buf2);
 
+    let content = format!("{:?}", buf2);
+    assert!(!content.contains('►'), "► indicator must not be rendered");
+
+    // The selected line 1 ('Yellow item with text') must have REVERSED modifier
+    let mut found_reversed = false;
     for y in 0..area.height {
         for x in 0..area.width {
             let cell = buf2.cell((x, y)).unwrap();
             if cell.symbol() == "Y" {
-                assert_ne!(
+                assert_eq!(
                     cell.style().bg,
-                    Some(Color::Cyan),
-                    "Item text must not have background patched"
+                    Some(Color::Indexed(235)),
+                    "Background must match styles.background"
                 );
+                assert!(
+                    cell.style().add_modifier.contains(Modifier::REVERSED),
+                    "Selected item text must be inverted (REVERSED)"
+                );
+                found_reversed = true;
             }
         }
     }
+    assert!(found_reversed, "Must find selected inverted item cell");
 }
 
 #[test]
