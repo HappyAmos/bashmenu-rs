@@ -408,3 +408,18 @@ fn test_headings_and_viewer_no_background_artifact() {
         }
     }
 }
+
+#[test]
+fn test_help_modal_renders_at_90_percent_width() {
+    use bashmenu_tui::HelpModal;
+
+    let styles = ResolvedThemeStyles::default();
+    let area = Rect::new(0, 0, 120, 30);
+    let mut buf = Buffer::empty(area);
+
+    let help = HelpModal::new("Wide Help", "Sample help text line.");
+    let inner = help.render(area, &styles, &mut buf);
+
+    // 90% of 120 is 108. Inner width is 108 - 2 borders = 106.
+    assert_eq!(inner.width, 106);
+}

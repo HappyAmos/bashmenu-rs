@@ -148,6 +148,10 @@
 - [x] **Theme Background Color Artifact Elimination:**
   - Replaced `styles.highlight` background application on markdown `## ` and `### ` headers with `styles.accent.add_modifier(Modifier::BOLD)` in both `HelpModal` and `NoteViewerModal`.
   - Replaced full-row background washing on selected lines in `NoteViewerModal` with a dedicated `►` margin indicator, preserving crisp markdown rendering.
+- [x] **Main Menu Help Modal Width Expansion:**
+  - Updated `HelpModal::render` in `crates/bashmenu-tui/src/modals/help.rs` to compute dialog width as 90% of screen width (`(area.width as f32 * 0.90)` clamped within margins).
+  - Relaxed the hard-coded 78-column cap in `render_modal_frame` in `crates/bashmenu-tui/src/modals/frame.rs` to allow dialog width to scale with screen width while maintaining shadow margins.
+  - Added integration test `test_help_modal_renders_at_90_percent_width` in `crates/bashmenu-tui/tests/modals_test.rs`.
 - [x] **Tests & Invariants Verification:**
   - Added unit and integration tests in `crates/bashmenu-tui/tests/modals_test.rs` covering word-boundary wrapping, End-key navigation, autocomplete enter continuation, mouse-click cursor positioning, and heading style background isolation.
   - Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` (all 61 tests passing).

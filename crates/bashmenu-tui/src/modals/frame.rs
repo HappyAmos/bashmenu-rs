@@ -21,8 +21,8 @@ pub fn render_modal_frame(
     styles: &ResolvedThemeStyles,
     buf: &mut Buffer,
 ) -> Rect {
-    // Clamp to viewport size and 80-column bounds
-    let w = dialog_w.min(area.width.saturating_sub(4)).min(78);
+    // Clamp to viewport size within shadow margins
+    let w = dialog_w.min(area.width.saturating_sub(4));
     let h = dialog_h.min(area.height.saturating_sub(2)).min(28);
 
     let start_x = area.x + (area.width.saturating_sub(w + 2)) / 2;

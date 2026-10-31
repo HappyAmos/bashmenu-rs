@@ -271,7 +271,7 @@ impl NoteEditorModal {
                 } else {
                     let dialog_w = (area.width.saturating_sub(4)).clamp(20, 84);
                     let dialog_h = (area.height.saturating_sub(4)).clamp(14, 28);
-                    let w = dialog_w.min(area.width.saturating_sub(4)).min(78);
+                    let w = dialog_w.min(area.width.saturating_sub(4));
                     let h = dialog_h.min(area.height.saturating_sub(2)).min(28);
                     let start_x = area.x + (area.width.saturating_sub(w + 2)) / 2;
                     let start_y = area.y + (area.height.saturating_sub(h + 1)) / 2;

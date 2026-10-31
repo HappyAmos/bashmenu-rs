@@ -77,8 +77,10 @@ impl HelpModal {
 
     /// Renders help modal
     pub fn render(&self, area: Rect, styles: &ResolvedThemeStyles, buf: &mut Buffer) -> Rect {
-        // Expand to 95% of terminal area, matching Python help_modal
-        let dialog_w = (area.width.saturating_sub(4)).max(20);
+        // Expand to 90% of screen width within margins
+        let dialog_w = ((area.width as f32 * 0.90) as u16)
+            .min(area.width.saturating_sub(4))
+            .max(20);
         let dialog_h = (area.height.saturating_sub(2)).max(10);
 
         let inner = render_modal_frame(area, dialog_w, dialog_h, &self.title, styles, buf);
