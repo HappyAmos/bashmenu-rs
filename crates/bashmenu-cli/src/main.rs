@@ -290,7 +290,7 @@ fn main() -> Result<()> {
                 }
                 ActiveModal::Input(modal) => {
                     let submitted = match ev {
-                        Event::Key(key) => modal.handle_key(key.code),
+                        Event::Key(key) => modal.handle_key_with_modifiers(key.code, key.modifiers),
                         Event::Mouse(mouse) => modal.handle_mouse(mouse, area),
                         _ => None,
                     };
@@ -404,7 +404,7 @@ fn main() -> Result<()> {
                 }
                 ActiveModal::NewNoteTitle(filepath, modal) => {
                     let submitted = match ev {
-                        Event::Key(key) => modal.handle_key(key.code),
+                        Event::Key(key) => modal.handle_key_with_modifiers(key.code, key.modifiers),
                         Event::Mouse(mouse) => modal.handle_mouse(mouse, area),
                         _ => None,
                     };
@@ -425,7 +425,7 @@ fn main() -> Result<()> {
                 }
                 ActiveModal::RenameNoteTitle(filepath, old_title, modal) => {
                     let submitted = match ev {
-                        Event::Key(key) => modal.handle_key(key.code),
+                        Event::Key(key) => modal.handle_key_with_modifiers(key.code, key.modifiers),
                         Event::Mouse(mouse) => modal.handle_mouse(mouse, area),
                         _ => None,
                     };
@@ -500,7 +500,7 @@ fn main() -> Result<()> {
                 }
                 ActiveModal::ConfigInput(key_path, modal) => {
                     let submitted = match ev {
-                        Event::Key(key) => modal.handle_key(key.code),
+                        Event::Key(key) => modal.handle_key_with_modifiers(key.code, key.modifiers),
                         Event::Mouse(mouse) => modal.handle_mouse(mouse, area),
                         _ => None,
                     };
@@ -644,9 +644,10 @@ fn main() -> Result<()> {
                                 .status_gutter
                                 .as_deref()
                                 .unwrap_or("{user} | {battery} | {date_time_24}");
+                            let prompt = "Enter status gutter format. Available options: {user}, {battery}, {date}, {date_time_24}, {date_time_24_short}, {date_time_12}, {date_time_12_short}, {host}, {user-mode}, {version}, {utc_seconds}";
                             active_modal = ActiveModal::Input(InputModal::new(
                                 "Configure Status Gutter",
-                                "Enter status gutter template:",
+                                prompt,
                                 current_gutter,
                             ));
                         }

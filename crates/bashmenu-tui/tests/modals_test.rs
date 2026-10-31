@@ -715,3 +715,48 @@ fn test_note_editor_initial_cursor_and_ctrl_word_navigation() {
     editor.handle_key(KeyCode::Left, KeyModifiers::CONTROL);
     assert_eq!(editor.cursor_col, 0);
 }
+
+#[test]
+fn test_input_modal_status_gutter_no_overflow_and_word_navigation() {
+    use crossterm::event::KeyModifiers;
+
+    let long_gutter = "| Theme: {theme} | {user} | Battery: {battery} ({battery_stat}) | {user.localip} | [b]{date_time_24_short}[/b]";
+    let prompt = "Enter status gutter format. Available options: {user}, {battery}, {date}, {date_time_24}, {date_time_24_short}, {date_time_12}, {date_time_12_short}, {host}, {user-mode}, {version}, {utc_seconds}";
+    let mut modal = InputModal::new("Configure Status Gutter", prompt, long_gutter);
+
+    let area = Rect::new(0, 0, 80, 24);
+    let styles = ResolvedThemeStyles::default();
+    let mut buf = Buffer::empty(area);
+
+    let inner = modal.render(area, &styles, &mut buf);
+    assert!(inner.width > 0);
+
+    // Verify right border is not overwritten by text:
+    // Any cell to the right of the dialog right frame (inner.x + inner.width) should NOT contain input chars
+    let right_boundary = inner.x + inner.width;
+    for y in inner.y..inner.y + inner.height {
+        for x in (right_boundary + 1)..area.width {
+            let ch = buf[(x, y)].symbol();
+            // Should be space or empty, not letters from input or prompt
+            assert!(
+                ch == " " || ch == "░",
+                "Cell at ({}, {}) has unexpected character '{}' exceeding modal width",
+                x,
+                y,
+                ch
+            );
+        }
+    }
+
+    // Test Ctrl+Left and Ctrl+Right word navigation in InputModal
+    modal.cursor_pos = 0;
+    modal.handle_key_with_modifiers(KeyCode::Right, KeyModifiers::CONTROL);
+    assert!(modal.cursor_pos > 0);
+
+    let next_pos = modal.cursor_pos;
+    modal.handle_key_with_modifiers(KeyCode::Right, KeyModifiers::CONTROL);
+    assert!(modal.cursor_pos > next_pos);
+
+    modal.handle_key_with_modifiers(KeyCode::Left, KeyModifiers::CONTROL);
+    assert_eq!(modal.cursor_pos, next_pos);
+}
