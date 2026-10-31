@@ -189,6 +189,7 @@ fn main() -> Result<()> {
     let mut last_plugin_check = Instant::now();
 
     // 7. Interactive Event Loop
+    let mut need_redraw = true;
     loop {
         let size = guard.terminal_mut().size()?;
         let area = ratatui::layout::Rect::new(0, 0, size.width, size.height);
@@ -202,6 +203,7 @@ fn main() -> Result<()> {
             let avail_w = size.width.saturating_sub(6) as usize;
             let rows = plugin_engine.format_display_rows(&config, avail_w, '─');
             menu_view.set_plugin_rows(rows);
+            need_redraw = true;
         }
 
         // Periodic check to trigger expired plugins
@@ -210,51 +212,60 @@ fn main() -> Result<()> {
             last_plugin_check = Instant::now();
         }
 
-        guard.terminal_mut().draw(|f| {
-            menu_view.render(f.area(), f.buffer_mut());
-            match &mut active_modal {
-                ActiveModal::None => {}
-                ActiveModal::Help(modal) => {
-                    modal.render(f.area(), &styles, f.buffer_mut());
+        if need_redraw {
+            guard.terminal_mut().draw(|f| {
+                menu_view.render(f.area(), f.buffer_mut());
+                match &mut active_modal {
+                    ActiveModal::None => {}
+                    ActiveModal::Help(modal) => {
+                        modal.render(f.area(), &styles, f.buffer_mut());
+                    }
+                    ActiveModal::ThemePicker(modal) => {
+                        modal.render(f.area(), &styles, f.buffer_mut());
+                    }
+                    ActiveModal::Input(modal) => {
+                        modal.render(f.area(), &styles, f.buffer_mut());
+                    }
+                    ActiveModal::NoteViewer(modal) => {
+                        modal.render(f.area(), &styles, f.buffer_mut());
+                    }
+                    ActiveModal::NoteEditor(modal) => {
+                        modal.render(f.area(), &styles, f.buffer_mut());
+                    }
+                    ActiveModal::NewNoteTitle(_, modal) => {
+                        modal.render(f.area(), &styles, f.buffer_mut());
+                    }
+                    ActiveModal::RenameNoteTitle(_, _, modal) => {
+                        modal.render(f.area(), &styles, f.buffer_mut());
+                    }
+                    ActiveModal::ConfirmDeleteNote(_, _, modal) => {
+                        modal.render(f.area(), &styles, f.buffer_mut());
+                    }
+                    ActiveModal::Toggle(_, modal) => {
+                        modal.render(f.area(), &styles, f.buffer_mut());
+                    }
+                    ActiveModal::ConfigInput(_, modal) => {
+                        modal.render(f.area(), &styles, f.buffer_mut());
+                    }
+                    ActiveModal::Radio(_, modal) => {
+                        modal.render(f.area(), &styles, f.buffer_mut());
+                    }
+                    ActiveModal::EditorFilePicker(_, modal) => {
+                        modal.render(f.area(), &styles, f.buffer_mut());
+                    }
                 }
-                ActiveModal::ThemePicker(modal) => {
-                    modal.render(f.area(), &styles, f.buffer_mut());
-                }
-                ActiveModal::Input(modal) => {
-                    modal.render(f.area(), &styles, f.buffer_mut());
-                }
-                ActiveModal::NoteViewer(modal) => {
-                    modal.render(f.area(), &styles, f.buffer_mut());
-                }
-                ActiveModal::NoteEditor(modal) => {
-                    modal.render(f.area(), &styles, f.buffer_mut());
-                }
-                ActiveModal::NewNoteTitle(_, modal) => {
-                    modal.render(f.area(), &styles, f.buffer_mut());
-                }
-                ActiveModal::RenameNoteTitle(_, _, modal) => {
-                    modal.render(f.area(), &styles, f.buffer_mut());
-                }
-                ActiveModal::ConfirmDeleteNote(_, _, modal) => {
-                    modal.render(f.area(), &styles, f.buffer_mut());
-                }
-                ActiveModal::Toggle(_, modal) => {
-                    modal.render(f.area(), &styles, f.buffer_mut());
-                }
-                ActiveModal::ConfigInput(_, modal) => {
-                    modal.render(f.area(), &styles, f.buffer_mut());
-                }
-                ActiveModal::Radio(_, modal) => {
-                    modal.render(f.area(), &styles, f.buffer_mut());
-                }
-                ActiveModal::EditorFilePicker(_, modal) => {
-                    modal.render(f.area(), &styles, f.buffer_mut());
-                }
-            }
-        })?;
+            })?;
+            need_redraw = false;
+        }
 
         if event::poll(Duration::from_millis(50))? {
             let ev = event::read()?;
+            if let Event::Mouse(m) = &ev {
+                if m.kind == crossterm::event::MouseEventKind::Moved {
+                    continue;
+                }
+            }
+            need_redraw = true;
 
             match &mut active_modal {
                 ActiveModal::Help(modal) => {

@@ -213,11 +213,11 @@ fn main() -> Result<()> {
             let p_inner_y = right_area.y + 2;
             let p_avail_w = right_area.width.saturating_sub(4);
             let p_avail_h = right_area.height.saturating_sub(4);
+            let b = &preview_styles.borders;
+            let border_style = Style::default().fg(preview_styles.border);
 
             match state.preview_mode {
                 PreviewMode::Menu => {
-                    let b = &preview_styles.borders;
-                    let border_style = Style::default().fg(preview_styles.border);
                     let w = right_area.width as usize;
 
                     // 1. Gutter layout calculation
@@ -339,6 +339,13 @@ fn main() -> Result<()> {
                     buf.set_line(p_inner_x, content_start_y + 2, &note_line, p_avail_w);
 
                     // Divider rule
+                    buf.set_string(right_area.x, content_start_y + 3, &b.left_tee, border_style);
+                    buf.set_string(
+                        right_area.x + right_area.width - 1,
+                        content_start_y + 3,
+                        &b.right_tee,
+                        border_style,
+                    );
                     let div_str = "─".repeat(p_avail_w as usize);
                     buf.set_line(
                         p_inner_x,
@@ -359,6 +366,13 @@ fn main() -> Result<()> {
                     // 6. Pseudo Plugins pinned above gutter
                     if content_avail_h >= 8 {
                         let plugin_start_y = gt_y.saturating_sub(3);
+                        buf.set_string(right_area.x, plugin_start_y, &b.left_tee, border_style);
+                        buf.set_string(
+                            right_area.x + right_area.width - 1,
+                            plugin_start_y,
+                            &b.right_tee,
+                            border_style,
+                        );
                         let p_div = "─".repeat(p_avail_w as usize);
                         buf.set_line(
                             p_inner_x,
@@ -473,8 +487,8 @@ fn main() -> Result<()> {
                 }
                 PreviewMode::Modals => {
                     // Modal dialog box centered within preview area
-                    let mod_w = (p_avail_w.saturating_sub(4)).clamp(28, 44);
-                    let mod_h = 10_u16.min(p_avail_h);
+                    let mod_w = (p_avail_w.saturating_sub(4)).clamp(32, 50);
+                    let mod_h = 12_u16.min(p_avail_h);
                     let mod_x = p_inner_x + (p_avail_w.saturating_sub(mod_w)) / 2;
                     let mod_y = p_inner_y + (p_avail_h.saturating_sub(mod_h)) / 2;
 
@@ -527,6 +541,27 @@ fn main() -> Result<()> {
                         cancel_btn,
                         preview_styles.text,
                     );
+
+                    // Modal Gutter Divider
+                    let m_div_y = mod_y + mod_h.saturating_sub(3);
+                    buf.set_string(mod_x, m_div_y, &b.left_tee, border_style);
+                    buf.set_string(mod_x + mod_w - 1, m_div_y, &b.right_tee, border_style);
+                    let m_div_str = "─".repeat(mod_w.saturating_sub(2) as usize);
+                    buf.set_string(mod_x + 1, m_div_y, &m_div_str, border_style);
+
+                    // Modal Help Gutter Text
+                    let m_gutter_y = mod_y + mod_h.saturating_sub(2);
+                    let m_help = "[ENTER]: Confirm | [ESC]: Cancel";
+                    buf.set_string(mod_x + 2, m_gutter_y, m_help, preview_styles.help_text);
+                    let m_stat = "[F1]: Help";
+                    if mod_w >= 36 {
+                        buf.set_string(
+                            mod_x + mod_w - 2 - m_stat.len() as u16,
+                            m_gutter_y,
+                            m_stat,
+                            preview_styles.gutter,
+                        );
+                    }
 
                     // Scrollbar indicator on right border
                     buf.set_string(mod_x + mod_w - 1, mod_y + 3, "▲", preview_styles.accent);
@@ -767,17 +802,53 @@ fn main() -> Result<()> {
                                 continue;
                             }
 
-                            // Click on preview mode tab header
                             let left_w = (area.width * 45 / 100).clamp(30, 42);
+                            let left_area =
+                                Rect::new(area.x + 2, area.y + 2, left_w, area.height - 4);
                             let right_x = area.x + left_w + 1;
                             let right_w = (area.x + area.width).saturating_sub(right_x + 2);
                             let right_area =
                                 Rect::new(right_x, area.y + 2, right_w, area.height - 4);
+
+                            // 1. Click on left token list
+                            if m.column >= left_area.x
+                                && m.column < left_area.x + left_area.width
+                                && m.row > left_area.y
+                                && m.row < left_area.y + left_area.height - 1
+                            {
+                                let clicked_idx = (m.row.saturating_sub(left_area.y + 1)) as usize;
+                                if clicked_idx < state.tokens.len() {
+                                    state.selected_idx = clicked_idx;
+                                    state.status_message =
+                                        format!("Selected: {}", state.tokens[clicked_idx].label);
+                                }
+                                continue;
+                            }
+
+                            // 2. Click on preview mode tab header
                             if m.row == right_area.y
                                 && m.column >= right_area.x
                                 && m.column < right_area.x + right_area.width
                             {
                                 state.preview_mode = state.preview_mode.next();
+                                continue;
+                            }
+
+                            // 3. Click on preview pane to focus clicked element
+                            if m.column >= right_area.x
+                                && m.column < right_area.x + right_area.width
+                                && m.row > right_area.y
+                                && m.row < right_area.y + right_area.height
+                            {
+                                if let Some(key) = hit_test_preview(
+                                    m.column,
+                                    m.row,
+                                    right_area,
+                                    state.preview_mode,
+                                ) {
+                                    state.select_token_by_key(key);
+                                }
+                                continue;
                             }
                         }
                     }
@@ -895,4 +966,255 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn hit_test_preview(
+    col: u16,
+    row: u16,
+    right_area: Rect,
+    mode: PreviewMode,
+) -> Option<&'static str> {
+    let w = right_area.width as usize;
+    let avail_both = (w.saturating_sub(11)).max(4);
+    let left_gutter_w = avail_both / 2;
+    let sep_x = (left_gutter_w + 5).min(w.saturating_sub(2));
+    let gt_y = right_area.y + right_area.height.saturating_sub(3);
+    let p_inner_x = right_area.x + 2;
+    let content_start_y = right_area.y + 2;
+    let content_avail_h = gt_y.saturating_sub(content_start_y);
+    let plugin_start_y = gt_y.saturating_sub(if content_avail_h >= 8 { 3 } else { 1 });
+
+    match mode {
+        PreviewMode::Menu => {
+            // 1. Top border
+            if row == right_area.y {
+                if col == right_area.x {
+                    return Some("border_top_left");
+                }
+                if col == right_area.x + right_area.width - 1 {
+                    return Some("border_top_right");
+                }
+                return Some("border_horizontal");
+            }
+            // 2. Bottom border
+            if row == right_area.y + right_area.height - 1 {
+                if col == right_area.x {
+                    return Some("border_bottom_left");
+                }
+                if col == right_area.x + right_area.width - 1 {
+                    return Some("border_bottom_right");
+                }
+                if col == right_area.x + sep_x as u16 {
+                    return Some("gutter_bottom_tee");
+                }
+                return Some("border_horizontal");
+            }
+            // 3. Left border
+            if col == right_area.x {
+                if row == content_start_y + 3 {
+                    return Some("left_tee");
+                }
+                if content_avail_h >= 6 && row == plugin_start_y {
+                    return Some("left_tee");
+                }
+                if row == gt_y {
+                    return Some("gutter_left_tee");
+                }
+                return Some("border_vertical");
+            }
+            // 4. Right border
+            if col == right_area.x + right_area.width - 1 {
+                if row == content_start_y + 3 {
+                    return Some("right_tee");
+                }
+                if content_avail_h >= 6 && row == plugin_start_y {
+                    return Some("right_tee");
+                }
+                if row == gt_y {
+                    return Some("gutter_right_tee");
+                }
+                return Some("border_vertical");
+            }
+            // 5. Gutter top border
+            if row == gt_y {
+                if col == right_area.x + sep_x as u16 {
+                    return Some("gutter_top_tee");
+                }
+                if col == right_area.x {
+                    return Some("gutter_left_tee");
+                }
+                if col == right_area.x + right_area.width - 1 {
+                    return Some("gutter_right_tee");
+                }
+                return Some("gutter_border");
+            }
+            // 6. Gutter content row
+            if row > gt_y && row < right_area.y + right_area.height - 1 {
+                if col == right_area.x + sep_x as u16 {
+                    return Some("gutter_separator");
+                }
+                if col < right_area.x + sep_x as u16 {
+                    return Some("help_text");
+                }
+                return Some("gutter");
+            }
+            // 7. Menu content
+            if row == content_start_y {
+                // Active menu row
+                if col >= p_inner_x && col < p_inner_x + 2 {
+                    return Some("indicator");
+                }
+                return Some("highlight");
+            }
+            if row == content_start_y + 1 {
+                // Item 2: Browse Directory
+                if col >= p_inner_x + 4 && col < p_inner_x + 7 {
+                    return Some("shortcut_key");
+                }
+                if col >= right_area.x + right_area.width.saturating_sub(6) {
+                    return Some("accent");
+                }
+                return Some("text");
+            }
+            if row == content_start_y + 2 {
+                // Item 3: Notes & Tasks [notes.yml]
+                if col >= p_inner_x + 4 && col < p_inner_x + 7 {
+                    return Some("shortcut_key");
+                }
+                if col >= right_area.x + right_area.width.saturating_sub(18) {
+                    return Some("gutter");
+                }
+                return Some("text");
+            }
+            if row == content_start_y + 3 {
+                // Divider row
+                return Some("divider");
+            }
+            if row == content_start_y + 4 {
+                // Item 4: Exit
+                if col >= p_inner_x + 4 && col < p_inner_x + 7 {
+                    return Some("shortcut_key");
+                }
+                return Some("text");
+            }
+            // Pseudo plugins
+            if content_avail_h >= 6 && row >= plugin_start_y {
+                if row == plugin_start_y {
+                    return Some("divider");
+                }
+                return Some("accent");
+            }
+            Some("text")
+        }
+        PreviewMode::Modals => {
+            let p_avail_w = right_area.width.saturating_sub(4);
+            let p_avail_h = right_area.height.saturating_sub(2);
+            let mod_w = (p_avail_w.saturating_sub(4)).clamp(32, 50);
+            let mod_h = 12_u16.min(p_avail_h);
+            let p_inner_y = right_area.y + 1;
+            let mod_x = p_inner_x + (p_avail_w.saturating_sub(mod_w)) / 2;
+            let mod_y = p_inner_y + (p_avail_h.saturating_sub(mod_h)) / 2;
+            let m_div_y = mod_y + mod_h.saturating_sub(3);
+            let m_gutter_y = mod_y + mod_h.saturating_sub(2);
+
+            if col >= mod_x && col < mod_x + mod_w && row >= mod_y && row < mod_y + mod_h {
+                if row == mod_y {
+                    if col == mod_x {
+                        return Some("border_top_left");
+                    }
+                    if col == mod_x + mod_w - 1 {
+                        return Some("border_top_right");
+                    }
+                    return Some("border_horizontal");
+                }
+                if row == mod_y + mod_h - 1 {
+                    if col == mod_x {
+                        return Some("border_bottom_left");
+                    }
+                    if col == mod_x + mod_w - 1 {
+                        return Some("border_bottom_right");
+                    }
+                    return Some("border_horizontal");
+                }
+                if col == mod_x {
+                    if row == m_div_y {
+                        return Some("left_tee");
+                    }
+                    return Some("border_vertical");
+                }
+                if col == mod_x + mod_w - 1 {
+                    if row == m_div_y {
+                        return Some("right_tee");
+                    }
+                    if row >= mod_y + 3 && row <= mod_y + 5 {
+                        return Some("accent");
+                    }
+                    return Some("border_vertical");
+                }
+                if row == m_div_y {
+                    return Some("divider");
+                }
+                if row == m_gutter_y {
+                    if col < mod_x + mod_w.saturating_sub(12) {
+                        return Some("help_text");
+                    }
+                    return Some("gutter");
+                }
+                if row == mod_y + 2 {
+                    return Some("text");
+                }
+                if row == mod_y + 3 {
+                    return Some("help_text");
+                }
+                if row == mod_y + 5 {
+                    return Some("text");
+                }
+                if row == mod_y + 7 {
+                    if col < mod_x + 18 {
+                        return Some("accent");
+                    }
+                    return Some("text");
+                }
+                return Some("text");
+            }
+            Some("border")
+        }
+        PreviewMode::TextEditor => {
+            if row == right_area.y + 1 {
+                return Some("highlight");
+            }
+            if row == right_area.y + 2 {
+                return Some("border");
+            }
+            if row == right_area.y + right_area.height - 2 {
+                return Some("highlight");
+            }
+            if row == right_area.y + right_area.height - 1 {
+                return Some("gutter");
+            }
+            if col < p_inner_x + 6 {
+                return Some("gutter");
+            }
+            if row == right_area.y + 5 {
+                return Some("highlight");
+            }
+            Some("text")
+        }
+        PreviewMode::MenuEditor => {
+            if col < right_area.x + right_area.width / 2 {
+                if row == right_area.y + 1 {
+                    return Some("accent");
+                }
+                if row == right_area.y + 3 {
+                    return Some("highlight");
+                }
+                Some("text")
+            } else {
+                if row == right_area.y + 1 {
+                    return Some("accent");
+                }
+                Some("text")
+            }
+        }
+    }
 }

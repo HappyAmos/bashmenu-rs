@@ -677,6 +677,8 @@ impl MenuView {
             }
 
             if item.is_divider() {
+                buf.set_string(area.x, row_y, &b.left_tee, border_style);
+                buf.set_string(area.x + area.width - 1, row_y, &b.right_tee, border_style);
                 let div_char = "─";
                 let div_line = div_char.repeat(avail_w);
                 buf.set_line(
@@ -828,6 +830,8 @@ impl MenuView {
             for (p_idx, prow) in self.plugin_rows.iter().take(active_plugin_rows).enumerate() {
                 let py = plugin_start_y + p_idx as u16;
                 if prow.is_divider {
+                    buf.set_string(area.x, py, &b.left_tee, border_style);
+                    buf.set_string(area.x + area.width - 1, py, &b.right_tee, border_style);
                     buf.set_line(
                         inner_x,
                         py,

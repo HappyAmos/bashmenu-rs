@@ -145,3 +145,71 @@ fn test_themeedit_help_text_and_gutter_tokens() {
     state.set_border_token("gutter_top_tee", '┬');
     assert_eq!(state.get_token_value_display(&gutter_top_tee_token), "'┬'");
 }
+
+#[test]
+fn test_themeedit_t_connectors_and_click_selection() {
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(fixture_path, Some("dracula".to_string()));
+
+    // Verify T-connector tokens exist and can be modified
+    let left_tee = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Left T-Connector")
+        .cloned()
+        .expect("Left T-Connector token must exist");
+    state.set_border_token("left_tee", '├');
+    assert_eq!(state.get_token_value_display(&left_tee), "'├'");
+
+    let right_tee = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Right T-Connector")
+        .cloned()
+        .expect("Right T-Connector token must exist");
+    state.set_border_token("right_tee", '┤');
+    assert_eq!(state.get_token_value_display(&right_tee), "'┤'");
+
+    let top_tee = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Top T-Connector")
+        .cloned()
+        .expect("Top T-Connector token must exist");
+    state.set_border_token("top_tee", '┬');
+    assert_eq!(state.get_token_value_display(&top_tee), "'┬'");
+
+    let bottom_tee = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Bottom T-Connector")
+        .cloned()
+        .expect("Bottom T-Connector token must exist");
+    state.set_border_token("bottom_tee", '┴');
+    assert_eq!(state.get_token_value_display(&bottom_tee), "'┴'");
+
+    // Verify click selection / focus by key
+    assert!(state.select_token_by_key("highlight"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Highlight Color");
+
+    assert!(state.select_token_by_key("left_tee"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Left T-Connector");
+
+    assert!(state.select_token_by_key("right_tee"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Right T-Connector");
+
+    assert!(state.select_token_by_key("help_text"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Help Text Color");
+
+    assert!(state.select_token_by_key("gutter"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Gutter Color");
+
+    assert!(state.select_token_by_key("shortcut_key"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Shortcut Color");
+
+    assert!(state.select_token_by_key("divider"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Divider Color");
+
+    assert!(state.select_token_by_key("indicator"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Cursor Indicator");
+}

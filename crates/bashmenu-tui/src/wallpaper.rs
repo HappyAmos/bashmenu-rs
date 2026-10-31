@@ -9,7 +9,6 @@ use image::{imageops, Rgb, RgbImage};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Color;
-use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 /// Converts a Ratatui `Color` to an approximate RGB triplet `(r, g, b)`.
@@ -462,20 +461,15 @@ pub fn composite_buffer(area: Rect, buf: &mut Buffer, grid: &WallpaperGrid, them
         let gy = r;
         let y = area.y + r as u16;
 
-        // 1. Identify space runs on this row to distinguish padding from word spaces
-        let mut is_space = Vec::with_capacity(w);
+        // 1. Identify padding cells: runs of 2+ spaces, leading spaces, trailing spaces, or blank rows
+        let mut is_padding = vec![false; w];
+        let mut start_idx = None;
 
         for c in 0..w {
             let x = area.x + c as u16;
             let sym = buf[(x, y)].symbol();
-            is_space.push(sym == " " || sym.is_empty());
-        }
+            let space = sym == " " || sym.is_empty();
 
-        // Identify padding cells: runs of 2+ spaces, leading spaces, trailing spaces, or blank rows
-        let mut is_padding = HashSet::new();
-        let mut start_idx = None;
-
-        for (c, &space) in is_space.iter().enumerate() {
             if space {
                 if start_idx.is_none() {
                     start_idx = Some(c);
@@ -483,22 +477,18 @@ pub fn composite_buffer(area: Rect, buf: &mut Buffer, grid: &WallpaperGrid, them
             } else if let Some(s) = start_idx {
                 let len = c - s;
                 if len >= 2 || s == 0 {
-                    for idx in s..c {
-                        is_padding.insert(idx);
-                    }
+                    is_padding[s..c].fill(true);
                 }
                 start_idx = None;
             }
         }
         if let Some(s) = start_idx {
             // Trailing spaces to end of row
-            for idx in s..w {
-                is_padding.insert(idx);
-            }
+            is_padding[s..w].fill(true);
         }
 
         // 2. Composite cells
-        for c in 0..w {
+        for (c, &padding) in is_padding.iter().enumerate().take(w) {
             let gx = c;
             let x = area.x + c as u16;
 
@@ -516,7 +506,7 @@ pub fn composite_buffer(area: Rect, buf: &mut Buffer, grid: &WallpaperGrid, them
                 continue;
             }
 
-            if is_padding.contains(&c) {
+            if padding {
                 // Padding space: render half-block with wallpaper top and bottom pixels
                 cell.set_symbol("▀");
                 cell.fg = wp.upper;

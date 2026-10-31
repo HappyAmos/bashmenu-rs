@@ -165,6 +165,22 @@ impl ThemeEditorState {
                 kind: TokenKind::Border("border_bottom_right".to_string()),
             },
             TokenItem {
+                label: "Left T-Connector".to_string(),
+                kind: TokenKind::Border("left_tee".to_string()),
+            },
+            TokenItem {
+                label: "Right T-Connector".to_string(),
+                kind: TokenKind::Border("right_tee".to_string()),
+            },
+            TokenItem {
+                label: "Top T-Connector".to_string(),
+                kind: TokenKind::Border("top_tee".to_string()),
+            },
+            TokenItem {
+                label: "Bottom T-Connector".to_string(),
+                kind: TokenKind::Border("bottom_tee".to_string()),
+            },
+            TokenItem {
                 label: "Gutter Border".to_string(),
                 kind: TokenKind::Border("gutter_border".to_string()),
             },
@@ -212,6 +228,10 @@ impl ThemeEditorState {
             border_top_right: Some("┐".to_string()),
             border_bottom_left: Some("└".to_string()),
             border_bottom_right: Some("┘".to_string()),
+            left_tee: Some("├".to_string()),
+            right_tee: Some("┤".to_string()),
+            top_tee: Some("┬".to_string()),
+            bottom_tee: Some("┴".to_string()),
             ..Default::default()
         };
         t.window = Some(borders);
@@ -298,6 +318,10 @@ impl ThemeEditorState {
                         "border_top_right" => win.border_top_right.as_deref(),
                         "border_bottom_left" => win.border_bottom_left.as_deref(),
                         "border_bottom_right" => win.border_bottom_right.as_deref(),
+                        "left_tee" => win.left_tee.as_deref(),
+                        "right_tee" => win.right_tee.as_deref(),
+                        "top_tee" => win.top_tee.as_deref(),
+                        "bottom_tee" => win.bottom_tee.as_deref(),
                         "gutter_border" => win.gutter_border.as_deref(),
                         "gutter_separator" => win.gutter_separator.as_deref(),
                         "gutter_left_tee" => win.gutter_left_tee.as_deref(),
@@ -351,6 +375,10 @@ impl ThemeEditorState {
                 "border_top_right" => win.border_top_right = str_val,
                 "border_bottom_left" => win.border_bottom_left = str_val,
                 "border_bottom_right" => win.border_bottom_right = str_val,
+                "left_tee" => win.left_tee = str_val,
+                "right_tee" => win.right_tee = str_val,
+                "top_tee" => win.top_tee = str_val,
+                "bottom_tee" => win.bottom_tee = str_val,
                 "gutter_border" => win.gutter_border = str_val,
                 "gutter_separator" => win.gutter_separator = str_val,
                 "gutter_left_tee" => win.gutter_left_tee = str_val,
@@ -371,5 +399,19 @@ impl ThemeEditorState {
         self.is_modified = false;
         self.status_message = format!("Saved theme '{}' directly to disk", self.current_name);
         Ok(())
+    }
+
+    /// Focuses/selects the token corresponding to the given style or border key
+    pub fn select_token_by_key(&mut self, key: &str) -> bool {
+        if let Some(idx) = self.tokens.iter().position(|t| match &t.kind {
+            TokenKind::Color(k) => k == key,
+            TokenKind::Border(k) => k == key,
+            TokenKind::Indicator => key == "indicator",
+        }) {
+            self.selected_idx = idx;
+            self.status_message = format!("Focused: {}", self.tokens[idx].label);
+            return true;
+        }
+        false
     }
 }
