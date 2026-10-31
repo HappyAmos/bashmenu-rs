@@ -79,16 +79,7 @@ pub fn resolve_notebook_path(raw_path: Option<&str>, ctx: &MacroContext) -> Path
         return p;
     }
 
-    let cand1 = notebooks_dir.join(&p);
-    if cand1.exists() {
-        return cand1;
-    }
-    let cand2 = ctx.bashmenu_dir.join(&p);
-    if cand2.exists() {
-        return cand2;
-    }
-
-    // Check user config directory fallback (~/.config/bashmenu/notebooks/...)
+    // 1st Priority: ~/.config/bashmenu/notebooks/ or ~/.config/bashmenu/
     if let Some(file_name) = p.file_name() {
         let user_cfg_nb = ctx
             .home_dir
@@ -101,6 +92,16 @@ pub fn resolve_notebook_path(raw_path: Option<&str>, ctx: &MacroContext) -> Path
         if user_cfg_root.exists() {
             return user_cfg_root;
         }
+    }
+
+    // 2nd Priority: {bashmenu_dir}/notebooks/ or {bashmenu_dir}/
+    let cand1 = notebooks_dir.join(&p);
+    if cand1.exists() {
+        return cand1;
+    }
+    let cand2 = ctx.bashmenu_dir.join(&p);
+    if cand2.exists() {
+        return cand2;
     }
 
     if p.is_absolute() {

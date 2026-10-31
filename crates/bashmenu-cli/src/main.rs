@@ -51,22 +51,31 @@ enum ActiveModal {
 }
 
 fn resolve_file_path(target: &Path) -> PathBuf {
-    if target.exists() {
+    if target.is_absolute() {
         return target.to_path_buf();
     }
-    if let Ok(dir) = std::env::var("BASHMENU_DIR") {
-        let candidate = PathBuf::from(dir).join(target);
-        if candidate.exists() {
-            return candidate;
-        }
+    if target.components().count() > 1 && target.exists() {
+        return target.to_path_buf();
     }
+    // 1st Priority: ~/.config/bashmenu/
     if let Ok(home) = std::env::var("HOME") {
         let user_cfg = PathBuf::from(home).join(".config/bashmenu").join(target);
         if user_cfg.exists() {
             return user_cfg;
         }
     }
-    // Check fixtures directory fallback
+    // 2nd Priority: {bashmenu_dir}/
+    if let Ok(dir) = std::env::var("BASHMENU_DIR") {
+        let candidate = PathBuf::from(dir).join(target);
+        if candidate.exists() {
+            return candidate;
+        }
+    }
+    // 3rd Priority: current working directory
+    if target.exists() {
+        return target.to_path_buf();
+    }
+    // 4th Priority: fixtures fallback
     let fixture_path = PathBuf::from("tests/fixtures").join(target);
     if fixture_path.exists() {
         return fixture_path;
