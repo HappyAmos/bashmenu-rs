@@ -198,3 +198,87 @@ fn test_editor_buffer_tilde_expansion() {
     let path = buf.file_path.unwrap();
     assert_eq!(path, PathBuf::from(&home).join(".bashrc"));
 }
+
+#[test]
+fn test_editor_buffer_undo_redo() {
+    let mut buf = EditorBuffer::new_empty();
+    buf.insert_char('a');
+    buf.insert_char('b');
+    buf.insert_char('c');
+    assert_eq!(buf.lines[0], "abc");
+
+    assert!(buf.undo());
+    assert_eq!(buf.lines[0], "ab");
+
+    assert!(buf.undo());
+    assert_eq!(buf.lines[0], "a");
+
+    assert!(buf.redo());
+    assert_eq!(buf.lines[0], "ab");
+
+    assert!(buf.redo());
+    assert_eq!(buf.lines[0], "abc");
+}
+
+#[test]
+fn test_editor_buffer_cut_copy_paste() {
+    let mut buf = EditorBuffer::new_empty();
+    for ch in "hello world".chars() {
+        buf.insert_char(ch);
+    }
+    assert_eq!(buf.lines[0], "hello world");
+
+    let mut cutbuffer = Vec::new();
+    // Mark selection of "world" (col 6..11)
+    buf.cursor_col = 6;
+    buf.toggle_mark();
+    buf.cursor_col = 11;
+    assert!(buf.get_selection_range().is_some());
+
+    // Cut selection
+    assert!(buf.cut(&mut cutbuffer));
+    assert_eq!(cutbuffer, vec!["world"]);
+    assert_eq!(buf.lines[0], "hello ");
+
+    // Move to beginning and paste
+    buf.cursor_col = 0;
+    assert!(buf.paste(&cutbuffer));
+    assert_eq!(buf.lines[0], "worldhello ");
+}
+
+#[test]
+fn test_editor_buffer_search() {
+    let mut buf = EditorBuffer::new_empty();
+    buf.lines = vec![
+        "First line".to_string(),
+        "Second target line".to_string(),
+        "Third line".to_string(),
+    ];
+    buf.cursor_row = 0;
+    buf.cursor_col = 0;
+
+    assert!(buf.search("target"));
+    assert_eq!(buf.cursor_row, 1);
+    assert_eq!(buf.cursor_col, 7);
+
+    assert!(!buf.search("nonexistent"));
+}
+
+#[test]
+fn test_editor_buffer_paragraph_navigation() {
+    let mut buf = EditorBuffer::new_empty();
+    buf.lines = vec![
+        "Para 1 line 1".to_string(),
+        "Para 1 line 2".to_string(),
+        "".to_string(),
+        "Para 2 line 1".to_string(),
+    ];
+    buf.cursor_row = 0;
+    buf.cursor_col = 0;
+
+    buf.move_paragraph_down();
+    assert_eq!(buf.cursor_row, 3);
+
+    buf.move_paragraph_up();
+    assert_eq!(buf.cursor_row, 0);
+}

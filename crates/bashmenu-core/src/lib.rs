@@ -1,6 +1,7 @@
 //! Core domain models, configuration loaders, serializers, and macro engines for BashMenu.
 
 pub mod config;
+pub mod constants;
 pub mod error;
 pub mod glyph;
 pub mod macro_engine;
@@ -10,6 +11,7 @@ pub mod plugin;
 pub mod theme;
 
 pub use config::{load_config, save_config, BashMenuConfig, Settings, CONFIG_HEADER};
+pub use constants::*;
 pub use error::{BashMenuError, Result};
 pub use glyph::{
     cp437_to_char, format_icon_slot, normalize_variation_selectors, parse_ascii_val, resolve_glyph,

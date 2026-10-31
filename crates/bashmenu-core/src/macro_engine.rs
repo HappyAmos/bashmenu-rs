@@ -354,7 +354,7 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
             .settings
             .scripts_dir
             .clone()
-            .unwrap_or_else(|| "{bashmenu_dir}/scripts".to_string());
+            .unwrap_or_else(|| format!("{}/scripts", ctx.bashmenu_dir.display()));
         direct_map.insert("{scripts_dir}", scripts_dir.clone());
         direct_map.insert("{scripts}", scripts_dir);
     }
@@ -364,7 +364,7 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
             .settings
             .templates_dir
             .clone()
-            .unwrap_or_else(|| "{bashmenu_dir}/templates".to_string());
+            .unwrap_or_else(|| format!("{}/templates", ctx.bashmenu_dir.display()));
         direct_map.insert("{templates_dir}", templates_dir.clone());
         direct_map.insert("{templates}", templates_dir);
     }
@@ -374,7 +374,7 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
             .settings
             .cache_dir
             .clone()
-            .unwrap_or_else(|| "{home}/.cache/bashmenu".to_string());
+            .unwrap_or_else(|| format!("{}/.cache/bashmenu", ctx.home_dir.display()));
         direct_map.insert("{cache_dir}", cache_dir.clone());
         direct_map.insert("{cache}", cache_dir);
     }

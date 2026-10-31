@@ -1,4 +1,4 @@
-//! File and directory browser modal dialog.
+//! Interactive file and directory picker dialog
 
 use super::frame::render_modal_frame;
 use crate::style::ResolvedThemeStyles;
@@ -26,12 +26,21 @@ pub struct FilePickerModal {
     pub selected_idx: usize,
     pub scroll_offset: usize,
     pub only_dirs: bool,
+    pub allow_new: bool,
+    pub creating_new: bool,
+    pub new_name_input: String,
 }
 
 impl FilePickerModal {
     pub fn new(title: impl Into<String>, start_dir: &Path, only_dirs: bool) -> Self {
         let current_dir = if start_dir.is_dir() {
             start_dir.to_path_buf()
+        } else if let Some(parent) = start_dir.parent() {
+            if parent.is_dir() {
+                parent.to_path_buf()
+            } else {
+                std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/"))
+            }
         } else {
             std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/"))
         };
@@ -43,9 +52,18 @@ impl FilePickerModal {
             selected_idx: 0,
             scroll_offset: 0,
             only_dirs,
+            allow_new: false,
+            creating_new: false,
+            new_name_input: String::new(),
         };
         picker.refresh_entries();
         picker
+    }
+
+    /// Builder method to allow creating new files or folders
+    pub fn with_allow_new(mut self, allow_new: bool) -> Self {
+        self.allow_new = allow_new;
+        self
     }
 
     /// Reload directory entries
@@ -53,6 +71,15 @@ impl FilePickerModal {
         self.items.clear();
         self.selected_idx = 0;
         self.scroll_offset = 0;
+
+        // Current directory selection for directory pickers
+        if self.only_dirs {
+            self.items.push(DirItem {
+                name: "[ Select Current Directory ]".to_string(),
+                is_dir: false,
+                path: self.current_dir.clone(),
+            });
+        }
 
         // Parent directory item
         if let Some(parent) = self.current_dir.parent() {
@@ -96,22 +123,57 @@ impl FilePickerModal {
     /// - `Some(None)` when cancelled
     /// - `None` while open
     pub fn handle_key(&mut self, code: KeyCode) -> Option<Option<PathBuf>> {
-        match code {
-            KeyCode::Up | KeyCode::Char('k') => {
-                if self.selected_idx > 0 {
-                    self.selected_idx -= 1;
+        if self.creating_new {
+            match code {
+                KeyCode::Esc => {
+                    self.creating_new = false;
+                    self.new_name_input.clear();
+                    None
                 }
-                None
-            }
-            KeyCode::Down | KeyCode::Char('j') => {
-                if !self.items.is_empty() && self.selected_idx + 1 < self.items.len() {
-                    self.selected_idx += 1;
+                KeyCode::Enter => {
+                    let trimmed = self.new_name_input.trim();
+                    if !trimmed.is_empty() {
+                        let path = self.current_dir.join(trimmed);
+                        self.creating_new = false;
+                        self.new_name_input.clear();
+                        Some(Some(path))
+                    } else {
+                        None
+                    }
                 }
-                None
+                KeyCode::Backspace => {
+                    self.new_name_input.pop();
+                    None
+                }
+                KeyCode::Char(c) => {
+                    self.new_name_input.push(c);
+                    None
+                }
+                _ => None,
             }
-            KeyCode::Enter => self.activate_selected(),
-            KeyCode::Esc => Some(None),
-            _ => None,
+        } else {
+            match code {
+                KeyCode::Char('n') | KeyCode::Char('N') if self.allow_new => {
+                    self.creating_new = true;
+                    self.new_name_input.clear();
+                    None
+                }
+                KeyCode::Up | KeyCode::Char('k') => {
+                    if self.selected_idx > 0 {
+                        self.selected_idx -= 1;
+                    }
+                    None
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    if !self.items.is_empty() && self.selected_idx + 1 < self.items.len() {
+                        self.selected_idx += 1;
+                    }
+                    None
+                }
+                KeyCode::Enter => self.activate_selected(),
+                KeyCode::Esc => Some(None),
+                _ => None,
+            }
         }
     }
 
@@ -226,14 +288,26 @@ impl FilePickerModal {
             buf.set_line(inner.x + 1, row_y, &line, list_w as u16);
         }
 
-        // 3. Bottom controls
+        // 3. Bottom controls / New File input
         let btn_y = inner.y + inner.height.saturating_sub(1);
-        buf.set_string(
-            inner.x + 2,
-            btn_y,
-            "[Enter] Select / Enter   [Esc] Cancel",
-            styles.gutter,
-        );
+        if self.creating_new {
+            let prompt = format!(" New file name: [{}]_ ", self.new_name_input);
+            buf.set_string(inner.x + 2, btn_y, &prompt, styles.highlight);
+        } else if self.allow_new {
+            buf.set_string(
+                inner.x + 2,
+                btn_y,
+                "[Enter] Select / Enter   [n] New File   [Esc] Cancel",
+                styles.gutter,
+            );
+        } else {
+            buf.set_string(
+                inner.x + 2,
+                btn_y,
+                "[Enter] Select / Enter   [Esc] Cancel",
+                styles.gutter,
+            );
+        }
 
         inner
     }

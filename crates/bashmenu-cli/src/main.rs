@@ -838,17 +838,22 @@ fn main() -> Result<()> {
                                     .or(item.script.as_ref())
                                     .map(|s| s.as_str())
                                     .unwrap_or_default();
-                                if target_raw.contains("{file_picker") {
+                                if target_raw.contains("{file_picker")
+                                    || target_raw.contains("{dir_picker")
+                                {
+                                    let is_dir_picker = target_raw.contains("dir_picker");
+                                    let allow_new = target_raw.contains("file_picker_new")
+                                        || target_raw.contains("dir_picker_new");
                                     let start_dir = item.start_dir.as_deref().unwrap_or(".");
                                     let exp_start = interpolate_placeholders(start_dir, &ctx);
-                                    let allow_new = target_raw.contains("file_picker_new");
                                     let raw_title = item.title().unwrap_or("Select File");
                                     let title = interpolate_placeholders(raw_title, &ctx);
                                     let picker = FilePickerModal::new(
                                         title,
                                         &PathBuf::from(exp_start),
-                                        allow_new,
-                                    );
+                                        is_dir_picker,
+                                    )
+                                    .with_allow_new(allow_new);
                                     active_modal = ActiveModal::EditorFilePicker(item, picker);
                                 } else {
                                     let target = interpolate_placeholders(target_raw, &ctx);
