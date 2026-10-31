@@ -815,9 +815,7 @@ impl MenuView {
             if is_active {
                 if let Some(bg) = item_style.bg {
                     for x in inner_x..(inner_x + avail_w as u16) {
-                        if buf[(x, row_y)].bg == ratatui::style::Color::Reset {
-                            buf[(x, row_y)].bg = bg;
-                        }
+                        buf[(x, row_y)].bg = bg;
                     }
                 }
             }

@@ -8,18 +8,18 @@ use crossterm::terminal::{
 };
 use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
-use std::io::{self, Stdout};
+use std::io::{self, BufWriter, Stdout};
 
 /// RAII guard managing terminal state (raw mode, alternate screen, mouse events).
 pub struct TerminalGuard {
-    terminal: Terminal<CrosstermBackend<Stdout>>,
+    terminal: Terminal<CrosstermBackend<BufWriter<Stdout>>>,
 }
 
 impl TerminalGuard {
     /// Initializes terminal in raw mode, on alternate screen with mouse capture.
     pub fn init() -> io::Result<Self> {
         enable_raw_mode()?;
-        let mut stdout = io::stdout();
+        let mut stdout = BufWriter::new(io::stdout());
         execute!(stdout, EnterAlternateScreen, EnableMouseCapture, Hide)?;
         let backend = CrosstermBackend::new(stdout);
         let terminal = Terminal::new(backend)?;
@@ -27,7 +27,7 @@ impl TerminalGuard {
     }
 
     /// Access mutable reference to underlying Ratatui terminal
-    pub fn terminal_mut(&mut self) -> &mut Terminal<CrosstermBackend<Stdout>> {
+    pub fn terminal_mut(&mut self) -> &mut Terminal<CrosstermBackend<BufWriter<Stdout>>> {
         &mut self.terminal
     }
 

@@ -265,6 +265,11 @@ fn main() -> Result<()> {
                     continue;
                 }
             }
+            if let Event::Key(k) = &ev {
+                if k.kind == crossterm::event::KeyEventKind::Release {
+                    continue;
+                }
+            }
             need_redraw = true;
 
             match &mut active_modal {

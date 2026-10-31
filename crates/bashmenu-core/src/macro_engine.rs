@@ -299,6 +299,13 @@ fn lookup_value_path(mut curr: &serde_json::Value, parts: &[&str]) -> Option<Str
     }
 }
 
+static NF_RE: std::sync::LazyLock<Regex> =
+    std::sync::LazyLock::new(|| Regex::new(r"\{nf:[^}]*\}").unwrap());
+static ENV_RE: std::sync::LazyLock<Regex> =
+    std::sync::LazyLock::new(|| Regex::new(r"\{env:([a-zA-Z0-9_]+)\}").unwrap());
+static DOT_RE: std::sync::LazyLock<Regex> =
+    std::sync::LazyLock::new(|| Regex::new(r"\{([a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)+)\}").unwrap());
+
 /// Recursively interpolates macro placeholders within a text string.
 pub fn interpolate_placeholders(text: &str, ctx: &MacroContext) -> String {
     interpolate_internal(text, ctx, 0)
@@ -314,148 +321,223 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
 
     // 2. Adaptive glyph: {nf:...}
     if res.contains("{nf:") {
-        let nf_re = Regex::new(r"\{nf:[^}]*\}").unwrap();
         let use_nerd = ctx.config.settings.use_nerd_fonts.unwrap_or(false);
-        res = nf_re
+        res = NF_RE
             .replace_all(&res, |caps: &Captures| resolve_glyph(&caps[0], use_nerd))
             .to_string();
     }
 
     // 3. Environment variables: {env:VAR_NAME}
     if res.contains("{env:") {
-        let env_re = Regex::new(r"\{env:([a-zA-Z0-9_]+)\}").unwrap();
-        res = env_re
+        res = ENV_RE
             .replace_all(&res, |caps: &Captures| {
                 std::env::var(&caps[1]).unwrap_or_default()
             })
             .to_string();
     }
 
-    // 4. Runtime & System Builtins
-    let scripts_dir = ctx
-        .config
-        .settings
-        .scripts_dir
-        .clone()
-        .unwrap_or_else(|| "{bashmenu_dir}/scripts".to_string());
-    let templates_dir = ctx
-        .config
-        .settings
-        .templates_dir
-        .clone()
-        .unwrap_or_else(|| "{bashmenu_dir}/templates".to_string());
-    let cache_dir = ctx
-        .config
-        .settings
-        .cache_dir
-        .clone()
-        .unwrap_or_else(|| "{home}/.cache/bashmenu".to_string());
-    let notebooks_dir = format!("{}/notebooks", ctx.bashmenu_dir.display());
-
-    let user_name = std::env::var("USER").unwrap_or_else(|_| "user".to_string());
-    let host_name = std::env::var("HOSTNAME").unwrap_or_else(|_| "localhost".to_string());
-    let is_root = unsafe { libc::geteuid() } == 0;
-    let user_mode = if is_root { "Root" } else { "User" };
-
-    let times = get_local_time_strings();
-
+    // 4. Runtime & System Builtins (computed lazily only if referenced)
     let mut direct_map: HashMap<&str, String> = HashMap::new();
-    direct_map.insert("{home}", ctx.home_dir.to_string_lossy().to_string());
-    direct_map.insert(
-        "{bashmenu_dir}",
-        ctx.bashmenu_dir.to_string_lossy().to_string(),
-    );
-    direct_map.insert("{scripts_dir}", scripts_dir.clone());
-    direct_map.insert("{scripts}", scripts_dir);
-    direct_map.insert("{templates_dir}", templates_dir.clone());
-    direct_map.insert("{templates}", templates_dir);
-    direct_map.insert("{cache_dir}", cache_dir.clone());
-    direct_map.insert("{cache}", cache_dir);
-    direct_map.insert("{notebooks_dir}", notebooks_dir.clone());
-    direct_map.insert("{notebooks}", notebooks_dir);
 
-    // Shell profiles and editor configs
-    let bashrc = ctx.home_dir.join(".bashrc").to_string_lossy().to_string();
-    let bash_aliases = ctx
-        .home_dir
-        .join(".bash_aliases")
-        .to_string_lossy()
-        .to_string();
-    let zshrc = ctx.home_dir.join(".zshrc").to_string_lossy().to_string();
-    let profile = resolve_profile_path(&ctx.home_dir)
-        .to_string_lossy()
-        .to_string();
-    let bash_profile = resolve_bash_profile_path(&ctx.home_dir)
-        .to_string_lossy()
-        .to_string();
-    let zprofile = ctx.home_dir.join(".zprofile").to_string_lossy().to_string();
-    let shell_profile = resolve_shell_profile(&ctx.home_dir)
-        .to_string_lossy()
-        .to_string();
-    let vimrc = ctx.home_dir.join(".vimrc").to_string_lossy().to_string();
-    let nanorc = ctx.home_dir.join(".nanorc").to_string_lossy().to_string();
+    if res.contains("{home}") {
+        direct_map.insert("{home}", ctx.home_dir.to_string_lossy().to_string());
+    }
+    if res.contains("{bashmenu_dir}") {
+        direct_map.insert(
+            "{bashmenu_dir}",
+            ctx.bashmenu_dir.to_string_lossy().to_string(),
+        );
+    }
+    if res.contains("{scripts_dir}") || res.contains("{scripts}") {
+        let scripts_dir = ctx
+            .config
+            .settings
+            .scripts_dir
+            .clone()
+            .unwrap_or_else(|| "{bashmenu_dir}/scripts".to_string());
+        direct_map.insert("{scripts_dir}", scripts_dir.clone());
+        direct_map.insert("{scripts}", scripts_dir);
+    }
+    if res.contains("{templates_dir}") || res.contains("{templates}") {
+        let templates_dir = ctx
+            .config
+            .settings
+            .templates_dir
+            .clone()
+            .unwrap_or_else(|| "{bashmenu_dir}/templates".to_string());
+        direct_map.insert("{templates_dir}", templates_dir.clone());
+        direct_map.insert("{templates}", templates_dir);
+    }
+    if res.contains("{cache_dir}") || res.contains("{cache}") {
+        let cache_dir = ctx
+            .config
+            .settings
+            .cache_dir
+            .clone()
+            .unwrap_or_else(|| "{home}/.cache/bashmenu".to_string());
+        direct_map.insert("{cache_dir}", cache_dir.clone());
+        direct_map.insert("{cache}", cache_dir);
+    }
+    if res.contains("{notebooks_dir}") || res.contains("{notebooks}") {
+        let notebooks_dir = format!("{}/notebooks", ctx.bashmenu_dir.display());
+        direct_map.insert("{notebooks_dir}", notebooks_dir.clone());
+        direct_map.insert("{notebooks}", notebooks_dir);
+    }
 
-    direct_map.insert("{bashrc}", bashrc);
-    direct_map.insert("{bash_aliases}", bash_aliases);
-    direct_map.insert("{zshrc}", zshrc);
-    direct_map.insert("{profile}", profile);
-    direct_map.insert("{bash_profile}", bash_profile);
-    direct_map.insert("{zprofile}", zprofile);
-    direct_map.insert("{shell_profile}", shell_profile);
-    direct_map.insert("{vimrc}", vimrc);
-    direct_map.insert("{nanorc}", nanorc);
+    // Shell profiles and editor configs (guarded to avoid disk stats per frame)
+    if res.contains("{bashrc}") {
+        direct_map.insert(
+            "{bashrc}",
+            ctx.home_dir.join(".bashrc").to_string_lossy().to_string(),
+        );
+    }
+    if res.contains("{bash_aliases}") {
+        direct_map.insert(
+            "{bash_aliases}",
+            ctx.home_dir
+                .join(".bash_aliases")
+                .to_string_lossy()
+                .to_string(),
+        );
+    }
+    if res.contains("{zshrc}") {
+        direct_map.insert(
+            "{zshrc}",
+            ctx.home_dir.join(".zshrc").to_string_lossy().to_string(),
+        );
+    }
+    if res.contains("{profile}") {
+        direct_map.insert(
+            "{profile}",
+            resolve_profile_path(&ctx.home_dir)
+                .to_string_lossy()
+                .to_string(),
+        );
+    }
+    if res.contains("{bash_profile}") {
+        direct_map.insert(
+            "{bash_profile}",
+            resolve_bash_profile_path(&ctx.home_dir)
+                .to_string_lossy()
+                .to_string(),
+        );
+    }
+    if res.contains("{zprofile}") {
+        direct_map.insert(
+            "{zprofile}",
+            ctx.home_dir.join(".zprofile").to_string_lossy().to_string(),
+        );
+    }
+    if res.contains("{shell_profile}") {
+        direct_map.insert(
+            "{shell_profile}",
+            resolve_shell_profile(&ctx.home_dir)
+                .to_string_lossy()
+                .to_string(),
+        );
+    }
+    if res.contains("{vimrc}") {
+        direct_map.insert(
+            "{vimrc}",
+            ctx.home_dir.join(".vimrc").to_string_lossy().to_string(),
+        );
+    }
+    if res.contains("{nanorc}") {
+        direct_map.insert(
+            "{nanorc}",
+            ctx.home_dir.join(".nanorc").to_string_lossy().to_string(),
+        );
+    }
 
     // Cross-Platform Environment
-    let prefix = std::env::var("PREFIX").unwrap_or_else(|_| "/usr".to_string());
-    let termux_properties = ctx
-        .home_dir
-        .join(".termux/termux.properties")
-        .to_string_lossy()
-        .to_string();
-    let termux_storage = ctx.home_dir.join("storage").to_string_lossy().to_string();
-    let powershell_profile = std::env::var("PROFILE").unwrap_or_else(|_| {
-        ctx.home_dir
-            .join("Documents/PowerShell/Microsoft.PowerShell_profile.ps1")
-            .to_string_lossy()
-            .to_string()
-    });
-    let appdata = std::env::var("APPDATA").unwrap_or_default();
-    let userprofile =
-        std::env::var("USERPROFILE").unwrap_or_else(|_| ctx.home_dir.to_string_lossy().to_string());
-
-    direct_map.insert("{prefix}", prefix);
-    direct_map.insert("{termux_properties}", termux_properties);
-    direct_map.insert("{termux_storage}", termux_storage);
-    direct_map.insert("{powershell_profile}", powershell_profile);
-    direct_map.insert("{appdata}", appdata);
-    direct_map.insert("{userprofile}", userprofile);
+    if res.contains("{prefix}") {
+        let prefix = std::env::var("PREFIX").unwrap_or_else(|_| "/usr".to_string());
+        direct_map.insert("{prefix}", prefix);
+    }
+    if res.contains("{termux_properties}") {
+        direct_map.insert(
+            "{termux_properties}",
+            ctx.home_dir
+                .join(".termux/termux.properties")
+                .to_string_lossy()
+                .to_string(),
+        );
+    }
+    if res.contains("{termux_storage}") {
+        direct_map.insert(
+            "{termux_storage}",
+            ctx.home_dir.join("storage").to_string_lossy().to_string(),
+        );
+    }
+    if res.contains("{powershell_profile}") {
+        let powershell_profile = std::env::var("PROFILE").unwrap_or_else(|_| {
+            ctx.home_dir
+                .join("Documents/PowerShell/Microsoft.PowerShell_profile.ps1")
+                .to_string_lossy()
+                .to_string()
+        });
+        direct_map.insert("{powershell_profile}", powershell_profile);
+    }
+    if res.contains("{appdata}") {
+        direct_map.insert("{appdata}", std::env::var("APPDATA").unwrap_or_default());
+    }
+    if res.contains("{userprofile}") {
+        let userprofile = std::env::var("USERPROFILE")
+            .unwrap_or_else(|_| ctx.home_dir.to_string_lossy().to_string());
+        direct_map.insert("{userprofile}", userprofile);
+    }
 
     // Divider
-    let div_len = ctx.window_width.max(10);
-    direct_map.insert("{divider}", "─".repeat(div_len));
+    if res.contains("{divider}") {
+        let div_len = ctx.window_width.max(10);
+        direct_map.insert("{divider}", "─".repeat(div_len));
+    }
 
-    direct_map.insert("{user}", user_name.clone());
-    direct_map.insert("{username}", user_name);
-    direct_map.insert("{host}", host_name.clone());
-    direct_map.insert("{hostname}", host_name);
-    direct_map.insert("{user-mode}", user_mode.to_string());
-    direct_map.insert("{version}", ctx.config.version.clone());
-    direct_map.insert("{theme}", ctx.config.theme.clone());
-    direct_map.insert("{app.theme}", ctx.config.theme.clone());
+    if res.contains("{user}") || res.contains("{username}") {
+        let user_name = std::env::var("USER").unwrap_or_else(|_| "user".to_string());
+        direct_map.insert("{user}", user_name.clone());
+        direct_map.insert("{username}", user_name);
+    }
+    if res.contains("{host}") || res.contains("{hostname}") {
+        let host_name = std::env::var("HOSTNAME").unwrap_or_else(|_| "localhost".to_string());
+        direct_map.insert("{host}", host_name.clone());
+        direct_map.insert("{hostname}", host_name);
+    }
+    if res.contains("{user-mode}") {
+        let is_root = unsafe { libc::geteuid() } == 0;
+        let user_mode = if is_root { "Root" } else { "User" };
+        direct_map.insert("{user-mode}", user_mode.to_string());
+    }
+    if res.contains("{version}") {
+        direct_map.insert("{version}", ctx.config.version.clone());
+    }
+    if res.contains("{theme}") || res.contains("{app.theme}") {
+        direct_map.insert("{theme}", ctx.config.theme.clone());
+        direct_map.insert("{app.theme}", ctx.config.theme.clone());
+    }
 
-    direct_map.insert("{window_width}", ctx.window_width.to_string());
-    direct_map.insert("{window_height}", ctx.window_height.to_string());
-    direct_map.insert("{screen_width}", ctx.screen_width.to_string());
+    if res.contains("{window_width}") {
+        direct_map.insert("{window_width}", ctx.window_width.to_string());
+    }
+    if res.contains("{window_height}") {
+        direct_map.insert("{window_height}", ctx.window_height.to_string());
+    }
+    if res.contains("{screen_width}") {
+        direct_map.insert("{screen_width}", ctx.screen_width.to_string());
+    }
 
-    direct_map.insert("{date_time_24}", times.date_time_24);
-    direct_map.insert("{date_time_24_short}", times.date_time_24_short);
-    direct_map.insert("{date_time_12}", times.date_time_12);
-    direct_map.insert("{date_time_12_short}", times.date_time_12_short);
-    direct_map.insert("{date}", times.date);
-    direct_map.insert("{time_24}", times.time_24);
-    direct_map.insert("{time_24_short}", times.time_24_short);
-    direct_map.insert("{time_12}", times.time_12);
-    direct_map.insert("{time_12_short}", times.time_12_short);
+    if res.contains("{date") || res.contains("{time") {
+        let times = get_local_time_strings();
+        direct_map.insert("{date_time_24}", times.date_time_24);
+        direct_map.insert("{date_time_24_short}", times.date_time_24_short);
+        direct_map.insert("{date_time_12}", times.date_time_12);
+        direct_map.insert("{date_time_12_short}", times.date_time_12_short);
+        direct_map.insert("{date}", times.date);
+        direct_map.insert("{time_24}", times.time_24);
+        direct_map.insert("{time_24_short}", times.time_24_short);
+        direct_map.insert("{time_12}", times.time_12);
+        direct_map.insert("{time_12_short}", times.time_12_short);
+    }
 
     if res.contains("{localip}") {
         direct_map.insert("{localip}", get_primary_ip());
@@ -484,11 +566,10 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
     }
 
     // 6. Dot notation properties: {user.<key>}, {settings.<key>}, {app.<key>}, etc.
-    if res.contains('{') {
-        let dot_re = Regex::new(r"\{([a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)+)\}").unwrap();
+    if res.contains('.') && res.contains('{') {
         let config_val = serde_json::to_value(ctx.config).unwrap_or(serde_json::Value::Null);
 
-        res = dot_re
+        res = DOT_RE
             .replace_all(&res, |caps: &Captures| {
                 let path = &caps[1];
                 if let Some(val) = resolve_config_dot_path(&config_val, path) {
