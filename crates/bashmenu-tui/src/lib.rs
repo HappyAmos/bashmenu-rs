@@ -2,6 +2,7 @@
 
 pub mod bbcode;
 pub mod borders;
+pub mod gutter;
 pub mod menu_view;
 pub mod modals;
 pub mod style;
@@ -13,6 +14,10 @@ pub use bbcode::{
     truncate_to_width, visible_text_len,
 };
 pub use borders::ResolvedWindowBorders;
+pub use gutter::{
+    format_spread_gutter_line, parse_help_tokens, spread_gutter_line_layout,
+    wrap_spread_help_gutter,
+};
 pub use menu_view::{MenuAction, MenuView};
 pub use modals::{
     compute_modal_inner, is_close_button_clicked, render_modal_frame, AsciiGridModal,

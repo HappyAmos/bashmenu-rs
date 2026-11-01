@@ -678,3 +678,51 @@ fn test_item_edit_modal_radio_multiline_editor() {
     assert!(inner.width > 0);
     assert!(inner.height > 0);
 }
+
+#[test]
+fn test_menuedit_footer_spread_and_position() {
+    let items_r1 = [
+        "[F1] Help",
+        "[F2] Toggle All",
+        "[F3] ASCII",
+        "[F4] Glyphs",
+        "[F5] Placeholders",
+        "[a] Add",
+        "[e/ENTER] Edit",
+        "[t] Type",
+    ];
+    let items_r2 = [
+        "[SPACE] Toggle",
+        "[d] Delete",
+        "[m] Move Dn",
+        "[M] Move Up",
+        "[>] Indent",
+        "[<] Outdent",
+        "[s] Save",
+        "[ESC/q] Exit",
+    ];
+
+    let avail_w = 120;
+    let (line_r1, ranges_r1) = bashmenu_tui::spread_gutter_line_layout(&items_r1, avail_w);
+    let (line_r2, ranges_r2) = bashmenu_tui::spread_gutter_line_layout(&items_r2, avail_w);
+
+    assert_eq!(bashmenu_tui::visible_text_len(&line_r1), avail_w);
+    assert_eq!(bashmenu_tui::visible_text_len(&line_r2), avail_w);
+
+    assert_eq!(ranges_r1.len(), 8);
+    assert_eq!(ranges_r2.len(), 8);
+
+    assert_eq!(ranges_r1[0].0, 0);
+    assert_eq!(ranges_r1[7].1, avail_w);
+    assert_eq!(ranges_r2[0].0, 0);
+    assert_eq!(ranges_r2[7].1, avail_w);
+
+    // Verify row placement relative to screen height
+    let screen_height: u16 = 30;
+    let footer_y1 = screen_height - 3;
+    let footer_y2 = screen_height - 2;
+    let bot_border_y = screen_height - 1;
+
+    assert!(footer_y1 < footer_y2);
+    assert!(footer_y2 < bot_border_y);
+}

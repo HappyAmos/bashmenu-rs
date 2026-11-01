@@ -430,25 +430,30 @@ fn main() -> Result<()> {
                 ("F8 MD Ref", FooterAction::MarkdownReference),
             ];
 
-            let mut cur_x_r1 = inner_x;
-            for (idx, (label, action)) in items_r1.iter().enumerate() {
-                let start_x = cur_x_r1;
-                buf.set_string(cur_x_r1, legend_row1_y, label, styles.accent);
-                cur_x_r1 += label.len() as u16;
-                footer_hit_regions.push(FooterHitRegion {
-                    row: legend_row1_y,
-                    start_x,
-                    end_x: cur_x_r1,
-                    action: *action,
-                });
-                if idx + 1 < items_r1.len() {
-                    buf.set_string(
-                        cur_x_r1,
-                        legend_row1_y,
-                        " | ",
-                        Style::default().fg(Color::DarkGray),
-                    );
-                    cur_x_r1 += 3;
+            let legend_avail_w = (area.width as usize).saturating_sub(2);
+            let labels_r1: Vec<&str> = items_r1.iter().map(|(lbl, _)| *lbl).collect();
+            let (line_r1, ranges_r1) =
+                bashmenu_tui::spread_gutter_line_layout(&labels_r1, legend_avail_w);
+
+            buf.set_string(
+                inner_x,
+                legend_row1_y,
+                &line_r1,
+                Style::default().fg(Color::DarkGray),
+            );
+
+            for (idx, (start, end)) in ranges_r1.into_iter().enumerate() {
+                if idx < items_r1.len() {
+                    let (label, action) = items_r1[idx];
+                    let screen_start = inner_x + start as u16;
+                    let screen_end = inner_x + end as u16;
+                    buf.set_string(screen_start, legend_row1_y, label, styles.accent);
+                    footer_hit_regions.push(FooterHitRegion {
+                        row: legend_row1_y,
+                        start_x: screen_start,
+                        end_x: screen_end,
+                        action,
+                    });
                 }
             }
 
@@ -463,25 +468,29 @@ fn main() -> Result<()> {
                 ("^Q/ESC Exit", FooterAction::Exit),
             ];
 
-            let mut cur_x_r2 = inner_x;
-            for (idx, (label, action)) in items_r2.iter().enumerate() {
-                let start_x = cur_x_r2;
-                buf.set_string(cur_x_r2, legend_row2_y, label, styles.accent);
-                cur_x_r2 += label.len() as u16;
-                footer_hit_regions.push(FooterHitRegion {
-                    row: legend_row2_y,
-                    start_x,
-                    end_x: cur_x_r2,
-                    action: *action,
-                });
-                if idx + 1 < items_r2.len() {
-                    buf.set_string(
-                        cur_x_r2,
-                        legend_row2_y,
-                        " | ",
-                        Style::default().fg(Color::DarkGray),
-                    );
-                    cur_x_r2 += 3;
+            let labels_r2: Vec<&str> = items_r2.iter().map(|(lbl, _)| *lbl).collect();
+            let (line_r2, ranges_r2) =
+                bashmenu_tui::spread_gutter_line_layout(&labels_r2, legend_avail_w);
+
+            buf.set_string(
+                inner_x,
+                legend_row2_y,
+                &line_r2,
+                Style::default().fg(Color::DarkGray),
+            );
+
+            for (idx, (start, end)) in ranges_r2.into_iter().enumerate() {
+                if idx < items_r2.len() {
+                    let (label, action) = items_r2[idx];
+                    let screen_start = inner_x + start as u16;
+                    let screen_end = inner_x + end as u16;
+                    buf.set_string(screen_start, legend_row2_y, label, styles.accent);
+                    footer_hit_regions.push(FooterHitRegion {
+                        row: legend_row2_y,
+                        start_x: screen_start,
+                        end_x: screen_end,
+                        action,
+                    });
                 }
             }
 

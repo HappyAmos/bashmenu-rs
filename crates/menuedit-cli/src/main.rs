@@ -23,6 +23,34 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MenuEditFooterAction {
+    Help,
+    ToggleAll,
+    Ascii,
+    Glyphs,
+    Placeholders,
+    Add,
+    Edit,
+    Type,
+    Toggle,
+    Delete,
+    MoveDown,
+    MoveUp,
+    Indent,
+    Outdent,
+    Save,
+    Exit,
+}
+
+#[derive(Clone, Copy)]
+struct FooterHitRegion {
+    row: u16,
+    start_x: u16,
+    end_x: u16,
+    action: MenuEditFooterAction,
+}
+
 #[derive(Parser, Debug)]
 #[command(
     name = "menuedit",
@@ -148,6 +176,8 @@ fn main() -> Result<()> {
         } else if selected_node_idx >= tree_scroll + max_tree_rows && max_tree_rows > 0 {
             tree_scroll = selected_node_idx.saturating_sub(max_tree_rows - 1);
         }
+
+        let mut footer_hit_regions: Vec<FooterHitRegion> = Vec::new();
 
         guard.terminal_mut().draw(|f| {
             let buf = f.buffer_mut();
@@ -283,10 +313,12 @@ fn main() -> Result<()> {
                         Style::default()
                             .fg(Color::Magenta)
                             .add_modifier(Modifier::BOLD)
-                    } else if line.starts_with("Title/Label:") || line.starts_with("Expanded Title:")
+                    } else if line.starts_with("Title/Label:")
+                        || line.starts_with("Expanded Title:")
                     {
                         Style::default().fg(Color::White)
-                    } else if line.starts_with("Icon/Glyph:") || line.starts_with("Expanded Icon:") {
+                    } else if line.starts_with("Icon/Glyph:") || line.starts_with("Expanded Icon:")
+                    {
                         Style::default().fg(Color::Cyan)
                     } else if line.starts_with("Action/Target:")
                         || line.starts_with("Expanded Action:")
@@ -316,24 +348,80 @@ fn main() -> Result<()> {
                 );
             }
 
-            // Footer (2 Lines matching Python Menuedit)
-            let footer_y1 = area.y + area.height - 2;
-            let footer_y2 = area.y + area.height - 1;
-            let row1_text = " [F1] Help | [F2] Toggle All | [F3] ASCII | [F4] Glyphs | [F5] Placeholders | [a] Add | [e/ENTER] Edit | [t] Type ";
-            let row2_text = " [SPACE] Toggle | [d] Delete | [m] Move Dn | [M] Move Up | [>] Indent | [<] Outdent | [s] Save | [ESC/q] Exit ";
+            // Footer (2 Lines matching Python Menuedit, raised above bottom border)
+            let footer_y1 = (area.y + area.height).saturating_sub(3);
+            let footer_y2 = (area.y + area.height).saturating_sub(2);
+
+            let items_r1 = [
+                ("[F1] Help", MenuEditFooterAction::Help),
+                ("[F2] Toggle All", MenuEditFooterAction::ToggleAll),
+                ("[F3] ASCII", MenuEditFooterAction::Ascii),
+                ("[F4] Glyphs", MenuEditFooterAction::Glyphs),
+                ("[F5] Placeholders", MenuEditFooterAction::Placeholders),
+                ("[a] Add", MenuEditFooterAction::Add),
+                ("[e/ENTER] Edit", MenuEditFooterAction::Edit),
+                ("[t] Type", MenuEditFooterAction::Type),
+            ];
+            let items_r2 = [
+                ("[SPACE] Toggle", MenuEditFooterAction::Toggle),
+                ("[d] Delete", MenuEditFooterAction::Delete),
+                ("[m] Move Dn", MenuEditFooterAction::MoveDown),
+                ("[M] Move Up", MenuEditFooterAction::MoveUp),
+                ("[>] Indent", MenuEditFooterAction::Indent),
+                ("[<] Outdent", MenuEditFooterAction::Outdent),
+                ("[s] Save", MenuEditFooterAction::Save),
+                ("[ESC/q] Exit", MenuEditFooterAction::Exit),
+            ];
+
+            let labels_r1: Vec<&str> = items_r1.iter().map(|(lbl, _)| *lbl).collect();
+            let labels_r2: Vec<&str> = items_r2.iter().map(|(lbl, _)| *lbl).collect();
+
+            let (line_r1, ranges_r1) =
+                bashmenu_tui::spread_gutter_line_layout(&labels_r1, avail_w as usize);
+            let (line_r2, ranges_r2) =
+                bashmenu_tui::spread_gutter_line_layout(&labels_r2, avail_w as usize);
 
             buf.set_string(
                 inner_x,
                 footer_y1,
-                row1_text,
+                &line_r1,
                 Style::default().fg(Color::DarkGray),
             );
+            for (idx, (start, end)) in ranges_r1.into_iter().enumerate() {
+                if idx < items_r1.len() {
+                    let (label, action) = items_r1[idx];
+                    let screen_start = inner_x + start as u16;
+                    let screen_end = inner_x + end as u16;
+                    buf.set_string(screen_start, footer_y1, label, styles.accent);
+                    footer_hit_regions.push(FooterHitRegion {
+                        row: footer_y1,
+                        start_x: screen_start,
+                        end_x: screen_end,
+                        action,
+                    });
+                }
+            }
+
             buf.set_string(
                 inner_x,
                 footer_y2,
-                row2_text,
+                &line_r2,
                 Style::default().fg(Color::DarkGray),
             );
+            for (idx, (start, end)) in ranges_r2.into_iter().enumerate() {
+                if idx < items_r2.len() {
+                    let (label, action) = items_r2[idx];
+                    let screen_start = inner_x + start as u16;
+                    let screen_end = inner_x + end as u16;
+                    buf.set_string(screen_start, footer_y2, label, styles.accent);
+                    footer_hit_regions.push(FooterHitRegion {
+                        row: footer_y2,
+                        start_x: screen_start,
+                        end_x: screen_end,
+                        action,
+                    });
+                }
+            }
 
             if !status_message.is_empty() {
                 let msg_x = (area.x + area.width).saturating_sub(status_message.len() as u16 + 3);
@@ -743,14 +831,201 @@ fn main() -> Result<()> {
                                     continue;
                                 }
 
+                                // Interactive footer clicks
+                                if let Some(hit) = footer_hit_regions.iter().find(|r| {
+                                    r.row == m.row && m.column >= r.start_x && m.column < r.end_x
+                                }) {
+                                    match hit.action {
+                                        MenuEditFooterAction::Help => {
+                                            active_modal = ActiveModal::Help(HelpModal::new(
+                                                "Visual Menu Editor Guide",
+                                                ITEM_EDIT_HELP_TEXT,
+                                            ));
+                                        }
+                                        MenuEditFooterAction::ToggleAll => {
+                                            toggle_all_nodes(&menu, &mut expanded_paths);
+                                            status_message = "Toggled all branches".to_string();
+                                        }
+                                        MenuEditFooterAction::Ascii => {
+                                            active_modal = ActiveModal::AsciiPicker(
+                                                AsciiGridModal::new("ASCII Character Table", 196),
+                                            );
+                                        }
+                                        MenuEditFooterAction::Glyphs => {
+                                            active_modal = ActiveModal::GlyphSearch(InputModal::new(
+                                                "Search Nerd Font & Emoji",
+                                                "Enter glyph search term (e.g. arrow, folder, python):",
+                                                "",
+                                            ));
+                                        }
+                                        MenuEditFooterAction::Placeholders => {
+                                            active_modal = ActiveModal::Help(HelpModal::new(
+                                                "Placeholders & Macros",
+                                                PLACEHOLDER_HELP_TEXT,
+                                            ));
+                                        }
+                                        MenuEditFooterAction::Add => {
+                                            active_modal = ActiveModal::TypePicker(
+                                                ItemTypePickerModal::new("command"),
+                                                None,
+                                            );
+                                        }
+                                        MenuEditFooterAction::Edit => {
+                                            if let Some(node) = visible_nodes.get(selected_node_idx)
+                                            {
+                                                active_modal = ActiveModal::ItemEdit(
+                                                    Box::new(ItemEditModal::new(&node.item)),
+                                                    node.path.clone(),
+                                                    None,
+                                                );
+                                            }
+                                        }
+                                        MenuEditFooterAction::Type => {
+                                            if let Some(node) = visible_nodes.get(selected_node_idx)
+                                            {
+                                                active_modal = ActiveModal::TypePicker(
+                                                    ItemTypePickerModal::new("command"),
+                                                    Some(node.path.clone()),
+                                                );
+                                            }
+                                        }
+                                        MenuEditFooterAction::Toggle => {
+                                            if let Some(node) = visible_nodes.get(selected_node_idx)
+                                            {
+                                                if node.has_children {
+                                                    if expanded_paths.contains(&node.path) {
+                                                        expanded_paths.remove(&node.path);
+                                                    } else {
+                                                        expanded_paths.insert(node.path.clone());
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        MenuEditFooterAction::Delete => {
+                                            if let Some(node) = visible_nodes.get(selected_node_idx)
+                                            {
+                                                active_modal = ActiveModal::ConfirmDelete(
+                                                    ConfirmModal::new(
+                                                        "Delete Item",
+                                                        format!(
+                                                            "Are you sure you want to delete '{}'?",
+                                                            node.item.label
+                                                        ),
+                                                    ),
+                                                    node.path.clone(),
+                                                );
+                                            }
+                                        }
+                                        MenuEditFooterAction::MoveDown => {
+                                            if let Some(node) = visible_nodes.get(selected_node_idx)
+                                            {
+                                                if let Some(new_p) =
+                                                    move_down_sibling(&mut menu, &node.path)
+                                                {
+                                                    is_modified = true;
+                                                    status_message = "Moved item down".to_string();
+                                                    let new_vis =
+                                                        flatten_tree(&menu, &expanded_paths);
+                                                    if let Some(pos) =
+                                                        new_vis.iter().position(|n| n.path == new_p)
+                                                    {
+                                                        selected_node_idx = pos;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        MenuEditFooterAction::MoveUp => {
+                                            if let Some(node) = visible_nodes.get(selected_node_idx)
+                                            {
+                                                if let Some(new_p) =
+                                                    move_up_sibling(&mut menu, &node.path)
+                                                {
+                                                    is_modified = true;
+                                                    status_message = "Moved item up".to_string();
+                                                    let new_vis =
+                                                        flatten_tree(&menu, &expanded_paths);
+                                                    if let Some(pos) =
+                                                        new_vis.iter().position(|n| n.path == new_p)
+                                                    {
+                                                        selected_node_idx = pos;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        MenuEditFooterAction::Indent => {
+                                            if let Some(node) = visible_nodes.get(selected_node_idx)
+                                            {
+                                                if let Some(new_p) = indent_item(
+                                                    &mut menu,
+                                                    &node.path,
+                                                    &mut expanded_paths,
+                                                ) {
+                                                    is_modified = true;
+                                                    status_message =
+                                                        "Indented item into submenu".to_string();
+                                                    let new_vis =
+                                                        flatten_tree(&menu, &expanded_paths);
+                                                    if let Some(pos) =
+                                                        new_vis.iter().position(|n| n.path == new_p)
+                                                    {
+                                                        selected_node_idx = pos;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        MenuEditFooterAction::Outdent => {
+                                            if let Some(node) = visible_nodes.get(selected_node_idx)
+                                            {
+                                                if let Some(new_p) =
+                                                    outdent_item(&mut menu, &node.path)
+                                                {
+                                                    is_modified = true;
+                                                    status_message =
+                                                        "Outdented item to parent level"
+                                                            .to_string();
+                                                    let new_vis =
+                                                        flatten_tree(&menu, &expanded_paths);
+                                                    if let Some(pos) =
+                                                        new_vis.iter().position(|n| n.path == new_p)
+                                                    {
+                                                        selected_node_idx = pos;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        MenuEditFooterAction::Save => {
+                                            if let Err(e) = save_menu(&menu_path, &menu) {
+                                                status_message = format!("Save error: {}", e);
+                                            } else {
+                                                is_modified = false;
+                                                status_message = "Saved menu to disk".to_string();
+                                            }
+                                        }
+                                        MenuEditFooterAction::Exit => {
+                                            if is_modified {
+                                                active_modal =
+                                                    ActiveModal::ConfirmExit(ConfirmModal::new(
+                                                        "Unsaved Changes",
+                                                        "You have unsaved changes. Save before exiting?",
+                                                    ));
+                                            } else {
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    continue;
+                                }
+
                                 // Tree panel clicks
                                 let inner_x = area.x + 2;
                                 let inner_y = area.y + 1;
                                 let avail_w = area.width.saturating_sub(4);
+                                let avail_h = area.height.saturating_sub(4);
                                 let left_w = avail_w / 2;
                                 if m.column >= inner_x
                                     && m.column < inner_x + left_w
                                     && m.row > inner_y
+                                    && m.row < inner_y + avail_h.saturating_sub(1)
                                 {
                                     let clicked_row = (m.row - inner_y - 1) as usize;
                                     let global_idx = tree_scroll + clicked_row;

@@ -282,3 +282,42 @@ fn test_editor_buffer_paragraph_navigation() {
     buf.move_paragraph_up();
     assert_eq!(buf.cursor_row, 0);
 }
+
+#[test]
+fn test_editor_legend_row_spread() {
+    let items_r1 = [
+        "F1 Help",
+        "F2 Whitespace",
+        "F3 ASCII",
+        "F4 Colors",
+        "F5 Macros",
+        "F6 MD",
+        "F7 Lineno",
+        "F8 MD Ref",
+    ];
+    let items_r2 = [
+        "^N Tab",
+        "^O Open",
+        "^S Save",
+        "^A SaveAs",
+        "^W Search",
+        "^Z Undo",
+        "Alt+←/→ Tab",
+        "^Q/ESC Exit",
+    ];
+
+    let avail_w = 110;
+    let (line_r1, ranges_r1) = bashmenu_tui::spread_gutter_line_layout(&items_r1, avail_w);
+    let (line_r2, ranges_r2) = bashmenu_tui::spread_gutter_line_layout(&items_r2, avail_w);
+
+    assert_eq!(bashmenu_tui::visible_text_len(&line_r1), avail_w);
+    assert_eq!(bashmenu_tui::visible_text_len(&line_r2), avail_w);
+
+    assert_eq!(ranges_r1.len(), 8);
+    assert_eq!(ranges_r2.len(), 8);
+
+    assert_eq!(ranges_r1[0].0, 0);
+    assert_eq!(ranges_r1[7].1, avail_w);
+    assert_eq!(ranges_r2[0].0, 0);
+    assert_eq!(ranges_r2[7].1, avail_w);
+}

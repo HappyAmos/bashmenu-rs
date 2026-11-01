@@ -3,6 +3,7 @@
 use crate::bbcode::{
     parse_bbcode_spans, split_label_brackets, truncate_to_width, visible_text_len,
 };
+use crate::gutter::wrap_spread_help_gutter;
 use crate::style::ResolvedThemeStyles;
 use crate::wallpaper::{composite_buffer, WallpaperCompositor};
 use bashmenu_core::{
@@ -551,7 +552,7 @@ impl MenuView {
             .map(|s| s.trim())
             .filter(|s| !s.is_empty())
             .collect();
-        let help_lines = wrap_gutter_tokens(&help_tokens, left_gutter_w, 2);
+        let help_lines = wrap_spread_help_gutter(&help_tokens, left_gutter_w, 2);
 
         let status_tokens: Vec<&str> = if self.status_gutter.is_empty() {
             Vec::new()

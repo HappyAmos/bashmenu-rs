@@ -601,48 +601,7 @@ fn parse_bullet_line(line: &str) -> Option<&str> {
 
 /// Wraps footer tokens across lines with equal spacing, treating "|" as a word.
 pub fn wrap_footer_tokens(tokens: &[&str], max_w: usize) -> Vec<String> {
-    if max_w == 0 {
-        return Vec::new();
-    }
-    let mut lines = Vec::new();
-    let mut current_tokens: Vec<&str> = Vec::new();
-    let mut current_len = 0;
-
-    for &tok in tokens {
-        let needed = if current_tokens.is_empty() {
-            tok.len()
-        } else {
-            1 + tok.len()
-        };
-
-        if current_len + needed <= max_w {
-            current_tokens.push(tok);
-            current_len += needed;
-        } else {
-            if current_tokens.last() == Some(&"|") {
-                current_tokens.pop();
-            }
-            if !current_tokens.is_empty() {
-                lines.push(current_tokens.join(" "));
-            }
-            current_tokens.clear();
-            if tok != "|" {
-                current_tokens.push(tok);
-                current_len = tok.len();
-            } else {
-                current_len = 0;
-            }
-        }
-    }
-
-    if current_tokens.last() == Some(&"|") {
-        current_tokens.pop();
-    }
-    if !current_tokens.is_empty() {
-        lines.push(current_tokens.join(" "));
-    }
-
-    lines
+    crate::gutter::wrap_spread_help_gutter(tokens, max_w, 2)
 }
 
 /// Checks whether a line contains a completed task list item `- [x]` or `- [X]`

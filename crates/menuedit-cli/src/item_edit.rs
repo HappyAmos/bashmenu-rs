@@ -1514,22 +1514,32 @@ impl ItemEditModal {
         let footer_y1 = inner.y + inner.height.saturating_sub(2);
         let footer_y2 = inner.y + inner.height.saturating_sub(1);
 
-        let row1_text = " [F1] Help | [CTRL+S / F2] Save | [CTRL+T] Type | [CTRL+A / F3] ASCII ";
-        let row2_text = " [CTRL+N / F4] Glyphs | [CTRL+P / F5] Placeholders | [ESC / C] Cancel ";
+        let items_r1 = [
+            "[F1] Help",
+            "[CTRL+S / F2] Save",
+            "[CTRL+T] Type",
+            "[CTRL+A / F3] ASCII",
+        ];
+        let items_r2 = [
+            "[CTRL+N / F4] Glyphs",
+            "[CTRL+P / F5] Placeholders",
+            "[ESC / C] Cancel",
+        ];
 
-        let f1_x = inner.x + (inner.width.saturating_sub(row1_text.len() as u16)) / 2;
-        let f2_x = inner.x + (inner.width.saturating_sub(row2_text.len() as u16)) / 2;
+        let footer_w = inner.width.saturating_sub(2) as usize;
+        let spread_r1 = bashmenu_tui::format_spread_gutter_line(&items_r1, footer_w);
+        let spread_r2 = bashmenu_tui::format_spread_gutter_line(&items_r2, footer_w);
 
         buf.set_string(
-            f1_x,
+            inner.x + 1,
             footer_y1,
-            row1_text,
+            spread_r1,
             Style::default().fg(Color::DarkGray),
         );
         buf.set_string(
-            f2_x,
+            inner.x + 1,
             footer_y2,
-            row2_text,
+            spread_r2,
             Style::default().fg(Color::DarkGray),
         );
 
