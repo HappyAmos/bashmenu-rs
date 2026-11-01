@@ -48,6 +48,7 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
     - `crates/menuedit-cli`: Visual menu tree editor executable (`menuedit`).
     - `crates/themeedit-cli`: Visual theme and palette editor executable (`themeedit`).
     - `crates/bashedit-cli`: Full-screen terminal text editor executable (`bashedit`).
+    - `crates/bmpager-cli`: Standalone native terminal pager with CommonMark markdown and OSC 8 hyperlink rendering (`bmpager`).
     - `crates/ymlcheck-cli`: Schema validator and linter executable (`ymlcheck`).
   - Tests: Unit tests are colocated in modules (`#[cfg(test)] mod tests`); integration tests reside in `crates/<crate>/tests/` or top-level `tests/`.
   - Extension Scripts: Standalone games, plugins, and helper tools must reside in `scripts/`, never in root. Menu actions reference them via `{scripts_dir}/<name>`.
@@ -129,6 +130,15 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
     - The option text may utilize the entire available width up to `avail_w` (`label_avail_w = std::cmp::max(5, avail_w.saturating_sub(prefix_w))`).
     - *Unselected Items:* Overflowing text truncates with an ellipsis (`…`).
     - *Selected Items:* Overflows marquee across the full available row width.
+  - **Marquee Tick Rate & Inactivity:**
+    - Main loop timer ticks every 250ms (4Hz).
+    - Reset ticker offset to 0 and restore 4-tick pause whenever row selection shifts.
+    - Pause marquee updates completely while any modal dialog or secondary screen is displayed.
+- **Toast Notification Rack Standards:**
+  - Docked at bottom-right corner (`max_w = (avail_w / 2).clamp(28, 60)`).
+  - Left boundary uses `▌` (`\u{258c}`) styled according to severity (`#4ebf71` Info, `#ffb86c` Warning, `#ff5555` Error).
+  - Interpolates nested placeholders recursively before mounting.
+  - Auto-expires on timeout; mouse click anywhere in bounding box dismisses instantly.
 
 ---
 
