@@ -322,10 +322,20 @@ pub fn load_themes<P: AsRef<Path>>(path: P) -> Result<ThemeCollection> {
     Ok(themes)
 }
 
-/// Saves theme collection to disk.
+/// Saves theme collection to disk in alphabetical order.
 pub fn save_themes<P: AsRef<Path>>(path: P, themes: &ThemeCollection) -> Result<()> {
     let p = path.as_ref();
-    let yaml_body = serde_yml::to_string(themes)?;
+    let mut entries: Vec<(&String, &Theme)> = themes.iter().collect();
+    entries.sort_by(|(a, _), (b, _)| {
+        a.to_ascii_lowercase()
+            .cmp(&b.to_ascii_lowercase())
+            .then_with(|| a.cmp(b))
+    });
+    let mut map = serde_yml::Mapping::new();
+    for (k, v) in entries {
+        map.insert(serde_yml::Value::String(k.clone()), serde_yml::to_value(v)?);
+    }
+    let yaml_body = serde_yml::to_string(&map)?.replace(": =\n", ": '='\n");
     fs::write(p, yaml_body).map_err(|e| BashMenuError::Io {
         path: p.to_path_buf(),
         source: e,

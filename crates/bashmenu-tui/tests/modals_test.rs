@@ -1354,3 +1354,34 @@ fn test_input_modal_masked_rendering() {
         "Asterisks matching input length must appear in rendered buffer when masked"
     );
 }
+
+#[test]
+fn test_theme_picker_alphabetical_order() {
+    use bashmenu_tui::ThemePickerModal;
+
+    let unsorted = vec![
+        "synthwave".to_string(),
+        "Test".to_string(),
+        "alaska-mountain".to_string(),
+        "dracula".to_string(),
+        "Cyberpunk".to_string(),
+        "nord".to_string(),
+        "tangyle".to_string(),
+        "tokyo_night".to_string(),
+    ];
+    let picker = ThemePickerModal::new(unsorted, "dracula");
+    assert_eq!(
+        picker.themes,
+        vec![
+            "alaska-mountain",
+            "Cyberpunk",
+            "dracula",
+            "nord",
+            "synthwave",
+            "tangyle",
+            "Test",
+            "tokyo_night",
+        ]
+    );
+    assert_eq!(picker.selected_idx, 2);
+}

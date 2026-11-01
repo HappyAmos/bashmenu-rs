@@ -149,7 +149,11 @@ impl ThemeEditorState {
                     Some("dracula".to_string())
                 } else {
                     let mut sorted: Vec<_> = themes.keys().cloned().collect();
-                    sorted.sort();
+                    sorted.sort_by(|a, b| {
+                        a.to_ascii_lowercase()
+                            .cmp(&b.to_ascii_lowercase())
+                            .then_with(|| a.cmp(b))
+                    });
                     sorted.into_iter().next()
                 }
             })
@@ -795,7 +799,11 @@ impl ThemeEditorState {
                 "dracula".to_string()
             } else {
                 let mut sorted: Vec<_> = self.themes.keys().cloned().collect();
-                sorted.sort();
+                sorted.sort_by(|a, b| {
+                    a.to_ascii_lowercase()
+                        .cmp(&b.to_ascii_lowercase())
+                        .then_with(|| a.cmp(b))
+                });
                 sorted
                     .into_iter()
                     .next()
@@ -876,7 +884,11 @@ impl ThemeEditorState {
             return;
         }
         let mut sorted: Vec<_> = self.themes.keys().cloned().collect();
-        sorted.sort();
+        sorted.sort_by(|a, b| {
+            a.to_ascii_lowercase()
+                .cmp(&b.to_ascii_lowercase())
+                .then_with(|| a.cmp(b))
+        });
         if let Some(pos) = sorted.iter().position(|k| k == &self.current_name) {
             let next_idx = if forward {
                 (pos + 1) % sorted.len()

@@ -17,13 +17,22 @@ pub struct ThemePickerModal {
 
 impl ThemePickerModal {
     pub fn new(mut themes: Vec<String>, current_theme: &str) -> Self {
-        themes.sort();
+        Self::sort_themes(&mut themes);
         let selected_idx = themes.iter().position(|t| t == current_theme).unwrap_or(0);
         Self {
             themes,
             selected_idx,
             scroll_offset: selected_idx.saturating_sub(5),
         }
+    }
+
+    /// Sorts theme names alphabetically (case-insensitively, with deterministic tie-breaking).
+    pub fn sort_themes(themes: &mut [String]) {
+        themes.sort_by(|a, b| {
+            a.to_ascii_lowercase()
+                .cmp(&b.to_ascii_lowercase())
+                .then_with(|| a.cmp(b))
+        });
     }
 
     /// Handles keyboard input.
