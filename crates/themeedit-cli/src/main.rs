@@ -1503,7 +1503,7 @@ fn hit_test_preview(
                 if row == plugin_start_y {
                     return Some(("divider", row, p_inner_x, p_inner_x + p_avail_w));
                 }
-                return Some(("accent", row, p_inner_x, p_inner_x + p_avail_w));
+                return Some(("plugin", row, p_inner_x, p_inner_x + p_avail_w));
             }
             Some((
                 "background",

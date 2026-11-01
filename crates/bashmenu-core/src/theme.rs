@@ -299,6 +299,7 @@ impl Theme {
         colors.insert("shortcut_key".to_string(), make_pair(255, -1));
         colors.insert("gutter".to_string(), make_pair(242, -1));
         colors.insert("help_text".to_string(), make_pair(250, -1));
+        colors.insert("plugin".to_string(), make_pair(250, -1));
         colors.insert("scrollbar".to_string(), make_pair(245, -1));
         colors.insert("toast_info".to_string(), make_pair(255, -1));
         colors.insert("toast_warning".to_string(), make_pair(250, -1));

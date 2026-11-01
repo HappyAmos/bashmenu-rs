@@ -1158,7 +1158,7 @@ impl MenuView {
                         );
                     }
                 } else {
-                    let spans = parse_bbcode_spans(&prow.text, self.styles.text);
+                    let spans = parse_bbcode_spans(&prow.text, self.styles.plugin);
                     buf.set_line(inner_x, py, &Line::from(spans), avail_w as u16);
                 }
             }

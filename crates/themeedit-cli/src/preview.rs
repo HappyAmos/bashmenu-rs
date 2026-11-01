@@ -262,28 +262,28 @@ pub fn render_preview_pane(
 
                 let plugin_row1 = Line::from(vec![
                     Span::styled(" ☁️  Weather: ", preview_styles.accent),
-                    Span::styled("+59°F Overcast", preview_styles.text),
+                    Span::styled("+59°F Overcast", preview_styles.plugin),
                     Span::styled("  │  Alienware: ", preview_styles.divider),
-                    Span::styled("Online", preview_styles.accent),
+                    Span::styled("Online", preview_styles.plugin),
                 ]);
                 buf.set_line(p_inner_x, plugin_start_y + 1, &plugin_row1, p_avail_w);
 
                 let plugin_row2 = Line::from(vec![
                     Span::styled(" 🖥️  CPU: ", preview_styles.accent),
-                    Span::styled("12%", preview_styles.text),
+                    Span::styled("12%", preview_styles.plugin),
                     Span::styled("  │  Mem: ", preview_styles.divider),
-                    Span::styled("3.8G/16G", preview_styles.text),
+                    Span::styled("3.8G/16G", preview_styles.plugin),
                     Span::styled("  │  Pi-3B: ", preview_styles.divider),
-                    Span::styled("Online", preview_styles.accent),
+                    Span::styled("Online", preview_styles.plugin),
                 ]);
                 buf.set_line(p_inner_x, plugin_start_y + 2, &plugin_row2, p_avail_w);
             } else if content_avail_h >= 6 {
                 let plugin_y = gt_y.saturating_sub(1);
                 let plugin_row = Line::from(vec![
                     Span::styled(" ☁️  Weather: ", preview_styles.accent),
-                    Span::styled("+59°F Overcast", preview_styles.text),
+                    Span::styled("+59°F Overcast", preview_styles.plugin),
                     Span::styled("  │  Alienware: ", preview_styles.divider),
-                    Span::styled("Online", preview_styles.accent),
+                    Span::styled("Online", preview_styles.plugin),
                 ]);
                 buf.set_line(p_inner_x, plugin_y, &plugin_row, p_avail_w);
             }

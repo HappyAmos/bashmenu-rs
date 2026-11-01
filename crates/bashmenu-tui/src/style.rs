@@ -16,6 +16,7 @@ pub struct ResolvedThemeStyles {
     pub footer: Style,
     pub gutter: Style,
     pub help_text: Style,
+    pub plugin: Style,
     pub selection: Style,
     pub shortcut_key: Style,
     pub divider: Style,
@@ -51,6 +52,7 @@ impl Default for ResolvedThemeStyles {
             footer: Style::default().fg(Color::DarkGray),
             gutter: Style::default().fg(Color::DarkGray),
             help_text: Style::default().fg(Color::Cyan),
+            plugin: Style::default().fg(Color::Cyan),
             selection: Style::default().fg(Color::Black).bg(Color::Cyan),
             shortcut_key: Style::default()
                 .fg(Color::Yellow)
@@ -224,6 +226,7 @@ impl ResolvedThemeStyles {
             }
             if let Some(st) = parse_style_pair(p.get("text")) {
                 resolved.text = st;
+                resolved.plugin = st;
             }
             if let Some(st) = parse_style_pair(p.get("highlight")) {
                 resolved.highlight = st.add_modifier(Modifier::BOLD);
@@ -239,6 +242,9 @@ impl ResolvedThemeStyles {
             }
             if let Some(st) = parse_style_pair(p.get("help_text")) {
                 resolved.help_text = st;
+            }
+            if let Some(st) = parse_style_pair(p.get("plugin")) {
+                resolved.plugin = st;
             }
             if let Some(st) = parse_style_pair(p.get("selection")) {
                 resolved.selection = st;

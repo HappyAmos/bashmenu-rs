@@ -204,6 +204,10 @@ impl ThemeEditorState {
                 kind: TokenKind::Color("help_text".to_string()),
             },
             TokenItem {
+                label: "Plugin Text Color".to_string(),
+                kind: TokenKind::Color("plugin".to_string()),
+            },
+            TokenItem {
                 label: "Gutter Color".to_string(),
                 kind: TokenKind::Color("gutter".to_string()),
             },
@@ -404,6 +408,13 @@ impl ThemeEditorState {
             "gutter".to_string(),
             serde_yml::Value::Sequence(vec![
                 serde_yml::Value::Number(239.into()),
+                serde_yml::Value::Number((-1).into()),
+            ]),
+        );
+        colors.insert(
+            "plugin".to_string(),
+            serde_yml::Value::Sequence(vec![
+                serde_yml::Value::Number(212.into()),
                 serde_yml::Value::Number((-1).into()),
             ]),
         );
@@ -649,6 +660,7 @@ impl ThemeEditorState {
             "accent" => styles.accent.fg.map(color_to_u8).unwrap_or(255),
             "shortcut_key" => styles.shortcut_key.fg.map(color_to_u8).unwrap_or(255),
             "help_text" => styles.help_text.fg.map(color_to_u8).unwrap_or(255),
+            "plugin" => styles.plugin.fg.map(color_to_u8).unwrap_or(255),
             "gutter" => styles.gutter.fg.map(color_to_u8).unwrap_or(255),
             "window_close_button" => styles
                 .window_close_button
@@ -965,6 +977,7 @@ impl ThemeEditorState {
             TokenKind::Color(k) => {
                 (k == "shortcut_key" && (key == "shortcut_gutter" || key == "shortcut"))
                     || (k == "text" && key == "content")
+                    || (k == "plugin" && (key == "plugin_text" || key == "plugins"))
                     || (k == "background"
                         && (key == "bg" || key == "bg_color" || key == "background_color"))
             }
@@ -1183,6 +1196,14 @@ pub fn get_token_preview_spans(
         }
         TokenKind::Color(key) if key == "help_text" => {
             spans.push((gt_y + 1, right_area.x + 2, sep_x));
+        }
+        TokenKind::Color(key) if key == "plugin" => {
+            if content_avail_h >= 8 {
+                spans.push((plugin_start_y + 1, p_inner_x, p_inner_x + p_avail_w));
+                spans.push((plugin_start_y + 2, p_inner_x, p_inner_x + p_avail_w));
+            } else if content_avail_h >= 6 {
+                spans.push((gt_y.saturating_sub(1), p_inner_x, p_inner_x + p_avail_w));
+            }
         }
         TokenKind::Color(key) if key == "gutter" => {
             spans.push((

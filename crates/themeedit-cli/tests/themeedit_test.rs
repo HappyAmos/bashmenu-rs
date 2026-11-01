@@ -205,6 +205,16 @@ fn test_themeedit_t_connectors_and_click_selection() {
     assert!(state.select_token_by_key("help_text"));
     assert_eq!(state.tokens[state.selected_idx].label, "Help Text Color");
 
+    assert!(state.select_token_by_key("plugin"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Plugin Text Color");
+    state.set_color_token("plugin", 198);
+    assert_eq!(state.get_color_token_u8("plugin"), 198);
+    let resolved = bashmenu_tui::ResolvedThemeStyles::from_theme(&state.current_theme, true);
+    assert_eq!(
+        resolved.plugin.fg,
+        Some(ratatui::style::Color::Indexed(198))
+    );
+
     assert!(state.select_token_by_key("gutter"));
     assert_eq!(state.tokens[state.selected_idx].label, "Gutter Color");
 
