@@ -129,8 +129,17 @@ impl MenuView {
         self
     }
 
-    /// Updates background wallpaper compositor configuration
+    /// Updates background wallpaper compositor configuration, reusing cached image/grid if unchanged
     pub fn set_wallpaper(&mut self, config: Option<WallpaperConfig>) {
+        match (&mut self.wallpaper, config) {
+            (Some(comp), Some(cfg)) => comp.set_config(cfg),
+            (None, Some(cfg)) => self.wallpaper = Some(WallpaperCompositor::new(cfg)),
+            (_, None) => self.wallpaper = None,
+        }
+    }
+
+    /// Forces a full reload of the background wallpaper image from disk
+    pub fn reload_wallpaper(&mut self, config: Option<WallpaperConfig>) {
         self.wallpaper = config.map(WallpaperCompositor::new);
     }
 
@@ -778,6 +787,7 @@ impl MenuView {
         // Clear background
         for y in area.y..area.y + area.height {
             for x in area.x..area.x + area.width {
+                buf[(x, y)].reset();
                 buf[(x, y)].set_style(ratatui::style::Style::default().bg(self.styles.background));
             }
         }

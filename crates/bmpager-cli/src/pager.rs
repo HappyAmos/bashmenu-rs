@@ -96,9 +96,14 @@ impl Pager {
     }
 
     pub fn run(&mut self) -> anyhow::Result<()> {
+        let keep_alt = std::env::var("BASHMENU_CHILD_ALT").as_deref() == Ok("1");
         enable_raw_mode()?;
         let mut out = stdout();
-        execute!(out, EnterAlternateScreen, Hide)?;
+        if keep_alt {
+            execute!(out, Hide)?;
+        } else {
+            execute!(out, EnterAlternateScreen, Hide)?;
+        }
         out.flush()?;
 
         self.query_size();
@@ -115,7 +120,9 @@ impl Pager {
             }
         }
 
-        execute!(out, Show, LeaveAlternateScreen)?;
+        if !keep_alt {
+            execute!(out, Show, LeaveAlternateScreen)?;
+        }
         disable_raw_mode()?;
         out.flush()?;
         Ok(())

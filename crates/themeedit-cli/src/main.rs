@@ -103,8 +103,14 @@ fn main() -> Result<()> {
                 (None, None) => {}
             }
 
-            guard.terminal_mut().draw(|f| {
+            guard.draw(|f| {
                 let buf = f.buffer_mut();
+
+                for y in area.y..area.y + area.height {
+                    for x in area.x..area.x + area.width {
+                        buf[(x, y)].reset();
+                    }
+                }
 
                 // Background fill
                 let root_block = Block::default()

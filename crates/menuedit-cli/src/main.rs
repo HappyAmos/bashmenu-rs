@@ -208,8 +208,14 @@ fn main() -> Result<()> {
 
         let mut footer_hit_regions: Vec<FooterHitRegion> = Vec::new();
 
-        guard.terminal_mut().draw(|f| {
+        guard.draw(|f| {
             let buf = f.buffer_mut();
+
+            for y in area.y..area.y + area.height {
+                for x in area.x..area.x + area.width {
+                    buf[(x, y)].reset();
+                }
+            }
 
             // Root window title
             let file_name = menu_path

@@ -236,7 +236,7 @@ fn main() -> Result<()> {
         }
 
         if need_redraw {
-            guard.terminal_mut().draw(|f| {
+            guard.draw(|f| {
                 menu_view.render(f.area(), f.buffer_mut());
                 match &mut active_modal {
                     ActiveModal::None => {}
@@ -855,7 +855,7 @@ fn main() -> Result<()> {
                         }
                         MenuAction::LaunchEditor => {
                             let editor_bin = locate_tool("bashedit");
-                            let _ = guard.suspend(|| {
+                            let _ = guard.suspend_keep_alt(|| {
                                 let _ = Command::new(&editor_bin).status();
                                 Ok(())
                             });
@@ -871,7 +871,7 @@ fn main() -> Result<()> {
                                 .join(",");
                             let sel_title = menu_view.selected_item().map(|it| it.label.clone());
                             let title_chain = menu_view.active_title_chain().join(" > ");
-                            let _ = guard.suspend(|| {
+                            let _ = guard.suspend_keep_alt(|| {
                                 let mut cmd = Command::new(&menuedit_bin);
                                 cmd.arg("-f").arg(&menu_path);
                                 if !path_str.is_empty() {
@@ -890,7 +890,6 @@ fn main() -> Result<()> {
                         }
                         MenuAction::Reload => {
                             clear_command_cache();
-                            plugin_engine.clear_cache();
 
                             if let Ok(new_config) = load_config(&config_path) {
                                 config = new_config;
@@ -932,10 +931,13 @@ fn main() -> Result<()> {
                                 .unwrap_or_default();
                             menu_view.set_status_gutter(gutter_str);
 
-                            menu_view.set_plugin_rows(Vec::new());
+                            let avail_w = size.width.saturating_sub(6) as usize;
+                            let div_ch = styles.divider_char.chars().next().unwrap_or('─');
+                            let rows = plugin_engine.format_display_rows(&config, avail_w, div_ch);
+                            menu_view.set_plugin_rows(rows);
                             plugin_engine.trigger_refresh(&config, true);
 
-                            let _ = guard.terminal_mut().clear();
+                            guard.request_clear();
                             need_redraw = true;
                         }
                         MenuAction::ToggleShortcuts => {
@@ -959,7 +961,7 @@ fn main() -> Result<()> {
                         }
                         MenuAction::LaunchThemeEditor => {
                             let themeedit_bin = locate_tool("themeedit");
-                            let _ = guard.suspend(|| {
+                            let _ = guard.suspend_keep_alt(|| {
                                 let _ = Command::new(&themeedit_bin)
                                     .arg("-f")
                                     .arg(&themes_path)
@@ -1173,7 +1175,7 @@ fn main() -> Result<()> {
                                     .unwrap_or_default();
                                 let target = interpolate_placeholders(target_raw, &ctx);
                                 let editor_bin = locate_tool("bashedit");
-                                let _ = guard.suspend(|| {
+                                let _ = guard.suspend_keep_alt(|| {
                                     let mut cmd = Command::new(&editor_bin);
                                     let trimmed = target.trim();
                                     if !trimmed.is_empty() {
@@ -1195,7 +1197,7 @@ fn main() -> Result<()> {
                                     || command_str == "action_theme_editor"
                                 {
                                     let themeedit_bin = locate_tool("themeedit");
-                                    let _ = guard.suspend(|| {
+                                    let _ = guard.suspend_keep_alt(|| {
                                         let _ = Command::new(&themeedit_bin)
                                             .arg("-f")
                                             .arg(&themes_path)
@@ -1220,7 +1222,7 @@ fn main() -> Result<()> {
                                     let sel_title =
                                         menu_view.selected_item().map(|it| it.label.clone());
                                     let title_chain = menu_view.active_title_chain().join(" > ");
-                                    let _ = guard.suspend(|| {
+                                    let _ = guard.suspend_keep_alt(|| {
                                         let mut cmd = Command::new(&menuedit_bin);
                                         cmd.arg("-f").arg(&menu_path);
                                         if !path_str.is_empty() {
@@ -1304,12 +1306,11 @@ fn main() -> Result<()> {
                                                 ExecutionMode::Console => {
                                                     let is_quiet = item.quiet.unwrap_or(false);
                                                     let use_alt = item.alt_buffer.unwrap_or(true);
-                                                    let _ = guard.suspend(|| {
+                                                    let run_console = || -> std::io::Result<()> {
                                                         if use_alt {
                                                             let mut stdout = std::io::stdout();
-                                                            let _ = stdout.write_all(
-                                                                b"\x1b[?1049h\x1b[H\x1b[2J",
-                                                            );
+                                                            let _ = stdout
+                                                                .write_all(b"\x1b[0m\x1b[H\x1b[2J");
                                                             let _ = stdout.flush();
                                                         }
                                                         if !is_quiet {
@@ -1330,13 +1331,14 @@ fn main() -> Result<()> {
                                                             let _ = std::io::stdin()
                                                                 .read_line(&mut input);
                                                         }
-                                                        if use_alt {
-                                                            let mut stdout = std::io::stdout();
-                                                            let _ = stdout.write_all(b"\x1b[?1049l");
-                                                            let _ = stdout.flush();
-                                                        }
                                                         Ok(())
-                                                    });
+                                                    };
+                                                    if use_alt {
+                                                        let _ = guard.suspend_keep_alt(run_console);
+                                                    } else {
+                                                        let _ = guard.suspend(run_console);
+                                                    }
+                                                    need_redraw = true;
                                                 }
                                             }
                                         }

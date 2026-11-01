@@ -135,7 +135,7 @@ fn launch_markdown_preview(guard: &mut TerminalGuard, tab: &EditorBuffer) {
     let temp_file = temp_dir.join(format!("bashedit_md_preview_{}.md", std::process::id()));
     let md_text = tab.lines.join("\n");
     if std::fs::write(&temp_file, &md_text).is_ok() {
-        let _ = guard.suspend(|| {
+        let _ = guard.suspend_keep_alt(|| {
             let _ = Command::new(&pager_bin)
                 .arg("--markdown")
                 .arg("--no-file")
@@ -144,7 +144,6 @@ fn launch_markdown_preview(guard: &mut TerminalGuard, tab: &EditorBuffer) {
             Ok(())
         });
         let _ = std::fs::remove_file(&temp_file);
-        let _ = guard.terminal_mut().clear();
     }
 }
 
@@ -301,7 +300,7 @@ fn main() -> Result<()> {
         let mut add_tab_region: Option<(u16, u16)> = None;
         let mut footer_hit_regions: Vec<FooterHitRegion> = Vec::new();
 
-        guard.terminal_mut().draw(|f| {
+        guard.draw(|f| {
             let buf = f.buffer_mut();
 
             // Clear screen area with background style
