@@ -1,5 +1,8 @@
 //! Library module for ThemeEdit core state, actions, and theme manipulation.
 
+pub mod preview;
+pub use preview::render_preview_pane;
+
 use anyhow::Result;
 use bashmenu_core::{
     load_themes, save_themes, DividerConfig, MarqueeConfig, Theme, ThemeCollection,

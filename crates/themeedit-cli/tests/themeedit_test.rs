@@ -673,3 +673,120 @@ fn test_themeedit_token_preview_spans_and_flash() {
     let sc_spans = get_token_preview_spans(sc_token, right_area, PreviewMode::Menu, &styles);
     assert_eq!(sc_spans.len(), 4, "Must flash 4 menu item shortcut digits");
 }
+
+#[test]
+fn test_modals_and_toast_preview_wallpaper_compositing() {
+    use bashmenu_core::WallpaperConfig;
+    use bashmenu_tui::{ResolvedThemeStyles, WallpaperCompositor};
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use themeedit_cli::{render_preview_pane, PreviewMode, ThemeEditorState};
+
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    let state = ThemeEditorState::new(fixture_path, Some("dracula".to_string()));
+    let styles = ResolvedThemeStyles::from_theme(&state.current_theme, true);
+    let right_area = Rect::new(40, 2, 60, 24);
+
+    let wp_cfg = WallpaperConfig {
+        enabled: true,
+        image: Some("assets/wallpapers/alaska-mountain.png".to_string()),
+        opacity: 0.85,
+        scaling: "stretch".to_string(),
+        clustering: 0,
+        quantization: 1,
+        mode: Some("halfblock".to_string()),
+    };
+
+    // 1. Verify PreviewMode::Modals composites wallpaper behind modal
+    {
+        let mut buf = Buffer::empty(Rect::new(0, 0, 110, 30));
+        let mut compositor = Some(WallpaperCompositor::new(wp_cfg.clone()));
+        render_preview_pane(
+            right_area,
+            &mut buf,
+            PreviewMode::Modals,
+            &styles,
+            &mut compositor,
+        );
+
+        let mut has_wallpaper_block = false;
+        let mut has_drop_shadow = false;
+
+        for y in right_area.y..right_area.bottom() {
+            for x in right_area.x..right_area.right() {
+                let sym = buf[(x, y)].symbol();
+                if sym == "▀" {
+                    has_wallpaper_block = true;
+                }
+                if sym == "░" {
+                    has_drop_shadow = true;
+                }
+            }
+        }
+
+        assert!(
+            has_wallpaper_block,
+            "PreviewMode::Modals must composite wallpaper half-blocks behind dialog"
+        );
+        assert!(
+            has_drop_shadow,
+            "PreviewMode::Modals must render drop-shadow '░' over wallpaper"
+        );
+
+        // Check that the modal title is present
+        let mut title_found = false;
+        for y in right_area.y..right_area.bottom() {
+            let mut line_str = String::new();
+            for x in right_area.x..right_area.right() {
+                line_str.push_str(buf[(x, y)].symbol());
+            }
+            if line_str.contains("Confirmation Dialog") {
+                title_found = true;
+                break;
+            }
+        }
+        assert!(
+            title_found,
+            "Modal confirmation dialog title must be rendered"
+        );
+    }
+
+    // 2. Verify PreviewMode::Toast composites wallpaper behind toasts
+    {
+        let mut buf = Buffer::empty(Rect::new(0, 0, 110, 30));
+        let mut compositor = Some(WallpaperCompositor::new(wp_cfg));
+        render_preview_pane(
+            right_area,
+            &mut buf,
+            PreviewMode::Toast,
+            &styles,
+            &mut compositor,
+        );
+
+        let mut has_wallpaper_block = false;
+        let mut toast_text_found = false;
+
+        for y in right_area.y..right_area.bottom() {
+            let mut line_str = String::new();
+            for x in right_area.x..right_area.right() {
+                let sym = buf[(x, y)].symbol();
+                if sym == "▀" {
+                    has_wallpaper_block = true;
+                }
+                line_str.push_str(sym);
+            }
+            if line_str.contains("Saved configuration to disk") {
+                toast_text_found = true;
+            }
+        }
+
+        assert!(
+            has_wallpaper_block,
+            "PreviewMode::Toast must composite wallpaper half-blocks behind toasts"
+        );
+        assert!(
+            toast_text_found,
+            "PreviewMode::Toast must render toast message text"
+        );
+    }
+}
