@@ -519,3 +519,286 @@ pub fn composite_buffer(area: Rect, buf: &mut Buffer, grid: &WallpaperGrid, them
         }
     }
 }
+
+/// Converts an RGB triplet to the nearest xterm-256 palette index (16..=255 preferred for accuracy).
+pub fn rgb_to_xterm256(r: u8, g: u8, b: u8) -> u8 {
+    let mut best_idx = 16u8;
+    let mut best_dist = u32::MAX;
+    for idx in 16..=255u8 {
+        let (pr, pg, pb) = indexed_to_rgb(idx);
+        let dr = r as i32 - pr as i32;
+        let dg = g as i32 - pg as i32;
+        let db = b as i32 - pb as i32;
+        let dist = (dr * dr + dg * dg + db * db) as u32;
+        if dist < best_dist {
+            best_dist = dist;
+            best_idx = idx;
+            if dist == 0 {
+                break;
+            }
+        }
+    }
+    best_idx
+}
+
+fn rgb_to_hsv(r: u8, g: u8, b: u8) -> (f64, f64, f64) {
+    let rf = r as f64 / 255.0;
+    let gf = g as f64 / 255.0;
+    let bf = b as f64 / 255.0;
+    let max = rf.max(gf).max(bf);
+    let min = rf.min(gf).min(bf);
+    let delta = max - min;
+
+    let h = if delta < 1e-6 {
+        0.0
+    } else if (max - rf).abs() < 1e-6 {
+        ((gf - bf) / delta).rem_euclid(6.0) / 6.0
+    } else if (max - gf).abs() < 1e-6 {
+        (((bf - rf) / delta) + 2.0) / 6.0
+    } else {
+        (((rf - gf) / delta) + 4.0) / 6.0
+    };
+    let s = if max < 1e-6 { 0.0 } else { delta / max };
+    (h, s, max)
+}
+
+fn color_luminance(r: u8, g: u8, b: u8) -> f64 {
+    0.2126 * (r as f64) + 0.7152 * (g as f64) + 0.0722 * (b as f64)
+}
+
+fn hue_distance(h1: f64, h2: f64) -> f64 {
+    let diff = (h1 - h2).abs();
+    diff.min(1.0 - diff)
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ExtractedColor {
+    idx: u8,
+    h: f64,
+    s: f64,
+    lum: f64,
+    count: u32,
+}
+
+/// Auto-derives a harmonious 256-color theme palette (`colors_256` map) from an image file.
+pub fn derive_palette_from_image(
+    image_path: &Path,
+) -> Result<std::collections::HashMap<String, serde_yml::Value>, String> {
+    let dyn_img = image::open(image_path)
+        .map_err(|e| format!("Failed to open image '{}': {}", image_path.display(), e))?;
+    let rgb_img = dyn_img.to_rgb8();
+    let thumb = if rgb_img.width() > 160 || rgb_img.height() > 160 {
+        imageops::thumbnail(&rgb_img, 160, 160)
+    } else {
+        rgb_img
+    };
+
+    let mut counts = [0u32; 256];
+    let mut total_pixels = 0u32;
+    for pixel in thumb.pixels() {
+        let idx = rgb_to_xterm256(pixel[0], pixel[1], pixel[2]);
+        counts[idx as usize] += 1;
+        total_pixels += 1;
+    }
+
+    if total_pixels == 0 {
+        return Err("Image contains no pixels".to_string());
+    }
+
+    let mut ranked: Vec<ExtractedColor> = (16..=255u8)
+        .filter(|&i| counts[i as usize] > 0)
+        .map(|idx| {
+            let (r, g, b) = indexed_to_rgb(idx);
+            let (h, s, _) = rgb_to_hsv(r, g, b);
+            let lum = color_luminance(r, g, b);
+            ExtractedColor {
+                idx,
+                h,
+                s,
+                lum,
+                count: counts[idx as usize],
+            }
+        })
+        .collect();
+
+    ranked.sort_by_key(|a| std::cmp::Reverse(a.count));
+    ranked.truncate(24);
+
+    if ranked.is_empty() {
+        return Err("Could not extract any colors from image".to_string());
+    }
+
+    // 1. Background color (darkest dominant shade)
+    let dark_cands: Vec<ExtractedColor> = ranked.iter().copied().filter(|c| c.lum < 55.0).collect();
+    let (bg_color, bg_lum) = if let Some(darkest) = dark_cands.iter().min_by(|a, b| {
+        a.lum
+            .partial_cmp(&b.lum)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    }) {
+        (darkest.idx, darkest.lum)
+    } else {
+        (16u8, 0.0)
+    };
+
+    // 2. Score candidates for accents (balancing saturation, contrast with background, and prevalence)
+    let mut scored: Vec<(ExtractedColor, f64)> = ranked
+        .iter()
+        .copied()
+        .filter(|c| c.idx != bg_color)
+        .map(|c| {
+            let contrast = (c.lum - bg_lum).abs() / 100.0;
+            let freq_bonus = ((c.count as f64) / (total_pixels as f64)).sqrt() * 0.4;
+            let score = (c.s * 1.6) + (contrast * 1.2) + freq_bonus;
+            (c, score)
+        })
+        .collect();
+    scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+    let primary = scored
+        .iter()
+        .find(|(c, _)| c.lum >= 45.0)
+        .or_else(|| scored.first())
+        .map(|(c, _)| *c)
+        .unwrap_or(ranked[0]);
+    let primary_accent = primary.idx;
+
+    let secondary_accent = scored
+        .iter()
+        .map(|(c, _)| *c)
+        .find(|c| {
+            c.idx != primary_accent
+                && (hue_distance(c.h, primary.h) > 0.08 || (c.lum - primary.lum).abs() > 25.0)
+        })
+        .or_else(|| {
+            scored
+                .iter()
+                .map(|(c, _)| *c)
+                .find(|c| c.idx != primary_accent)
+        })
+        .map(|c| c.idx)
+        .unwrap_or(primary_accent);
+
+    // 3. Borders and structural lines (mid-tones)
+    let mut border_cands: Vec<ExtractedColor> = ranked
+        .iter()
+        .copied()
+        .filter(|c| (40.0..=150.0).contains(&c.lum) && c.idx != bg_color)
+        .collect();
+    border_cands.sort_by(|a, b| {
+        (a.lum - 85.0)
+            .abs()
+            .partial_cmp(&(b.lum - 85.0).abs())
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    let border_color = border_cands
+        .first()
+        .map(|c| c.idx)
+        .unwrap_or(primary_accent);
+
+    // 4. Dimmer gutter/whitespace tone
+    let mut gutter_cands: Vec<ExtractedColor> = ranked
+        .iter()
+        .copied()
+        .filter(|c| (25.0..=100.0).contains(&c.lum) && c.idx != bg_color && c.idx != border_color)
+        .collect();
+    gutter_cands.sort_by(|a, b| {
+        a.lum
+            .partial_cmp(&b.lum)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    let gutter_color = gutter_cands.first().map(|c| c.idx).unwrap_or(238);
+
+    // 5. Contrast foreground for selection/highlight
+    let selection_fg: u8 = if primary.lum > 135.0 { 16 } else { 255 };
+    let text_fg: u8 = 255;
+
+    // 6. Semantic alert/button accents from image if available
+    let button_error = ranked
+        .iter()
+        .find(|c| (c.h >= 0.94 || c.h <= 0.06) && c.s >= 0.35)
+        .map(|c| c.idx)
+        .unwrap_or(196);
+    let toast_warn = ranked
+        .iter()
+        .find(|c| (0.06..=0.20).contains(&c.h) && c.s >= 0.30)
+        .map(|c| c.idx)
+        .unwrap_or(214);
+    let button_success = ranked
+        .iter()
+        .find(|c| (0.22..=0.44).contains(&c.h) && c.s >= 0.30)
+        .map(|c| c.idx)
+        .unwrap_or(40);
+
+    let make_pair = |fg: i64, bg: i64| -> serde_yml::Value {
+        serde_yml::Value::Sequence(vec![
+            serde_yml::Value::Number(fg.into()),
+            serde_yml::Value::Number(bg.into()),
+        ])
+    };
+
+    let mut colors = std::collections::HashMap::new();
+    colors.insert(
+        "background".to_string(),
+        serde_yml::Value::Number((bg_color as i64).into()),
+    );
+    colors.insert("title".to_string(), make_pair(primary_accent as i64, -1));
+    colors.insert("border".to_string(), make_pair(border_color as i64, -1));
+    colors.insert("text".to_string(), make_pair(text_fg as i64, -1));
+    colors.insert(
+        "highlight".to_string(),
+        make_pair(selection_fg as i64, primary_accent as i64),
+    );
+    colors.insert("accent".to_string(), make_pair(secondary_accent as i64, -1));
+    colors.insert("footer".to_string(), make_pair(border_color as i64, -1));
+    colors.insert("gutter".to_string(), make_pair(gutter_color as i64, -1));
+    colors.insert(
+        "selection".to_string(),
+        make_pair(selection_fg as i64, primary_accent as i64),
+    );
+    colors.insert(
+        "shortcut_key".to_string(),
+        make_pair(secondary_accent as i64, -1),
+    );
+    colors.insert("divider".to_string(), make_pair(border_color as i64, -1));
+    colors.insert(
+        "button_primary".to_string(),
+        make_pair(selection_fg as i64, primary_accent as i64),
+    );
+    colors.insert(
+        "button_error".to_string(),
+        make_pair(255, button_error as i64),
+    );
+    colors.insert(
+        "button_cancel".to_string(),
+        make_pair(text_fg as i64, gutter_color as i64),
+    );
+    colors.insert(
+        "button_success".to_string(),
+        make_pair(255, button_success as i64),
+    );
+    colors.insert(
+        "help_text".to_string(),
+        make_pair(secondary_accent as i64, -1),
+    );
+    colors.insert("plugin".to_string(), make_pair(secondary_accent as i64, -1));
+    colors.insert("window_close_button".to_string(), make_pair(203, -1));
+    colors.insert(
+        "scrollbar".to_string(),
+        make_pair(primary_accent as i64, 236),
+    );
+    colors.insert("whitespace".to_string(), make_pair(gutter_color as i64, -1));
+    colors.insert(
+        "toast_info".to_string(),
+        make_pair(primary_accent as i64, -1),
+    );
+    colors.insert(
+        "toast_warning".to_string(),
+        make_pair(toast_warn as i64, -1),
+    );
+    colors.insert(
+        "toast_error".to_string(),
+        make_pair(button_error as i64, -1),
+    );
+
+    Ok(colors)
+}

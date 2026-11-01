@@ -39,8 +39,8 @@ pub use terminal::TerminalGuard;
 pub use text_input::TextInput;
 pub use toast::{ActiveToast, ToastRack};
 pub use wallpaper::{
-    color_to_rgb, composite_buffer, resolve_wallpaper_path, WallpaperCell, WallpaperCompositor,
-    WallpaperGrid,
+    color_to_rgb, composite_buffer, derive_palette_from_image, resolve_wallpaper_path,
+    rgb_to_xterm256, WallpaperCell, WallpaperCompositor, WallpaperGrid,
 };
 
 use std::panic;

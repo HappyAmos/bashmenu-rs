@@ -283,6 +283,7 @@ fn main() -> Result<()> {
                 );
 
                 let bottom_items = [
+                    "[F5] Derive",
                     "[F6] New",
                     "[F7] Rename",
                     "[F8] Del",
@@ -996,6 +997,30 @@ fn main() -> Result<()> {
                             }
 
                             match k.code {
+                                KeyCode::F(5) | KeyCode::F(9) => {
+                                    // F5 / F9 auto-derives theme colors from configured wallpaper image
+                                    match state.derive_colors_from_wallpaper() {
+                                        Ok(fname) => {
+                                            toast_rack.add(ToastNotification {
+                                                title: Some("Derive Theme Colors".to_string()),
+                                                message: format!(
+                                                    "Derived theme colors from '{}'",
+                                                    fname
+                                                ),
+                                                severity: ToastSeverity::Information,
+                                                timeout_secs: 2.5,
+                                            });
+                                        }
+                                        Err(err) => {
+                                            toast_rack.add(ToastNotification {
+                                                title: Some("Derive Theme Colors".to_string()),
+                                                message: err,
+                                                severity: ToastSeverity::Warning,
+                                                timeout_secs: 3.0,
+                                            });
+                                        }
+                                    }
+                                }
                                 KeyCode::F(6) => {
                                     // F6 creates new theme
                                     active_modal = ActiveModal::NewTheme(InputModal::new(

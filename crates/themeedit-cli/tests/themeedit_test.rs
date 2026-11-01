@@ -982,3 +982,51 @@ fn test_name_input_text_editing() {
         .handle_key_with_modifiers(KeyCode::Char('a'), KeyModifiers::CONTROL);
     assert_eq!(state.name_input.selection_range(), Some((0, 2)));
 }
+
+#[test]
+fn test_derive_colors_from_wallpaper() {
+    let fixture_path = get_fixture_path("bashmenu.themes");
+
+    // 1. Theme without wallpaper returns descriptive error
+    let mut state_no_wp = ThemeEditorState::new(fixture_path.clone(), Some("dracula".to_string()));
+    state_no_wp.set_wallpaper_image(None);
+    state_no_wp.is_modified = false;
+    assert!(state_no_wp.derive_colors_from_wallpaper().is_err());
+    assert!(!state_no_wp.is_modified);
+
+    // 2. Theme with configured wallpaper ("alaska-mountain") derives harmonious 256-color palette
+    let mut state_wp = ThemeEditorState::new(fixture_path, Some("alaska-mountain".to_string()));
+    state_wp.is_modified = false;
+    let derived_file = state_wp
+        .derive_colors_from_wallpaper()
+        .expect("should derive colors from alaska-mountain wallpaper");
+    assert!(derived_file.contains("mountain"));
+    assert!(state_wp.is_modified);
+
+    let c256 = state_wp
+        .current_theme
+        .colors_256
+        .as_ref()
+        .expect("colors_256 must exist");
+    for key in [
+        "background",
+        "text",
+        "highlight",
+        "border",
+        "divider",
+        "accent",
+        "shortcut_key",
+        "help_text",
+        "gutter",
+        "scrollbar",
+        "toast_info",
+        "toast_warning",
+        "toast_error",
+    ] {
+        assert!(
+            c256.contains_key(key),
+            "Derived palette must contain token '{}'",
+            key
+        );
+    }
+}

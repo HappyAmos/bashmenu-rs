@@ -582,6 +582,43 @@ impl ThemeEditorState {
         }
     }
 
+    /// Auto-derives theme colors based on the colors of the configured background wallpaper image.
+    pub fn derive_colors_from_wallpaper(&mut self) -> std::result::Result<String, String> {
+        let img_str = self
+            .current_theme
+            .wallpaper_config()
+            .and_then(|wp| wp.image)
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| "No background wallpaper image configured on this theme".to_string())?;
+
+        let resolved_path = bashmenu_tui::resolve_wallpaper_path(&img_str)
+            .ok_or_else(|| format!("Wallpaper image file not found: {}", img_str))?;
+
+        let derived = bashmenu_tui::derive_palette_from_image(&resolved_path)?;
+        let c_map = self
+            .current_theme
+            .colors_256
+            .get_or_insert_with(HashMap::new);
+
+        for (k, v) in derived {
+            c_map.insert(k, v);
+        }
+        // Clear view-specific sub-table overrides so derived colors apply uniformly
+        c_map.remove("menu_editor");
+        c_map.remove("editor");
+        c_map.remove("modals");
+
+        self.is_modified = true;
+        let fname = resolved_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or(&img_str)
+            .to_string();
+        self.status_message = format!("Derived theme colors from '{}'", fname);
+        Ok(fname)
+    }
+
     pub fn get_color_token_u8(&self, key: &str) -> u8 {
         if let Some(c_map) = &self.current_theme.colors_256 {
             if let Some(val) = c_map.get(key) {
