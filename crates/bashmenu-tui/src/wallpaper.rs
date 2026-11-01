@@ -125,6 +125,7 @@ pub fn resolve_wallpaper_path(path_str: &str) -> Option<PathBuf> {
                 .join(&expanded_path),
         );
     }
+    candidates.push(bashmenu_core::get_user_config_dir().join(&expanded_path));
     candidates.push(PathBuf::from("/opt/bashmenu").join(&expanded_path));
     candidates.push(PathBuf::from("/usr/local/share/bashmenu").join(&expanded_path));
 

@@ -71,6 +71,16 @@ for cfg in bashmenu.yml bashmenu.mnu bashmenu.themes; do
     fi
 done
 
+# Symlink assets and scripts into user config directory if present
+if [ -d "$SCRIPT_DIR/assets" ]; then
+    ln -sf "$SCRIPT_DIR/assets" "$CONFIG_DIR/assets"
+    echo "  [+] Symlinked assets -> $CONFIG_DIR/assets"
+fi
+if [ -d "$SCRIPT_DIR/scripts" ]; then
+    ln -sf "$SCRIPT_DIR/scripts" "$CONFIG_DIR/scripts"
+    echo "  [+] Symlinked scripts -> $CONFIG_DIR/scripts"
+fi
+
 # Initialize user notebooks directory if missing
 if [ -d "$SCRIPT_DIR/notebooks" ]; then
     mkdir -p "$CONFIG_DIR/notebooks"
