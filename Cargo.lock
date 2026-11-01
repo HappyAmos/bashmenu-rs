@@ -136,6 +136,7 @@ dependencies = [
  "bashmenu-core",
  "crossterm",
  "image",
+ "libc",
  "ratatui",
  "serde_yml",
  "thiserror",

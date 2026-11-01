@@ -1048,3 +1048,51 @@ fn test_note_viewer_scrolling_when_show_done_enabled() {
     let close_action = viewer.handle_key(KeyCode::Esc);
     assert_eq!(close_action, NoteViewerAction::Close);
 }
+
+#[test]
+fn test_stream_output_modal_lifecycle_and_rendering() {
+    use bashmenu_tui::{StreamOutputAction, StreamOutputModal};
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+    let mut modal = StreamOutputModal::new(
+        "Stream Output Test".to_string(),
+        "echo 'Hello Streaming World'; echo 'Line Two'".to_string(),
+        65,
+        false,
+    );
+
+    assert_eq!(modal.window_percent, 65);
+    assert!(!modal.is_running);
+
+    modal.start();
+    assert!(modal.is_running);
+
+    // Poll until process completes or timeout
+    let start = std::time::Instant::now();
+    while modal.is_running && start.elapsed().as_secs() < 3 {
+        modal.poll_output();
+        std::thread::sleep(std::time::Duration::from_millis(15));
+    }
+
+    assert!(!modal.is_running);
+    assert_eq!(modal.exit_code, Some(0));
+    assert!(modal
+        .lines
+        .iter()
+        .any(|l| l.contains("Hello Streaming World")));
+    assert!(modal.lines.iter().any(|l| l.contains("Line Two")));
+
+    // Rendering test
+    let styles = ResolvedThemeStyles::default();
+    let area = Rect::new(0, 0, 80, 24);
+    let mut buf = Buffer::empty(area);
+    modal.render(area, &styles, &mut buf);
+    let s = format!("{:?}", buf);
+    assert!(s.contains("Stream Output Test"));
+    assert!(s.contains("Hello Streaming World"));
+    assert!(s.contains("Close"));
+
+    // Enter closes when finished
+    let act = modal.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    assert_eq!(act, StreamOutputAction::Close);
+}

@@ -334,6 +334,7 @@ pub enum FocusControl {
     StartDirBrowseBtn,
     TabstopInput,
     ExecModeSelector,
+    WindowPercentInput,
     AltBufferChk,
     NoFormattingChk,
     MaskedChk,
@@ -368,8 +369,9 @@ pub struct ItemEditModal {
     pub start_dir_input: TextInput,
     pub tabstop_input: TextInput,
 
-    // Execution mode: 0 = Streaming, 1 = Interactive, 2 = Standard Terminal
+    // Execution mode: 0 = Streaming, 1 = Interactive, 2 = Console
     pub exec_mode: usize,
+    pub window_percent_input: TextInput,
 
     // Boolean checkboxes
     pub alt_buffer: bool,
@@ -472,14 +474,34 @@ impl ItemEditModal {
             .extra
             .get("stream")
             .and_then(|v| v.as_bool())
-            .unwrap_or(false);
+            .unwrap_or(false)
+            || item.interactive == Some(false);
+        let is_interactive = item.extra.get("exec_mode").and_then(|v| v.as_str())
+            == Some("interactive")
+            || item
+                .extra
+                .get("floating")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
         let exec_mode = if is_stream {
             0
-        } else if item.quiet.unwrap_or(false) {
+        } else if is_interactive {
             1
         } else {
             2
         };
+
+        let window_percent_val = item
+            .extra
+            .get("window_percent")
+            .and_then(|v| {
+                if let Some(n) = v.as_u64() {
+                    Some(n.to_string())
+                } else {
+                    v.as_str().map(|s| s.to_string())
+                }
+            })
+            .unwrap_or_else(|| "65".to_string());
 
         let alt_buffer = item.alt_buffer.unwrap_or(true);
         let no_formatting = item
@@ -525,6 +547,7 @@ impl ItemEditModal {
             start_dir_input: TextInput::new(start_dir_val),
             tabstop_input: TextInput::new(&tabstop_val),
             exec_mode,
+            window_percent_input: TextInput::new(&window_percent_val),
             alt_buffer,
             no_formatting,
             masked,
@@ -606,7 +629,10 @@ impl ItemEditModal {
             controls.push(FocusControl::StartDirBrowseBtn);
             controls.push(FocusControl::TabstopInput);
             controls.push(FocusControl::ExecModeSelector);
-            if self.exec_mode != 0 {
+            if self.exec_mode == 0 || self.exec_mode == 1 {
+                controls.push(FocusControl::WindowPercentInput);
+            }
+            if self.exec_mode == 2 {
                 controls.push(FocusControl::AltBufferChk);
             }
             controls.push(FocusControl::NoFormattingChk);
@@ -910,6 +936,7 @@ impl ItemEditModal {
             FocusControl::BlockIdInput => Some(&mut self.block_id_input),
             FocusControl::StartDirInput => Some(&mut self.start_dir_input),
             FocusControl::TabstopInput => Some(&mut self.tabstop_input),
+            FocusControl::WindowPercentInput => Some(&mut self.window_percent_input),
             _ => None,
         };
 
@@ -1173,19 +1200,58 @@ impl ItemEditModal {
             0 => {
                 item.extra
                     .insert("stream".to_string(), serde_yml::Value::Bool(true));
+                item.extra.insert(
+                    "exec_mode".to_string(),
+                    serde_yml::Value::String("streaming".to_string()),
+                );
+                item.extra.remove("floating");
                 item.interactive = Some(false);
                 item.quiet = Some(true);
+                let pct = self
+                    .window_percent_input
+                    .as_string()
+                    .trim()
+                    .trim_end_matches('%')
+                    .parse::<u64>()
+                    .unwrap_or(65)
+                    .clamp(20, 100);
+                item.extra.insert(
+                    "window_percent".to_string(),
+                    serde_yml::Value::Number(pct.into()),
+                );
             }
             1 => {
                 item.extra
                     .insert("stream".to_string(), serde_yml::Value::Bool(false));
+                item.extra.insert(
+                    "exec_mode".to_string(),
+                    serde_yml::Value::String("interactive".to_string()),
+                );
+                item.extra
+                    .insert("floating".to_string(), serde_yml::Value::Bool(true));
                 item.interactive = Some(true);
                 item.quiet = Some(true);
-                item.alt_buffer = Some(self.alt_buffer);
+                let pct = self
+                    .window_percent_input
+                    .as_string()
+                    .trim()
+                    .trim_end_matches('%')
+                    .parse::<u64>()
+                    .unwrap_or(65)
+                    .clamp(20, 100);
+                item.extra.insert(
+                    "window_percent".to_string(),
+                    serde_yml::Value::Number(pct.into()),
+                );
             }
             _ => {
                 item.extra
                     .insert("stream".to_string(), serde_yml::Value::Bool(false));
+                item.extra.insert(
+                    "exec_mode".to_string(),
+                    serde_yml::Value::String("console".to_string()),
+                );
+                item.extra.remove("floating");
                 item.interactive = Some(true);
                 item.quiet = Some(false);
                 item.alt_buffer = Some(self.alt_buffer);
@@ -1410,7 +1476,16 @@ impl ItemEditModal {
                 is_active: cur_ctrl == FocusControl::ExecModeSelector,
             });
 
-            if self.exec_mode != 0 {
+            if self.exec_mode == 0 || self.exec_mode == 1 {
+                form_lines.push(FormRow::Label("Window Size % (20-100):"));
+                form_lines.push(FormRow::Input {
+                    ctrl: FocusControl::WindowPercentInput,
+                    text: self.window_percent_input.as_string(),
+                    cursor: self.window_percent_input.cursor,
+                });
+            }
+
+            if self.exec_mode == 2 {
                 form_lines.push(FormRow::Checkbox {
                     ctrl: FocusControl::AltBufferChk,
                     label: "Run in Alternate Screen Buffer (alt_buffer=true)",
@@ -1739,9 +1814,9 @@ impl FormRow {
             }
             FormRow::ExecMode { mode, is_active } => {
                 let mode_str = match mode {
-                    0 => " ● 📡 Streaming Mode (stream=true, live TUI modal output) ",
-                    1 => " ● 🖥️ Interactive Mode (interactive=true, full-screen TTY tool) ",
-                    _ => " ● 📄 Standard Terminal Mode (quiet=false, header & pause prompt) ",
+                    0 => " ● 📡 Streaming Mode (interactive=false, live popup output) ",
+                    1 => " ● 💬 Interactive Mode (interactive=true, floating window) ",
+                    _ => " ● 🖥️ Console Mode (interactive=true, full-screen terminal) ",
                 };
                 let style = if *is_active {
                     styles.highlight.add_modifier(Modifier::BOLD)

@@ -59,12 +59,15 @@ Template Path (template) [inject_block]
 Target Path (target) [inject_block]
   Destination file edited on install or removal.
 
-── 2. Execution Flags ──
+── 2. Execution Modes & Flags ──
 
+Streaming Mode: Live output inside floating popup window (interactive=false, stream=true)
+Interactive Mode: Floating interactive window above menu (interactive=true, floating=true)
+Console Mode: Full-screen terminal in dedicated alternate buffer; quiet flag controls pause
+Window Size %: Percentage of screen dimensions used by floating windows (20-100)
 Alt Buffer: Run command inside alternate screen buffer (alt_buffer=true)
 No Formatting: Disable BBCode parsing in title/message (no_formatting=true)
-Quiet: Suppress stdout output (quiet=true)
-Interactive: Attach full interactive terminal stdin/stdout (interactive=true)
+Quiet: Return immediately without pause prompt (quiet=true)
 Show Whitespace: Display visible tabs and spaces in editor (show_whitespace=true)
 External: Execute outside terminal sandbox (external=true)
 ";
@@ -290,6 +293,25 @@ pub fn format_inspector_text(
         lines.push(format!("Flags: {}", flags.join(", ")));
     }
 
+    let mode = item.execution_mode();
+    match mode {
+        bashmenu_core::ExecutionMode::Streaming => {
+            lines.push(format!(
+                "Execution Mode: Streaming ({}% window)",
+                item.window_percent()
+            ));
+        }
+        bashmenu_core::ExecutionMode::Interactive => {
+            lines.push(format!(
+                "Execution Mode: Interactive ({}% window)",
+                item.window_percent()
+            ));
+        }
+        bashmenu_core::ExecutionMode::Console => {
+            lines.push("Execution Mode: Console (Full-screen terminal)".to_string());
+        }
+    }
+
     if let Some(ref sub) = item.submenu {
         lines.push(format!("Submenu Items: {} items", sub.items.len()));
     }
@@ -320,6 +342,9 @@ pub fn format_inspector_text(
         "alt_buffer",
         "no_formatting",
         "stream",
+        "exec_mode",
+        "window_percent",
+        "floating",
         "quiet",
         "interactive",
         "show_whitespace",

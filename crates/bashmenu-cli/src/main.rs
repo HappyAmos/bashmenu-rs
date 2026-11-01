@@ -4,16 +4,18 @@ use anyhow::Result;
 use bashmenu_core::{
     add_or_update_note, build_notebook_submenu, delete_note, extract_toasts, get_note_by_title,
     interpolate_placeholders, load_config, load_menu, load_notebook, load_themes, rename_note,
-    resolve_notebook_path, save_config, save_notebook, BashMenuConfig, MacroContext, MenuItemType,
-    MenuSchema, NoteItem, PluginEngine, ToastNotification,
+    resolve_notebook_path, save_config, save_notebook, BashMenuConfig, ExecutionMode, MacroContext,
+    MenuItemType, MenuSchema, NoteItem, PluginEngine, ToastNotification,
 };
 use bashmenu_tui::{
     install_panic_hook, ConfirmModal, FilePickerModal, HelpModal, InputModal, MenuAction, MenuView,
     NoteEditorAction, NoteEditorModal, NoteViewerAction, NoteViewerModal, RadioModal,
-    ResolvedThemeStyles, TerminalGuard, ThemePickerModal, ToastRack, ToggleChoice, ToggleModal,
+    ResolvedThemeStyles, StreamOutputAction, StreamOutputModal, TerminalGuard, ThemePickerModal,
+    ToastRack, ToggleChoice, ToggleModal,
 };
 use clap::Parser;
 use crossterm::event::{self, Event};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::mpsc;
@@ -58,6 +60,7 @@ enum ActiveModal {
     ConfigInput(String, InputModal),
     Radio(String, RadioModal),
     EditorFilePicker(Box<bashmenu_core::MenuItem>, FilePickerModal),
+    StreamOutput(StreamOutputModal),
 }
 
 fn resolve_file_path(target: &Path, local: bool) -> PathBuf {
@@ -210,6 +213,13 @@ fn main() -> Result<()> {
             need_redraw = true;
         }
 
+        // Periodic poll for streaming command output
+        if let ActiveModal::StreamOutput(ref mut modal) = active_modal {
+            if modal.poll_output() {
+                need_redraw = true;
+            }
+        }
+
         if need_redraw {
             guard.terminal_mut().draw(|f| {
                 menu_view.render(f.area(), f.buffer_mut());
@@ -249,6 +259,9 @@ fn main() -> Result<()> {
                         modal.render(f.area(), &styles, f.buffer_mut());
                     }
                     ActiveModal::EditorFilePicker(_, modal) => {
+                        modal.render(f.area(), &styles, f.buffer_mut());
+                    }
+                    ActiveModal::StreamOutput(modal) => {
                         modal.render(f.area(), &styles, f.buffer_mut());
                     }
                 }
@@ -589,6 +602,16 @@ fn main() -> Result<()> {
                                 Ok(())
                             });
                         }
+                        active_modal = ActiveModal::None;
+                    }
+                }
+                ActiveModal::StreamOutput(modal) => {
+                    let action = match ev {
+                        Event::Key(key) => modal.handle_key(key),
+                        Event::Mouse(mouse) => modal.handle_mouse(mouse, area),
+                        _ => StreamOutputAction::None,
+                    };
+                    if action == StreamOutputAction::Close {
                         active_modal = ActiveModal::None;
                     }
                 }
@@ -990,22 +1013,77 @@ fn main() -> Result<()> {
                                     }
                                     need_redraw = true;
                                 } else {
-                                    let cmd_to_run = item.command.or(item.action).or(item.script);
+                                    let cmd_to_run = item
+                                        .command
+                                        .as_deref()
+                                        .or(item.action.as_deref())
+                                        .or(item.script.as_deref());
                                     if let Some(raw_cmd) = cmd_to_run {
-                                        let (clean_cmd, toasts) = extract_toasts(&raw_cmd, &ctx);
+                                        let (clean_cmd, toasts) = extract_toasts(raw_cmd, &ctx);
                                         for t in toasts {
                                             toast_rack.add(t);
                                             need_redraw = true;
                                         }
                                         let final_cmd = interpolate_placeholders(&clean_cmd, &ctx);
                                         if !final_cmd.trim().is_empty() {
-                                            let _ = guard.suspend(|| {
-                                                let _ = Command::new("/bin/bash")
-                                                    .arg("-c")
-                                                    .arg(&final_cmd)
-                                                    .status();
-                                                Ok(())
-                                            });
+                                            let mode = item.execution_mode();
+                                            match mode {
+                                                ExecutionMode::Streaming
+                                                | ExecutionMode::Interactive => {
+                                                    let is_interactive =
+                                                        mode == ExecutionMode::Interactive;
+                                                    let title = item
+                                                        .title()
+                                                        .map(|t| interpolate_placeholders(t, &ctx))
+                                                        .unwrap_or_else(|| clean_cmd.clone());
+                                                    let mut modal = StreamOutputModal::new(
+                                                        title,
+                                                        final_cmd,
+                                                        item.window_percent(),
+                                                        is_interactive,
+                                                    );
+                                                    modal.start();
+                                                    active_modal = ActiveModal::StreamOutput(modal);
+                                                    need_redraw = true;
+                                                }
+                                                ExecutionMode::Console => {
+                                                    let is_quiet = item.quiet.unwrap_or(false);
+                                                    let use_alt = item.alt_buffer.unwrap_or(true);
+                                                    let _ = guard.suspend(|| {
+                                                        if use_alt {
+                                                            let mut stdout = std::io::stdout();
+                                                            let _ = stdout.write_all(
+                                                                b"\x1b[?1049h\x1b[H\x1b[2J",
+                                                            );
+                                                            let _ = stdout.flush();
+                                                        }
+                                                        if !is_quiet {
+                                                            println!(
+                                                                "\n--- Running Command: {} ---\n",
+                                                                final_cmd
+                                                            );
+                                                        }
+                                                        let _ = Command::new("/bin/bash")
+                                                            .arg("-c")
+                                                            .arg(&final_cmd)
+                                                            .status();
+                                                        if !is_quiet {
+                                                            println!("\n--------------------------------------------------");
+                                                            print!("Press [ENTER] to return to menu...");
+                                                            let _ = std::io::stdout().flush();
+                                                            let mut input = String::new();
+                                                            let _ = std::io::stdin()
+                                                                .read_line(&mut input);
+                                                        }
+                                                        if use_alt {
+                                                            let mut stdout = std::io::stdout();
+                                                            let _ = stdout.write_all(b"\x1b[?1049l");
+                                                            let _ = stdout.flush();
+                                                        }
+                                                        Ok(())
+                                                    });
+                                                }
+                                            }
                                         }
                                     }
                                 }

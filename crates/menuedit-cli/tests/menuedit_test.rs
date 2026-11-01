@@ -767,3 +767,59 @@ fn test_menuedit_find_node_path_and_ancestor_expansion() {
         "Nested target node must be visible after ancestor expansion"
     );
 }
+
+#[test]
+fn test_menuedit_execution_mode_selector_and_window_percent() {
+    use bashmenu_core::{ExecutionMode, MenuItem, MenuItemType};
+    use crossterm::event::KeyCode;
+    use menuedit_cli::{FocusControl, ItemEditModal, ItemEditResult};
+
+    let item = MenuItem {
+        label: "Check Disk Usage [df -h]".to_string(),
+        r#type: MenuItemType::Command,
+        command: Some("df -h".to_string()),
+        ..Default::default()
+    };
+
+    let mut modal = ItemEditModal::new(&item);
+
+    // Initial default is Console (2)
+    assert_eq!(modal.exec_mode, 2);
+
+    // Move to ExecModeSelector and cycle mode
+    let ctrls = modal.focus_controls();
+    let exec_idx = ctrls
+        .iter()
+        .position(|c| *c == FocusControl::ExecModeSelector)
+        .expect("ExecModeSelector must be in controls");
+    modal.active_control_idx = exec_idx;
+
+    // Press '1' -> Streaming Mode (0)
+    assert_eq!(
+        modal.handle_key(KeyCode::Char('1'), crossterm::event::KeyModifiers::NONE),
+        ItemEditResult::Continue
+    );
+    assert_eq!(modal.exec_mode, 0);
+
+    // Window percent control should now be available
+    let ctrls_stream = modal.focus_controls();
+    assert!(ctrls_stream.contains(&FocusControl::WindowPercentInput));
+
+    // Edit window percent
+    let win_pct_idx = ctrls_stream
+        .iter()
+        .position(|c| *c == FocusControl::WindowPercentInput)
+        .unwrap();
+    modal.active_control_idx = win_pct_idx;
+    modal.window_percent_input = menuedit_cli::TextInput::new("75");
+
+    // Save item and verify
+    let updated = modal.build_updated_item();
+    assert_eq!(updated.execution_mode(), ExecutionMode::Streaming);
+    assert_eq!(updated.window_percent(), 75);
+    assert_eq!(updated.interactive, Some(false));
+    assert_eq!(
+        updated.extra.get("stream").and_then(|v| v.as_bool()),
+        Some(true)
+    );
+}

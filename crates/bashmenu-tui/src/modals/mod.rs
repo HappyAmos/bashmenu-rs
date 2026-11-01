@@ -10,6 +10,7 @@ pub mod message;
 pub mod note_editor;
 pub mod note_viewer;
 pub mod radio;
+pub mod stream_output;
 pub mod theme_picker;
 pub mod toggle;
 
@@ -23,5 +24,6 @@ pub use message::MessageModal;
 pub use note_editor::{NoteEditorAction, NoteEditorModal};
 pub use note_viewer::{wrap_footer_tokens, NoteViewerAction, NoteViewerModal};
 pub use radio::RadioModal;
+pub use stream_output::{StreamOutputAction, StreamOutputModal, StreamOutputMsg};
 pub use theme_picker::ThemePickerModal;
 pub use toggle::{ToggleChoice, ToggleModal};

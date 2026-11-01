@@ -335,7 +335,7 @@ items:
               icon: '{nf::#f02aa}'
           - Install Kitty [curl -L https://sw.kovidgoyal.net/kitty/installer.sh | sh /dev/stdin]:
               type: command
-              action: curl -L https://sw.kovidgoyal.net/kitty/installer.sh | sh /dev/stdin
+              action: curl -fsSL https://sw.kovidgoyal.net/kitty/installer.sh | sh /dev/stdin
               icon: '{nf::#f26b:}'
               interactive: true
               quiet: true
@@ -756,14 +756,14 @@ items:
               picker: none
           - Weather -> 3 Day [curl wttr.in/{user.postal_code}]:
               type: command
-              action: curl wttr.in/{user.postal_code} | {scripts_dir}/pager.sh
+              action: curl -s wttr.in/{user.postal_code} | {scripts_dir}/pager.sh
               icon: '{nf::#eef0:}'
               quiet: true
               interactive: true
               alt_buffer: true
           - Weather -> 3 Day v.2. [curl v2.wttr.in/{user.postal_code}]:
               type: command
-              action: curl v2.wttr.in/{user.postal_code} | {scripts_dir}/pager.sh
+              action: curl -s v2.wttr.in/{user.postal_code} | {scripts_dir}/pager.sh
               icon: '{nf::#eef0:}'
               interactive: true
               quiet: true

@@ -91,6 +91,52 @@ fn test_parse_production_bashmenu_mnu() {
 }
 
 #[test]
+fn test_menu_item_execution_mode_and_window_percent() {
+    use bashmenu_core::{ExecutionMode, MenuItem};
+
+    // 1. Streaming via stream: true
+    let mut item_stream = MenuItem::default();
+    item_stream
+        .extra
+        .insert("stream".to_string(), serde_yml::Value::Bool(true));
+    assert_eq!(item_stream.execution_mode(), ExecutionMode::Streaming);
+    assert!(item_stream.is_streaming());
+    assert_eq!(item_stream.window_percent(), 65);
+
+    // 2. Streaming via interactive: false
+    let item_non_interactive = MenuItem {
+        interactive: Some(false),
+        ..Default::default()
+    };
+    assert_eq!(
+        item_non_interactive.execution_mode(),
+        ExecutionMode::Streaming
+    );
+    assert!(item_non_interactive.is_streaming());
+
+    // 3. Interactive via exec_mode: "interactive" and window_percent: 80
+    let mut item_interact = MenuItem::default();
+    item_interact.extra.insert(
+        "exec_mode".to_string(),
+        serde_yml::Value::String("interactive".to_string()),
+    );
+    item_interact.extra.insert(
+        "window_percent".to_string(),
+        serde_yml::Value::Number(80.into()),
+    );
+    assert_eq!(item_interact.execution_mode(), ExecutionMode::Interactive);
+    assert_eq!(item_interact.window_percent(), 80);
+
+    // 4. Console mode (default or interactive: true)
+    let item_console = MenuItem {
+        interactive: Some(true),
+        ..Default::default()
+    };
+    assert_eq!(item_console.execution_mode(), ExecutionMode::Console);
+    assert_eq!(item_console.window_percent(), 65);
+}
+
+#[test]
 fn test_parse_production_bashmenu_themes() {
     let fixture = fixture_path("bashmenu.themes");
     assert!(

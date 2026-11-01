@@ -1,5 +1,6 @@
 //! Reusable TUI primitives, widgets, terminal guards, modals, and panic safety hooks for BashMenu.
 
+pub mod ansi;
 pub mod bbcode;
 pub mod borders;
 pub mod gutter;
@@ -11,6 +12,7 @@ pub mod terminal;
 pub mod toast;
 pub mod wallpaper;
 
+pub use ansi::ansi_to_line;
 pub use bbcode::{
     is_bbcode_tag, parse_bbcode_spans, parse_color, split_label_brackets, strip_bbcode,
     truncate_to_width, visible_text_len,
@@ -26,7 +28,8 @@ pub use modals::{
     compute_modal_inner, is_close_button_clicked, render_modal_frame, AsciiGridModal,
     ColorGridModal, ConfirmModal, FilePickerModal, HelpModal, InputModal, MessageModal,
     NoteEditorAction, NoteEditorModal, NoteViewerAction, NoteViewerModal, RadioModal,
-    ThemePickerModal, ToggleChoice, ToggleModal,
+    StreamOutputAction, StreamOutputModal, StreamOutputMsg, ThemePickerModal, ToggleChoice,
+    ToggleModal,
 };
 pub use style::{parse_color_value, ResolvedThemeStyles};
 pub use terminal::TerminalGuard;

@@ -174,6 +174,68 @@ impl MenuItem {
         }
         list
     }
+
+    /// Execution mode for this menu item
+    pub fn execution_mode(&self) -> ExecutionMode {
+        if let Some(s) = self.extra.get("exec_mode").and_then(|v| v.as_str()) {
+            match s.to_lowercase().as_str() {
+                "streaming" | "stream" => ExecutionMode::Streaming,
+                "interactive" => ExecutionMode::Interactive,
+                "console" | "standard" | "terminal" => ExecutionMode::Console,
+                _ => ExecutionMode::Console,
+            }
+        } else if self.is_streaming() {
+            ExecutionMode::Streaming
+        } else if self
+            .extra
+            .get("floating")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)
+        {
+            ExecutionMode::Interactive
+        } else {
+            ExecutionMode::Console
+        }
+    }
+
+    /// Whether this item executes in streaming mode
+    pub fn is_streaming(&self) -> bool {
+        if let Some(b) = self.extra.get("stream").and_then(|v| v.as_bool()) {
+            if b {
+                return true;
+            }
+        }
+        if self.interactive == Some(false) {
+            return true;
+        }
+        false
+    }
+
+    /// Window percentage for floating dialogs (Streaming or Interactive mode)
+    pub fn window_percent(&self) -> u16 {
+        self.extra
+            .get("window_percent")
+            .and_then(|v| {
+                if let Some(n) = v.as_u64() {
+                    Some(n as u16)
+                } else if let Some(s) = v.as_str() {
+                    s.trim().trim_end_matches('%').parse::<u16>().ok()
+                } else {
+                    None
+                }
+            })
+            .map(|pct| pct.clamp(20, 100))
+            .unwrap_or(65)
+    }
+}
+
+/// Execution mode for a menu command or action
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ExecutionMode {
+    Streaming,
+    Interactive,
+    Console,
 }
 
 /// Submenu container holding child items

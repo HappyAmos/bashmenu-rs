@@ -9,7 +9,7 @@ use ratatui::widgets::{Block, Borders, Clear, Widget};
 /// Calculates the inner `Rect` for a modal dialog given the viewport and target dimensions
 pub fn compute_modal_inner(area: Rect, dialog_w: u16, dialog_h: u16) -> Rect {
     let w = dialog_w.min(area.width.saturating_sub(4));
-    let h = dialog_h.min(area.height.saturating_sub(2)).min(28);
+    let h = dialog_h.min(area.height.saturating_sub(2));
 
     let start_x = area.x + (area.width.saturating_sub(w + 2)) / 2;
     let start_y = area.y + (area.height.saturating_sub(h + 1)) / 2;
@@ -39,7 +39,7 @@ pub fn render_modal_frame(
 ) -> Rect {
     // Clamp to viewport size within shadow margins
     let w = dialog_w.min(area.width.saturating_sub(4));
-    let h = dialog_h.min(area.height.saturating_sub(2)).min(28);
+    let h = dialog_h.min(area.height.saturating_sub(2));
 
     let start_x = area.x + (area.width.saturating_sub(w + 2)) / 2;
     let start_y = area.y + (area.height.saturating_sub(h + 1)) / 2;
