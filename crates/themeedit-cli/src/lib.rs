@@ -2,8 +2,11 @@
 
 use anyhow::Result;
 use bashmenu_core::{
-    load_themes, save_themes, DividerConfig, MarqueeConfig, Theme, ThemeCollection, WindowBorders,
+    load_themes, save_themes, DividerConfig, MarqueeConfig, Theme, ThemeCollection,
+    WallpaperSetting, WindowBorders,
 };
+use bashmenu_tui::ResolvedThemeStyles;
+use ratatui::layout::Rect;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -18,6 +21,7 @@ pub enum TokenKind {
     MarqueeGap,
     ToastChar,
     ToastTimeout,
+    WallpaperImage,
 }
 
 #[derive(Debug, Clone)]
@@ -113,6 +117,15 @@ impl ThemeEditorState {
             .unwrap_or_else(Self::create_default_theme);
 
         let tokens = vec![
+            // Background & Wallpaper
+            TokenItem {
+                label: "Background Color".to_string(),
+                kind: TokenKind::Color("background".to_string()),
+            },
+            TokenItem {
+                label: "Wallpaper Image".to_string(),
+                kind: TokenKind::WallpaperImage,
+            },
             // Colors
             TokenItem {
                 label: "Text Color".to_string(),
@@ -456,6 +469,21 @@ impl ThemeEditorState {
                     .unwrap_or(2.0);
                 format!("{:.1}s", t)
             }
+            TokenKind::WallpaperImage => {
+                if let Some(wp) = self.current_theme.wallpaper_config() {
+                    if let Some(img) = &wp.image {
+                        if !img.is_empty() {
+                            let p = std::path::Path::new(img);
+                            return p
+                                .file_name()
+                                .and_then(|n| n.to_str())
+                                .unwrap_or(img)
+                                .to_string();
+                        }
+                    }
+                }
+                "None".to_string()
+            }
         }
     }
 
@@ -464,16 +492,62 @@ impl ThemeEditorState {
             self.current_theme.colors_256 = Some(HashMap::new());
         }
         if let Some(c_map) = &mut self.current_theme.colors_256 {
-            c_map.insert(
-                key.to_string(),
-                serde_yml::Value::Sequence(vec![
+            if key == "background" {
+                c_map.insert(
+                    key.to_string(),
                     serde_yml::Value::Number((color_idx as i64).into()),
-                    serde_yml::Value::Number((-1).into()),
-                ]),
-            );
+                );
+            } else {
+                c_map.insert(
+                    key.to_string(),
+                    serde_yml::Value::Sequence(vec![
+                        serde_yml::Value::Number((color_idx as i64).into()),
+                        serde_yml::Value::Number((-1).into()),
+                    ]),
+                );
+            }
             self.is_modified = true;
             self.status_message = format!("Updated {} to color {}", key, color_idx);
         }
+    }
+
+    pub fn set_wallpaper_image(&mut self, path: Option<String>) {
+        match path {
+            Some(p) => {
+                let mut cfg = self.current_theme.wallpaper_config().unwrap_or_default();
+                cfg.image = Some(p.clone());
+                cfg.enabled = true;
+                self.current_theme.background = Some(WallpaperSetting::Config(cfg));
+                self.is_modified = true;
+                self.status_message = format!("Set wallpaper image to {}", p);
+            }
+            None => {
+                self.current_theme.background = None;
+                self.current_theme.extra.remove("wallpaper");
+                self.current_theme.extra.remove("theme_background");
+                self.is_modified = true;
+                self.status_message = "Removed wallpaper image".to_string();
+            }
+        }
+    }
+
+    pub fn get_color_token_u8(&self, key: &str) -> u8 {
+        if let Some(c_map) = &self.current_theme.colors_256 {
+            if let Some(val) = c_map.get(key) {
+                if let Some(seq) = val.as_sequence() {
+                    if let Some(fg) = seq.first().and_then(|v| v.as_i64()) {
+                        if (0..=255).contains(&fg) {
+                            return fg as u8;
+                        }
+                    }
+                } else if let Some(n) = val.as_i64() {
+                    if (0..=255).contains(&n) {
+                        return n as u8;
+                    }
+                }
+            }
+        }
+        255
     }
 
     pub fn set_border_token(&mut self, key: &str, ch: char) {
@@ -622,6 +696,7 @@ impl ThemeEditorState {
             TokenKind::MarqueeGap => key == "marquee_gap",
             TokenKind::ToastChar => key == "toast_char",
             TokenKind::ToastTimeout => key == "toast_timeout",
+            TokenKind::WallpaperImage => key == "wallpaper" || key == "wallpaper_image",
         }) {
             self.selected_idx = idx;
             self.status_message.clear();
@@ -633,6 +708,8 @@ impl ThemeEditorState {
             TokenKind::Color(k) => {
                 (k == "shortcut_key" && (key == "shortcut_gutter" || key == "shortcut"))
                     || (k == "text" && key == "content")
+                    || (k == "background"
+                        && (key == "bg" || key == "bg_color" || key == "background_color"))
             }
             TokenKind::Border(k) => {
                 (k == "top_tee" && key == "gutter_top_tee")
@@ -648,6 +725,9 @@ impl ThemeEditorState {
             TokenKind::MarqueeChar => key == "marquee",
             TokenKind::ToastChar => key == "toast_char" || key == "toast_bar" || key == "toast",
             TokenKind::ToastTimeout => key == "toast_timeout" || key == "toast_duration",
+            TokenKind::WallpaperImage => {
+                key == "wallpaper" || key == "wallpaper_image" || key == "bg_image"
+            }
             _ => false,
         }) {
             self.selected_idx = idx;
@@ -656,4 +736,236 @@ impl ThemeEditorState {
         }
         false
     }
+}
+
+/// Calculates visual rectangular spans `(y, x_start, x_end)` in the preview pane corresponding
+/// to a theme token so the UI can flash them when selected or clicked.
+pub fn get_token_preview_spans(
+    token: &TokenItem,
+    right_area: Rect,
+    _mode: PreviewMode,
+    _preview_styles: &ResolvedThemeStyles,
+) -> Vec<(u16, u16, u16)> {
+    let mut spans = Vec::new();
+    if right_area.width < 6 || right_area.height < 6 {
+        return spans;
+    }
+    let w = right_area.width as usize;
+    let avail_both = (w.saturating_sub(6)).max(4);
+    let left_gutter_w = avail_both / 2;
+    let sep_x = (right_area.x + 2 + left_gutter_w as u16)
+        .min(right_area.x + right_area.width.saturating_sub(2));
+    let gt_y = right_area.y + right_area.height.saturating_sub(3);
+    let p_inner_x = right_area.x + 2;
+    let p_avail_w = right_area.width.saturating_sub(4);
+    let content_start_y = right_area.y + 2;
+    let content_avail_h = gt_y.saturating_sub(content_start_y);
+    let plugin_start_y = gt_y.saturating_sub(if content_avail_h >= 8 { 3 } else { 1 });
+    let bot_y = right_area.y + right_area.height.saturating_sub(1);
+
+    match &token.kind {
+        TokenKind::Color(key) if key == "background" => {
+            for y in (right_area.y + 1)..bot_y {
+                spans.push((
+                    y,
+                    right_area.x + 1,
+                    right_area.x + right_area.width.saturating_sub(1),
+                ));
+            }
+        }
+        TokenKind::WallpaperImage => {
+            for y in (right_area.y + 1)..bot_y {
+                spans.push((
+                    y,
+                    right_area.x + 1,
+                    right_area.x + right_area.width.saturating_sub(1),
+                ));
+            }
+        }
+        TokenKind::Color(key) if key == "border" => {
+            spans.push((right_area.y, right_area.x, right_area.x + right_area.width));
+            spans.push((bot_y, right_area.x, right_area.x + right_area.width));
+            for y in (right_area.y + 1)..bot_y {
+                spans.push((y, right_area.x, right_area.x + 1));
+                spans.push((
+                    y,
+                    right_area.x + right_area.width.saturating_sub(1),
+                    right_area.x + right_area.width,
+                ));
+            }
+        }
+        TokenKind::Border(key) if key == "border_horizontal" => {
+            spans.push((
+                right_area.y,
+                right_area.x + 1,
+                right_area.x + right_area.width.saturating_sub(1),
+            ));
+            spans.push((
+                bot_y,
+                right_area.x + 1,
+                right_area.x + right_area.width.saturating_sub(1),
+            ));
+        }
+        TokenKind::Border(key) if key == "border_vertical" => {
+            for y in (right_area.y + 1)..bot_y {
+                spans.push((y, right_area.x, right_area.x + 1));
+                spans.push((
+                    y,
+                    right_area.x + right_area.width.saturating_sub(1),
+                    right_area.x + right_area.width,
+                ));
+            }
+        }
+        TokenKind::Border(key) if key == "border_top_left" => {
+            spans.push((right_area.y, right_area.x, right_area.x + 1));
+        }
+        TokenKind::Border(key) if key == "border_top_right" => {
+            spans.push((
+                right_area.y,
+                right_area.x + right_area.width.saturating_sub(1),
+                right_area.x + right_area.width,
+            ));
+        }
+        TokenKind::Border(key) if key == "border_bottom_left" => {
+            spans.push((bot_y, right_area.x, right_area.x + 1));
+        }
+        TokenKind::Border(key) if key == "border_bottom_right" => {
+            spans.push((
+                bot_y,
+                right_area.x + right_area.width.saturating_sub(1),
+                right_area.x + right_area.width,
+            ));
+        }
+        TokenKind::Border(key) if key == "left_tee" || key == "gutter_left_tee" => {
+            spans.push((gt_y, right_area.x, right_area.x + 1));
+        }
+        TokenKind::Border(key) if key == "right_tee" || key == "gutter_right_tee" => {
+            spans.push((
+                gt_y,
+                right_area.x + right_area.width.saturating_sub(1),
+                right_area.x + right_area.width,
+            ));
+        }
+        TokenKind::Border(key) if key == "top_tee" || key == "gutter_top_tee" => {
+            spans.push((gt_y, sep_x, sep_x + 1));
+        }
+        TokenKind::Border(key) if key == "bottom_tee" || key == "gutter_bottom_tee" => {
+            spans.push((bot_y, sep_x, sep_x + 1));
+        }
+        TokenKind::Border(key) if key == "gutter_border" => {
+            spans.push((
+                gt_y,
+                right_area.x + 1,
+                right_area.x + right_area.width.saturating_sub(1),
+            ));
+        }
+        TokenKind::Border(key) if key == "gutter_separator" => {
+            spans.push((gt_y + 1, sep_x, sep_x + 1));
+        }
+        TokenKind::Color(key) if key == "title" => {
+            spans.push((
+                right_area.y,
+                right_area.x + 2,
+                right_area.x + right_area.width.saturating_sub(2),
+            ));
+        }
+        TokenKind::Color(key) if key == "highlight" => {
+            spans.push((content_start_y + 1, p_inner_x, p_inner_x + p_avail_w));
+        }
+        TokenKind::Color(key) if key == "text" => {
+            spans.push((
+                content_start_y,
+                p_inner_x + 6,
+                right_area.x + right_area.width.saturating_sub(2),
+            ));
+            spans.push((
+                content_start_y + 2,
+                p_inner_x + 6,
+                right_area.x + right_area.width.saturating_sub(18),
+            ));
+            spans.push((
+                content_start_y + 4,
+                p_inner_x + 6,
+                right_area.x + right_area.width.saturating_sub(2),
+            ));
+        }
+        TokenKind::Color(key) if key == "accent" => {
+            if content_avail_h >= 8 {
+                spans.push((plugin_start_y + 1, p_inner_x, p_inner_x + p_avail_w));
+            }
+            spans.push((
+                content_start_y + 2,
+                right_area.x + right_area.width.saturating_sub(18),
+                right_area.x + right_area.width.saturating_sub(2),
+            ));
+        }
+        TokenKind::Color(key) if key == "shortcut_key" => {
+            spans.push((content_start_y, p_inner_x + 7, p_inner_x + 10));
+            spans.push((content_start_y + 1, p_inner_x + 7, p_inner_x + 10));
+            spans.push((content_start_y + 2, p_inner_x + 7, p_inner_x + 10));
+            spans.push((content_start_y + 4, p_inner_x + 7, p_inner_x + 10));
+        }
+        TokenKind::Indicator => {
+            spans.push((content_start_y + 1, p_inner_x + 2, p_inner_x + 7));
+        }
+        TokenKind::Color(key) if key == "divider" => {
+            spans.push((content_start_y + 3, p_inner_x, p_inner_x + p_avail_w));
+            if content_avail_h >= 8 {
+                spans.push((plugin_start_y, p_inner_x, p_inner_x + p_avail_w));
+            }
+        }
+        TokenKind::DividerChar | TokenKind::DividerLength => {
+            spans.push((content_start_y + 3, p_inner_x, p_inner_x + p_avail_w));
+        }
+        TokenKind::MarqueeChar | TokenKind::MarqueeGap => {
+            spans.push((
+                content_start_y + 1,
+                p_inner_x + 10,
+                right_area.x + right_area.width.saturating_sub(6),
+            ));
+        }
+        TokenKind::Color(key) if key == "help_text" => {
+            spans.push((gt_y + 1, right_area.x + 2, sep_x));
+        }
+        TokenKind::Color(key) if key == "gutter" => {
+            spans.push((
+                gt_y + 1,
+                sep_x + 1,
+                right_area.x + right_area.width.saturating_sub(2),
+            ));
+        }
+        TokenKind::Color(key) if key == "scrollbar" => {
+            let top_sb = (right_area.y + 3).min(bot_y);
+            let bot_sb = (right_area.y + 6).min(bot_y);
+            for y in top_sb..=bot_sb {
+                spans.push((
+                    y,
+                    right_area.x + right_area.width.saturating_sub(1),
+                    right_area.x + right_area.width,
+                ));
+            }
+        }
+        TokenKind::ToastChar | TokenKind::ToastTimeout => {
+            let toast_w = 40_u16.min(right_area.width.saturating_sub(4));
+            let toast_h = 4_u16.min(right_area.height.saturating_sub(2));
+            let toast_x = right_area.x + right_area.width.saturating_sub(toast_w + 2);
+            let toast_y = bot_y.saturating_sub(toast_h + 1);
+            for y in toast_y..toast_y + toast_h {
+                spans.push((y, toast_x, toast_x + 2));
+            }
+        }
+        TokenKind::Color(key) if key.starts_with("toast_") => {
+            let toast_w = 40_u16.min(right_area.width.saturating_sub(4));
+            let toast_h = 4_u16.min(right_area.height.saturating_sub(2));
+            let toast_x = right_area.x + right_area.width.saturating_sub(toast_w + 2);
+            let toast_y = bot_y.saturating_sub(toast_h + 1);
+            for y in toast_y..toast_y + toast_h {
+                spans.push((y, toast_x, toast_x + toast_w));
+            }
+        }
+        _ => {
+            spans.push((content_start_y, p_inner_x, p_inner_x + p_avail_w));
+        }
+    }
+    spans
 }

@@ -544,10 +544,16 @@ fn test_modal_frame_close_button_rendering_and_clicking() {
 
     let inner = render_modal_frame(area, 60, 15, "Close Test", &styles, &mut buf);
 
+    // Verify top border title format: ┌─[ Close Test ]─────...
+    let top_y = inner.y - 1;
+    let corner_x = inner.x - 1;
+    assert_eq!(buf[(corner_x, top_y)].symbol(), "┌");
+    assert_eq!(buf[(corner_x + 1, top_y)].symbol(), "─");
+    assert_eq!(buf[(corner_x + 2, top_y)].symbol(), "[");
+
     // Top-right corner character is at inner.x + inner.width.
     // Close button [X] is at inner.x + inner.width - 3 .. -1.
     let close_start = inner.x + inner.width - 3;
-    let top_y = inner.y - 1;
 
     let cell_bracket_open = buf.cell((close_start, top_y)).unwrap();
     assert_eq!(cell_bracket_open.symbol(), "[");

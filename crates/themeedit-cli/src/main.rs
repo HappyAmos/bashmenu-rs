@@ -7,8 +7,9 @@
 use anyhow::Result;
 use bashmenu_core::{ToastNotification, ToastSeverity};
 use bashmenu_tui::{
-    composite_buffer, install_panic_hook, AsciiGridModal, ColorGridModal, ConfirmModal, InputModal,
-    ResolvedThemeStyles, TerminalGuard, ToastRack, WallpaperCompositor,
+    composite_buffer, install_panic_hook, AsciiGridModal, ColorGridModal, ConfirmModal,
+    FilePickerModal, InputModal, ResolvedThemeStyles, TerminalGuard, ToastRack,
+    WallpaperCompositor,
 };
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers, MouseButton, MouseEventKind};
@@ -18,7 +19,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Widget};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-use themeedit_cli::{PreviewMode, ThemeEditorState, TokenKind};
+use themeedit_cli::{get_token_preview_spans, PreviewMode, ThemeEditorState, TokenKind};
 
 #[derive(Parser, Debug)]
 #[command(
@@ -59,7 +60,10 @@ enum ActiveModal {
     AsciiPicker(String, AsciiGridModal),
     SaveAs(InputModal),
     ConfirmExit(ConfirmModal),
+    WallpaperPicker(FilePickerModal),
 }
+
+type FlashHighlight = (std::time::Instant, Vec<(u16, u16, u16)>);
 
 fn main() -> Result<()> {
     install_panic_hook();
@@ -76,7 +80,7 @@ fn main() -> Result<()> {
         .wallpaper_config()
         .map(WallpaperCompositor::new);
     let mut need_redraw = true;
-    let mut click_flash: Option<(std::time::Instant, u16, u16, u16)> = None;
+    let mut click_flash: Option<FlashHighlight> = None;
     let mut toast_rack = ToastRack::new();
 
     loop {
@@ -102,9 +106,9 @@ fn main() -> Result<()> {
                 let root_block = Block::default()
                     .borders(Borders::ALL)
                     .title(format!(
-                        " [ ThemeEdit: {} {} ] ",
+                        "─[ ThemeEdit: {}{} ]",
                         state.current_name,
-                        if state.is_modified { "(Modified)" } else { "" }
+                        if state.is_modified { " (Modified)" } else { "" }
                     ))
                     .border_style(Style::default().fg(Color::Cyan));
                 root_block.render(area, buf);
@@ -209,7 +213,7 @@ fn main() -> Result<()> {
                 };
 
                 let preview_title = format!(
-                    " [ Preview: {} | {} | {} | {} | {} ] ",
+                    "─[ Preview: {} | {} | {} | {} | {} ]",
                     tab_menu, tab_ed, tab_mod, tab_me, tab_toast
                 );
 
@@ -574,7 +578,7 @@ fn main() -> Result<()> {
 
                         let modal_block = Block::default()
                             .borders(Borders::ALL)
-                            .title(" [ Confirmation Dialog ] ")
+                            .title("─[ Confirmation Dialog ]")
                             .border_style(Style::default().fg(preview_styles.border))
                             .style(Style::default().bg(preview_styles.background));
                         modal_block.render(Rect::new(mod_x, mod_y, mod_w, mod_h), buf);
@@ -668,14 +672,14 @@ fn main() -> Result<()> {
                         // Left Panel: Tree with interior borders in accent style
                         let tree_block = Block::default()
                             .borders(Borders::ALL)
-                            .title(" [ Menu Structure ] ")
+                            .title("─[ Menu Structure ]")
                             .border_style(preview_styles.accent);
                         tree_block.render(tree_rect, buf);
 
                         // Right Panel: Property Inspector with interior borders in accent style
                         let insp_block = Block::default()
                             .borders(Borders::ALL)
-                            .title(" ── Property Inspector ── ")
+                            .title("───[ Property Inspector ]")
                             .border_style(preview_styles.accent);
                         insp_block.render(insp_rect, buf);
 
@@ -930,6 +934,7 @@ fn main() -> Result<()> {
                 let bottom_items = [
                     "[TAB/1-5] Switch Preview",
                     "[Enter] Pick",
+                    "[F2] Wallpaper",
                     "[Ctrl+S] Save",
                     "[Ctrl+A] Save As",
                     "[q] Exit",
@@ -963,15 +968,20 @@ fn main() -> Result<()> {
                     ActiveModal::ConfirmExit(modal) => {
                         modal.render(area, &preview_styles, buf);
                     }
+                    ActiveModal::WallpaperPicker(modal) => {
+                        modal.render(area, &preview_styles, buf);
+                    }
                     ActiveModal::None => {}
                 }
 
-                // 5. Visual/Haptic feedback flash for preview panel clicks (Modifier::REVERSED for 150ms)
-                if let Some((flash_start, fy, fx_start, fx_end)) = click_flash {
-                    if flash_start.elapsed() < Duration::from_millis(150) {
-                        for x in fx_start..fx_end {
-                            if let Some(cell) = buf.cell_mut((x, fy)) {
-                                cell.modifier |= Modifier::REVERSED;
+                // 5. Visual/Haptic feedback flash for preview panel clicks & inspector token selection (Modifier::REVERSED for 200ms)
+                if let Some((flash_start, ref spans)) = click_flash {
+                    if flash_start.elapsed() < Duration::from_millis(200) {
+                        for &(fy, fx_start, fx_end) in spans {
+                            for x in fx_start..fx_end {
+                                if let Some(cell) = buf.cell_mut((x, fy)) {
+                                    cell.modifier |= Modifier::REVERSED;
+                                }
                             }
                         }
                     } else {
@@ -1149,303 +1159,492 @@ fn main() -> Result<()> {
                     }
                     _ => {}
                 },
-                ActiveModal::None => match ev {
-                    Event::Mouse(m) => {
-                        if toast_rack.handle_mouse(m.column, m.row) {
-                            continue;
-                        }
-
-                        let bot_y = area.y + area.height - 1;
-                        let footer_y = bot_y.saturating_sub(1);
-                        let gt_y = footer_y.saturating_sub(1);
-                        let panel_y = area.y + 2;
-                        let panel_h = gt_y.saturating_sub(panel_y);
-
-                        let left_w = (area.width * 45 / 100).clamp(30, 42);
-                        let left_area = Rect::new(area.x + 2, panel_y, left_w, panel_h);
-                        let right_x = area.x + left_w + 1;
-                        let right_w = (area.x + area.width).saturating_sub(right_x + 2);
-                        let right_area = Rect::new(right_x, panel_y, right_w, panel_h);
-
-                        if m.kind == MouseEventKind::ScrollUp {
-                            if m.column >= left_area.x
-                                && m.column < left_area.x + left_area.width
-                                && state.selected_idx > 0
-                            {
-                                state.selected_idx -= 1;
-                            }
-                            continue;
-                        }
-                        if m.kind == MouseEventKind::ScrollDown {
-                            if m.column >= left_area.x
-                                && m.column < left_area.x + left_area.width
-                                && state.selected_idx + 1 < state.tokens.len()
-                            {
-                                state.selected_idx += 1;
-                            }
-                            continue;
-                        }
-
-                        if m.kind == MouseEventKind::Down(MouseButton::Left) {
-                            // Universal close button [X]
-                            if m.row == area.y && m.column >= area.x + area.width - 5 {
-                                if state.is_modified {
-                                    active_modal = ActiveModal::ConfirmExit(ConfirmModal::new(
-                                        "Unsaved Changes",
-                                        "Discard unsaved changes and exit?",
-                                    ));
-                                } else {
-                                    break;
-                                }
-                                continue;
-                            }
-
-                            // 1. Click on left token list
-                            let visible_rows = (left_area.height.saturating_sub(2)) as usize;
-                            if m.column >= left_area.x
-                                && m.column < left_area.x + left_area.width
-                                && m.row >= left_area.y + 2
-                                && m.row < left_area.y + 2 + visible_rows as u16
-                            {
-                                let clicked_idx =
-                                    state.scroll_offset + (m.row - (left_area.y + 2)) as usize;
-                                if clicked_idx < state.tokens.len() {
-                                    state.selected_idx = clicked_idx;
-                                    let label = state.tokens[clicked_idx].label.clone();
-                                    toast_rack.add(ToastNotification {
-                                        title: Some("Theme Editor".to_string()),
-                                        message: format!("Selected: {}", label),
-                                        severity: ToastSeverity::Information,
-                                        timeout_secs: 1.5,
-                                    });
-                                }
-                                continue;
-                            }
-
-                            // 2. Click on preview mode tab header
-                            let title_text = format!(
-                                " Preview: {} (Click to Switch) ",
-                                state.preview_mode.title()
-                            );
-                            let title_start = right_area.x + 3;
-                            let title_end = title_start + title_text.len() as u16;
-                            if m.row == right_area.y
-                                && m.column >= title_start
-                                && m.column < title_end
-                            {
-                                state.preview_mode = state.preview_mode.next();
-                                continue;
-                            }
-
-                            // 3. Click on preview pane to focus clicked element and trigger haptic flash
-                            if m.column >= right_area.x
-                                && m.column < right_area.x + right_area.width
-                                && m.row >= right_area.y
-                                && m.row < right_area.y + right_area.height
-                            {
-                                if let Some((key, fy, fx_start, fx_end)) = hit_test_preview(
-                                    m.column,
-                                    m.row,
-                                    right_area,
-                                    state.preview_mode,
-                                    preview_styles.divider_is_screen_width,
-                                ) {
-                                    if state.select_token_by_key(key) {
-                                        let label = state.tokens[state.selected_idx].label.clone();
-                                        toast_rack.add(ToastNotification {
-                                            title: Some("Theme Editor".to_string()),
-                                            message: format!("Selected: {}", label),
-                                            severity: ToastSeverity::Information,
-                                            timeout_secs: 1.5,
-                                        });
-                                    }
-                                    click_flash =
-                                        Some((std::time::Instant::now(), fy, fx_start, fx_end));
-                                    need_redraw = true;
-                                }
-                                continue;
-                            }
-                        }
-                    }
+                ActiveModal::WallpaperPicker(ref mut modal) => match ev {
                     Event::Key(k) => {
-                        // Invariant: Ctrl+S saves directly whenever theme_name is set; only untitled diverts to Save As
-                        if k.modifiers.contains(KeyModifiers::CONTROL) {
-                            match k.code {
-                                KeyCode::Char('s') => {
-                                    if state.current_name.is_empty()
-                                        || state.current_name == "untitled"
-                                    {
-                                        active_modal = ActiveModal::SaveAs(InputModal::new(
-                                            "Save Theme As",
-                                            "Enter theme name:",
-                                            &state.current_name,
-                                        ));
-                                    } else {
-                                        match state.save_to_disk() {
-                                            Ok(_) => {
-                                                toast_rack.add(ToastNotification {
-                                                    title: Some("Save Theme".to_string()),
-                                                    message: format!(
-                                                        "Saved theme '{}' to disk",
-                                                        state.current_name
-                                                    ),
-                                                    severity: ToastSeverity::Information,
-                                                    timeout_secs: 2.0,
-                                                });
-                                            }
-                                            Err(e) => {
-                                                toast_rack.add(ToastNotification {
-                                                    title: Some("Error".to_string()),
-                                                    message: format!("Failed to save theme: {}", e),
-                                                    severity: ToastSeverity::Error,
-                                                    timeout_secs: 3.0,
-                                                });
-                                            }
+                        if k.code == KeyCode::Delete || k.code == KeyCode::Char('d') {
+                            state.set_wallpaper_image(None);
+                            toast_rack.add(ToastNotification {
+                                title: Some("Theme Editor".to_string()),
+                                message: "Wallpaper removed".to_string(),
+                                severity: ToastSeverity::Information,
+                                timeout_secs: 2.0,
+                            });
+                            active_modal = ActiveModal::None;
+                        } else if let Some(res) = modal.handle_key(k.code) {
+                            if let Some(path) = res {
+                                if path.is_file() {
+                                    let rel_path = if let Ok(cwd) = std::env::current_dir() {
+                                        if let Ok(rel) = path.strip_prefix(&cwd) {
+                                            rel.to_string_lossy().to_string()
+                                        } else {
+                                            path.to_string_lossy().to_string()
                                         }
-                                    }
-                                    continue;
-                                }
-                                KeyCode::Char('a') => {
-                                    // Ctrl+A opens Save As
-                                    active_modal = ActiveModal::SaveAs(InputModal::new(
-                                        "Save Theme As",
-                                        "Enter new theme name:",
-                                        &state.current_name,
-                                    ));
-                                    continue;
-                                }
-                                KeyCode::Char('n') => {
-                                    // Ctrl+N creates new theme
-                                    state.current_name = "untitled".to_string();
-                                    state.current_theme = ThemeEditorState::create_default_theme();
-                                    state.is_modified = true;
+                                    } else {
+                                        path.to_string_lossy().to_string()
+                                    };
+                                    state.set_wallpaper_image(Some(rel_path.clone()));
                                     toast_rack.add(ToastNotification {
                                         title: Some("Theme Editor".to_string()),
-                                        message: "Created new untitled theme".to_string(),
+                                        message: format!("Wallpaper: {}", rel_path),
                                         severity: ToastSeverity::Information,
                                         timeout_secs: 2.0,
                                     });
-                                    continue;
                                 }
-                                _ => {}
                             }
+                            active_modal = ActiveModal::None;
                         }
-
-                        match k.code {
-                            KeyCode::Tab | KeyCode::Char('p') | KeyCode::Char('P') => {
-                                state.preview_mode = state.preview_mode.next();
-                            }
-                            KeyCode::Char('1') => {
-                                state.preview_mode = PreviewMode::Menu;
-                            }
-                            KeyCode::Char('2') => {
-                                state.preview_mode = PreviewMode::TextEditor;
-                            }
-                            KeyCode::Char('3') => {
-                                state.preview_mode = PreviewMode::Modals;
-                            }
-                            KeyCode::Char('4') => {
-                                state.preview_mode = PreviewMode::MenuEditor;
-                            }
-                            KeyCode::Char('5') => {
-                                state.preview_mode = PreviewMode::Toast;
-                            }
-                            KeyCode::Up | KeyCode::Char('k') => {
-                                if state.selected_idx > 0 {
-                                    state.selected_idx -= 1;
+                    }
+                    Event::Mouse(m) => {
+                        if let Some(res) = modal.handle_mouse(m, area) {
+                            if let Some(path) = res {
+                                if path.is_file() {
+                                    let rel_path = if let Ok(cwd) = std::env::current_dir() {
+                                        if let Ok(rel) = path.strip_prefix(&cwd) {
+                                            rel.to_string_lossy().to_string()
+                                        } else {
+                                            path.to_string_lossy().to_string()
+                                        }
+                                    } else {
+                                        path.to_string_lossy().to_string()
+                                    };
+                                    state.set_wallpaper_image(Some(rel_path.clone()));
+                                    toast_rack.add(ToastNotification {
+                                        title: Some("Theme Editor".to_string()),
+                                        message: format!("Wallpaper: {}", rel_path),
+                                        severity: ToastSeverity::Information,
+                                        timeout_secs: 2.0,
+                                    });
                                 }
                             }
-                            KeyCode::Down | KeyCode::Char('j') => {
-                                if state.selected_idx + 1 < state.tokens.len() {
-                                    state.selected_idx += 1;
-                                }
-                            }
-                            KeyCode::PageUp => {
-                                state.selected_idx = state.selected_idx.saturating_sub(5);
-                            }
-                            KeyCode::PageDown => {
-                                state.selected_idx = (state.selected_idx + 5)
-                                    .min(state.tokens.len().saturating_sub(1));
-                            }
-                            KeyCode::Home => {
-                                state.selected_idx = 0;
-                            }
-                            KeyCode::End => {
-                                state.selected_idx = state.tokens.len().saturating_sub(1);
-                            }
-                            KeyCode::Enter => {
-                                let token = state.tokens[state.selected_idx].clone();
-                                match token.kind {
-                                    TokenKind::Color(key) => {
-                                        active_modal = ActiveModal::ColorPicker(
-                                            key,
-                                            ColorGridModal::new("Pick 256 Color", 255),
-                                        );
-                                    }
-                                    TokenKind::Border(key) => {
-                                        active_modal = ActiveModal::AsciiPicker(
-                                            key,
-                                            AsciiGridModal::new("Pick CP437 Border Char", 196),
-                                        );
-                                    }
-                                    TokenKind::Indicator => {
-                                        // Cycle indicator
-                                        state.current_theme.indicator =
-                                            match state.current_theme.indicator.as_deref() {
-                                                Some("> ") => Some("▶ ".to_string()),
-                                                Some("▶ ") => Some("{ascii:240}".to_string()),
-                                                Some("{ascii:240}") => Some("• ".to_string()),
-                                                _ => Some("> ".to_string()),
-                                            };
-                                        state.is_modified = true;
-                                    }
-                                    TokenKind::DividerChar => {
-                                        active_modal = ActiveModal::AsciiPicker(
-                                            "divider_char".to_string(),
-                                            AsciiGridModal::new("Pick CP437 Divider Char", 196),
-                                        );
-                                    }
-                                    TokenKind::DividerLength => {
-                                        state.toggle_divider_length();
-                                    }
-                                    TokenKind::MarqueeChar => {
-                                        active_modal = ActiveModal::AsciiPicker(
-                                            "marquee_char".to_string(),
-                                            AsciiGridModal::new("Pick CP437 Marquee Char", 7),
-                                        );
-                                    }
-                                    TokenKind::MarqueeGap => {
-                                        state.cycle_marquee_gap();
-                                    }
-                                    TokenKind::ToastChar => {
-                                        active_modal = ActiveModal::AsciiPicker(
-                                            "toast_char".to_string(),
-                                            AsciiGridModal::new("Pick Toast Left Bar Glyph", 221),
-                                        );
-                                    }
-                                    TokenKind::ToastTimeout => {
-                                        state.cycle_toast_timeout();
-                                    }
-                                }
-                            }
-                            KeyCode::Esc | KeyCode::Char('q') => {
-                                if state.is_modified {
-                                    active_modal = ActiveModal::ConfirmExit(ConfirmModal::new(
-                                        "Unsaved Changes",
-                                        "Discard unsaved changes and exit?",
-                                    ));
-                                } else {
-                                    break;
-                                }
-                            }
-                            _ => {}
+                            active_modal = ActiveModal::None;
                         }
                     }
                     _ => {}
                 },
+                ActiveModal::None => {
+                    let bot_y = area.y + area.height - 1;
+                    let footer_y = bot_y.saturating_sub(1);
+                    let gt_y = footer_y.saturating_sub(1);
+                    let panel_y = area.y + 2;
+                    let panel_h = gt_y.saturating_sub(panel_y);
+
+                    let left_w = (area.width * 45 / 100).clamp(30, 42);
+                    let left_area = Rect::new(area.x + 2, panel_y, left_w, panel_h);
+                    let right_x = area.x + left_w + 1;
+                    let right_w = (area.x + area.width).saturating_sub(right_x + 2);
+                    let right_area = Rect::new(right_x, panel_y, right_w, panel_h);
+
+                    match ev {
+                        Event::Mouse(m) => {
+                            if toast_rack.handle_mouse(m.column, m.row) {
+                                continue;
+                            }
+
+                            if m.kind == MouseEventKind::ScrollUp {
+                                if m.column >= left_area.x
+                                    && m.column < left_area.x + left_area.width
+                                    && state.selected_idx > 0
+                                {
+                                    state.selected_idx -= 1;
+                                }
+                                continue;
+                            }
+                            if m.kind == MouseEventKind::ScrollDown {
+                                if m.column >= left_area.x
+                                    && m.column < left_area.x + left_area.width
+                                    && state.selected_idx + 1 < state.tokens.len()
+                                {
+                                    state.selected_idx += 1;
+                                }
+                                continue;
+                            }
+
+                            if m.kind == MouseEventKind::Down(MouseButton::Left) {
+                                // Universal close button [X]
+                                if m.row == area.y && m.column >= area.x + area.width - 5 {
+                                    if state.is_modified {
+                                        active_modal = ActiveModal::ConfirmExit(ConfirmModal::new(
+                                            "Unsaved Changes",
+                                            "Discard unsaved changes and exit?",
+                                        ));
+                                    } else {
+                                        break;
+                                    }
+                                    continue;
+                                }
+
+                                // 1. Click on left token list
+                                let visible_rows = (left_area.height.saturating_sub(2)) as usize;
+                                if m.column >= left_area.x
+                                    && m.column < left_area.x + left_area.width
+                                    && m.row >= left_area.y + 2
+                                    && m.row < left_area.y + 2 + visible_rows as u16
+                                {
+                                    let clicked_idx =
+                                        state.scroll_offset + (m.row - (left_area.y + 2)) as usize;
+                                    if clicked_idx < state.tokens.len() {
+                                        state.selected_idx = clicked_idx;
+                                        let token = state.tokens[clicked_idx].clone();
+                                        toast_rack.add(ToastNotification {
+                                            title: Some("Theme Editor".to_string()),
+                                            message: format!("Selected: {}", token.label),
+                                            severity: ToastSeverity::Information,
+                                            timeout_secs: 1.5,
+                                        });
+                                        if matches!(
+                                            token.kind,
+                                            TokenKind::ToastChar | TokenKind::ToastTimeout
+                                        ) || matches!(
+                                            &token.kind,
+                                            TokenKind::Color(ref k) if k.starts_with("toast_")
+                                        ) {
+                                            state.preview_mode = PreviewMode::Toast;
+                                        }
+                                        let spans = get_token_preview_spans(
+                                            &token,
+                                            right_area,
+                                            state.preview_mode,
+                                            &preview_styles,
+                                        );
+                                        click_flash = Some((std::time::Instant::now(), spans));
+                                        need_redraw = true;
+                                    }
+                                    continue;
+                                }
+
+                                // 2. Click on preview mode tab header
+                                let title_text = format!(
+                                    " Preview: {} (Click to Switch) ",
+                                    state.preview_mode.title()
+                                );
+                                let title_start = right_area.x + 3;
+                                let title_end = title_start + title_text.len() as u16;
+                                if m.row == right_area.y
+                                    && m.column >= title_start
+                                    && m.column < title_end
+                                {
+                                    state.preview_mode = state.preview_mode.next();
+                                    continue;
+                                }
+
+                                // 3. Click on preview pane to focus clicked element and trigger haptic flash
+                                if m.column >= right_area.x
+                                    && m.column < right_area.x + right_area.width
+                                    && m.row >= right_area.y
+                                    && m.row < right_area.y + right_area.height
+                                {
+                                    if let Some((key, fy, fx_start, fx_end)) = hit_test_preview(
+                                        m.column,
+                                        m.row,
+                                        right_area,
+                                        state.preview_mode,
+                                        preview_styles.divider_is_screen_width,
+                                    ) {
+                                        if state.select_token_by_key(key) {
+                                            let label =
+                                                state.tokens[state.selected_idx].label.clone();
+                                            toast_rack.add(ToastNotification {
+                                                title: Some("Theme Editor".to_string()),
+                                                message: format!("Selected: {}", label),
+                                                severity: ToastSeverity::Information,
+                                                timeout_secs: 1.5,
+                                            });
+                                        }
+                                        click_flash = Some((
+                                            std::time::Instant::now(),
+                                            vec![(fy, fx_start, fx_end)],
+                                        ));
+                                        need_redraw = true;
+                                    }
+                                    continue;
+                                }
+                            }
+                        }
+                        Event::Key(k) => {
+                            // Invariant: Ctrl+S saves directly whenever theme_name is set; only untitled diverts to Save As
+                            if k.modifiers.contains(KeyModifiers::CONTROL) {
+                                match k.code {
+                                    KeyCode::Char('s') => {
+                                        if state.current_name.is_empty()
+                                            || state.current_name == "untitled"
+                                        {
+                                            active_modal = ActiveModal::SaveAs(InputModal::new(
+                                                "Save Theme As",
+                                                "Enter theme name:",
+                                                &state.current_name,
+                                            ));
+                                        } else {
+                                            match state.save_to_disk() {
+                                                Ok(_) => {
+                                                    toast_rack.add(ToastNotification {
+                                                        title: Some("Save Theme".to_string()),
+                                                        message: format!(
+                                                            "Saved theme '{}' to disk",
+                                                            state.current_name
+                                                        ),
+                                                        severity: ToastSeverity::Information,
+                                                        timeout_secs: 2.0,
+                                                    });
+                                                }
+                                                Err(e) => {
+                                                    toast_rack.add(ToastNotification {
+                                                        title: Some("Error".to_string()),
+                                                        message: format!(
+                                                            "Failed to save theme: {}",
+                                                            e
+                                                        ),
+                                                        severity: ToastSeverity::Error,
+                                                        timeout_secs: 3.0,
+                                                    });
+                                                }
+                                            }
+                                        }
+                                        continue;
+                                    }
+                                    KeyCode::Char('a') => {
+                                        // Ctrl+A opens Save As
+                                        active_modal = ActiveModal::SaveAs(InputModal::new(
+                                            "Save Theme As",
+                                            "Enter new theme name:",
+                                            &state.current_name,
+                                        ));
+                                        continue;
+                                    }
+                                    KeyCode::Char('n') => {
+                                        // Ctrl+N creates new theme
+                                        state.current_name = "untitled".to_string();
+                                        state.current_theme =
+                                            ThemeEditorState::create_default_theme();
+                                        state.is_modified = true;
+                                        toast_rack.add(ToastNotification {
+                                            title: Some("Theme Editor".to_string()),
+                                            message: "Created new untitled theme".to_string(),
+                                            severity: ToastSeverity::Information,
+                                            timeout_secs: 2.0,
+                                        });
+                                        continue;
+                                    }
+                                    _ => {}
+                                }
+                            }
+
+                            match k.code {
+                                KeyCode::Tab | KeyCode::Char('p') | KeyCode::Char('P') => {
+                                    state.preview_mode = state.preview_mode.next();
+                                }
+                                KeyCode::Char('1') => {
+                                    state.preview_mode = PreviewMode::Menu;
+                                }
+                                KeyCode::Char('2') => {
+                                    state.preview_mode = PreviewMode::TextEditor;
+                                }
+                                KeyCode::Char('3') => {
+                                    state.preview_mode = PreviewMode::Modals;
+                                }
+                                KeyCode::Char('4') => {
+                                    state.preview_mode = PreviewMode::MenuEditor;
+                                }
+                                KeyCode::Char('5') => {
+                                    state.preview_mode = PreviewMode::Toast;
+                                }
+                                KeyCode::Up | KeyCode::Char('k') => {
+                                    if state.selected_idx > 0 {
+                                        state.selected_idx -= 1;
+                                        let spans = get_token_preview_spans(
+                                            &state.tokens[state.selected_idx],
+                                            right_area,
+                                            state.preview_mode,
+                                            &preview_styles,
+                                        );
+                                        click_flash = Some((std::time::Instant::now(), spans));
+                                    }
+                                }
+                                KeyCode::Down | KeyCode::Char('j') => {
+                                    if state.selected_idx + 1 < state.tokens.len() {
+                                        state.selected_idx += 1;
+                                        let spans = get_token_preview_spans(
+                                            &state.tokens[state.selected_idx],
+                                            right_area,
+                                            state.preview_mode,
+                                            &preview_styles,
+                                        );
+                                        click_flash = Some((std::time::Instant::now(), spans));
+                                    }
+                                }
+                                KeyCode::PageUp => {
+                                    state.selected_idx = state.selected_idx.saturating_sub(5);
+                                    let spans = get_token_preview_spans(
+                                        &state.tokens[state.selected_idx],
+                                        right_area,
+                                        state.preview_mode,
+                                        &preview_styles,
+                                    );
+                                    click_flash = Some((std::time::Instant::now(), spans));
+                                }
+                                KeyCode::PageDown => {
+                                    state.selected_idx = (state.selected_idx + 5)
+                                        .min(state.tokens.len().saturating_sub(1));
+                                    let spans = get_token_preview_spans(
+                                        &state.tokens[state.selected_idx],
+                                        right_area,
+                                        state.preview_mode,
+                                        &preview_styles,
+                                    );
+                                    click_flash = Some((std::time::Instant::now(), spans));
+                                }
+                                KeyCode::Home => {
+                                    state.selected_idx = 0;
+                                    let spans = get_token_preview_spans(
+                                        &state.tokens[state.selected_idx],
+                                        right_area,
+                                        state.preview_mode,
+                                        &preview_styles,
+                                    );
+                                    click_flash = Some((std::time::Instant::now(), spans));
+                                }
+                                KeyCode::End => {
+                                    state.selected_idx = state.tokens.len().saturating_sub(1);
+                                    let spans = get_token_preview_spans(
+                                        &state.tokens[state.selected_idx],
+                                        right_area,
+                                        state.preview_mode,
+                                        &preview_styles,
+                                    );
+                                    click_flash = Some((std::time::Instant::now(), spans));
+                                }
+                                KeyCode::F(2) | KeyCode::Char('b') => {
+                                    let start_dir = if let Ok(cwd) = std::env::current_dir() {
+                                        let wp_dir = cwd.join("assets/wallpapers");
+                                        if wp_dir.is_dir() {
+                                            wp_dir
+                                        } else {
+                                            cwd
+                                        }
+                                    } else {
+                                        PathBuf::from(".")
+                                    };
+                                    active_modal =
+                                        ActiveModal::WallpaperPicker(FilePickerModal::new(
+                                            "Choose Wallpaper Image",
+                                            &start_dir,
+                                            false,
+                                        ));
+                                }
+                                KeyCode::Delete | KeyCode::Backspace => {
+                                    if state.tokens[state.selected_idx].kind
+                                        == TokenKind::WallpaperImage
+                                    {
+                                        state.set_wallpaper_image(None);
+                                        toast_rack.add(ToastNotification {
+                                            title: Some("Theme Editor".to_string()),
+                                            message: "Wallpaper removed".to_string(),
+                                            severity: ToastSeverity::Information,
+                                            timeout_secs: 2.0,
+                                        });
+                                    }
+                                }
+                                KeyCode::Enter => {
+                                    let token = state.tokens[state.selected_idx].clone();
+                                    match token.kind {
+                                        TokenKind::Color(key) => {
+                                            let initial_code = state.get_color_token_u8(&key);
+                                            let title = if key == "background" {
+                                                "Pick Background Color"
+                                            } else {
+                                                "Pick 256 Color"
+                                            };
+                                            active_modal = ActiveModal::ColorPicker(
+                                                key,
+                                                ColorGridModal::new(title, initial_code),
+                                            );
+                                        }
+                                        TokenKind::WallpaperImage => {
+                                            let start_dir = if let Ok(cwd) = std::env::current_dir()
+                                            {
+                                                let wp_dir = cwd.join("assets/wallpapers");
+                                                if wp_dir.is_dir() {
+                                                    wp_dir
+                                                } else {
+                                                    cwd
+                                                }
+                                            } else {
+                                                PathBuf::from(".")
+                                            };
+                                            active_modal =
+                                                ActiveModal::WallpaperPicker(FilePickerModal::new(
+                                                    "Choose Wallpaper Image",
+                                                    &start_dir,
+                                                    false,
+                                                ));
+                                        }
+                                        TokenKind::Border(key) => {
+                                            active_modal = ActiveModal::AsciiPicker(
+                                                key,
+                                                AsciiGridModal::new("Pick CP437 Border Char", 196),
+                                            );
+                                        }
+                                        TokenKind::Indicator => {
+                                            // Cycle indicator
+                                            state.current_theme.indicator =
+                                                match state.current_theme.indicator.as_deref() {
+                                                    Some("> ") => Some("▶ ".to_string()),
+                                                    Some("▶ ") => Some("{ascii:240}".to_string()),
+                                                    Some("{ascii:240}") => Some("• ".to_string()),
+                                                    _ => Some("> ".to_string()),
+                                                };
+                                            state.is_modified = true;
+                                        }
+                                        TokenKind::DividerChar => {
+                                            active_modal = ActiveModal::AsciiPicker(
+                                                "divider_char".to_string(),
+                                                AsciiGridModal::new("Pick CP437 Divider Char", 196),
+                                            );
+                                        }
+                                        TokenKind::DividerLength => {
+                                            state.toggle_divider_length();
+                                        }
+                                        TokenKind::MarqueeChar => {
+                                            active_modal = ActiveModal::AsciiPicker(
+                                                "marquee_char".to_string(),
+                                                AsciiGridModal::new("Pick CP437 Marquee Char", 7),
+                                            );
+                                        }
+                                        TokenKind::MarqueeGap => {
+                                            state.cycle_marquee_gap();
+                                        }
+                                        TokenKind::ToastChar => {
+                                            active_modal = ActiveModal::AsciiPicker(
+                                                "toast_char".to_string(),
+                                                AsciiGridModal::new(
+                                                    "Pick Toast Left Bar Glyph",
+                                                    221,
+                                                ),
+                                            );
+                                        }
+                                        TokenKind::ToastTimeout => {
+                                            state.cycle_toast_timeout();
+                                        }
+                                    }
+                                }
+                                KeyCode::Esc | KeyCode::Char('q') => {
+                                    if state.is_modified {
+                                        active_modal = ActiveModal::ConfirmExit(ConfirmModal::new(
+                                            "Unsaved Changes",
+                                            "Discard unsaved changes and exit?",
+                                        ));
+                                    } else {
+                                        break;
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                        _ => {}
+                    }
+                }
             }
-        } else if let Some((flash_start, _, _, _)) = click_flash {
-            if flash_start.elapsed() >= Duration::from_millis(150) {
+        } else if let Some((flash_start, _)) = click_flash {
+            if flash_start.elapsed() >= Duration::from_millis(200) {
                 click_flash = None;
                 need_redraw = true;
             }
@@ -1647,7 +1846,12 @@ fn hit_test_preview(
                 }
                 return Some(("accent", row, p_inner_x, p_inner_x + p_avail_w));
             }
-            Some(("text", row, p_inner_x, p_inner_x + p_avail_w))
+            Some((
+                "background",
+                row,
+                right_area.x + 1,
+                right_area.x + right_area.width.saturating_sub(1),
+            ))
         }
         PreviewMode::Modals => {
             let p_avail_w = right_area.width.saturating_sub(4);
@@ -1730,7 +1934,12 @@ fn hit_test_preview(
                 }
                 return Some(("text", row, mod_x + 2, mod_x + mod_w - 2));
             }
-            Some(("border", row, right_area.x, right_area.x + right_area.width))
+            Some((
+                "background",
+                row,
+                right_area.x + 1,
+                right_area.x + right_area.width.saturating_sub(1),
+            ))
         }
         PreviewMode::TextEditor => {
             if row == right_area.y + 1 {
@@ -1751,7 +1960,7 @@ fn hit_test_preview(
             if row == right_area.y + 5 {
                 return Some(("highlight", row, p_inner_x, p_inner_x + p_avail_w));
             }
-            Some(("text", row, p_inner_x, p_inner_x + p_avail_w))
+            Some(("background", row, p_inner_x, p_inner_x + p_avail_w))
         }
         PreviewMode::MenuEditor => {
             let bot_y = right_area.y + right_area.height.saturating_sub(1);
@@ -1853,7 +2062,7 @@ fn hit_test_preview(
                 ));
             }
 
-            Some(("border", row, col, col + 1))
+            Some(("background", row, p_inner_x, p_inner_x + p_avail_w))
         }
         PreviewMode::Toast => {
             let toast_w = (p_avail_w.saturating_sub(6)).clamp(28, 48);
@@ -1950,7 +2159,12 @@ fn hit_test_preview(
                 return Some(("help_text", row, p_inner_x, p_inner_x + p_avail_w));
             }
 
-            Some(("text", row, p_inner_x, p_inner_x + p_avail_w))
+            Some((
+                "background",
+                row,
+                right_area.x + 1,
+                right_area.x + right_area.width.saturating_sub(1),
+            ))
         }
     }
 }

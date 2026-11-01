@@ -565,7 +565,7 @@ impl NoteEditorModal {
         let dialog_w = (area.width.saturating_sub(4)).clamp(20, 84);
         let dialog_h = (area.height.saturating_sub(4)).clamp(14, 28);
 
-        let modal_title = format!(" [ Edit Note: {} ] ", self.title);
+        let modal_title = format!("Edit Note: {}", self.title);
         let inner = render_modal_frame(area, dialog_w, dialog_h, &modal_title, styles, buf);
         self.last_inner_rect = inner;
 

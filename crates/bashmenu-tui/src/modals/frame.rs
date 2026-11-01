@@ -72,11 +72,17 @@ pub fn render_modal_frame(
     let dialog_rect = Rect::new(start_x, start_y, w, h);
     Clear.render(dialog_rect, buf);
 
+    let clean_title = title.trim();
+    let clean_title = clean_title
+        .trim_start_matches('[')
+        .trim_end_matches(']')
+        .trim();
+
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(styles.border))
         .style(Style::default().bg(styles.background))
-        .title(format!(" [ {} ] ", title))
+        .title(format!("─[ {} ]", clean_title))
         .title_style(styles.title.add_modifier(Modifier::BOLD));
 
     let inner = block.inner(dialog_rect);

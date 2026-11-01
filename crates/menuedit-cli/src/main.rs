@@ -198,8 +198,8 @@ fn main() -> Result<()> {
             selected_node_idx = visible_nodes.len() - 1;
         }
 
-        // Keep tree scroll visible
-        let max_tree_rows = area.height.saturating_sub(6) as usize;
+        // Keep tree scroll visible (shrink available height by 1 row to prevent bottom border overlap)
+        let max_tree_rows = area.height.saturating_sub(7) as usize;
         if selected_node_idx < tree_scroll {
             tree_scroll = selected_node_idx;
         } else if selected_node_idx >= tree_scroll + max_tree_rows && max_tree_rows > 0 {
@@ -216,11 +216,8 @@ fn main() -> Result<()> {
                 .file_name()
                 .map(|s| s.to_string_lossy().to_string())
                 .unwrap_or_else(|| "bashmenu.mnu".to_string());
-            let title = format!(
-                " [ Visual Menu Editor - {} {} ] ",
-                file_name,
-                if is_modified { "(Modified)" } else { "" }
-            );
+            let mod_str = if is_modified { " (Modified)" } else { "" };
+            let title = format!("─[ Visual Menu Editor - {}{} ]", file_name, mod_str);
 
             let root_block = Block::default()
                 .borders(Borders::ALL)
@@ -250,7 +247,7 @@ fn main() -> Result<()> {
             // Left Panel: Tree
             let tree_block = Block::default()
                 .borders(Borders::ALL)
-                .title(" [ Menu Structure ] ")
+                .title("─[ Menu Structure ]")
                 .border_style(styles.accent);
             let tree_rect = Rect::new(inner_x, inner_y, left_w, avail_h.saturating_sub(1));
             tree_block.render(tree_rect, buf);
@@ -319,7 +316,7 @@ fn main() -> Result<()> {
             let insp_rect = Rect::new(insp_x, inner_y, right_w, avail_h.saturating_sub(1));
             let insp_block = Block::default()
                 .borders(Borders::ALL)
-                .title(" ── Property Inspector ── ")
+                .title("───[ Property Inspector ]")
                 .border_style(styles.accent);
             insp_block.render(insp_rect, buf);
 

@@ -340,7 +340,7 @@ impl NoteViewerModal {
         let dialog_w = (area.width.saturating_sub(4)).min(78);
         let dialog_h = (area.height.saturating_sub(4)).clamp(14, 28);
 
-        let modal_title = format!(" [ Note: {} ] ", self.title);
+        let modal_title = format!("Note: {}", self.title);
         let inner = render_modal_frame(area, dialog_w, dialog_h, &modal_title, styles, buf);
 
         let toggle_action = if self.show_completed {

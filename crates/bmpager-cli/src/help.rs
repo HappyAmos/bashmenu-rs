@@ -95,7 +95,7 @@ pub fn show_help_modal(strip_colors: bool) -> anyhow::Result<()> {
         let mut out = String::from("\x1b[2J");
 
         // Top border
-        let title = " Pager Help & Manual ";
+        let title = "[ Pager Help & Manual ]";
         let t_len = crate::ansi::visual_width(title);
         let r_len = box_w.saturating_sub(t_len + 3);
         let top_bar = "─".repeat(r_len);

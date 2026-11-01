@@ -376,7 +376,7 @@ fn test_themeedit_preview_menu_editor_border_intact() {
 
     let preview_block = Block::default()
         .borders(Borders::ALL)
-        .title(" [ Visual Menu Editor ] ")
+        .title("─[ Visual Menu Editor ]")
         .border_style(ratatui::style::Style::default().fg(styles.border));
     preview_block.render(area, &mut buf);
 
@@ -394,13 +394,13 @@ fn test_themeedit_preview_menu_editor_border_intact() {
 
     let tree_block = Block::default()
         .borders(Borders::ALL)
-        .title(" [ Menu Structure ] ")
+        .title("─[ Menu Structure ]")
         .border_style(styles.accent);
     tree_block.render(tree_rect, &mut buf);
 
     let insp_block = Block::default()
         .borders(Borders::ALL)
-        .title(" ── Property Inspector ── ")
+        .title("───[ Property Inspector ]")
         .border_style(styles.accent);
     insp_block.render(insp_rect, &mut buf);
 
@@ -423,7 +423,7 @@ fn test_themeedit_preview_menu_editor_border_intact() {
 
     let mut insp_title_found = false;
     for x in insp_rect.x..insp_rect.x + insp_rect.width {
-        if buf[(x, insp_rect.y)].symbol() == "─" {
+        if buf[(x, insp_rect.y)].symbol() == "[" {
             insp_title_found = true;
             break;
         }
@@ -565,4 +565,111 @@ fn test_themeedit_help_gutter_layout_above_bottom_border() {
     // Gutter divider must be on row gt_y
     assert_eq!(buf[(area.x, gt_y)].symbol(), "├");
     assert_eq!(buf[(area.x + area.width - 1, gt_y)].symbol(), "┤");
+}
+
+#[test]
+fn test_themeedit_background_color_and_wallpaper_tokens() {
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(fixture_path, Some("dracula".to_string()));
+
+    // 1. Background Color token exists and can be updated
+    let bg_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Background Color")
+        .cloned()
+        .expect("Background Color token must exist");
+    assert_eq!(bg_token.label, "Background Color");
+
+    state.set_color_token("background", 234);
+    assert_eq!(state.get_token_value_display(&bg_token), "Color 234");
+    assert!(state.select_token_by_key("background"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Background Color");
+    assert!(state.select_token_by_key("bg"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Background Color");
+
+    // 2. Wallpaper Image token exists and displays None initially
+    let wp_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Wallpaper Image")
+        .cloned()
+        .expect("Wallpaper Image token must exist");
+    assert_eq!(state.get_token_value_display(&wp_token), "None");
+
+    // 3. Set wallpaper image
+    state.set_wallpaper_image(Some("assets/wallpapers/twilight.png".to_string()));
+    assert_eq!(state.get_token_value_display(&wp_token), "twilight.png");
+    assert!(state.select_token_by_key("wallpaper"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Wallpaper Image");
+    assert!(state.select_token_by_key("wallpaper_image"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Wallpaper Image");
+
+    // 4. Remove/clear wallpaper image
+    state.set_wallpaper_image(None);
+    assert_eq!(state.get_token_value_display(&wp_token), "None");
+}
+
+#[test]
+fn test_themeedit_token_preview_spans_and_flash() {
+    use bashmenu_tui::ResolvedThemeStyles;
+    use ratatui::layout::Rect;
+    use themeedit_cli::{get_token_preview_spans, PreviewMode};
+
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    let state = ThemeEditorState::new(fixture_path, Some("dracula".to_string()));
+    let styles = ResolvedThemeStyles::from_theme(&state.current_theme, true);
+    let right_area = Rect::new(40, 2, 40, 20);
+
+    // 1. Background Color spans the interior
+    let bg_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Background Color")
+        .unwrap();
+    let bg_spans = get_token_preview_spans(bg_token, right_area, PreviewMode::Menu, &styles);
+    assert!(!bg_spans.is_empty(), "Background spans must not be empty");
+    assert_eq!(bg_spans[0].1, right_area.x + 1);
+    assert_eq!(bg_spans[0].2, right_area.x + right_area.width - 1);
+
+    // 2. Wallpaper Image spans the interior
+    let wp_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Wallpaper Image")
+        .unwrap();
+    let wp_spans = get_token_preview_spans(wp_token, right_area, PreviewMode::Menu, &styles);
+    assert!(!wp_spans.is_empty(), "Wallpaper spans must not be empty");
+
+    // 3. Highlight Color spans the active row
+    let hl_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Highlight Color")
+        .unwrap();
+    let hl_spans = get_token_preview_spans(hl_token, right_area, PreviewMode::Menu, &styles);
+    assert_eq!(hl_spans.len(), 1);
+    assert_eq!(hl_spans[0].0, right_area.y + 3); // content_start_y + 1
+
+    // 4. Border Color spans all 4 border edges
+    let border_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Border Color")
+        .unwrap();
+    let border_spans =
+        get_token_preview_spans(border_token, right_area, PreviewMode::Menu, &styles);
+    assert!(
+        border_spans.len() >= 4,
+        "Border spans must cover all outer edges"
+    );
+
+    // 5. Shortcut Gutter spans shortcut digits 1-4
+    let sc_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label.contains("Shortcut Gutter"))
+        .unwrap();
+    let sc_spans = get_token_preview_spans(sc_token, right_area, PreviewMode::Menu, &styles);
+    assert_eq!(sc_spans.len(), 4, "Must flash 4 menu item shortcut digits");
 }

@@ -76,6 +76,7 @@ impl Default for ResolvedThemeStyles {
 /// Parses a color identifier (number, hex string, or named constant) into a Ratatui Color.
 pub fn parse_color_value(val: &serde_yml::Value) -> Option<Color> {
     match val {
+        serde_yml::Value::Sequence(seq) => seq.first().and_then(parse_color_value),
         serde_yml::Value::Number(n) => {
             if let Some(i) = n.as_i64() {
                 if i < 0 {
