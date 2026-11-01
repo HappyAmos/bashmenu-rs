@@ -231,6 +231,92 @@ impl MenuItem {
         self.extra.get("picker").and_then(|v| v.as_str())
     }
 
+    /// Whether input prompts for this item should mask characters with `*`
+    pub fn masked(&self) -> bool {
+        match self.extra.get("masked") {
+            Some(serde_yml::Value::Bool(b)) => *b,
+            Some(serde_yml::Value::String(s)) => {
+                matches!(s.trim().to_ascii_lowercase().as_str(), "true" | "1" | "yes")
+            }
+            Some(serde_yml::Value::Number(n)) => n.as_i64().unwrap_or(0) != 0,
+            _ => false,
+        }
+    }
+
+    /// Returns true if any executable or target payload field contains `{param}`
+    pub fn has_param_placeholder(&self) -> bool {
+        [
+            self.command.as_deref(),
+            self.action.as_deref(),
+            self.script.as_deref(),
+            self.file.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        .any(|s| s.contains("{param}"))
+    }
+
+    /// Substitutes `{param}` with `value` across all executable and target payload fields
+    pub fn apply_param_placeholder(&mut self, value: &str) {
+        if let Some(ref mut s) = self.command {
+            if s.contains("{param}") {
+                *s = s.replace("{param}", value);
+            }
+        }
+        if let Some(ref mut s) = self.action {
+            if s.contains("{param}") {
+                *s = s.replace("{param}", value);
+            }
+        }
+        if let Some(ref mut s) = self.script {
+            if s.contains("{param}") {
+                *s = s.replace("{param}", value);
+            }
+        }
+        if let Some(ref mut s) = self.file {
+            if s.contains("{param}") {
+                *s = s.replace("{param}", value);
+            }
+        }
+    }
+
+    /// Modal header title for a `{param}` input dialog
+    pub fn param_modal_title(&self) -> &str {
+        if let Some(t) = self
+            .extra
+            .get("title")
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.trim().is_empty())
+        {
+            return t;
+        }
+        let trimmed_label = self.label.trim();
+        if !trimmed_label.is_empty() {
+            return trimmed_label;
+        }
+        "Parameter Input"
+    }
+
+    /// Modal prompt message for a `{param}` input dialog
+    pub fn param_modal_prompt(&self) -> &str {
+        self.prompt
+            .as_deref()
+            .filter(|s| !s.trim().is_empty())
+            .or_else(|| {
+                self.extra
+                    .get("message")
+                    .and_then(|v| v.as_str())
+                    .filter(|s| !s.trim().is_empty())
+            })
+            .or_else(|| {
+                self.extra
+                    .get("text")
+                    .and_then(|v| v.as_str())
+                    .filter(|s| !s.trim().is_empty())
+            })
+            .unwrap_or("Enter parameter:")
+    }
+
     /// Radio selection options as (value, label) pairs
     pub fn options(&self) -> Vec<(String, String)> {
         let mut list = Vec::new();

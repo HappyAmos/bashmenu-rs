@@ -253,3 +253,28 @@ fn test_config_get_set_value_and_menu_item_helpers() {
     assert!(found_nerd, "Enable Nerd Fonts item with key must be found");
     assert!(found_pager, "Pager editor item with options must be found");
 }
+
+#[test]
+fn test_menu_item_param_placeholder_and_masked() {
+    use bashmenu_core::MenuItem;
+
+    let mut item = MenuItem {
+        label: "Which Command [which [param]]".to_string(),
+        action: Some("which {param}".to_string()),
+        command: Some("which {param}".to_string()),
+        prompt: Some("Enter command name to locate:".to_string()),
+        ..Default::default()
+    };
+    item.extra
+        .insert("masked".to_string(), serde_yml::Value::Bool(true));
+
+    assert!(item.has_param_placeholder());
+    assert!(item.masked());
+    assert_eq!(item.param_modal_title(), "Which Command [which [param]]");
+    assert_eq!(item.param_modal_prompt(), "Enter command name to locate:");
+
+    item.apply_param_placeholder("cargo");
+    assert!(!item.has_param_placeholder());
+    assert_eq!(item.action.as_deref(), Some("which cargo"));
+    assert_eq!(item.command.as_deref(), Some("which cargo"));
+}

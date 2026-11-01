@@ -62,6 +62,7 @@ enum ActiveModal {
     Message(MessageModal),
     Toggle(String, ToggleModal),
     ConfigInput(String, InputModal),
+    ParamInput(Box<bashmenu_core::MenuItem>, InputModal),
     Radio(String, RadioModal),
     EditorFilePicker(Box<bashmenu_core::MenuItem>, FilePickerModal),
     StreamOutput(StreamOutputModal),
@@ -264,6 +265,9 @@ fn main() -> Result<()> {
                         modal.render(f.area(), &styles, f.buffer_mut());
                     }
                     ActiveModal::ConfigInput(_, modal) => {
+                        modal.render(f.area(), &styles, f.buffer_mut());
+                    }
+                    ActiveModal::ParamInput(_, modal) => {
                         modal.render(f.area(), &styles, f.buffer_mut());
                     }
                     ActiveModal::Radio(_, modal) => {
@@ -742,6 +746,23 @@ fn main() -> Result<()> {
                         active_modal = ActiveModal::None;
                     }
                 }
+                ActiveModal::ParamInput(item, modal) => {
+                    let submitted = match ev {
+                        Event::Key(key) => modal.handle_key_with_modifiers(key.code, key.modifiers),
+                        Event::Mouse(mouse) => modal.handle_mouse(mouse, area),
+                        _ => None,
+                    };
+                    if let Some(opt_val) = submitted {
+                        if let Some(val) = opt_val {
+                            let mut resolved_item = item.clone();
+                            resolved_item.apply_param_placeholder(&val);
+                            active_modal = ActiveModal::None;
+                            pending_action = Some(MenuAction::Execute(resolved_item));
+                        } else {
+                            active_modal = ActiveModal::None;
+                        }
+                    }
+                }
                 ActiveModal::Radio(key_path, modal) => {
                     let submitted = match ev {
                         Event::Key(key) => modal.handle_key(key.code),
@@ -1048,7 +1069,8 @@ fn main() -> Result<()> {
                                     let curr_val = config.get_value(key_path).unwrap_or_default();
                                     active_modal = ActiveModal::ConfigInput(
                                         key_path.to_string(),
-                                        InputModal::new(title, prompt, &curr_val),
+                                        InputModal::new(title, prompt, &curr_val)
+                                            .with_masked(item.masked()),
                                     );
                                 }
                             } else if item.r#type == MenuItemType::ThemeSelector
@@ -1071,6 +1093,26 @@ fn main() -> Result<()> {
                                 let msg = interpolate_placeholders(raw_msg, &ctx);
                                 active_modal =
                                     ActiveModal::ConfirmItem(item, ConfirmModal::new(title, msg));
+                            } else if item.has_param_placeholder() {
+                                let raw_title = item.param_modal_title();
+                                let clean_title = if item.extra.contains_key("title") {
+                                    raw_title.to_string()
+                                } else {
+                                    let (main_lbl, _) =
+                                        bashmenu_tui::split_label_brackets(raw_title);
+                                    let trimmed = main_lbl.trim();
+                                    if trimmed.is_empty() {
+                                        raw_title.to_string()
+                                    } else {
+                                        trimmed.to_string()
+                                    }
+                                };
+                                let title = interpolate_placeholders(&clean_title, &ctx);
+                                let prompt =
+                                    interpolate_placeholders(item.param_modal_prompt(), &ctx);
+                                let modal =
+                                    InputModal::new(title, prompt, "").with_masked(item.masked());
+                                active_modal = ActiveModal::ParamInput(item, modal);
                             } else if item.r#type == MenuItemType::Editor {
                                 let target_raw = item
                                     .file

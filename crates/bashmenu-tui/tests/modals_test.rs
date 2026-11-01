@@ -1325,3 +1325,32 @@ fn test_note_editor_selection_and_clipboard() {
         vec!["Line 1: Alpha", "Line 2: Beta", "Line 3: Gamma"]
     );
 }
+
+#[test]
+fn test_input_modal_masked_rendering() {
+    use bashmenu_tui::InputModal;
+
+    let modal = InputModal::new("Password Input", "Enter secret:", "secret123").with_masked(true);
+    assert!(modal.masked);
+    assert_eq!(modal.value, "secret123");
+
+    let area = Rect::new(0, 0, 80, 24);
+    let styles = ResolvedThemeStyles::default();
+    let mut buf = Buffer::empty(area);
+    modal.render(area, &styles, &mut buf);
+
+    let mut rendered_text = String::new();
+    for y in 0..area.height {
+        for x in 0..area.width {
+            rendered_text.push_str(buf[(x, y)].symbol());
+        }
+    }
+    assert!(
+        !rendered_text.contains("secret123"),
+        "Plaintext value must not appear in rendered buffer when masked"
+    );
+    assert!(
+        rendered_text.contains("*********"),
+        "Asterisks matching input length must appear in rendered buffer when masked"
+    );
+}

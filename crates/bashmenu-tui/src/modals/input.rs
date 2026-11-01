@@ -16,6 +16,7 @@ pub struct InputModal {
     pub cursor_pos: usize,
     pub scroll_offset: usize,
     pub selection_anchor: Option<usize>,
+    pub masked: bool,
 }
 
 impl InputModal {
@@ -28,7 +29,14 @@ impl InputModal {
             cursor_pos: char_count,
             scroll_offset: 0,
             selection_anchor: None,
+            masked: false,
         }
+    }
+
+    /// Configures whether input characters are visually masked with asterisks (`*`).
+    pub fn with_masked(mut self, masked: bool) -> Self {
+        self.masked = masked;
+        self
     }
 
     /// Returns the active selection character index range `(start, end)` if any.
@@ -387,7 +395,11 @@ impl InputModal {
             for i in 0..input_w {
                 let char_idx = scroll + i;
                 let ch = if i < vis_chars.len() {
-                    vis_chars[i]
+                    if self.masked {
+                        '*'
+                    } else {
+                        vis_chars[i]
+                    }
                 } else {
                     ' '
                 };
