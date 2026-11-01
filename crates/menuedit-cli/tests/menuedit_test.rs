@@ -1127,3 +1127,38 @@ fn test_item_edit_modal_field_visibility_per_type() {
         ]
     );
 }
+
+#[test]
+fn test_menuedit_quiet_flag_toggle_and_persistence() {
+    use crossterm::event::{KeyCode, KeyModifiers};
+    use menuedit_cli::{FocusControl, ItemEditModal, ItemEditResult};
+
+    let item = MenuItem {
+        label: "Run Script".to_string(),
+        r#type: MenuItemType::Script,
+        script: Some("scripts/demo.sh".to_string()),
+        ..Default::default()
+    };
+    let mut modal = ItemEditModal::new(&item);
+    assert!(!modal.quiet);
+
+    let ctrls = modal.focus_controls();
+    let quiet_idx = ctrls
+        .iter()
+        .position(|&c| c == FocusControl::QuietChk)
+        .expect("QuietChk must be present for script/command items");
+    modal.active_control_idx = quiet_idx;
+
+    assert_eq!(
+        modal.handle_key(KeyCode::Char(' '), KeyModifiers::NONE),
+        ItemEditResult::Continue
+    );
+    assert!(modal.quiet);
+
+    let updated = modal.build_updated_item();
+    assert_eq!(updated.quiet, Some(true));
+
+    // Reopen modal on saved item and verify quiet flag is preserved
+    let modal_reopened = ItemEditModal::new(&updated);
+    assert!(modal_reopened.quiet);
+}

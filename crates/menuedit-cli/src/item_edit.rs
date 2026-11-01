@@ -594,6 +594,7 @@ pub enum FocusControl {
     ExecModeSelector,
     WindowPercentInput,
     AltBufferChk,
+    QuietChk,
     NoFormattingChk,
     MaskedChk,
     RefreshChk,
@@ -635,6 +636,7 @@ pub struct ItemEditModal {
 
     // Boolean checkboxes
     pub alt_buffer: bool,
+    pub quiet: bool,
     pub no_formatting: bool,
     pub masked: bool,
     pub refresh: bool,
@@ -767,6 +769,7 @@ impl ItemEditModal {
             .unwrap_or_else(|| "65".to_string());
 
         let alt_buffer = item.alt_buffer.unwrap_or(true);
+        let quiet = item.quiet.unwrap_or(false);
         let no_formatting = item
             .extra
             .get("no_formatting")
@@ -814,6 +817,7 @@ impl ItemEditModal {
             exec_mode,
             window_percent_input: TextInput::new(&window_percent_val),
             alt_buffer,
+            quiet,
             no_formatting,
             masked,
             refresh,
@@ -976,6 +980,7 @@ impl ItemEditModal {
                 if self.exec_mode == 2 {
                     controls.push(FocusControl::AltBufferChk);
                 }
+                controls.push(FocusControl::QuietChk);
             }
 
             if self.current_type == "editor" {
@@ -1258,6 +1263,12 @@ impl ItemEditModal {
             FocusControl::AltBufferChk => {
                 if matches!(code, KeyCode::Char(' ') | KeyCode::Enter) {
                     self.alt_buffer = !self.alt_buffer;
+                    return ItemEditResult::Continue;
+                }
+            }
+            FocusControl::QuietChk => {
+                if matches!(code, KeyCode::Char(' ') | KeyCode::Enter) {
+                    self.quiet = !self.quiet;
                     return ItemEditResult::Continue;
                 }
             }
@@ -1729,7 +1740,7 @@ impl ItemEditModal {
                 );
                 item.extra.remove("floating");
                 item.interactive = Some(true);
-                item.quiet = Some(false);
+                item.quiet = Some(self.quiet);
                 item.alt_buffer = Some(self.alt_buffer);
             }
         }
@@ -2059,6 +2070,12 @@ impl ItemEditModal {
                         checked: self.alt_buffer,
                     });
                 }
+                form_lines.push(FormRow::Checkbox {
+                    ctrl: FocusControl::QuietChk,
+                    label:
+                        "Quiet Mode - Suppress 'Press [ENTER] to return to menu...' (quiet=true)",
+                    checked: self.quiet,
+                });
             }
 
             if self.current_type == "editor" {
