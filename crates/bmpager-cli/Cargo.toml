@@ -1,0 +1,21 @@
+[package]
+name = "bmpager-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "bmpager"
+path = "src/main.rs"
+
+[dependencies]
+bashmenu-core = { workspace = true }
+bashmenu-tui = { workspace = true }
+crossterm = { workspace = true }
+clap = { workspace = true }
+unicode-width = { workspace = true }
+regex = { workspace = true }
+anyhow = { workspace = true }
+pulldown-cmark = { workspace = true }
