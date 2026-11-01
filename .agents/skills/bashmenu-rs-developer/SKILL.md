@@ -19,6 +19,9 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
   - Every completed task, bug fix, feature addition, or refactoring step must conclude by creating a concise, descriptive git commit (`git commit -m "..."`) and pushing directly to GitHub (`git push origin main`).
   - Never leave changes uncommitted or unpushed in the local repository.
   - After pushing to `origin/main`, inspect or verify GitHub Actions CI when appropriate using GitHub CLI (`gh run list`).
+- **Sequential TODO Execution Invariant:**
+  - Unless specifically labeled or explicitly instructed otherwise by the user, always tackle items from project TODO lists (such as `notes.yml` or `TODO.md`) strictly in sequential order, top to bottom.
+  - Complete each task fully (including verification, commit, push, and remote CI verification) before proceeding to the next.
 - **Configuration Header Preservation Invariant (`bashmenu.yml`):**
   - Never use raw file writes with `serde_yml::to_string()` directly to overwrite `bashmenu.yml`.
   - Always call `bashmenu_core::config::save_config(path, config)` so that `CONFIG_HEADER` comments, documentation, and placeholder references are cleanly preserved at the top of the file.

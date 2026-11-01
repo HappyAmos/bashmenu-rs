@@ -31,3 +31,7 @@
   3. Tests: `cargo test --workspace`
   4. Shell Scripts: `shellcheck *.sh`
 - In terminal scripts, do not assume `/usr/local/bin` for non-root users; install user CLI tools to `$HOME/.local/bin`.
+
+## 5. TODO Task Execution Ordering Invariant
+- **Sequential TODO Execution:** Unless specifically labeled or explicitly instructed otherwise by the user, always tackle items from TODO lists (such as `notes.yml` or `TODO.md`) strictly in sequential order, top to bottom. Complete each item fully (including verification, commit, push, and remote CI check) before moving to the next.
+
