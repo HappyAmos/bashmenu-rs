@@ -431,6 +431,69 @@ fn test_help_modal_renders_at_90_percent_width() {
 }
 
 #[test]
+fn test_help_modal_renders_markdown_table() {
+    use bashmenu_tui::HelpModal;
+    use ratatui::style::{Color, Style};
+
+    let styles = ResolvedThemeStyles {
+        background: Color::Indexed(236),
+        text: Style::default().fg(Color::White),
+        accent: Style::default().fg(Color::Yellow),
+        ..Default::default()
+    };
+    let area = Rect::new(0, 0, 80, 24);
+    let mut buf = Buffer::empty(area);
+
+    let md_table = "\
+# Table Title
+
+| Syntax | Action |
+| :--- | :--- |
+| `F1` | Help Manual |
+| `^S` | Save File |
+";
+    let help = HelpModal::new("Table Test", md_table);
+    help.render(area, &styles, &mut buf);
+
+    // Look for box drawing characters ┌, ┬, ┐, │, ├, ┼, ┤, └, ┴, ┘
+    let mut found_top_left = false;
+    let mut found_pipe = false;
+    let mut found_header = false;
+    let mut found_cell = false;
+
+    for y in 0..area.height {
+        let mut row_str = String::new();
+        for x in 0..area.width {
+            let cell = buf.cell((x, y)).unwrap();
+            row_str.push_str(cell.symbol());
+            if cell.symbol() == "┌" {
+                found_top_left = true;
+            }
+            if cell.symbol() == "│" {
+                found_pipe = true;
+            }
+        }
+        if row_str.contains("Syntax") && row_str.contains("Action") {
+            found_header = true;
+        }
+        if row_str.contains("`F1`") && row_str.contains("Help Manual") {
+            found_cell = true;
+        }
+    }
+
+    assert!(found_top_left, "Must render box-drawing top border ┌");
+    assert!(found_pipe, "Must render vertical column divider │");
+    assert!(
+        found_header,
+        "Must render table header row with Syntax and Action"
+    );
+    assert!(
+        found_cell,
+        "Must render table data row with `F1` and Help Manual"
+    );
+}
+
+#[test]
 fn test_modal_frame_close_button_rendering_and_clicking() {
     use bashmenu_tui::{is_close_button_clicked, render_modal_frame, HelpModal};
     use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};

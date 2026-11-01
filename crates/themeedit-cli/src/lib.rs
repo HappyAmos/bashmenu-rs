@@ -123,7 +123,7 @@ impl ThemeEditorState {
                 kind: TokenKind::Color("accent".to_string()),
             },
             TokenItem {
-                label: "Shortcut Color".to_string(),
+                label: "Shortcut Gutter (1-9, a-z)".to_string(),
                 kind: TokenKind::Color("shortcut_key".to_string()),
             },
             TokenItem {
@@ -403,13 +403,33 @@ impl ThemeEditorState {
 
     /// Focuses/selects the token corresponding to the given style or border key
     pub fn select_token_by_key(&mut self, key: &str) -> bool {
+        // 1. Exact match first
         if let Some(idx) = self.tokens.iter().position(|t| match &t.kind {
             TokenKind::Color(k) => k == key,
             TokenKind::Border(k) => k == key,
             TokenKind::Indicator => key == "indicator",
         }) {
             self.selected_idx = idx;
-            self.status_message = format!("Focused: {}", self.tokens[idx].label);
+            self.status_message = format!("Selected: {}", self.tokens[idx].label);
+            return true;
+        }
+
+        // 2. Fallback aliases
+        if let Some(idx) = self.tokens.iter().position(|t| match &t.kind {
+            TokenKind::Color(k) => {
+                (k == "shortcut_key" && (key == "shortcut_gutter" || key == "shortcut"))
+                    || (k == "text" && key == "content")
+            }
+            TokenKind::Border(k) => {
+                (k == "top_tee" && key == "gutter_top_tee")
+                    || (k == "bottom_tee" && key == "gutter_bottom_tee")
+                    || (k == "gutter_top_tee" && key == "top_tee")
+                    || (k == "gutter_bottom_tee" && key == "bottom_tee")
+            }
+            TokenKind::Indicator => false,
+        }) {
+            self.selected_idx = idx;
+            self.status_message = format!("Selected: {}", self.tokens[idx].label);
             return true;
         }
         false

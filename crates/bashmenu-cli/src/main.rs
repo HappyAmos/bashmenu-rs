@@ -38,6 +38,10 @@ struct Cli {
     /// Override active theme
     #[arg(short, long)]
     theme: Option<String>,
+
+    /// Load and save configuration files in current working directory
+    #[arg(long)]
+    local: bool,
 }
 
 enum ActiveModal {
@@ -56,37 +60,16 @@ enum ActiveModal {
     EditorFilePicker(Box<bashmenu_core::MenuItem>, FilePickerModal),
 }
 
-fn resolve_file_path(target: &Path) -> PathBuf {
-    if target.is_absolute() {
-        return target.to_path_buf();
-    }
-    if target.components().count() > 1 && target.exists() {
-        return target.to_path_buf();
-    }
-    // 1st Priority: ~/.config/bashmenu/
-    if let Ok(home) = std::env::var("HOME") {
-        let user_cfg = PathBuf::from(home).join(".config/bashmenu").join(target);
-        if user_cfg.exists() {
-            return user_cfg;
+fn resolve_file_path(target: &Path, local: bool) -> PathBuf {
+    if local {
+        if target.is_absolute() {
+            target.to_path_buf()
+        } else {
+            PathBuf::from(".").join(target)
         }
+    } else {
+        bashmenu_core::resolve_app_path(target)
     }
-    // 2nd Priority: {bashmenu_dir}/
-    if let Ok(dir) = std::env::var("BASHMENU_DIR") {
-        let candidate = PathBuf::from(dir).join(target);
-        if candidate.exists() {
-            return candidate;
-        }
-    }
-    // 3rd Priority: current working directory
-    if target.exists() {
-        return target.to_path_buf();
-    }
-    // 4th Priority: fixtures fallback
-    let fixture_path = PathBuf::from("tests/fixtures").join(target);
-    if fixture_path.exists() {
-        return fixture_path;
-    }
-    target.to_path_buf()
 }
 
 fn locate_tool(name: &str) -> PathBuf {
@@ -126,7 +109,7 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     // 2. Load Configuration and Menus
-    let config_path = resolve_file_path(&cli.config);
+    let config_path = resolve_file_path(&cli.config, cli.local);
     let mut config = if config_path.exists() {
         load_config(&config_path).unwrap_or_default()
     } else {
@@ -137,7 +120,7 @@ fn main() -> Result<()> {
         config.theme = t;
     }
 
-    let menu_path = resolve_file_path(&cli.menu);
+    let menu_path = resolve_file_path(&cli.menu, cli.local);
     let menu = if menu_path.exists() {
         load_menu(&menu_path).unwrap_or_default()
     } else {
@@ -145,7 +128,7 @@ fn main() -> Result<()> {
     };
 
     // 3. Load Themes
-    let themes_path = resolve_file_path(Path::new("bashmenu.themes"));
+    let themes_path = resolve_file_path(Path::new("bashmenu.themes"), cli.local);
     let mut themes = if themes_path.exists() {
         load_themes(&themes_path).unwrap_or_default()
     } else {
@@ -595,7 +578,7 @@ fn main() -> Result<()> {
 
                     match action {
                         MenuAction::Help => {
-                            let doc_path = resolve_file_path(Path::new("bashmenu.md"));
+                            let doc_path = resolve_file_path(Path::new("bashmenu.md"), cli.local);
                             let help_content = std::fs::read_to_string(&doc_path).unwrap_or_else(|_| {
                                 "BashMenu Documentation\n\nNavigation:\n  Up/Down, k/j: Navigate items\n  Enter: Select item\n  Esc/q: Back or exit\n\nFunction Keys:\n  F1: Help manual\n  F2: Theme picker\n  F3: Text editor\n  F4: Menu editor\n  F5: Reload config and menus\n  F6: Toggle shortcut numbers\n  F7: Configure status gutter\n  F8: Theme editor".to_string()
                             });

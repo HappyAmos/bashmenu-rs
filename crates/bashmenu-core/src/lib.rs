@@ -10,7 +10,10 @@ pub mod notebook;
 pub mod plugin;
 pub mod theme;
 
-pub use config::{load_config, save_config, BashMenuConfig, Settings, CONFIG_HEADER};
+pub use config::{
+    get_user_config_dir, load_config, resolve_app_path, save_config, BashMenuConfig, Settings,
+    CONFIG_HEADER,
+};
 pub use constants::*;
 pub use error::{BashMenuError, Result};
 pub use glyph::{

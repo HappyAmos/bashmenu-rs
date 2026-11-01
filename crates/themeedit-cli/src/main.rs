@@ -15,7 +15,7 @@ use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Widget};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 use themeedit_cli::{PreviewMode, ThemeEditorState, TokenKind};
 
@@ -34,38 +34,22 @@ struct Cli {
     /// Name of specific theme to edit
     #[arg(short, long)]
     theme: Option<String>,
+
+    /// Load and save theme files in current working directory
+    #[arg(long)]
+    local: bool,
 }
 
-fn resolve_themes_path(target: &PathBuf) -> PathBuf {
-    if target.is_absolute() {
-        return target.clone();
-    }
-    if target.components().count() > 1 && target.exists() {
-        return target.clone();
-    }
-    // 1st Priority: ~/.config/bashmenu/
-    if let Ok(home) = std::env::var("HOME") {
-        let user_cfg = PathBuf::from(home).join(".config/bashmenu").join(target);
-        if user_cfg.exists() {
-            return user_cfg;
+fn resolve_themes_path(target: &Path, local: bool) -> PathBuf {
+    if local {
+        if target.is_absolute() {
+            target.to_path_buf()
+        } else {
+            PathBuf::from(".").join(target)
         }
+    } else {
+        bashmenu_core::resolve_app_path(target)
     }
-    // 2nd Priority: {bashmenu_dir}/
-    if let Ok(dir) = std::env::var("BASHMENU_DIR") {
-        let candidate = PathBuf::from(dir).join(target);
-        if candidate.exists() {
-            return candidate;
-        }
-    }
-    // 3rd Priority: current working directory
-    if target.exists() {
-        return target.clone();
-    }
-    let fixture = PathBuf::from("tests/fixtures").join(target);
-    if fixture.exists() {
-        return fixture;
-    }
-    target.clone()
 }
 
 enum ActiveModal {
@@ -80,7 +64,7 @@ fn main() -> Result<()> {
     install_panic_hook();
 
     let cli = Cli::parse();
-    let themes_path = resolve_themes_path(&cli.file);
+    let themes_path = resolve_themes_path(&cli.file, cli.local);
     let mut state = ThemeEditorState::new(themes_path, cli.theme);
 
     let mut guard = TerminalGuard::init()?;
@@ -91,6 +75,7 @@ fn main() -> Result<()> {
         .wallpaper_config()
         .map(WallpaperCompositor::new);
     let mut need_redraw = true;
+    let mut click_flash: Option<(std::time::Instant, u16, u16, u16)> = None;
 
     loop {
         let size = guard.terminal_mut().size()?;
@@ -307,10 +292,14 @@ fn main() -> Result<()> {
 
                         // Active item
                         let ind = &preview_styles.indicator_symbol;
+                        let sc_active_style = Style::default()
+                            .fg(preview_styles.shortcut_key.fg.unwrap_or(Color::Magenta))
+                            .bg(preview_styles.highlight.bg.unwrap_or(Color::Cyan))
+                            .add_modifier(Modifier::BOLD);
                         let mut active_spans = vec![
                             Span::styled(ind, preview_styles.highlight),
                             Span::styled("  🚀 ", preview_styles.highlight),
-                            Span::styled("1. ", preview_styles.highlight),
+                            Span::styled("1. ", sc_active_style),
                             Span::styled("Launch Application", preview_styles.highlight),
                         ];
                         let active_vis: usize =
@@ -614,10 +603,17 @@ fn main() -> Result<()> {
                             preview_styles.text,
                         );
 
-                        // Center divider
+                        // Center divider with top_tee and bottom_tee
+                        buf.set_string(sep_col, right_area.y, &b.top_tee, border_style);
                         for y in p_inner_y..(p_inner_y + p_avail_h.saturating_sub(1)) {
-                            buf.set_string(sep_col, y, "│", preview_styles.border);
+                            buf.set_string(sep_col, y, &b.border_vertical_left, border_style);
                         }
+                        buf.set_string(
+                            sep_col,
+                            right_area.y + right_area.height.saturating_sub(2),
+                            &b.bottom_tee,
+                            border_style,
+                        );
 
                         // Right Pane: Property Inspector
                         let r_x = sep_col + 2;
@@ -715,11 +711,30 @@ fn main() -> Result<()> {
                     }
                     ActiveModal::None => {}
                 }
+
+                // 5. Visual/Haptic feedback flash for preview panel clicks (Modifier::REVERSED for 150ms)
+                if let Some((flash_start, fy, fx_start, fx_end)) = click_flash {
+                    if flash_start.elapsed() < Duration::from_millis(150) {
+                        for x in fx_start..fx_end {
+                            if let Some(cell) = buf.cell_mut((x, fy)) {
+                                cell.modifier |= Modifier::REVERSED;
+                            }
+                        }
+                    } else {
+                        click_flash = None;
+                    }
+                }
             })?;
             need_redraw = false;
         }
 
-        if event::poll(Duration::from_millis(50))? {
+        let poll_dur = if click_flash.is_some() {
+            Duration::from_millis(30)
+        } else {
+            Duration::from_millis(50)
+        };
+
+        if event::poll(poll_dur)? {
             let ev = event::read()?;
 
             // Ignore pure mouse movement events to avoid event queue flooding and latency
@@ -859,27 +874,36 @@ fn main() -> Result<()> {
                             }
 
                             // 2. Click on preview mode tab header
+                            let title_text = format!(
+                                " Preview: {} (Click to Switch) ",
+                                state.preview_mode.title()
+                            );
+                            let title_start = right_area.x + 3;
+                            let title_end = title_start + title_text.len() as u16;
                             if m.row == right_area.y
-                                && m.column >= right_area.x
-                                && m.column < right_area.x + right_area.width
+                                && m.column >= title_start
+                                && m.column < title_end
                             {
                                 state.preview_mode = state.preview_mode.next();
                                 continue;
                             }
 
-                            // 3. Click on preview pane to focus clicked element
+                            // 3. Click on preview pane to focus clicked element and trigger haptic flash
                             if m.column >= right_area.x
                                 && m.column < right_area.x + right_area.width
-                                && m.row > right_area.y
+                                && m.row >= right_area.y
                                 && m.row < right_area.y + right_area.height
                             {
-                                if let Some(key) = hit_test_preview(
+                                if let Some((key, fy, fx_start, fx_end)) = hit_test_preview(
                                     m.column,
                                     m.row,
                                     right_area,
                                     state.preview_mode,
                                 ) {
                                     state.select_token_by_key(key);
+                                    click_flash =
+                                        Some((std::time::Instant::now(), fy, fx_start, fx_end));
+                                    need_redraw = true;
                                 }
                                 continue;
                             }
@@ -995,6 +1019,11 @@ fn main() -> Result<()> {
                     _ => {}
                 },
             }
+        } else if let Some((flash_start, _, _, _)) = click_flash {
+            if flash_start.elapsed() >= Duration::from_millis(150) {
+                click_flash = None;
+                need_redraw = true;
+            }
         }
     }
 
@@ -1006,13 +1035,14 @@ fn hit_test_preview(
     row: u16,
     right_area: Rect,
     mode: PreviewMode,
-) -> Option<&'static str> {
+) -> Option<(&'static str, u16, u16, u16)> {
     let w = right_area.width as usize;
-    let avail_both = (w.saturating_sub(11)).max(4);
+    let avail_both = (w.saturating_sub(6)).max(4);
     let left_gutter_w = avail_both / 2;
-    let sep_x = (left_gutter_w + 5).min(w.saturating_sub(2));
+    let sep_x = (left_gutter_w + 2).min(w.saturating_sub(2));
     let gt_y = right_area.y + right_area.height.saturating_sub(3);
     let p_inner_x = right_area.x + 2;
+    let p_avail_w = right_area.width.saturating_sub(4);
     let content_start_y = right_area.y + 2;
     let content_avail_h = gt_y.saturating_sub(content_start_y);
     let plugin_start_y = gt_y.saturating_sub(if content_avail_h >= 8 { 3 } else { 1 });
@@ -1022,122 +1052,175 @@ fn hit_test_preview(
             // 1. Top border
             if row == right_area.y {
                 if col == right_area.x {
-                    return Some("border_top_left");
+                    return Some(("border_top_left", row, col, col + 1));
                 }
                 if col == right_area.x + right_area.width - 1 {
-                    return Some("border_top_right");
+                    return Some(("border_top_right", row, col, col + 1));
                 }
-                return Some("border_horizontal");
+                return Some((
+                    "border_horizontal",
+                    row,
+                    right_area.x + 1,
+                    right_area.x + right_area.width - 1,
+                ));
             }
             // 2. Bottom border
             if row == right_area.y + right_area.height - 1 {
                 if col == right_area.x {
-                    return Some("border_bottom_left");
+                    return Some(("border_bottom_left", row, col, col + 1));
                 }
                 if col == right_area.x + right_area.width - 1 {
-                    return Some("border_bottom_right");
+                    return Some(("border_bottom_right", row, col, col + 1));
                 }
                 if col == right_area.x + sep_x as u16 {
-                    return Some("gutter_bottom_tee");
+                    return Some(("gutter_bottom_tee", row, col, col + 1));
                 }
-                return Some("border_horizontal");
+                return Some((
+                    "border_horizontal",
+                    row,
+                    right_area.x + 1,
+                    right_area.x + right_area.width - 1,
+                ));
             }
             // 3. Left border
             if col == right_area.x {
                 if row == content_start_y + 3 {
-                    return Some("left_tee");
+                    return Some(("left_tee", row, col, col + 1));
                 }
                 if content_avail_h >= 6 && row == plugin_start_y {
-                    return Some("left_tee");
+                    return Some(("left_tee", row, col, col + 1));
                 }
                 if row == gt_y {
-                    return Some("gutter_left_tee");
+                    return Some(("gutter_left_tee", row, col, col + 1));
                 }
-                return Some("border_vertical");
+                return Some(("border_vertical", row, col, col + 1));
             }
             // 4. Right border
             if col == right_area.x + right_area.width - 1 {
                 if row == content_start_y + 3 {
-                    return Some("right_tee");
+                    return Some(("right_tee", row, col, col + 1));
                 }
                 if content_avail_h >= 6 && row == plugin_start_y {
-                    return Some("right_tee");
+                    return Some(("right_tee", row, col, col + 1));
                 }
                 if row == gt_y {
-                    return Some("gutter_right_tee");
+                    return Some(("gutter_right_tee", row, col, col + 1));
                 }
-                return Some("border_vertical");
+                return Some(("border_vertical", row, col, col + 1));
             }
             // 5. Gutter top border
             if row == gt_y {
                 if col == right_area.x + sep_x as u16 {
-                    return Some("gutter_top_tee");
+                    return Some(("gutter_top_tee", row, col, col + 1));
                 }
                 if col == right_area.x {
-                    return Some("gutter_left_tee");
+                    return Some(("gutter_left_tee", row, col, col + 1));
                 }
                 if col == right_area.x + right_area.width - 1 {
-                    return Some("gutter_right_tee");
+                    return Some(("gutter_right_tee", row, col, col + 1));
                 }
-                return Some("gutter_border");
+                return Some((
+                    "gutter_border",
+                    row,
+                    right_area.x + 1,
+                    right_area.x + right_area.width - 1,
+                ));
             }
             // 6. Gutter content row
             if row > gt_y && row < right_area.y + right_area.height - 1 {
                 if col == right_area.x + sep_x as u16 {
-                    return Some("gutter_separator");
+                    return Some(("gutter_separator", row, col, col + 1));
                 }
                 if col < right_area.x + sep_x as u16 {
-                    return Some("help_text");
+                    return Some((
+                        "help_text",
+                        row,
+                        right_area.x + 2,
+                        right_area.x + sep_x as u16,
+                    ));
                 }
-                return Some("gutter");
+                return Some((
+                    "gutter",
+                    row,
+                    right_area.x + sep_x as u16 + 1,
+                    right_area.x + right_area.width - 1,
+                ));
             }
             // 7. Menu content
             if row == content_start_y {
                 // Active menu row
                 if col >= p_inner_x && col < p_inner_x + 2 {
-                    return Some("indicator");
+                    return Some(("indicator", row, p_inner_x, p_inner_x + 2));
                 }
-                return Some("highlight");
+                if col >= p_inner_x + 7 && col < p_inner_x + 10 {
+                    return Some(("shortcut_key", row, p_inner_x + 7, p_inner_x + 10));
+                }
+                return Some(("highlight", row, p_inner_x, p_inner_x + p_avail_w));
             }
             if row == content_start_y + 1 {
                 // Item 2: Browse Directory
-                if col >= p_inner_x + 4 && col < p_inner_x + 7 {
-                    return Some("shortcut_key");
+                if col >= p_inner_x + 7 && col < p_inner_x + 10 {
+                    return Some(("shortcut_key", row, p_inner_x + 7, p_inner_x + 10));
                 }
                 if col >= right_area.x + right_area.width.saturating_sub(6) {
-                    return Some("accent");
+                    return Some((
+                        "accent",
+                        row,
+                        right_area.x + right_area.width.saturating_sub(6),
+                        right_area.x + right_area.width - 1,
+                    ));
                 }
-                return Some("text");
+                return Some((
+                    "text",
+                    row,
+                    p_inner_x + 10,
+                    right_area.x + right_area.width - 6,
+                ));
             }
             if row == content_start_y + 2 {
                 // Item 3: Notes & Tasks [notes.yml]
-                if col >= p_inner_x + 4 && col < p_inner_x + 7 {
-                    return Some("shortcut_key");
+                if col >= p_inner_x + 7 && col < p_inner_x + 10 {
+                    return Some(("shortcut_key", row, p_inner_x + 7, p_inner_x + 10));
                 }
                 if col >= right_area.x + right_area.width.saturating_sub(18) {
-                    return Some("gutter");
+                    return Some((
+                        "gutter",
+                        row,
+                        right_area.x + right_area.width.saturating_sub(18),
+                        right_area.x + right_area.width - 1,
+                    ));
                 }
-                return Some("text");
+                return Some((
+                    "text",
+                    row,
+                    p_inner_x + 10,
+                    right_area.x + right_area.width - 18,
+                ));
             }
             if row == content_start_y + 3 {
                 // Divider row
-                return Some("divider");
+                return Some(("divider", row, p_inner_x, p_inner_x + p_avail_w));
             }
             if row == content_start_y + 4 {
                 // Item 4: Exit
-                if col >= p_inner_x + 4 && col < p_inner_x + 7 {
-                    return Some("shortcut_key");
+                if col >= p_inner_x + 7 && col < p_inner_x + 10 {
+                    return Some(("shortcut_key", row, p_inner_x + 7, p_inner_x + 10));
                 }
-                return Some("text");
+                return Some((
+                    "text",
+                    row,
+                    p_inner_x + 10,
+                    right_area.x + right_area.width - 2,
+                ));
             }
             // Pseudo plugins
             if content_avail_h >= 6 && row >= plugin_start_y {
                 if row == plugin_start_y {
-                    return Some("divider");
+                    return Some(("divider", row, p_inner_x, p_inner_x + p_avail_w));
                 }
-                return Some("accent");
+                return Some(("accent", row, p_inner_x, p_inner_x + p_avail_w));
             }
-            Some("text")
+            Some(("text", row, p_inner_x, p_inner_x + p_avail_w))
         }
         PreviewMode::Modals => {
             let p_avail_w = right_area.width.saturating_sub(4);
@@ -1153,100 +1236,120 @@ fn hit_test_preview(
             if col >= mod_x && col < mod_x + mod_w && row >= mod_y && row < mod_y + mod_h {
                 if row == mod_y {
                     if col == mod_x {
-                        return Some("border_top_left");
+                        return Some(("border_top_left", row, col, col + 1));
                     }
                     if col == mod_x + mod_w - 1 {
-                        return Some("border_top_right");
+                        return Some(("border_top_right", row, col, col + 1));
                     }
-                    return Some("border_horizontal");
+                    return Some(("border_horizontal", row, mod_x + 1, mod_x + mod_w - 1));
                 }
                 if row == mod_y + mod_h - 1 {
                     if col == mod_x {
-                        return Some("border_bottom_left");
+                        return Some(("border_bottom_left", row, col, col + 1));
                     }
                     if col == mod_x + mod_w - 1 {
-                        return Some("border_bottom_right");
+                        return Some(("border_bottom_right", row, col, col + 1));
                     }
-                    return Some("border_horizontal");
+                    return Some(("border_horizontal", row, mod_x + 1, mod_x + mod_w - 1));
                 }
                 if col == mod_x {
                     if row == m_div_y {
-                        return Some("left_tee");
+                        return Some(("left_tee", row, col, col + 1));
                     }
-                    return Some("border_vertical");
+                    return Some(("border_vertical", row, col, col + 1));
                 }
                 if col == mod_x + mod_w - 1 {
                     if row == m_div_y {
-                        return Some("right_tee");
+                        return Some(("right_tee", row, col, col + 1));
                     }
                     if row >= mod_y + 3 && row <= mod_y + 5 {
-                        return Some("accent");
+                        return Some(("accent", row, col, col + 1));
                     }
-                    return Some("border_vertical");
+                    return Some(("border_vertical", row, col, col + 1));
                 }
                 if row == m_div_y {
-                    return Some("divider");
+                    return Some(("divider", row, mod_x + 1, mod_x + mod_w - 1));
                 }
                 if row == m_gutter_y {
                     if col < mod_x + mod_w.saturating_sub(12) {
-                        return Some("help_text");
+                        return Some((
+                            "help_text",
+                            row,
+                            mod_x + 2,
+                            mod_x + mod_w.saturating_sub(12),
+                        ));
                     }
-                    return Some("gutter");
+                    return Some((
+                        "gutter",
+                        row,
+                        mod_x + mod_w.saturating_sub(12),
+                        mod_x + mod_w - 1,
+                    ));
                 }
                 if row == mod_y + 2 {
-                    return Some("text");
+                    return Some(("text", row, mod_x + 2, mod_x + mod_w - 2));
                 }
                 if row == mod_y + 3 {
-                    return Some("help_text");
+                    return Some(("help_text", row, mod_x + 2, mod_x + mod_w - 2));
                 }
                 if row == mod_y + 5 {
-                    return Some("text");
+                    return Some(("text", row, mod_x + 2, mod_x + mod_w - 2));
                 }
                 if row == mod_y + 7 {
                     if col < mod_x + 18 {
-                        return Some("accent");
+                        return Some(("accent", row, mod_x + 2, mod_x + 18));
                     }
-                    return Some("text");
+                    return Some(("text", row, mod_x + 18, mod_x + mod_w - 2));
                 }
-                return Some("text");
+                return Some(("text", row, mod_x + 2, mod_x + mod_w - 2));
             }
-            Some("border")
+            Some(("border", row, right_area.x, right_area.x + right_area.width))
         }
         PreviewMode::TextEditor => {
             if row == right_area.y + 1 {
-                return Some("highlight");
+                return Some(("highlight", row, p_inner_x, p_inner_x + p_avail_w));
             }
             if row == right_area.y + 2 {
-                return Some("border");
+                return Some(("border", row, p_inner_x, p_inner_x + p_avail_w));
             }
             if row == right_area.y + right_area.height - 2 {
-                return Some("highlight");
+                return Some(("highlight", row, p_inner_x, p_inner_x + p_avail_w));
             }
             if row == right_area.y + right_area.height - 1 {
-                return Some("gutter");
+                return Some(("gutter", row, p_inner_x, p_inner_x + p_avail_w));
             }
             if col < p_inner_x + 6 {
-                return Some("gutter");
+                return Some(("gutter", row, p_inner_x, p_inner_x + 6));
             }
             if row == right_area.y + 5 {
-                return Some("highlight");
+                return Some(("highlight", row, p_inner_x, p_inner_x + p_avail_w));
             }
-            Some("text")
+            Some(("text", row, p_inner_x, p_inner_x + p_avail_w))
         }
         PreviewMode::MenuEditor => {
-            if col < right_area.x + right_area.width / 2 {
+            let sep_col = p_inner_x + p_avail_w / 2;
+            if col == sep_col {
+                if row == right_area.y {
+                    return Some(("top_tee", row, col, col + 1));
+                }
+                if row == right_area.y + right_area.height.saturating_sub(2) {
+                    return Some(("bottom_tee", row, col, col + 1));
+                }
+                return Some(("border_vertical", row, col, col + 1));
+            }
+            if col < sep_col {
                 if row == right_area.y + 1 {
-                    return Some("accent");
+                    return Some(("accent", row, p_inner_x, sep_col));
                 }
                 if row == right_area.y + 3 {
-                    return Some("highlight");
+                    return Some(("highlight", row, p_inner_x, sep_col));
                 }
-                Some("text")
+                Some(("text", row, p_inner_x, sep_col))
             } else {
                 if row == right_area.y + 1 {
-                    return Some("accent");
+                    return Some(("accent", row, sep_col + 1, p_inner_x + p_avail_w));
                 }
-                Some("text")
+                Some(("text", row, sep_col + 1, p_inner_x + p_avail_w))
             }
         }
     }

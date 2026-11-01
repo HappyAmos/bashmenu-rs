@@ -62,38 +62,22 @@ struct Cli {
     /// Path to menu definition file
     #[arg(short, long, default_value = "bashmenu.mnu")]
     file: PathBuf,
+
+    /// Load and save menu files in current working directory
+    #[arg(long)]
+    local: bool,
 }
 
-fn resolve_menu_path(target: &Path) -> PathBuf {
-    if target.is_absolute() {
-        return target.to_path_buf();
-    }
-    if target.components().count() > 1 && target.exists() {
-        return target.to_path_buf();
-    }
-    // 1st Priority: ~/.config/bashmenu/
-    if let Ok(home) = std::env::var("HOME") {
-        let user_cfg = PathBuf::from(home).join(".config/bashmenu").join(target);
-        if user_cfg.exists() {
-            return user_cfg;
+fn resolve_menu_path(target: &Path, local: bool) -> PathBuf {
+    if local {
+        if target.is_absolute() {
+            target.to_path_buf()
+        } else {
+            PathBuf::from(".").join(target)
         }
+    } else {
+        bashmenu_core::resolve_app_path(target)
     }
-    // 2nd Priority: {bashmenu_dir}/
-    if let Ok(dir) = std::env::var("BASHMENU_DIR") {
-        let candidate = PathBuf::from(dir).join(target);
-        if candidate.exists() {
-            return candidate;
-        }
-    }
-    // 3rd Priority: current working directory
-    if target.exists() {
-        return target.to_path_buf();
-    }
-    let fixture = PathBuf::from("tests/fixtures").join(target);
-    if fixture.exists() {
-        return fixture;
-    }
-    target.to_path_buf()
 }
 
 fn resolve_script_path(script_name: &str) -> Option<PathBuf> {
@@ -141,14 +125,15 @@ fn main() -> Result<()> {
     install_panic_hook();
 
     let cli = Cli::parse();
-    let menu_path = resolve_menu_path(&cli.file);
+    let menu_path = resolve_menu_path(&cli.file, cli.local);
     let mut menu = if menu_path.exists() {
         load_menu(&menu_path).unwrap_or_default()
     } else {
         MenuSchema::default()
     };
 
-    let cfg = load_config("bashmenu.yml").ok();
+    let cfg_path = resolve_menu_path(Path::new("bashmenu.yml"), cli.local);
+    let cfg = load_config(&cfg_path).ok();
     let mut guard = TerminalGuard::init()?;
     let styles = ResolvedThemeStyles::default();
 

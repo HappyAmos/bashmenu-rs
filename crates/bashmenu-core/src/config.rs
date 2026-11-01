@@ -5,7 +5,7 @@ use crate::theme::{Theme, WallpaperConfig, WallpaperSetting};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Canonical header comments preserved at the top of bashmenu.yml.
 pub const CONFIG_HEADER: &str = r#"# ==============================================================================
@@ -313,6 +313,72 @@ impl BashMenuConfig {
         }
         true
     }
+}
+
+/// Returns the canonical BashMenu user configuration directory:
+/// `~/.config/bashmenu` (or `$XDG_CONFIG_HOME/bashmenu`).
+pub fn get_user_config_dir() -> PathBuf {
+    if let Ok(xdg) = std::env::var("XDG_CONFIG_HOME") {
+        if !xdg.is_empty() {
+            return PathBuf::from(xdg).join("bashmenu");
+        }
+    }
+    if let Ok(home) = std::env::var("HOME") {
+        return PathBuf::from(home).join(".config/bashmenu");
+    }
+    PathBuf::from(".config/bashmenu")
+}
+
+/// Resolves a configuration, menu, or theme file path according to the standard
+/// BashMenu single-source-of-truth rules:
+///
+/// 1. If `target` is absolute, return it directly.
+/// 2. If `target` contains directory components (e.g. `./local.yml` or `sub/menu.mnu`),
+///    treat it as an explicit relative path.
+/// 3. Standard User Configuration Path:
+///    Look in `get_user_config_dir().join(target)`. If it exists, return it.
+/// 4. Environment override (`$BASHMENU_DIR`):
+///    If set and `$BASHMENU_DIR/<target>` exists, return it.
+/// 5. Test Fixtures fallback (for unit tests running inside workspace crates):
+///    If `tests/fixtures/<target>` exists, return it.
+/// 6. Default fallback:
+///    Return `get_user_config_dir().join(target)`. This ensures newly created/saved
+///    files always persist to the single source of truth in `~/.config/bashmenu/`
+///    regardless of which directory the command was launched from.
+pub fn resolve_app_path<P: AsRef<Path>>(target: P) -> PathBuf {
+    let target = target.as_ref();
+    if target.is_absolute() {
+        return target.to_path_buf();
+    }
+    if target.components().count() > 1 && target.exists() {
+        return target.to_path_buf();
+    }
+
+    let user_cfg_dir = get_user_config_dir();
+    let user_path = user_cfg_dir.join(target);
+    if user_path.exists() {
+        return user_path;
+    }
+
+    if let Ok(dir) = std::env::var("BASHMENU_DIR") {
+        let candidate = PathBuf::from(dir).join(target);
+        if candidate.exists() {
+            return candidate;
+        }
+    }
+
+    let fixture_paths = [
+        PathBuf::from("tests/fixtures").join(target),
+        PathBuf::from("../../tests/fixtures").join(target),
+    ];
+    for fix in fixture_paths {
+        if fix.exists() {
+            return fix;
+        }
+    }
+
+    // Default to the single source of truth in ~/.config/bashmenu/
+    user_path
 }
 
 /// Loads and parses `bashmenu.yml` from the specified path.

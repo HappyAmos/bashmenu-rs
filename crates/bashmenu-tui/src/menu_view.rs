@@ -13,7 +13,7 @@ use bashmenu_core::{
 use crossterm::event::{KeyCode, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::Modifier;
+use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 
 /// Outcome of handling a user input event
@@ -370,6 +370,11 @@ impl MenuView {
                 let target_num = 10 + (c as u8 - b'a') as usize;
                 self.activate_shortcut_index(target_num)
             }
+            KeyCode::Char(c) if self.show_shortcuts && c.is_ascii_uppercase() => {
+                // Letter shortcuts A..Z
+                let target_num = 36 + (c as u8 - b'A') as usize;
+                self.activate_shortcut_index(target_num)
+            }
             KeyCode::F(1) => MenuAction::Help,
             KeyCode::F(2) => MenuAction::ThemeSelector,
             KeyCode::F(3) => MenuAction::LaunchEditor,
@@ -709,9 +714,14 @@ impl MenuView {
             let shortcut = if self.show_shortcuts {
                 if selectable_num <= 9 {
                     format!("{}. ", selectable_num)
-                } else {
+                } else if selectable_num <= 35 {
                     let ch = (b'a' + (selectable_num - 10) as u8) as char;
                     format!("{}. ", ch)
+                } else if selectable_num <= 61 {
+                    let ch = (b'A' + (selectable_num - 36) as u8) as char;
+                    format!("{}. ", ch)
+                } else {
+                    String::new()
                 }
             } else {
                 String::new()
@@ -736,7 +746,10 @@ impl MenuView {
             ];
             if !shortcut.is_empty() {
                 let sc_style = if is_active {
-                    item_style
+                    Style::default()
+                        .fg(self.styles.shortcut_key.fg.unwrap_or(Color::Magenta))
+                        .bg(self.styles.highlight.bg.unwrap_or(Color::Cyan))
+                        .add_modifier(Modifier::BOLD)
                 } else {
                     self.styles.shortcut_key
                 };

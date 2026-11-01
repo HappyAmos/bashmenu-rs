@@ -205,7 +205,23 @@ fn test_themeedit_t_connectors_and_click_selection() {
     assert_eq!(state.tokens[state.selected_idx].label, "Gutter Color");
 
     assert!(state.select_token_by_key("shortcut_key"));
-    assert_eq!(state.tokens[state.selected_idx].label, "Shortcut Color");
+    assert_eq!(
+        state.tokens[state.selected_idx].label,
+        "Shortcut Gutter (1-9, a-z)"
+    );
+
+    // Verify gutter T-connectors and window T-connectors select exact tokens
+    assert!(state.select_token_by_key("gutter_top_tee"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Gutter Top Tee");
+
+    assert!(state.select_token_by_key("gutter_bottom_tee"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Gutter Bottom Tee");
+
+    assert!(state.select_token_by_key("top_tee"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Top T-Connector");
+
+    assert!(state.select_token_by_key("bottom_tee"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Bottom T-Connector");
 
     assert!(state.select_token_by_key("divider"));
     assert_eq!(state.tokens[state.selected_idx].label, "Divider Color");

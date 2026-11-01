@@ -48,6 +48,10 @@ struct Cli {
     /// Theme override name
     #[arg(short, long)]
     theme: Option<String>,
+
+    /// Load and save configuration files in current working directory
+    #[arg(long)]
+    local: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -118,11 +122,19 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     let mut guard = TerminalGuard::init()?;
 
-    // Load active theme configuration
-    let home_dir = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-    let bashmenu_dir = PathBuf::from(&home_dir).join(".config/bashmenu");
-    let config = load_config(bashmenu_dir.join("bashmenu.yml")).unwrap_or_default();
-    let themes = load_themes(bashmenu_dir.join("bashmenu.themes")).unwrap_or_default();
+    // Load active theme configuration (single source of truth: ~/.config/bashmenu/)
+    let config_path = if cli.local {
+        PathBuf::from("bashmenu.yml")
+    } else {
+        bashmenu_core::resolve_app_path(Path::new("bashmenu.yml"))
+    };
+    let themes_path = if cli.local {
+        PathBuf::from("bashmenu.themes")
+    } else {
+        bashmenu_core::resolve_app_path(Path::new("bashmenu.themes"))
+    };
+    let config = load_config(&config_path).unwrap_or_default();
+    let themes = load_themes(&themes_path).unwrap_or_default();
     let use_nerd = config.settings.use_nerd_fonts.unwrap_or(false);
 
     let active_theme_name = cli.theme.as_deref().unwrap_or(&config.theme);
