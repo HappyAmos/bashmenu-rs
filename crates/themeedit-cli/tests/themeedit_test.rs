@@ -834,3 +834,151 @@ fn test_color_picker_configured_color_selection_and_x_indicator() {
         "Color picker modal must render uppercase 'X' indicator on the selected color"
     );
 }
+
+#[test]
+fn test_create_theme_with_base_monochrome() {
+    let tmp_dir =
+        std::env::temp_dir().join(format!("themeedit_create_test_{}", std::process::id()));
+    let _ = fs::create_dir_all(&tmp_dir);
+    let tmp_file = tmp_dir.join("test.themes");
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    fs::copy(&fixture_path, &tmp_file).unwrap();
+
+    let mut state = ThemeEditorState::new(tmp_file.clone(), Some("dracula".to_string()));
+    assert_eq!(state.current_name, "dracula");
+
+    // Creating with empty name returns error
+    assert!(state.create_theme("   ").is_err());
+    // Creating existing name returns error
+    assert!(state.create_theme("dracula").is_err());
+
+    // Create new monochrome theme
+    state.create_theme("mono_theme").unwrap();
+    assert_eq!(state.current_name, "mono_theme");
+    assert_eq!(state.name_input.as_string(), "mono_theme");
+    assert!(state.is_modified);
+    assert!(state.themes.contains_key("mono_theme"));
+
+    // Verify monochrome palette defaults: text=255, highlight=0 on 255
+    assert_eq!(state.get_color_token_u8("text"), 255);
+    assert_eq!(state.get_color_token_u8("highlight"), 0);
+    assert_eq!(state.get_color_token_u8("border"), 250);
+
+    let _ = fs::remove_dir_all(&tmp_dir);
+}
+
+#[test]
+fn test_rename_theme() {
+    let tmp_dir =
+        std::env::temp_dir().join(format!("themeedit_rename_test_{}", std::process::id()));
+    let _ = fs::create_dir_all(&tmp_dir);
+    let tmp_file = tmp_dir.join("test.themes");
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    fs::copy(&fixture_path, &tmp_file).unwrap();
+
+    let mut state = ThemeEditorState::new(tmp_file.clone(), Some("dracula".to_string()));
+    assert_eq!(state.current_name, "dracula");
+
+    // Error on empty rename
+    assert!(state.rename_theme("").is_err());
+    // Error on duplicate rename
+    assert!(state.rename_theme("nord").is_err());
+
+    // Rename to valid new name
+    state.rename_theme("vampire").unwrap();
+    assert_eq!(state.current_name, "vampire");
+    assert_eq!(state.name_input.as_string(), "vampire");
+    assert!(!state.themes.contains_key("dracula"));
+    assert!(state.themes.contains_key("vampire"));
+    assert!(state.is_modified);
+
+    // Save to disk and verify reload
+    state.save_to_disk().unwrap();
+    let reloaded = ThemeEditorState::new(tmp_file, Some("vampire".to_string()));
+    assert_eq!(reloaded.current_name, "vampire");
+    assert!(!reloaded.themes.contains_key("dracula"));
+    assert!(reloaded.themes.contains_key("vampire"));
+
+    let _ = fs::remove_dir_all(&tmp_dir);
+}
+
+#[test]
+fn test_delete_theme_with_confirmation_and_fallback() {
+    let tmp_dir =
+        std::env::temp_dir().join(format!("themeedit_delete_test_{}", std::process::id()));
+    let _ = fs::create_dir_all(&tmp_dir);
+    let tmp_file = tmp_dir.join("test.themes");
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    fs::copy(&fixture_path, &tmp_file).unwrap();
+
+    let mut state = ThemeEditorState::new(tmp_file.clone(), Some("dracula".to_string()));
+    assert!(state.themes.contains_key("dracula"));
+
+    // Delete active theme "dracula"
+    state.delete_theme("dracula").unwrap();
+    assert!(!state.themes.contains_key("dracula"));
+    assert_ne!(state.current_name, "dracula");
+    assert_eq!(state.name_input.as_string(), state.current_name);
+
+    // Verify deletion persisted to disk
+    let reloaded = ThemeEditorState::new(tmp_file, None);
+    assert!(!reloaded.themes.contains_key("dracula"));
+
+    let _ = fs::remove_dir_all(&tmp_dir);
+}
+
+#[test]
+fn test_save_as_new_theme() {
+    let tmp_dir =
+        std::env::temp_dir().join(format!("themeedit_saveas_test_{}", std::process::id()));
+    let _ = fs::create_dir_all(&tmp_dir);
+    let tmp_file = tmp_dir.join("test.themes");
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    fs::copy(&fixture_path, &tmp_file).unwrap();
+
+    let mut state = ThemeEditorState::new(tmp_file.clone(), Some("dracula".to_string()));
+    state.set_color_token("text", 180);
+
+    // Save as new theme using current theme as base
+    state.save_as_theme("dracula_custom").unwrap();
+    assert_eq!(state.current_name, "dracula_custom");
+    assert_eq!(state.name_input.as_string(), "dracula_custom");
+    assert!(!state.is_modified);
+
+    // Verify both original and new theme exist on disk
+    let reloaded = ThemeEditorState::new(tmp_file, Some("dracula_custom".to_string()));
+    assert!(reloaded.themes.contains_key("dracula"));
+    assert!(reloaded.themes.contains_key("dracula_custom"));
+    assert_eq!(reloaded.get_color_token_u8("text"), 180);
+
+    let _ = fs::remove_dir_all(&tmp_dir);
+}
+
+#[test]
+fn test_name_input_text_editing() {
+    use crossterm::event::{KeyCode, KeyModifiers};
+
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(fixture_path, Some("my_theme".to_string()));
+    assert_eq!(state.name_input.as_string(), "my_theme");
+
+    // Select all and type replacement
+    state.name_input.select_all();
+    state.name_input.handle_key(KeyCode::Char('n'));
+    assert_eq!(state.name_input.as_string(), "n");
+
+    // Append characters
+    state.name_input.handle_key(KeyCode::Char('e'));
+    state.name_input.handle_key(KeyCode::Char('w'));
+    assert_eq!(state.name_input.as_string(), "new");
+
+    // Test backspace
+    state.name_input.handle_key(KeyCode::Backspace);
+    assert_eq!(state.name_input.as_string(), "ne");
+
+    // Test Ctrl+A select all
+    state
+        .name_input
+        .handle_key_with_modifiers(KeyCode::Char('a'), KeyModifiers::CONTROL);
+    assert_eq!(state.name_input.selection_range(), Some((0, 2)));
+}

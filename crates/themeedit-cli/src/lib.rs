@@ -8,7 +8,7 @@ use bashmenu_core::{
     load_themes, save_themes, DividerConfig, MarqueeConfig, Theme, ThemeCollection,
     WallpaperSetting, WindowBorders,
 };
-use bashmenu_tui::ResolvedThemeStyles;
+use bashmenu_tui::{ResolvedThemeStyles, TextInput};
 use ratatui::layout::Rect;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -76,6 +76,7 @@ pub struct ThemeEditorState {
     pub scroll_offset: usize,
     pub status_message: String,
     pub preview_mode: PreviewMode,
+    pub name_input: TextInput,
 }
 
 /// Converts a Ratatui Color to an ANSI 256 color index (0..=255)
@@ -317,6 +318,8 @@ impl ThemeEditorState {
             },
         ];
 
+        let name_input = TextInput::new(&initial_name);
+
         Self {
             themes,
             themes_path,
@@ -328,6 +331,7 @@ impl ThemeEditorState {
             scroll_offset: 0,
             status_message: "Ready".to_string(),
             preview_mode: PreviewMode::default(),
+            name_input,
         }
     }
 
@@ -749,6 +753,142 @@ impl ThemeEditorState {
         self.is_modified = false;
         self.status_message = format!("Saved theme '{}' directly to disk", self.current_name);
         Ok(())
+    }
+
+    pub fn create_monochrome_theme() -> Theme {
+        Theme::monochrome()
+    }
+
+    pub fn create_theme(&mut self, name: &str) -> std::result::Result<(), String> {
+        let trimmed = name.trim();
+        if trimmed.is_empty() {
+            return Err("Theme name cannot be empty".to_string());
+        }
+        if self.themes.contains_key(trimmed) {
+            return Err(format!("Theme '{}' already exists", trimmed));
+        }
+        if self.is_modified {
+            self.themes
+                .insert(self.current_name.clone(), self.current_theme.clone());
+        }
+        let new_theme = Theme::monochrome();
+        self.themes.insert(trimmed.to_string(), new_theme.clone());
+        self.current_name = trimmed.to_string();
+        self.current_theme = new_theme;
+        self.name_input.set_text(&self.current_name);
+        self.is_modified = true;
+        self.status_message = format!(
+            "Created new theme '{}' (monochrome base)",
+            self.current_name
+        );
+        Ok(())
+    }
+
+    pub fn delete_theme(&mut self, name: &str) -> std::result::Result<(), String> {
+        self.themes.remove(name);
+        if self.themes.is_empty() {
+            self.themes
+                .insert("default".to_string(), Theme::monochrome());
+        }
+        if self.current_name == name {
+            let next_name = if self.themes.contains_key("dracula") {
+                "dracula".to_string()
+            } else {
+                let mut sorted: Vec<_> = self.themes.keys().cloned().collect();
+                sorted.sort();
+                sorted
+                    .into_iter()
+                    .next()
+                    .unwrap_or_else(|| "default".to_string())
+            };
+            self.current_name = next_name.clone();
+            self.current_theme = self
+                .themes
+                .get(&next_name)
+                .cloned()
+                .unwrap_or_else(Theme::monochrome);
+            self.name_input.set_text(&self.current_name);
+        }
+        save_themes(&self.themes_path, &self.themes)
+            .map_err(|e| format!("Failed to save themes after deletion: {}", e))?;
+        self.is_modified = false;
+        self.status_message = format!("Deleted theme '{}'", name);
+        Ok(())
+    }
+
+    pub fn rename_theme(&mut self, new_name: &str) -> std::result::Result<(), String> {
+        let trimmed = new_name.trim();
+        if trimmed.is_empty() {
+            return Err("Theme name cannot be empty".to_string());
+        }
+        if trimmed == self.current_name {
+            self.name_input.set_text(&self.current_name);
+            return Ok(());
+        }
+        if self.themes.contains_key(trimmed) {
+            return Err(format!("Theme '{}' already exists", trimmed));
+        }
+        self.themes.remove(&self.current_name);
+        self.themes
+            .insert(trimmed.to_string(), self.current_theme.clone());
+        self.current_name = trimmed.to_string();
+        self.name_input.set_text(&self.current_name);
+        self.is_modified = true;
+        self.status_message = format!("Renamed theme to '{}'", trimmed);
+        Ok(())
+    }
+
+    pub fn save_as_theme(&mut self, new_name: &str) -> std::result::Result<(), String> {
+        let trimmed = new_name.trim();
+        if trimmed.is_empty() {
+            return Err("Theme name cannot be empty".to_string());
+        }
+        self.themes
+            .insert(trimmed.to_string(), self.current_theme.clone());
+        self.current_name = trimmed.to_string();
+        self.name_input.set_text(&self.current_name);
+        save_themes(&self.themes_path, &self.themes)
+            .map_err(|e| format!("Failed to save theme: {}", e))?;
+        self.is_modified = false;
+        self.status_message = format!("Saved as new theme '{}'", trimmed);
+        Ok(())
+    }
+
+    pub fn switch_theme(&mut self, name: &str) -> bool {
+        if let Some(th) = self.themes.get(name).cloned() {
+            if self.is_modified {
+                self.themes
+                    .insert(self.current_name.clone(), self.current_theme.clone());
+            }
+            self.current_name = name.to_string();
+            self.current_theme = th;
+            self.name_input.set_text(&self.current_name);
+            self.is_modified = false;
+            self.status_message = format!("Switched to theme '{}'", name);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn cycle_theme(&mut self, forward: bool) {
+        if self.themes.is_empty() {
+            return;
+        }
+        let mut sorted: Vec<_> = self.themes.keys().cloned().collect();
+        sorted.sort();
+        if let Some(pos) = sorted.iter().position(|k| k == &self.current_name) {
+            let next_idx = if forward {
+                (pos + 1) % sorted.len()
+            } else if pos == 0 {
+                sorted.len().saturating_sub(1)
+            } else {
+                pos - 1
+            };
+            self.switch_theme(&sorted[next_idx]);
+        } else if let Some(first) = sorted.first() {
+            self.switch_theme(first);
+        }
     }
 
     /// Focuses/selects the token corresponding to the given style or border key

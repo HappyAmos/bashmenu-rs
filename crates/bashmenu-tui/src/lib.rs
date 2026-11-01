@@ -10,6 +10,7 @@ pub mod menu_view;
 pub mod modals;
 pub mod style;
 pub mod terminal;
+pub mod text_input;
 pub mod toast;
 pub mod wallpaper;
 
@@ -35,6 +36,7 @@ pub use modals::{
 };
 pub use style::{parse_color_value, ResolvedThemeStyles};
 pub use terminal::TerminalGuard;
+pub use text_input::TextInput;
 pub use toast::{ActiveToast, ToastRack};
 pub use wallpaper::{
     color_to_rgb, composite_buffer, resolve_wallpaper_path, WallpaperCell, WallpaperCompositor,

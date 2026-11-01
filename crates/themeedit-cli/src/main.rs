@@ -60,6 +60,8 @@ enum ActiveModal {
     ColorPicker(String, ColorGridModal),
     AsciiPicker(String, AsciiGridModal),
     SaveAs(InputModal),
+    NewTheme(InputModal),
+    ConfirmDelete(ConfirmModal),
     ConfirmExit(ConfirmModal),
     WallpaperPicker(FilePickerModal),
 }
@@ -83,6 +85,7 @@ fn main() -> Result<()> {
     let mut need_redraw = true;
     let mut click_flash: Option<FlashHighlight> = None;
     let mut toast_rack = ToastRack::new();
+    let mut is_editing_name = false;
 
     loop {
         let size = guard.terminal_mut().size()?;
@@ -138,8 +141,68 @@ fn main() -> Result<()> {
                 let right_w = (area.x + area.width).saturating_sub(right_x + 2);
                 let right_area = Rect::new(right_x, panel_y, right_w, panel_h);
 
-                // 1. Render Left Panel: Token List
-                let visible_rows = (left_area.height.saturating_sub(2)) as usize;
+                // 1. Render Left Panel: Editable Theme Name & Token List
+                let theme_label = "Theme: ";
+                buf.set_string(
+                    left_area.x,
+                    left_area.y,
+                    theme_label,
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                );
+                let input_box_x = left_area.x + theme_label.len() as u16;
+                let input_box_w = (left_area.width.saturating_sub(theme_label.len() as u16)).max(8);
+
+                let name_str = state.name_input.as_string();
+                let box_style = if is_editing_name {
+                    Style::default().fg(Color::White).bg(Color::Indexed(236))
+                } else {
+                    Style::default().fg(Color::Cyan)
+                };
+                let inner_w = (input_box_w.saturating_sub(4)) as usize;
+                let display_text = if name_str.len() > inner_w {
+                    &name_str[..inner_w]
+                } else {
+                    &name_str
+                };
+                let padded = format!("[ {:<width$} ]", display_text, width = inner_w);
+                buf.set_string(input_box_x, left_area.y, &padded, box_style);
+
+                if is_editing_name {
+                    let sel_range = state.name_input.selection_range();
+                    let text_start_x = input_box_x + 2;
+                    for (c_idx, ch) in display_text.chars().enumerate() {
+                        let cx = text_start_x + c_idx as u16;
+                        let mut char_style = box_style;
+                        if let Some((s_start, s_end)) = sel_range {
+                            if c_idx >= s_start && c_idx < s_end {
+                                char_style = char_style.add_modifier(Modifier::REVERSED);
+                            }
+                        }
+                        if c_idx == state.name_input.cursor {
+                            char_style = char_style.add_modifier(Modifier::REVERSED);
+                        }
+                        buf.set_string(cx, left_area.y, ch.to_string(), char_style);
+                    }
+                    let cursor_col = text_start_x + state.name_input.cursor as u16;
+                    if state.name_input.cursor >= display_text.chars().count()
+                        && cursor_col < input_box_x + input_box_w.saturating_sub(1)
+                    {
+                        if let Some(cell) = buf.cell_mut((cursor_col, left_area.y)) {
+                            cell.set_char(' ');
+                            cell.modifier |= Modifier::REVERSED;
+                        }
+                    }
+                }
+
+                // Sub-divider under theme name
+                let sep_style = Style::default().fg(Color::DarkGray);
+                let div_w = left_area.width as usize;
+                buf.set_string(left_area.x, left_area.y + 1, "─".repeat(div_w), sep_style);
+
+                // Tokens header
+                let visible_rows = (left_area.height.saturating_sub(3)) as usize;
                 state.adjust_scroll(visible_rows);
 
                 let scroll_up_ind = if state.scroll_offset > 0 { " ▲" } else { "" };
@@ -151,7 +214,7 @@ fn main() -> Result<()> {
                 let list_title = format!(" Theme Tokens{}{}", scroll_up_ind, scroll_dn_ind);
                 buf.set_string(
                     left_area.x,
-                    left_area.y,
+                    left_area.y + 2,
                     list_title,
                     Style::default()
                         .fg(Color::Yellow)
@@ -165,9 +228,9 @@ fn main() -> Result<()> {
                     .skip(state.scroll_offset)
                     .take(visible_rows)
                 {
-                    let row_y = left_area.y + 2 + (v_idx - state.scroll_offset) as u16;
+                    let row_y = left_area.y + 3 + (v_idx - state.scroll_offset) as u16;
 
-                    let is_sel = v_idx == state.selected_idx;
+                    let is_sel = !is_editing_name && v_idx == state.selected_idx;
                     let val_str = state.get_token_value_display(token);
 
                     let cursor = if is_sel { "▶ " } else { "  " };
@@ -220,11 +283,12 @@ fn main() -> Result<()> {
                 );
 
                 let bottom_items = [
-                    "[TAB/1-5] Switch Preview",
-                    "[Enter] Pick",
-                    "[F2] Wallpaper",
+                    "[F6] New",
+                    "[F7] Rename",
+                    "[F8] Del",
                     "[Ctrl+S] Save",
                     "[Ctrl+A] Save As",
+                    "[TAB] View",
                     "[q] Exit",
                 ];
                 let bottom_avail_w = area.width.saturating_sub(4) as usize;
@@ -251,6 +315,12 @@ fn main() -> Result<()> {
                         last_grid_origin = origin;
                     }
                     ActiveModal::SaveAs(modal) => {
+                        modal.render(area, &preview_styles, buf);
+                    }
+                    ActiveModal::NewTheme(modal) => {
+                        modal.render(area, &preview_styles, buf);
+                    }
+                    ActiveModal::ConfirmDelete(modal) => {
                         modal.render(area, &preview_styles, buf);
                     }
                     ActiveModal::ConfirmExit(modal) => {
@@ -365,13 +435,12 @@ fn main() -> Result<()> {
                             if let Some(new_name) = res {
                                 let trimmed = new_name.trim();
                                 if !trimmed.is_empty() {
-                                    state.current_name = trimmed.to_string();
-                                    match state.save_to_disk() {
+                                    match state.save_as_theme(trimmed) {
                                         Ok(_) => {
                                             toast_rack.add(ToastNotification {
-                                                title: Some("Save Theme".to_string()),
+                                                title: Some("Save Theme As".to_string()),
                                                 message: format!(
-                                                    "Saved theme '{}' to disk",
+                                                    "Saved as new theme '{}' to disk",
                                                     state.current_name
                                                 ),
                                                 severity: ToastSeverity::Information,
@@ -397,13 +466,12 @@ fn main() -> Result<()> {
                             if let Some(new_name) = res {
                                 let trimmed = new_name.trim();
                                 if !trimmed.is_empty() {
-                                    state.current_name = trimmed.to_string();
-                                    match state.save_to_disk() {
+                                    match state.save_as_theme(trimmed) {
                                         Ok(_) => {
                                             toast_rack.add(ToastNotification {
-                                                title: Some("Save Theme".to_string()),
+                                                title: Some("Save Theme As".to_string()),
                                                 message: format!(
-                                                    "Saved theme '{}' to disk",
+                                                    "Saved as new theme '{}' to disk",
                                                     state.current_name
                                                 ),
                                                 severity: ToastSeverity::Information,
@@ -418,6 +486,126 @@ fn main() -> Result<()> {
                                                 timeout_secs: 3.0,
                                             });
                                         }
+                                    }
+                                }
+                            }
+                            active_modal = ActiveModal::None;
+                        }
+                    }
+                    _ => {}
+                },
+                ActiveModal::NewTheme(modal) => match ev {
+                    Event::Key(k) => {
+                        if let Some(res) = modal.handle_key_with_modifiers(k.code, k.modifiers) {
+                            if let Some(new_name) = res {
+                                let trimmed = new_name.trim();
+                                if !trimmed.is_empty() {
+                                    match state.create_theme(trimmed) {
+                                        Ok(_) => {
+                                            toast_rack.add(ToastNotification {
+                                                title: Some("Theme Editor".to_string()),
+                                                message: format!(
+                                                    "Created new theme '{}' (monochrome base)",
+                                                    state.current_name
+                                                ),
+                                                severity: ToastSeverity::Information,
+                                                timeout_secs: 2.0,
+                                            });
+                                        }
+                                        Err(e) => {
+                                            toast_rack.add(ToastNotification {
+                                                title: Some("Error".to_string()),
+                                                message: e,
+                                                severity: ToastSeverity::Error,
+                                                timeout_secs: 3.0,
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                            active_modal = ActiveModal::None;
+                        }
+                    }
+                    Event::Mouse(m) => {
+                        if let Some(res) = modal.handle_mouse(m, area) {
+                            if let Some(new_name) = res {
+                                let trimmed = new_name.trim();
+                                if !trimmed.is_empty() {
+                                    match state.create_theme(trimmed) {
+                                        Ok(_) => {
+                                            toast_rack.add(ToastNotification {
+                                                title: Some("Theme Editor".to_string()),
+                                                message: format!(
+                                                    "Created new theme '{}' (monochrome base)",
+                                                    state.current_name
+                                                ),
+                                                severity: ToastSeverity::Information,
+                                                timeout_secs: 2.0,
+                                            });
+                                        }
+                                        Err(e) => {
+                                            toast_rack.add(ToastNotification {
+                                                title: Some("Error".to_string()),
+                                                message: e,
+                                                severity: ToastSeverity::Error,
+                                                timeout_secs: 3.0,
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                            active_modal = ActiveModal::None;
+                        }
+                    }
+                    _ => {}
+                },
+                ActiveModal::ConfirmDelete(modal) => match ev {
+                    Event::Key(k) => {
+                        if let Some(choice) = modal.handle_key(k.code) {
+                            if choice.is_yes() {
+                                let to_del = state.current_name.clone();
+                                match state.delete_theme(&to_del) {
+                                    Ok(_) => {
+                                        toast_rack.add(ToastNotification {
+                                            title: Some("Theme Editor".to_string()),
+                                            message: format!("Deleted theme '{}'", to_del),
+                                            severity: ToastSeverity::Information,
+                                            timeout_secs: 2.0,
+                                        });
+                                    }
+                                    Err(e) => {
+                                        toast_rack.add(ToastNotification {
+                                            title: Some("Error".to_string()),
+                                            message: e,
+                                            severity: ToastSeverity::Error,
+                                            timeout_secs: 3.0,
+                                        });
+                                    }
+                                }
+                            }
+                            active_modal = ActiveModal::None;
+                        }
+                    }
+                    Event::Mouse(m) => {
+                        if let Some(choice) = modal.handle_mouse(m, area) {
+                            if choice.is_yes() {
+                                let to_del = state.current_name.clone();
+                                match state.delete_theme(&to_del) {
+                                    Ok(_) => {
+                                        toast_rack.add(ToastNotification {
+                                            title: Some("Theme Editor".to_string()),
+                                            message: format!("Deleted theme '{}'", to_del),
+                                            severity: ToastSeverity::Information,
+                                            timeout_secs: 2.0,
+                                        });
+                                    }
+                                    Err(e) => {
+                                        toast_rack.add(ToastNotification {
+                                            title: Some("Error".to_string()),
+                                            message: e,
+                                            severity: ToastSeverity::Error,
+                                            timeout_secs: 3.0,
+                                        });
                                     }
                                 }
                             }
@@ -561,15 +749,38 @@ fn main() -> Result<()> {
                                     continue;
                                 }
 
+                                // Click on Theme Name field
+                                if m.row == left_area.y
+                                    && m.column >= left_area.x
+                                    && m.column < left_area.x + left_area.width
+                                {
+                                    is_editing_name = true;
+                                    let theme_label_len = 7_u16;
+                                    let input_box_x = left_area.x + theme_label_len;
+                                    let click_inner =
+                                        m.column.saturating_sub(input_box_x + 2) as usize;
+                                    state.name_input.cursor =
+                                        click_inner.min(state.name_input.len());
+                                    state.name_input.clear_selection();
+                                    continue;
+                                }
+
+                                // If clicked elsewhere while editing name, commit rename
+                                if is_editing_name {
+                                    let new_name = state.name_input.as_string();
+                                    let _ = state.rename_theme(&new_name);
+                                    is_editing_name = false;
+                                }
+
                                 // 1. Click on left token list
-                                let visible_rows = (left_area.height.saturating_sub(2)) as usize;
+                                let visible_rows = (left_area.height.saturating_sub(3)) as usize;
                                 if m.column >= left_area.x
                                     && m.column < left_area.x + left_area.width
-                                    && m.row >= left_area.y + 2
-                                    && m.row < left_area.y + 2 + visible_rows as u16
+                                    && m.row >= left_area.y + 3
+                                    && m.row < left_area.y + 3 + visible_rows as u16
                                 {
                                     let clicked_idx =
-                                        state.scroll_offset + (m.row - (left_area.y + 2)) as usize;
+                                        state.scroll_offset + (m.row - (left_area.y + 3)) as usize;
                                     if clicked_idx < state.tokens.len() {
                                         let was_selected = clicked_idx == state.selected_idx;
                                         state.selected_idx = clicked_idx;
@@ -658,6 +869,55 @@ fn main() -> Result<()> {
                             }
                         }
                         Event::Key(k) => {
+                            if is_editing_name {
+                                match k.code {
+                                    KeyCode::Enter => {
+                                        let new_name = state.name_input.as_string();
+                                        match state.rename_theme(&new_name) {
+                                            Ok(_) => {
+                                                is_editing_name = false;
+                                                toast_rack.add(ToastNotification {
+                                                    title: Some("Theme Editor".to_string()),
+                                                    message: format!(
+                                                        "Renamed theme to '{}'",
+                                                        state.current_name
+                                                    ),
+                                                    severity: ToastSeverity::Information,
+                                                    timeout_secs: 2.0,
+                                                });
+                                            }
+                                            Err(err) => {
+                                                toast_rack.add(ToastNotification {
+                                                    title: Some("Rename Error".to_string()),
+                                                    message: err,
+                                                    severity: ToastSeverity::Error,
+                                                    timeout_secs: 3.0,
+                                                });
+                                            }
+                                        }
+                                        continue;
+                                    }
+                                    KeyCode::Esc => {
+                                        state.name_input.set_text(&state.current_name);
+                                        is_editing_name = false;
+                                        continue;
+                                    }
+                                    KeyCode::Tab | KeyCode::Down => {
+                                        let new_name = state.name_input.as_string();
+                                        if state.rename_theme(&new_name).is_ok() {
+                                            is_editing_name = false;
+                                        }
+                                        continue;
+                                    }
+                                    _ => {
+                                        state
+                                            .name_input
+                                            .handle_key_with_modifiers(k.code, k.modifiers);
+                                        continue;
+                                    }
+                                }
+                            }
+
                             // Invariant: Ctrl+S saves directly whenever theme_name is set; only untitled diverts to Save As
                             if k.modifiers.contains(KeyModifiers::CONTROL) {
                                 match k.code {
@@ -699,7 +959,7 @@ fn main() -> Result<()> {
                                         continue;
                                     }
                                     KeyCode::Char('a') => {
-                                        // Ctrl+A opens Save As
+                                        // Ctrl+A opens Save As dialog
                                         active_modal = ActiveModal::SaveAs(InputModal::new(
                                             "Save Theme As",
                                             "Enter new theme name:",
@@ -708,16 +968,26 @@ fn main() -> Result<()> {
                                         continue;
                                     }
                                     KeyCode::Char('n') => {
-                                        // Ctrl+N creates new theme
-                                        state.current_name = "untitled".to_string();
-                                        state.current_theme =
-                                            ThemeEditorState::create_default_theme();
-                                        state.is_modified = true;
+                                        // Ctrl+N creates new theme with base monochrome theme
+                                        active_modal = ActiveModal::NewTheme(InputModal::new(
+                                            "Create New Theme",
+                                            "Enter new theme name:",
+                                            "",
+                                        ));
+                                        continue;
+                                    }
+                                    KeyCode::Char('r') => {
+                                        // Ctrl+R renames theme
+                                        is_editing_name = true;
+                                        state.name_input.set_text(&state.current_name);
+                                        state.name_input.select_all();
                                         toast_rack.add(ToastNotification {
                                             title: Some("Theme Editor".to_string()),
-                                            message: "Created new untitled theme".to_string(),
+                                            message:
+                                                "Editing theme name (Enter to apply, Esc to cancel)"
+                                                    .to_string(),
                                             severity: ToastSeverity::Information,
-                                            timeout_secs: 2.0,
+                                            timeout_secs: 1.5,
                                         });
                                         continue;
                                     }
@@ -726,6 +996,56 @@ fn main() -> Result<()> {
                             }
 
                             match k.code {
+                                KeyCode::F(6) => {
+                                    // F6 creates new theme
+                                    active_modal = ActiveModal::NewTheme(InputModal::new(
+                                        "Create New Theme",
+                                        "Enter new theme name:",
+                                        "",
+                                    ));
+                                }
+                                KeyCode::F(7) | KeyCode::F(2) => {
+                                    // F7 / F2 renames theme
+                                    is_editing_name = true;
+                                    state.name_input.set_text(&state.current_name);
+                                    state.name_input.select_all();
+                                    toast_rack.add(ToastNotification {
+                                        title: Some("Theme Editor".to_string()),
+                                        message:
+                                            "Editing theme name (Enter to apply, Esc to cancel)"
+                                                .to_string(),
+                                        severity: ToastSeverity::Information,
+                                        timeout_secs: 1.5,
+                                    });
+                                }
+                                KeyCode::F(8) => {
+                                    // F8 deletes current theme with confirmation
+                                    active_modal = ActiveModal::ConfirmDelete(ConfirmModal::new(
+                                        "Delete Theme",
+                                        format!(
+                                            "Are you sure you want to delete theme '{}'?",
+                                            state.current_name
+                                        ),
+                                    ));
+                                }
+                                KeyCode::Char('[') => {
+                                    state.cycle_theme(false);
+                                    toast_rack.add(ToastNotification {
+                                        title: Some("Theme Switcher".to_string()),
+                                        message: format!("Switched to '{}'", state.current_name),
+                                        severity: ToastSeverity::Information,
+                                        timeout_secs: 1.5,
+                                    });
+                                }
+                                KeyCode::Char(']') => {
+                                    state.cycle_theme(true);
+                                    toast_rack.add(ToastNotification {
+                                        title: Some("Theme Switcher".to_string()),
+                                        message: format!("Switched to '{}'", state.current_name),
+                                        severity: ToastSeverity::Information,
+                                        timeout_secs: 1.5,
+                                    });
+                                }
                                 KeyCode::Tab | KeyCode::Char('p') | KeyCode::Char('P') => {
                                     state.preview_mode = state.preview_mode.next();
                                 }
@@ -745,7 +1065,10 @@ fn main() -> Result<()> {
                                     state.preview_mode = PreviewMode::Toast;
                                 }
                                 KeyCode::Up | KeyCode::Char('k') => {
-                                    if state.selected_idx > 0 {
+                                    if state.selected_idx == 0 {
+                                        is_editing_name = true;
+                                        state.name_input.select_all();
+                                    } else {
                                         state.selected_idx -= 1;
                                         let spans = get_token_preview_spans(
                                             &state.tokens[state.selected_idx],
@@ -809,7 +1132,7 @@ fn main() -> Result<()> {
                                     );
                                     click_flash = Some((std::time::Instant::now(), spans));
                                 }
-                                KeyCode::F(2) | KeyCode::Char('b') => {
+                                KeyCode::F(4) | KeyCode::Char('b') => {
                                     let start_dir = if let Ok(cwd) = std::env::current_dir() {
                                         let wp_dir = cwd.join("assets/wallpapers");
                                         if wp_dir.is_dir() {
@@ -827,7 +1150,29 @@ fn main() -> Result<()> {
                                             false,
                                         ));
                                 }
-                                KeyCode::Delete | KeyCode::Backspace => {
+                                KeyCode::Delete => {
+                                    if state.tokens[state.selected_idx].kind
+                                        == TokenKind::WallpaperImage
+                                    {
+                                        state.set_wallpaper_image(None);
+                                        toast_rack.add(ToastNotification {
+                                            title: Some("Theme Editor".to_string()),
+                                            message: "Wallpaper removed".to_string(),
+                                            severity: ToastSeverity::Information,
+                                            timeout_secs: 2.0,
+                                        });
+                                    } else {
+                                        active_modal =
+                                            ActiveModal::ConfirmDelete(ConfirmModal::new(
+                                                "Delete Theme",
+                                                format!(
+                                                    "Are you sure you want to delete theme '{}'?",
+                                                    state.current_name
+                                                ),
+                                            ));
+                                    }
+                                }
+                                KeyCode::Backspace => {
                                     if state.tokens[state.selected_idx].kind
                                         == TokenKind::WallpaperImage
                                     {

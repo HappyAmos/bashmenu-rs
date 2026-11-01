@@ -250,6 +250,62 @@ impl Theme {
         }
         None
     }
+
+    /// Creates a base monochrome theme with clean single-line borders,
+    /// white-on-black/transparent text, and standard indicators.
+    pub fn monochrome() -> Self {
+        let mut t = Self::default();
+        let borders = WindowBorders {
+            border_horizontal: Some("─".to_string()),
+            border_vertical: Some("│".to_string()),
+            border_top_left: Some("┌".to_string()),
+            border_top_right: Some("┐".to_string()),
+            border_bottom_left: Some("└".to_string()),
+            border_bottom_right: Some("┘".to_string()),
+            left_tee: Some("├".to_string()),
+            right_tee: Some("┤".to_string()),
+            top_tee: Some("┬".to_string()),
+            bottom_tee: Some("┴".to_string()),
+            ..Default::default()
+        };
+        t.window = Some(borders);
+        t.indicator = Some("> ".to_string());
+        t.divider = Some(DividerConfig {
+            char: Some("─".to_string()),
+            length: Some("{window_width}".to_string()),
+        });
+        t.marquee = Some(MarqueeConfig {
+            char: "•".to_string(),
+            gap: 4,
+        });
+        t.toast = Some(ToastConfig {
+            char: Some("▌".to_string()),
+            timeout: Some(2.0),
+        });
+
+        let mut colors = HashMap::new();
+        let make_pair = |fg: i64, bg: i64| -> serde_yml::Value {
+            serde_yml::Value::Sequence(vec![
+                serde_yml::Value::Number(fg.into()),
+                serde_yml::Value::Number(bg.into()),
+            ])
+        };
+        colors.insert("background".to_string(), serde_yml::Value::Number(0.into()));
+        colors.insert("text".to_string(), make_pair(255, -1));
+        colors.insert("highlight".to_string(), make_pair(0, 255));
+        colors.insert("border".to_string(), make_pair(250, -1));
+        colors.insert("divider".to_string(), make_pair(245, -1));
+        colors.insert("accent".to_string(), make_pair(255, -1));
+        colors.insert("shortcut_key".to_string(), make_pair(255, -1));
+        colors.insert("gutter".to_string(), make_pair(242, -1));
+        colors.insert("help_text".to_string(), make_pair(250, -1));
+        colors.insert("scrollbar".to_string(), make_pair(245, -1));
+        colors.insert("toast_info".to_string(), make_pair(255, -1));
+        colors.insert("toast_warning".to_string(), make_pair(250, -1));
+        colors.insert("toast_error".to_string(), make_pair(245, -1));
+        t.colors_256 = Some(colors);
+        t
+    }
 }
 
 /// Type alias for all loaded themes mapped by theme name
