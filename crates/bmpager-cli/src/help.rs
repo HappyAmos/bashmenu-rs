@@ -92,11 +92,11 @@ pub fn show_help_modal(strip_colors: bool) -> anyhow::Result<()> {
             ("\x1b[1;36m", "\x1b[1;37;44m", "\x1b[1;33m", "\x1b[0m")
         };
 
-        let mut out = String::new();
+        let mut out = String::from("\x1b[2J");
 
         // Top border
         let title = " Pager Help & Manual ";
-        let t_len = title.len();
+        let t_len = crate::ansi::visual_width(title);
         let r_len = box_w.saturating_sub(t_len + 3);
         let top_bar = "─".repeat(r_len);
         out.push_str(&format!(
@@ -121,8 +121,13 @@ pub fn show_help_modal(strip_colors: bool) -> anyhow::Result<()> {
             let l_style = if is_heading { s_style } else { r_style };
 
             let vis = crate::ansi::visual_width(line_content);
-            let clipped: String = line_content.chars().take(inner_w).collect();
-            let pad = inner_w.saturating_sub(vis);
+            let clipped = if vis > inner_w {
+                crate::ansi::clip_ansi_line(line_content, inner_w, strip_colors)
+            } else {
+                line_content.to_string()
+            };
+            let clipped_vis = crate::ansi::visual_width(&clipped);
+            let pad = inner_w.saturating_sub(clipped_vis);
 
             let cur_r = start_r + 1 + r_idx;
             out.push_str(&format!(
@@ -151,7 +156,7 @@ pub fn show_help_modal(strip_colors: bool) -> anyhow::Result<()> {
         };
 
         let hint = format!(" [▲▼/PgUp/PgDn: scroll • q/ESC: close] ({}) ", pct_str);
-        let h_len = hint.len();
+        let h_len = crate::ansi::visual_width(&hint);
         let b_len = box_w.saturating_sub(h_len + 3);
         let bot_bar = "─".repeat(b_len);
         let bot_r = start_r + box_h - 1;
@@ -209,5 +214,7 @@ pub fn show_help_modal(strip_colors: bool) -> anyhow::Result<()> {
         }
     }
 
+    print!("\x1b[2J");
+    stdout().flush()?;
     Ok(())
 }

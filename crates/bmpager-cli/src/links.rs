@@ -55,12 +55,17 @@ pub fn extract_links(lines: &[String]) -> Vec<DocumentLink> {
         }
     }
 
-    // Deduplicate / consolidate consecutive identical URLs on the same line
+    // Deduplicate / consolidate consecutive identical URLs on the same or adjacent lines
     let mut consolidated: Vec<DocumentLink> = Vec::new();
     for link in links {
         if let Some(last) = consolidated.last_mut() {
-            if last.url == link.url && last.line_no == link.line_no {
-                last.text = format!("{} {}", last.text, link.text);
+            if last.url == link.url
+                && (last.line_no == link.line_no || link.line_no == last.line_no + 1)
+            {
+                last.text = format!("{} {}", last.text, link.text)
+                    .split_whitespace()
+                    .collect::<Vec<_>>()
+                    .join(" ");
                 continue;
             }
         }
@@ -84,10 +89,17 @@ pub fn normalize_for_anchor(s: &str) -> String {
     result.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-/// Resolves an internal anchor link `#target` to a 1-indexed line number in the document.
-pub fn resolve_anchor(lines: &[String], anchor: &str, source_line: usize) -> Option<usize> {
-    let norm_target = normalize_for_anchor(anchor.trim_start_matches('#'));
-    if norm_target.is_empty() {
+/// Resolves an internal anchor link `#target` or label `chosen_text` to a 1-indexed line number in the document.
+pub fn resolve_anchor(
+    lines: &[String],
+    anchor: &str,
+    chosen_text: &str,
+    source_line: usize,
+) -> Option<usize> {
+    let norm_anchor = normalize_for_anchor(anchor.trim_start_matches('#'));
+    let norm_text = normalize_for_anchor(chosen_text);
+
+    if norm_anchor.is_empty() && norm_text.is_empty() {
         return None;
     }
 
@@ -113,10 +125,21 @@ pub fn resolve_anchor(lines: &[String], anchor: &str, source_line: usize) -> Opt
             }
 
             let mut score = 0;
-            if norm_line.starts_with(&norm_target) || norm_target.starts_with(&norm_line) {
+            // 1. Text label match (highest priority, e.g. "3.1 Main Menu Engine (bashmenu.py)")
+            if !norm_text.is_empty()
+                && (norm_line.starts_with(&norm_text) || norm_text.starts_with(&norm_line))
+            {
                 score += 100;
+            } else if !norm_anchor.is_empty()
+                && (norm_line.starts_with(&norm_anchor) || norm_anchor.starts_with(&norm_line))
+            {
+                score += 90;
             } else {
-                let tw: Vec<&str> = norm_target.split_whitespace().collect();
+                let tw: Vec<&str> = if !norm_text.is_empty() {
+                    norm_text.split_whitespace().collect()
+                } else {
+                    norm_anchor.split_whitespace().collect()
+                };
                 let lw: Vec<&str> = norm_line.split_whitespace().collect();
                 if tw.len() >= 2 && lw.len() >= 2 && tw[..2] == lw[..2] {
                     score += 80;
@@ -138,6 +161,22 @@ pub fn resolve_anchor(lines: &[String], anchor: &str, source_line: usize) -> Opt
     }
 
     best_line
+}
+
+/// Resolves a local file path referenced in a link.
+pub fn resolve_local_file(url: &str) -> Option<std::path::PathBuf> {
+    let clean = url.trim_start_matches("file://");
+    let p = std::path::Path::new(clean);
+    if p.exists() {
+        return Some(p.to_path_buf());
+    }
+    if let Ok(root) = std::env::current_dir() {
+        let cand = root.join(clean);
+        if cand.exists() {
+            return Some(cand);
+        }
+    }
+    None
 }
 
 /// Opens an external URL or file in a background process.

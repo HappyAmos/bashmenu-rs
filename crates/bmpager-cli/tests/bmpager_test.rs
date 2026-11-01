@@ -151,3 +151,38 @@ fn test_bmpager_file_argument() {
     let out_str = String::from_utf8_lossy(&output.stdout);
     assert!(out_str.contains("[package]") || out_str.contains("[workspace]"));
 }
+
+#[test]
+fn test_bmpager_link_extraction_and_anchor_resolution() {
+    let mut child = Command::new("cargo")
+        .args([
+            "run",
+            "-p",
+            "bmpager-cli",
+            "--bin",
+            "bmpager",
+            "--",
+            "--markdown",
+        ])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("failed to spawn bmpager");
+
+    let doc = "\
+- [3.1 Main Menu Engine (`bashmenu.py`)](#31-main-menu-engine-bashmenupy)
+
+### 3.1 Main Menu Engine (`bashmenu.py`)
+
+Here is section 3.1 content.
+";
+    {
+        let stdin = child.stdin.as_mut().expect("failed to open stdin");
+        stdin.write_all(doc.as_bytes()).unwrap();
+    }
+
+    let output = child.wait_with_output().expect("failed to read stdout");
+    assert!(output.status.success());
+    let out_str = String::from_utf8_lossy(&output.stdout);
+    assert!(out_str.contains("3.1 Main Menu Engine"));
+}

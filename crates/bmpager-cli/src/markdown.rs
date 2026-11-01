@@ -266,8 +266,15 @@ impl MarkdownRenderer {
                     } else if self.in_table {
                         self.current_cell.push_str(&format!("`{}`", code));
                     } else {
-                        // Inline code styled distinctively
-                        let styled = format!("\x1b[38;5;208;48;5;236m {} \x1b[0m", code);
+                        // Inline code styled distinctively (with OSC 8 link if inside link)
+                        let styled = if let Some(ref url) = self.link_url {
+                            format!(
+                                "\x1b]8;;{}\x1b\\\x1b[38;5;208;48;5;236m `{}` \x1b[0m\x1b]8;;\x1b\\",
+                                url, code
+                            )
+                        } else {
+                            format!("\x1b[38;5;208;48;5;236m {} \x1b[0m", code)
+                        };
                         self.emit_word(&styled);
                     }
                 }

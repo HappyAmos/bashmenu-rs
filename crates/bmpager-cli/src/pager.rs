@@ -587,7 +587,9 @@ impl Pager {
 
         let chosen = &links[sel];
         if chosen.url.starts_with('#') {
-            if let Some(target_line) = resolve_anchor(&self.lines, &chosen.url, chosen.line_no) {
+            if let Some(target_line) =
+                resolve_anchor(&self.lines, &chosen.url, &chosen.text, chosen.line_no)
+            {
                 self.top_line = target_line;
                 self.message = format!("jumped to {}", chosen.url);
             } else {
@@ -596,14 +598,25 @@ impl Pager {
         } else if chosen.url.starts_with("http://") || chosen.url.starts_with("https://") {
             let _ = open_external_url(&chosen.url);
             self.message = format!("opened {}", chosen.url);
-        } else {
-            let path_str = chosen.url.trim_start_matches("file://");
-            let target_path = Path::new(path_str);
-            if target_path.exists() {
-                self.message = format!("viewed {}", chosen.url);
-            } else {
-                self.message = format!("file not found: {}", chosen.url);
+        } else if let Some(full_file) = crate::links::resolve_local_file(&chosen.url) {
+            // Temporarily leave raw mode and alternate screen to launch child viewer
+            execute!(stdout(), Show, LeaveAlternateScreen)?;
+            disable_raw_mode()?;
+
+            let mut cmd =
+                Command::new(std::env::current_exe().unwrap_or_else(|_| PathBuf::from("bmpager")));
+            if full_file.extension().map(|e| e == "md").unwrap_or(false) {
+                cmd.arg("-m");
             }
+            cmd.arg(&full_file);
+            let _ = cmd.status();
+
+            enable_raw_mode()?;
+            execute!(stdout(), EnterAlternateScreen, Hide)?;
+            stdout().flush()?;
+            self.message = format!("viewed {}", chosen.url);
+        } else {
+            self.message = format!("file not found: {}", chosen.url);
         }
 
         Ok(())
