@@ -1079,6 +1079,48 @@ impl ItemEditModal {
         self.current_type == "radio" || self.current_type == "config_radio"
     }
 
+    pub fn is_nav_type(&self) -> bool {
+        matches!(
+            self.current_type.as_str(),
+            "submenu" | "notebook" | "theme_selector" | "back" | "exit"
+        )
+    }
+
+    pub fn is_executable(&self) -> bool {
+        matches!(
+            self.current_type.as_str(),
+            "command" | "script" | "confirm" | "python"
+        )
+    }
+
+    pub fn shows_start_dir(&self) -> bool {
+        matches!(self.current_type.as_str(), "command" | "script" | "editor")
+    }
+
+    pub fn shows_prompt(&self) -> bool {
+        matches!(
+            self.current_type.as_str(),
+            "command" | "script" | "config" | "toggle" | "radio" | "confirm" | "message" | "python"
+        )
+    }
+
+    pub fn shows_action(&self) -> bool {
+        !self.is_divider()
+            && !self.is_confirm()
+            && self.current_type != "inject_block"
+            && !matches!(
+                self.current_type.as_str(),
+                "submenu" | "theme_selector" | "back" | "exit"
+            )
+    }
+
+    pub fn shows_action_browse(&self) -> bool {
+        matches!(
+            self.current_type.as_str(),
+            "command" | "script" | "editor" | "notebook" | "python"
+        )
+    }
+
     /// Dynamically lists active focusable controls based on item type and mode
     pub fn focus_controls(&self) -> Vec<FocusControl> {
         let mut controls = vec![FocusControl::ChangeTypeBtn];
@@ -1089,40 +1131,69 @@ impl ItemEditModal {
         } else {
             controls.push(FocusControl::TitleInput);
             controls.push(FocusControl::IconInput);
+
             if self.is_confirm() {
                 controls.push(FocusControl::PromptInput);
                 controls.push(FocusControl::OnYesInput);
                 controls.push(FocusControl::OnYesBrowseBtn);
                 controls.push(FocusControl::OnNoInput);
                 controls.push(FocusControl::OnNoBrowseBtn);
-            } else {
+            } else if self.shows_action() {
                 controls.push(FocusControl::ActionInput);
-                controls.push(FocusControl::ActionBrowseBtn);
+                if self.shows_action_browse() {
+                    controls.push(FocusControl::ActionBrowseBtn);
+                }
+                if self.shows_prompt() {
+                    controls.push(FocusControl::PromptInput);
+                }
+            } else if self.shows_prompt() {
                 controls.push(FocusControl::PromptInput);
             }
+
             if self.is_radio() {
                 controls.push(FocusControl::RadioOptionsInput);
             }
-            controls.push(FocusControl::TemplateInput);
-            controls.push(FocusControl::TemplateBrowseBtn);
-            controls.push(FocusControl::TargetInput);
-            controls.push(FocusControl::TargetBrowseBtn);
-            controls.push(FocusControl::BlockIdInput);
-            controls.push(FocusControl::StartDirInput);
-            controls.push(FocusControl::StartDirBrowseBtn);
-            controls.push(FocusControl::TabstopInput);
-            controls.push(FocusControl::ExecModeSelector);
-            if self.exec_mode == 0 || self.exec_mode == 1 {
-                controls.push(FocusControl::WindowPercentInput);
+
+            if self.current_type == "inject_block" {
+                controls.push(FocusControl::TemplateInput);
+                controls.push(FocusControl::TemplateBrowseBtn);
+                controls.push(FocusControl::TargetInput);
+                controls.push(FocusControl::TargetBrowseBtn);
+                controls.push(FocusControl::BlockIdInput);
             }
-            if self.exec_mode == 2 {
-                controls.push(FocusControl::AltBufferChk);
+
+            if self.shows_start_dir() {
+                controls.push(FocusControl::StartDirInput);
+                controls.push(FocusControl::StartDirBrowseBtn);
             }
-            controls.push(FocusControl::NoFormattingChk);
-            controls.push(FocusControl::MaskedChk);
-            controls.push(FocusControl::RefreshChk);
-            controls.push(FocusControl::ShowWhitespaceChk);
-            controls.push(FocusControl::ExternalChk);
+
+            if self.current_type == "editor" {
+                controls.push(FocusControl::TabstopInput);
+            }
+
+            if self.is_executable() {
+                controls.push(FocusControl::ExecModeSelector);
+                if self.exec_mode == 0 || self.exec_mode == 1 {
+                    controls.push(FocusControl::WindowPercentInput);
+                }
+                if self.exec_mode == 2 {
+                    controls.push(FocusControl::AltBufferChk);
+                }
+            }
+
+            if self.current_type == "editor" {
+                controls.push(FocusControl::NoFormattingChk);
+                controls.push(FocusControl::ShowWhitespaceChk);
+            }
+
+            if matches!(self.current_type.as_str(), "command" | "script") {
+                controls.push(FocusControl::MaskedChk);
+            }
+
+            if !self.is_nav_type() {
+                controls.push(FocusControl::RefreshChk);
+                controls.push(FocusControl::ExternalChk);
+            }
         }
 
         controls.push(FocusControl::SaveBtn);
@@ -2017,16 +2088,42 @@ impl ItemEditModal {
                     selection: self.on_no_input.selection_range(),
                     btn_ctrl: FocusControl::OnNoBrowseBtn,
                 });
-            } else {
+            } else if self.shows_action() {
                 form_lines.push(FormRow::Label(self.get_action_label_text()));
-                form_lines.push(FormRow::InputWithBrowse {
-                    input_ctrl: FocusControl::ActionInput,
-                    text: self.action_input.as_string(),
-                    cursor: self.action_input.cursor,
-                    selection: self.action_input.selection_range(),
-                    btn_ctrl: FocusControl::ActionBrowseBtn,
-                });
+                if self.shows_action_browse() {
+                    form_lines.push(FormRow::InputWithBrowse {
+                        input_ctrl: FocusControl::ActionInput,
+                        text: self.action_input.as_string(),
+                        cursor: self.action_input.cursor,
+                        selection: self.action_input.selection_range(),
+                        btn_ctrl: FocusControl::ActionBrowseBtn,
+                    });
+                } else {
+                    form_lines.push(FormRow::Input {
+                        ctrl: FocusControl::ActionInput,
+                        text: self.action_input.as_string(),
+                        cursor: self.action_input.cursor,
+                        selection: self.action_input.selection_range(),
+                    });
+                }
 
+                if self.shows_prompt() {
+                    let prompt_label = match self.current_type.as_str() {
+                        "command" | "script" => "Prompt Text (for {param} or file pickers):",
+                        "config" => "Config Prompt Message:",
+                        "toggle" => "Toggle Confirmation Prompt (optional):",
+                        "radio" => "Radio Dialog Title / Prompt:",
+                        _ => "Message / Prompt Text:",
+                    };
+                    form_lines.push(FormRow::Label(prompt_label));
+                    form_lines.push(FormRow::Input {
+                        ctrl: FocusControl::PromptInput,
+                        text: self.prompt_input.as_string(),
+                        cursor: self.prompt_input.cursor,
+                        selection: self.prompt_input.selection_range(),
+                    });
+                }
+            } else if self.shows_prompt() {
                 form_lines.push(FormRow::Label("Message / Prompt Text:"));
                 form_lines.push(FormRow::Input {
                     ctrl: FocusControl::PromptInput,
@@ -2090,99 +2187,116 @@ impl ItemEditModal {
                 }
             }
 
-            form_lines.push(FormRow::Label("Template Path (inject_block):"));
-            form_lines.push(FormRow::InputWithBrowse {
-                input_ctrl: FocusControl::TemplateInput,
-                text: self.template_input.as_string(),
-                cursor: self.template_input.cursor,
-                selection: self.template_input.selection_range(),
-                btn_ctrl: FocusControl::TemplateBrowseBtn,
-            });
+            if self.current_type == "inject_block" {
+                form_lines.push(FormRow::Label("Template Path (inject_block):"));
+                form_lines.push(FormRow::InputWithBrowse {
+                    input_ctrl: FocusControl::TemplateInput,
+                    text: self.template_input.as_string(),
+                    cursor: self.template_input.cursor,
+                    selection: self.template_input.selection_range(),
+                    btn_ctrl: FocusControl::TemplateBrowseBtn,
+                });
 
-            form_lines.push(FormRow::Label("Target Path (inject_block):"));
-            form_lines.push(FormRow::InputWithBrowse {
-                input_ctrl: FocusControl::TargetInput,
-                text: self.target_input.as_string(),
-                cursor: self.target_input.cursor,
-                selection: self.target_input.selection_range(),
-                btn_ctrl: FocusControl::TargetBrowseBtn,
-            });
+                form_lines.push(FormRow::Label("Target Path (inject_block):"));
+                form_lines.push(FormRow::InputWithBrowse {
+                    input_ctrl: FocusControl::TargetInput,
+                    text: self.target_input.as_string(),
+                    cursor: self.target_input.cursor,
+                    selection: self.target_input.selection_range(),
+                    btn_ctrl: FocusControl::TargetBrowseBtn,
+                });
 
-            form_lines.push(FormRow::Label("Block ID (inject_block):"));
-            form_lines.push(FormRow::Input {
-                ctrl: FocusControl::BlockIdInput,
-                text: self.block_id_input.as_string(),
-                cursor: self.block_id_input.cursor,
-                selection: self.block_id_input.selection_range(),
-            });
-
-            form_lines.push(FormRow::Label(
-                "Start Directory ({file_picker} / {dir_picker}):",
-            ));
-            form_lines.push(FormRow::InputWithBrowse {
-                input_ctrl: FocusControl::StartDirInput,
-                text: self.start_dir_input.as_string(),
-                cursor: self.start_dir_input.cursor,
-                selection: self.start_dir_input.selection_range(),
-                btn_ctrl: FocusControl::StartDirBrowseBtn,
-            });
-
-            form_lines.push(FormRow::Label("Tabstop:"));
-            form_lines.push(FormRow::Input {
-                ctrl: FocusControl::TabstopInput,
-                text: self.tabstop_input.as_string(),
-                cursor: self.tabstop_input.cursor,
-                selection: self.tabstop_input.selection_range(),
-            });
-
-            form_lines.push(FormRow::Label("Execution Mode:"));
-            form_lines.push(FormRow::ExecMode {
-                mode: self.exec_mode,
-                is_active: cur_ctrl == FocusControl::ExecModeSelector,
-            });
-
-            if self.exec_mode == 0 || self.exec_mode == 1 {
-                form_lines.push(FormRow::Label("Window Size % (20-100):"));
+                form_lines.push(FormRow::Label("Block ID (inject_block):"));
                 form_lines.push(FormRow::Input {
-                    ctrl: FocusControl::WindowPercentInput,
-                    text: self.window_percent_input.as_string(),
-                    cursor: self.window_percent_input.cursor,
-                    selection: self.window_percent_input.selection_range(),
+                    ctrl: FocusControl::BlockIdInput,
+                    text: self.block_id_input.as_string(),
+                    cursor: self.block_id_input.cursor,
+                    selection: self.block_id_input.selection_range(),
                 });
             }
 
-            if self.exec_mode == 2 {
-                form_lines.push(FormRow::Checkbox {
-                    ctrl: FocusControl::AltBufferChk,
-                    label: "Run in Alternate Screen Buffer (alt_buffer=true)",
-                    checked: self.alt_buffer,
+            if self.shows_start_dir() {
+                form_lines.push(FormRow::Label(
+                    "Start Directory ({file_picker} / {dir_picker}):",
+                ));
+                form_lines.push(FormRow::InputWithBrowse {
+                    input_ctrl: FocusControl::StartDirInput,
+                    text: self.start_dir_input.as_string(),
+                    cursor: self.start_dir_input.cursor,
+                    selection: self.start_dir_input.selection_range(),
+                    btn_ctrl: FocusControl::StartDirBrowseBtn,
                 });
             }
-            form_lines.push(FormRow::Checkbox {
-                ctrl: FocusControl::NoFormattingChk,
-                label: "Disable Formatting (no_formatting=true)",
-                checked: self.no_formatting,
-            });
-            form_lines.push(FormRow::Checkbox {
-                ctrl: FocusControl::MaskedChk,
-                label: "Mask Input (masked=true)",
-                checked: self.masked,
-            });
-            form_lines.push(FormRow::Checkbox {
-                ctrl: FocusControl::RefreshChk,
-                label: "Refresh Environment (refresh=true)",
-                checked: self.refresh,
-            });
-            form_lines.push(FormRow::Checkbox {
-                ctrl: FocusControl::ShowWhitespaceChk,
-                label: "Show Whitespace in Editor (show_whitespace=true)",
-                checked: self.show_whitespace,
-            });
-            form_lines.push(FormRow::Checkbox {
-                ctrl: FocusControl::ExternalChk,
-                label: "External Execution (external=true)",
-                checked: self.external,
-            });
+
+            if self.current_type == "editor" {
+                form_lines.push(FormRow::Label("Tabstop:"));
+                form_lines.push(FormRow::Input {
+                    ctrl: FocusControl::TabstopInput,
+                    text: self.tabstop_input.as_string(),
+                    cursor: self.tabstop_input.cursor,
+                    selection: self.tabstop_input.selection_range(),
+                });
+            }
+
+            if self.is_executable() {
+                form_lines.push(FormRow::Label("Execution Mode:"));
+                form_lines.push(FormRow::ExecMode {
+                    mode: self.exec_mode,
+                    is_active: cur_ctrl == FocusControl::ExecModeSelector,
+                });
+
+                if self.exec_mode == 0 || self.exec_mode == 1 {
+                    form_lines.push(FormRow::Label("Window Size % (20-100):"));
+                    form_lines.push(FormRow::Input {
+                        ctrl: FocusControl::WindowPercentInput,
+                        text: self.window_percent_input.as_string(),
+                        cursor: self.window_percent_input.cursor,
+                        selection: self.window_percent_input.selection_range(),
+                    });
+                }
+
+                if self.exec_mode == 2 {
+                    form_lines.push(FormRow::Checkbox {
+                        ctrl: FocusControl::AltBufferChk,
+                        label: "Run in Alternate Screen Buffer (alt_buffer=true)",
+                        checked: self.alt_buffer,
+                    });
+                }
+            }
+
+            if self.current_type == "editor" {
+                form_lines.push(FormRow::Checkbox {
+                    ctrl: FocusControl::NoFormattingChk,
+                    label: "Disable Formatting (no_formatting=true)",
+                    checked: self.no_formatting,
+                });
+                form_lines.push(FormRow::Checkbox {
+                    ctrl: FocusControl::ShowWhitespaceChk,
+                    label: "Show Whitespace in Editor (show_whitespace=true)",
+                    checked: self.show_whitespace,
+                });
+            }
+
+            if matches!(self.current_type.as_str(), "command" | "script") {
+                form_lines.push(FormRow::Checkbox {
+                    ctrl: FocusControl::MaskedChk,
+                    label: "Mask Input (masked=true)",
+                    checked: self.masked,
+                });
+            }
+
+            if !self.is_nav_type() {
+                form_lines.push(FormRow::Checkbox {
+                    ctrl: FocusControl::RefreshChk,
+                    label: "Refresh Environment (refresh=true)",
+                    checked: self.refresh,
+                });
+                form_lines.push(FormRow::Checkbox {
+                    ctrl: FocusControl::ExternalChk,
+                    label: "External Execution (external=true)",
+                    checked: self.external,
+                });
+            }
 
             form_lines.push(FormRow::Label("Preview:"));
             // Live item preview

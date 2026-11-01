@@ -359,20 +359,20 @@ fn test_item_edit_modal_standard_item_parity() {
     use ratatui::layout::Rect;
 
     let item = MenuItem {
-        label: "Edit Configuration".to_string(),
-        r#type: MenuItemType::Editor,
-        file: Some("bashmenu.yml".to_string()),
+        label: "Execute Script".to_string(),
+        r#type: MenuItemType::Script,
+        script: Some("test.sh".to_string()),
         icon: Some("{nf:*:f013:⚙️}".to_string()),
         prompt: Some("Open editor".to_string()),
         ..Default::default()
     };
 
     let mut modal = ItemEditModal::new(&item);
-    assert_eq!(modal.current_type, "editor");
+    assert_eq!(modal.current_type, "script");
     assert!(!modal.is_divider());
-    assert_eq!(modal.title_input.as_string(), "Edit Configuration");
-    assert_eq!(modal.action_input.as_string(), "bashmenu.yml");
-    assert_eq!(modal.get_action_label_text(), "File to Edit (file):");
+    assert_eq!(modal.title_input.as_string(), "Execute Script");
+    assert_eq!(modal.action_input.as_string(), "test.sh");
+    assert_eq!(modal.get_action_label_text(), "Script Path (script):");
 
     // Test text editing on Title input
     modal.active_control_idx = modal
@@ -382,7 +382,7 @@ fn test_item_edit_modal_standard_item_parity() {
         .unwrap();
     modal.handle_key(KeyCode::End, KeyModifiers::NONE);
     modal.handle_key(KeyCode::Char('!'), KeyModifiers::NONE);
-    assert_eq!(modal.title_input.as_string(), "Edit Configuration!");
+    assert_eq!(modal.title_input.as_string(), "Execute Script!");
 
     // Test toggling execution mode
     modal.active_control_idx = modal
@@ -399,8 +399,8 @@ fn test_item_edit_modal_standard_item_parity() {
 
     // Test saving
     let updated = modal.build_updated_item();
-    assert_eq!(updated.label, "Edit Configuration!");
-    assert_eq!(updated.file.as_deref(), Some("bashmenu.yml"));
+    assert_eq!(updated.label, "Execute Script!");
+    assert_eq!(updated.script.as_deref(), Some("test.sh"));
     assert_eq!(
         updated.extra.get("stream").and_then(|v| v.as_bool()),
         Some(false)
@@ -1002,4 +1002,128 @@ fn test_menuedit_confirm_item_properties() {
     assert!(buf_str.contains("CONFIRM"));
     assert!(buf_str.contains("on_yes"));
     assert!(buf_str.contains("on_no"));
+}
+
+#[test]
+fn test_item_edit_modal_field_visibility_per_type() {
+    use menuedit_cli::{FocusControl, ItemEditModal};
+
+    // 1. Submenu: only Title, Icon, ChangeType, Save, Cancel
+    let sub = MenuItem {
+        label: "My Submenu".to_string(),
+        r#type: MenuItemType::Submenu,
+        ..Default::default()
+    };
+    let modal_sub = ItemEditModal::new(&sub);
+    let ctrls_sub = modal_sub.focus_controls();
+    assert!(ctrls_sub.contains(&FocusControl::TitleInput));
+    assert!(ctrls_sub.contains(&FocusControl::IconInput));
+    assert!(!ctrls_sub.contains(&FocusControl::ActionInput));
+    assert!(!ctrls_sub.contains(&FocusControl::PromptInput));
+    assert!(!ctrls_sub.contains(&FocusControl::TemplateInput));
+    assert!(!ctrls_sub.contains(&FocusControl::TargetInput));
+    assert!(!ctrls_sub.contains(&FocusControl::BlockIdInput));
+    assert!(!ctrls_sub.contains(&FocusControl::StartDirInput));
+    assert!(!ctrls_sub.contains(&FocusControl::TabstopInput));
+    assert!(!ctrls_sub.contains(&FocusControl::ExecModeSelector));
+    assert!(!ctrls_sub.contains(&FocusControl::NoFormattingChk));
+    assert!(!ctrls_sub.contains(&FocusControl::ShowWhitespaceChk));
+    assert!(!ctrls_sub.contains(&FocusControl::MaskedChk));
+    assert!(!ctrls_sub.contains(&FocusControl::RefreshChk));
+    assert!(!ctrls_sub.contains(&FocusControl::ExternalChk));
+
+    // 2. Command: Title, Icon, Action, Prompt (Option A), StartDir, ExecMode, Masked, Refresh, External
+    let cmd = MenuItem {
+        label: "My Command".to_string(),
+        r#type: MenuItemType::Command,
+        command: Some("ls -la".to_string()),
+        ..Default::default()
+    };
+    let modal_cmd = ItemEditModal::new(&cmd);
+    let ctrls_cmd = modal_cmd.focus_controls();
+    assert!(ctrls_cmd.contains(&FocusControl::TitleInput));
+    assert!(ctrls_cmd.contains(&FocusControl::IconInput));
+    assert!(ctrls_cmd.contains(&FocusControl::ActionInput));
+    assert!(ctrls_cmd.contains(&FocusControl::ActionBrowseBtn));
+    assert!(ctrls_cmd.contains(&FocusControl::PromptInput));
+    assert!(ctrls_cmd.contains(&FocusControl::StartDirInput));
+    assert!(ctrls_cmd.contains(&FocusControl::ExecModeSelector));
+    assert!(ctrls_cmd.contains(&FocusControl::MaskedChk));
+    assert!(ctrls_cmd.contains(&FocusControl::RefreshChk));
+    assert!(ctrls_cmd.contains(&FocusControl::ExternalChk));
+    assert!(!ctrls_cmd.contains(&FocusControl::TemplateInput));
+    assert!(!ctrls_cmd.contains(&FocusControl::TargetInput));
+    assert!(!ctrls_cmd.contains(&FocusControl::BlockIdInput));
+    assert!(!ctrls_cmd.contains(&FocusControl::TabstopInput));
+    assert!(!ctrls_cmd.contains(&FocusControl::NoFormattingChk));
+    assert!(!ctrls_cmd.contains(&FocusControl::ShowWhitespaceChk));
+
+    // 3. Editor: Title, Icon, File (Action), StartDir, Tabstop, NoFormatting, ShowWhitespace, Refresh, External
+    let edt = MenuItem {
+        label: "My File".to_string(),
+        r#type: MenuItemType::Editor,
+        file: Some("notes.txt".to_string()),
+        ..Default::default()
+    };
+    let modal_edt = ItemEditModal::new(&edt);
+    let ctrls_edt = modal_edt.focus_controls();
+    assert!(ctrls_edt.contains(&FocusControl::TitleInput));
+    assert!(ctrls_edt.contains(&FocusControl::IconInput));
+    assert!(ctrls_edt.contains(&FocusControl::ActionInput));
+    assert!(ctrls_edt.contains(&FocusControl::ActionBrowseBtn));
+    assert!(ctrls_edt.contains(&FocusControl::StartDirInput));
+    assert!(ctrls_edt.contains(&FocusControl::TabstopInput));
+    assert!(ctrls_edt.contains(&FocusControl::NoFormattingChk));
+    assert!(ctrls_edt.contains(&FocusControl::ShowWhitespaceChk));
+    assert!(ctrls_edt.contains(&FocusControl::RefreshChk));
+    assert!(ctrls_edt.contains(&FocusControl::ExternalChk));
+    assert!(!ctrls_edt.contains(&FocusControl::PromptInput));
+    assert!(!ctrls_edt.contains(&FocusControl::ExecModeSelector));
+    assert!(!ctrls_edt.contains(&FocusControl::MaskedChk));
+    assert!(!ctrls_edt.contains(&FocusControl::TemplateInput));
+
+    // 4. Config: Title, Icon, Key (Action without browse), Prompt, Refresh, External
+    let cfg = MenuItem {
+        label: "My Config".to_string(),
+        r#type: MenuItemType::Config,
+        extra: [(
+            "key".to_string(),
+            serde_yml::Value::String("settings.theme".to_string()),
+        )]
+        .into_iter()
+        .collect(),
+        ..Default::default()
+    };
+    let modal_cfg = ItemEditModal::new(&cfg);
+    let ctrls_cfg = modal_cfg.focus_controls();
+    assert!(ctrls_cfg.contains(&FocusControl::TitleInput));
+    assert!(ctrls_cfg.contains(&FocusControl::IconInput));
+    assert!(ctrls_cfg.contains(&FocusControl::ActionInput));
+    assert!(!ctrls_cfg.contains(&FocusControl::ActionBrowseBtn));
+    assert!(ctrls_cfg.contains(&FocusControl::PromptInput));
+    assert!(ctrls_cfg.contains(&FocusControl::RefreshChk));
+    assert!(ctrls_cfg.contains(&FocusControl::ExternalChk));
+    assert!(!ctrls_cfg.contains(&FocusControl::StartDirInput));
+    assert!(!ctrls_cfg.contains(&FocusControl::TabstopInput));
+    assert!(!ctrls_cfg.contains(&FocusControl::ExecModeSelector));
+    assert!(!ctrls_cfg.contains(&FocusControl::TemplateInput));
+
+    // 5. Back / Exit: Title, Icon only
+    let bck = MenuItem {
+        label: "Back".to_string(),
+        r#type: MenuItemType::Back,
+        ..Default::default()
+    };
+    let modal_bck = ItemEditModal::new(&bck);
+    let ctrls_bck = modal_bck.focus_controls();
+    assert_eq!(
+        ctrls_bck,
+        vec![
+            FocusControl::ChangeTypeBtn,
+            FocusControl::TitleInput,
+            FocusControl::IconInput,
+            FocusControl::SaveBtn,
+            FocusControl::CancelBtn,
+        ]
+    );
 }
