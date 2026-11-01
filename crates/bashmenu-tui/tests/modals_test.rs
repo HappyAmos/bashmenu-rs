@@ -611,7 +611,7 @@ fn test_note_viewer_and_editor_checkbox_margin_wrapping() {
     // 1. NoteViewerModal wraps checkbox items with margin
     let note =
         "- [ ] This is a very long checkbox note item that will wrap onto multiple visual lines";
-    let viewer = NoteViewerModal::new("Viewer", "/tmp/v.yml", note);
+    let mut viewer = NoteViewerModal::new("Viewer", "/tmp/v.yml", note);
     let mut buf = Buffer::empty(area);
     viewer.render(area, &styles, &mut buf);
 
@@ -868,7 +868,7 @@ fn test_note_viewer_and_editor_scrollbar_when_lines_exceed_window_height() {
 
     // 1. Short note: does NOT have more lines than window height -> NO scrollbar
     let short_note = "Short line 1\nShort line 2\n";
-    let viewer_short = NoteViewerModal::new("Short Note", "/tmp/short.yml", short_note);
+    let mut viewer_short = NoteViewerModal::new("Short Note", "/tmp/short.yml", short_note);
     let mut buf = Buffer::empty(area);
     let inner_short = viewer_short.render(area, &styles, &mut buf);
     let sb_x_short = inner_short.x + inner_short.width - 1;
@@ -962,4 +962,78 @@ fn test_note_viewer_and_editor_scrollbar_when_lines_exceed_window_height() {
     let sb_x_ed = inner_ed.x + inner_ed.width - 1;
     assert_eq!(buf_ed[(sb_x_ed + 1, inner_ed.y + 1)].symbol(), "│");
     assert_eq!(buf_ed[(sb_x_ed, inner_ed.y + 1)].symbol(), "▲");
+}
+
+#[test]
+fn test_note_viewer_scrolling_when_show_done_enabled() {
+    use bashmenu_tui::{NoteViewerAction, NoteViewerModal};
+    use crossterm::event::{KeyCode, MouseButton, MouseEvent, MouseEventKind};
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+
+    let styles = ResolvedThemeStyles::default();
+    let area = Rect::new(0, 0, 80, 24);
+
+    // Create a note with 30 items: odd are completed [x], even are todo [ ]
+    let mut note_lines = Vec::new();
+    for i in 0..30 {
+        if i % 2 == 1 {
+            note_lines.push(format!("- [x] Completed task {}", i));
+        } else {
+            note_lines.push(format!("- [ ] Pending task {}", i));
+        }
+    }
+    let note_content = note_lines.join("\n");
+    let mut viewer = NoteViewerModal::new("Tasks Note", "/tmp/tasks.yml", &note_content);
+
+    // Initial state: show_completed is false, only 15 pending tasks
+    let mut buf = Buffer::empty(area);
+    viewer.render(area, &styles, &mut buf);
+    assert!(!viewer.show_completed);
+    assert_eq!(viewer.scroll_offset, 0);
+
+    // Press 'h' to enable "Show Done"
+    viewer.handle_key(KeyCode::Char('h'));
+    assert!(viewer.show_completed);
+
+    // Re-render to update visible entries with completed tasks included
+    viewer.render(area, &styles, &mut buf);
+    assert_eq!(viewer.last_visible_raw_indices.len(), 30);
+
+    // Arrow down through all 30 items
+    for _ in 0..29 {
+        viewer.handle_key(KeyCode::Down);
+        viewer.render(area, &styles, &mut buf);
+    }
+    assert_eq!(viewer.selected_line, 29);
+    assert!(
+        viewer.scroll_offset > 0,
+        "View window must scroll down with selection when show done is enabled, scroll_offset was {}",
+        viewer.scroll_offset
+    );
+
+    // Arrow up back to the first item
+    for _ in 0..29 {
+        viewer.handle_key(KeyCode::Up);
+        viewer.render(area, &styles, &mut buf);
+    }
+    assert_eq!(viewer.selected_line, 0);
+    assert_eq!(
+        viewer.scroll_offset, 0,
+        "View window must scroll back up to 0 when navigating to the top"
+    );
+
+    // Test mouse clicking on footer
+    let footer_start_y = 24 - 5;
+    let click_footer = MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: 25,
+        row: footer_start_y,
+        modifiers: crossterm::event::KeyModifiers::NONE,
+    };
+    viewer.handle_mouse(click_footer, area);
+
+    // Clicking ESC exits
+    let close_action = viewer.handle_key(KeyCode::Esc);
+    assert_eq!(close_action, NoteViewerAction::Close);
 }

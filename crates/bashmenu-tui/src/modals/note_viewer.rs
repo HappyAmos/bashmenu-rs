@@ -34,6 +34,8 @@ pub struct NoteViewerModal {
     pub show_completed: bool,
     pub scroll_offset: usize,
     pub selected_line: usize,
+    pub follow_selection: bool,
+    pub last_visible_raw_indices: Vec<usize>,
 }
 
 impl NoteViewerModal {
@@ -45,6 +47,8 @@ impl NoteViewerModal {
             show_completed: false,
             scroll_offset: 0,
             selected_line: 0,
+            follow_selection: true,
+            last_visible_raw_indices: Vec::new(),
         }
     }
 
@@ -75,6 +79,7 @@ impl NoteViewerModal {
                         self.selected_line = first;
                     }
                 }
+                self.follow_selection = true;
                 NoteViewerAction::None
             }
             KeyCode::Char('c') | KeyCode::Char('C') => {
@@ -95,6 +100,7 @@ impl NoteViewerModal {
                                 lines.iter().map(|s| s.to_string()).collect();
                             new_lines[self.selected_line] = toggled;
                             self.content = new_lines.join("\n");
+                            self.follow_selection = true;
                             return NoteViewerAction::ContentModified(self.content.clone());
                         }
                     }
@@ -112,9 +118,7 @@ impl NoteViewerModal {
                         self.selected_line = selectable[cur_pos - 1];
                     }
                 }
-                if self.selected_line < self.scroll_offset {
-                    self.scroll_offset = self.selected_line;
-                }
+                self.follow_selection = true;
                 NoteViewerAction::None
             }
             KeyCode::Down | KeyCode::Char('j') => {
@@ -128,6 +132,7 @@ impl NoteViewerModal {
                         self.selected_line = selectable[cur_pos + 1];
                     }
                 }
+                self.follow_selection = true;
                 NoteViewerAction::None
             }
             KeyCode::PageUp => {
@@ -140,7 +145,7 @@ impl NoteViewerModal {
                     let target_pos = cur_pos.saturating_sub(15);
                     self.selected_line = selectable[target_pos];
                 }
-                self.scroll_offset = self.scroll_offset.saturating_sub(15);
+                self.follow_selection = true;
                 NoteViewerAction::None
             }
             KeyCode::PageDown => {
@@ -153,17 +158,20 @@ impl NoteViewerModal {
                     let target_pos = (cur_pos + 15).min(selectable.len().saturating_sub(1));
                     self.selected_line = selectable[target_pos];
                 }
+                self.follow_selection = true;
                 NoteViewerAction::None
             }
             KeyCode::Home => {
                 let selectable = self.get_selectable_lines();
                 self.selected_line = selectable.first().copied().unwrap_or(0);
                 self.scroll_offset = 0;
+                self.follow_selection = true;
                 NoteViewerAction::None
             }
             KeyCode::End => {
                 let selectable = self.get_selectable_lines();
                 self.selected_line = selectable.last().copied().unwrap_or(0);
+                self.follow_selection = true;
                 NoteViewerAction::None
             }
             _ => NoteViewerAction::None,
@@ -174,14 +182,20 @@ impl NoteViewerModal {
     pub fn handle_mouse(&mut self, mouse: MouseEvent, area: Rect) -> NoteViewerAction {
         match mouse.kind {
             MouseEventKind::ScrollDown => {
-                let total_lines = self.content.lines().count();
+                let total_lines = if !self.last_visible_raw_indices.is_empty() {
+                    self.last_visible_raw_indices.len()
+                } else {
+                    self.content.lines().count()
+                };
                 if self.scroll_offset + 2 < total_lines {
                     self.scroll_offset += 2;
                 }
+                self.follow_selection = false;
                 NoteViewerAction::None
             }
             MouseEventKind::ScrollUp => {
                 self.scroll_offset = self.scroll_offset.saturating_sub(2);
+                self.follow_selection = false;
                 NoteViewerAction::None
             }
             MouseEventKind::Down(crossterm::event::MouseButton::Left) => {
@@ -193,56 +207,136 @@ impl NoteViewerModal {
                     super::frame::compute_modal_inner(area, dialog_w, dialog_h)
                 };
                 if super::frame::is_close_button_clicked(inner, mouse.row, mouse.column) {
-                    NoteViewerAction::Close
-                } else {
-                    let sb_x = inner.x + inner.width.saturating_sub(1);
-                    if mouse.column == sb_x {
-                        let footer_tokens = [
-                            "[SPACE] Toggle",
-                            "|",
-                            "[H] Hide Done",
-                            "|",
-                            "[E] Edit",
-                            "|",
-                            "[M] Rename",
-                            "|",
-                            "[D] Delete",
-                            "|",
-                            "[C] Copy",
-                            "|",
-                            "[ESC] Close",
-                        ];
-                        let max_footer_w = inner.width.saturating_sub(4) as usize;
-                        let footer_lines = wrap_footer_tokens(&footer_tokens, max_footer_w);
-                        let footer_h = footer_lines.len().max(1);
-                        let content_h =
-                            inner.height.saturating_sub(1 + footer_h as u16 + 1) as usize;
-                        let content_start_y = inner.y + 1;
-                        let content_end_y = content_start_y + content_h as u16;
+                    return NoteViewerAction::Close;
+                }
 
-                        if mouse.row >= content_start_y && mouse.row < content_end_y {
-                            let total_lines = self.content.lines().count();
-                            let max_scroll = total_lines.saturating_sub(content_h);
-                            if mouse.row == content_start_y {
-                                self.scroll_offset = self.scroll_offset.saturating_sub(1);
-                            } else if mouse.row == content_end_y - 1 {
-                                self.scroll_offset = (self.scroll_offset + 1).min(max_scroll);
-                            } else if content_h >= 3 && max_scroll > 0 {
-                                let track_len = content_h - 2;
-                                let rel_y = (mouse.row - (content_start_y + 1)) as usize;
-                                self.scroll_offset = (rel_y * max_scroll) / track_len;
+                let toggle_action = if self.show_completed {
+                    "[H] Hide Done"
+                } else {
+                    "[H] Show Done"
+                };
+                let footer_tokens = [
+                    "[SPACE] Toggle",
+                    "|",
+                    toggle_action,
+                    "|",
+                    "[E] Edit",
+                    "|",
+                    "[M] Rename",
+                    "|",
+                    "[D] Delete",
+                    "|",
+                    "[C] Copy",
+                    "|",
+                    "[ESC] Close",
+                ];
+                let max_footer_w = inner.width.saturating_sub(4) as usize;
+                let footer_lines = wrap_footer_tokens(&footer_tokens, max_footer_w);
+                let footer_h = footer_lines.len().max(1);
+                let content_h = inner.height.saturating_sub(1 + footer_h as u16 + 1) as usize;
+                let content_start_y = inner.y + 1;
+                let content_end_y = content_start_y + content_h as u16;
+
+                let sb_x = inner.x + inner.width.saturating_sub(1);
+                if mouse.column == sb_x {
+                    if mouse.row >= content_start_y && mouse.row < content_end_y {
+                        let total_lines = if !self.last_visible_raw_indices.is_empty() {
+                            self.last_visible_raw_indices.len()
+                        } else {
+                            self.content.lines().count()
+                        };
+                        let max_scroll = total_lines.saturating_sub(content_h);
+                        if mouse.row == content_start_y {
+                            self.scroll_offset = self.scroll_offset.saturating_sub(1);
+                        } else if mouse.row == content_end_y - 1 {
+                            self.scroll_offset = (self.scroll_offset + 1).min(max_scroll);
+                        } else if content_h >= 3 && max_scroll > 0 {
+                            let track_len = content_h - 2;
+                            let rel_y = (mouse.row - (content_start_y + 1)) as usize;
+                            self.scroll_offset = (rel_y * max_scroll) / track_len;
+                        }
+                        self.follow_selection = false;
+                    }
+                    return NoteViewerAction::None;
+                }
+
+                // Check footer button clicks
+                let footer_start_y = inner.y + inner.height.saturating_sub(1 + footer_h as u16);
+                if mouse.row >= footer_start_y && mouse.row < footer_start_y + footer_h as u16 {
+                    let f_idx = (mouse.row - footer_start_y) as usize;
+                    if f_idx < footer_lines.len() {
+                        let f_line = &footer_lines[f_idx];
+                        let footer_x =
+                            inner.x + (inner.width.saturating_sub(f_line.len() as u16) / 2);
+                        if mouse.column >= footer_x && mouse.column < footer_x + f_line.len() as u16
+                        {
+                            let rel_col = (mouse.column - footer_x) as usize;
+                            let line_str = f_line.as_str();
+
+                            if let Some(pos) = line_str.find("[SPACE]") {
+                                if rel_col >= pos && rel_col < pos + 14 {
+                                    return self.handle_key(KeyCode::Char(' '));
+                                }
+                            }
+                            if let Some(pos) = line_str.find(toggle_action) {
+                                if rel_col >= pos && rel_col < pos + toggle_action.len() {
+                                    return self.handle_key(KeyCode::Char('h'));
+                                }
+                            }
+                            if let Some(pos) = line_str.find("[E] Edit") {
+                                if rel_col >= pos && rel_col < pos + 8 {
+                                    return NoteViewerAction::Edit;
+                                }
+                            }
+                            if let Some(pos) = line_str.find("[M] Rename") {
+                                if rel_col >= pos && rel_col < pos + 10 {
+                                    return NoteViewerAction::Rename;
+                                }
+                            }
+                            if let Some(pos) = line_str.find("[D] Delete") {
+                                if rel_col >= pos && rel_col < pos + 10 {
+                                    return NoteViewerAction::Delete;
+                                }
+                            }
+                            if let Some(pos) = line_str.find("[C] Copy") {
+                                if rel_col >= pos && rel_col < pos + 8 {
+                                    let b64 = base64_encode(self.content.as_bytes());
+                                    print!("\x1b]52;c;{}\x07", b64);
+                                    return NoteViewerAction::None;
+                                }
+                            }
+                            if let Some(pos) = line_str.find("[ESC] Close") {
+                                if rel_col >= pos && rel_col < pos + 11 {
+                                    return NoteViewerAction::Close;
+                                }
                             }
                         }
                     }
-                    NoteViewerAction::None
+                    return NoteViewerAction::None;
                 }
+
+                // Check content area row clicks to select active line
+                if mouse.row >= content_start_y
+                    && mouse.row < content_end_y
+                    && mouse.column >= inner.x + 2
+                    && mouse.column < sb_x
+                {
+                    let vis_row = self.scroll_offset + (mouse.row - content_start_y) as usize;
+                    if vis_row < self.last_visible_raw_indices.len() {
+                        let clicked_raw = self.last_visible_raw_indices[vis_row];
+                        self.selected_line = clicked_raw;
+                        self.follow_selection = true;
+                    }
+                }
+
+                NoteViewerAction::None
             }
             _ => NoteViewerAction::None,
         }
     }
 
     /// Renders note viewer modal with rendered markdown and code blocks
-    pub fn render(&self, area: Rect, styles: &ResolvedThemeStyles, buf: &mut Buffer) -> Rect {
+    pub fn render(&mut self, area: Rect, styles: &ResolvedThemeStyles, buf: &mut Buffer) -> Rect {
         let dialog_w = (area.width.saturating_sub(4)).min(78);
         let dialog_h = (area.height.saturating_sub(4)).clamp(14, 28);
 
@@ -512,8 +606,36 @@ impl NoteViewerModal {
             }
         }
 
+        self.last_visible_raw_indices = visible_entries
+            .iter()
+            .map(|(raw_idx, _)| *raw_idx)
+            .collect();
+
+        // Follow selection when navigation or toggling occurred
+        if self.follow_selection {
+            let first_vis = visible_entries
+                .iter()
+                .position(|(raw_idx, _)| *raw_idx == self.selected_line);
+            let last_vis = visible_entries
+                .iter()
+                .rposition(|(raw_idx, _)| *raw_idx == self.selected_line);
+
+            if let (Some(first_idx), Some(last_idx)) = (first_vis, last_vis) {
+                if content_h > 0 {
+                    if last_idx >= self.scroll_offset + content_h {
+                        self.scroll_offset = last_idx.saturating_sub(content_h.saturating_sub(1));
+                    }
+                    if first_idx < self.scroll_offset {
+                        self.scroll_offset = first_idx;
+                    }
+                }
+            }
+            self.follow_selection = false;
+        }
+
         let max_scroll = visible_entries.len().saturating_sub(content_h);
-        let eff_scroll = self.scroll_offset.min(max_scroll);
+        self.scroll_offset = self.scroll_offset.min(max_scroll);
+        let eff_scroll = self.scroll_offset;
 
         // Render visible entries
         for (i, (raw_idx, line_obj)) in visible_entries

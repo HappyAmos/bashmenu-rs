@@ -226,7 +226,8 @@ fn main() -> Result<()> {
             let root_block = Block::default()
                 .borders(Borders::ALL)
                 .title(title)
-                .border_style(Style::default().fg(Color::Cyan));
+                .border_style(Style::default().fg(styles.border))
+                .style(Style::default().bg(styles.background));
             root_block.render(area, buf);
 
             // Universal [X] close button on top right of the root editor window
@@ -251,7 +252,7 @@ fn main() -> Result<()> {
             let tree_block = Block::default()
                 .borders(Borders::ALL)
                 .title(" [ Menu Structure ] ")
-                .border_style(Style::default().fg(Color::Blue));
+                .border_style(styles.accent);
             let tree_rect = Rect::new(inner_x, inner_y, left_w, avail_h.saturating_sub(1));
             tree_block.render(tree_rect, buf);
 
@@ -320,7 +321,7 @@ fn main() -> Result<()> {
             let insp_block = Block::default()
                 .borders(Borders::ALL)
                 .title(" ── Property Inspector ── ")
-                .border_style(Style::default().fg(Color::Blue));
+                .border_style(styles.accent);
             insp_block.render(insp_rect, buf);
 
             let insp_content_w = insp_rect.width.saturating_sub(2);

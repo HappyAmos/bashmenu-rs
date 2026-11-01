@@ -654,100 +654,132 @@ fn main() -> Result<()> {
                         buf.set_string(mod_x + mod_w - 1, mod_y + 5, "▼", sb_st);
                     }
                     PreviewMode::MenuEditor => {
-                        // Visual Menu Editor Split View
-                        let sep_col = p_inner_x + p_avail_w / 2;
+                        // Visual Menu Editor Split View with interior boxed panels
                         let bot_y = right_area.y + right_area.height.saturating_sub(1);
                         let footer_y = bot_y.saturating_sub(1);
-                        let gt_y = footer_y.saturating_sub(1);
+                        let panels_y = p_inner_y;
+                        let panels_h = footer_y.saturating_sub(panels_y);
+                        let left_w = p_avail_w / 2;
+                        let right_w = p_avail_w.saturating_sub(left_w);
 
-                        // Left Pane: Tree
-                        buf.set_string(p_inner_x, p_inner_y, "▼ Main Menu", preview_styles.title);
-                        buf.set_string(
-                            p_inner_x,
-                            p_inner_y + 1,
-                            "  ├─▶ Applications",
-                            preview_styles.text,
-                        );
-                        buf.set_string(
-                            p_inner_x,
-                            p_inner_y + 2,
-                            "  │ └─• Terminal",
-                            preview_styles.highlight,
-                        );
-                        buf.set_string(
-                            p_inner_x,
-                            p_inner_y + 3,
-                            "  ├─• File Manager",
-                            preview_styles.text,
-                        );
-                        buf.set_string(
-                            p_inner_x,
-                            p_inner_y + 4,
-                            "  └─• Settings",
-                            preview_styles.text,
-                        );
+                        let tree_rect = Rect::new(p_inner_x, panels_y, left_w, panels_h);
+                        let insp_rect = Rect::new(p_inner_x + left_w, panels_y, right_w, panels_h);
 
-                        // Center vertical divider
-                        buf.set_string(sep_col, right_area.y, &b.top_tee, border_style);
-                        for y in p_inner_y..gt_y {
-                            buf.set_string(sep_col, y, &b.border_vertical_left, border_style);
+                        // Left Panel: Tree with interior borders in accent style
+                        let tree_block = Block::default()
+                            .borders(Borders::ALL)
+                            .title(" [ Menu Structure ] ")
+                            .border_style(preview_styles.accent);
+                        tree_block.render(tree_rect, buf);
+
+                        // Right Panel: Property Inspector with interior borders in accent style
+                        let insp_block = Block::default()
+                            .borders(Borders::ALL)
+                            .title(" ── Property Inspector ── ")
+                            .border_style(preview_styles.accent);
+                        insp_block.render(insp_rect, buf);
+
+                        // Left Pane: Tree Content
+                        if tree_rect.width > 2 && tree_rect.height > 2 {
+                            let t_x = tree_rect.x + 1;
+                            let mut t_y = tree_rect.y + 1;
+                            let max_y = tree_rect.y + tree_rect.height.saturating_sub(1);
+
+                            if t_y < max_y {
+                                buf.set_string(t_x, t_y, "▼ [MNU] Main Menu", preview_styles.title);
+                                t_y += 1;
+                            }
+                            if t_y < max_y {
+                                buf.set_string(
+                                    t_x,
+                                    t_y,
+                                    "  ├─▶ [SUB] Applications",
+                                    preview_styles.text,
+                                );
+                                t_y += 1;
+                            }
+                            if t_y < max_y {
+                                buf.set_string(
+                                    t_x,
+                                    t_y,
+                                    "  │ └─• [CMD] Terminal",
+                                    preview_styles.highlight,
+                                );
+                                t_y += 1;
+                            }
+                            if t_y < max_y {
+                                buf.set_string(
+                                    t_x,
+                                    t_y,
+                                    "  ├─• [CMD] File Manager",
+                                    preview_styles.text,
+                                );
+                                t_y += 1;
+                            }
+                            if t_y < max_y {
+                                buf.set_string(
+                                    t_x,
+                                    t_y,
+                                    "  └─• [SUB] Settings",
+                                    preview_styles.text,
+                                );
+                            }
                         }
 
-                        // Right Pane: Property Inspector
-                        let r_x = sep_col + 2;
-                        buf.set_string(
-                            r_x,
-                            p_inner_y,
-                            "Title:  [ Terminal ]",
-                            preview_styles.accent,
-                        );
-                        buf.set_string(r_x, p_inner_y + 1, "Icon:   [ 💻 ]", preview_styles.text);
-                        buf.set_string(
-                            r_x,
-                            p_inner_y + 2,
-                            "Action: [ alacritty ]",
-                            preview_styles.shortcut_key,
-                        );
-                        buf.set_string(
-                            r_x,
-                            p_inner_y + 3,
-                            "Type:   [ command ]",
-                            preview_styles.accent,
-                        );
+                        // Right Pane: Property Inspector Content
+                        if insp_rect.width > 4 && insp_rect.height > 2 {
+                            let r_x = insp_rect.x + 2;
+                            let mut r_y = insp_rect.y + 1;
+                            let max_y = insp_rect.y + insp_rect.height.saturating_sub(1);
 
-                        let btn_save = " [ Save ] ";
-                        let btn_del = " [ Delete ] ";
-                        buf.set_string(
-                            r_x,
-                            p_inner_y + 5,
-                            btn_save,
-                            preview_styles.accent.add_modifier(Modifier::BOLD),
-                        );
-                        buf.set_string(
-                            r_x + btn_save.len() as u16 + 2,
-                            p_inner_y + 5,
-                            btn_del,
-                            preview_styles.window_close_button,
-                        );
-
-                        // Gutter top border divider (connecting center divider to outer borders)
-                        buf.set_string(right_area.x, gt_y, &b.left_tee, border_style);
-                        buf.set_string(
-                            right_area.x + right_area.width - 1,
-                            gt_y,
-                            &b.right_tee,
-                            border_style,
-                        );
-                        let div_left_len = sep_col.saturating_sub(right_area.x + 1) as usize;
-                        let div_left = b.border_horizontal_bottom.repeat(div_left_len);
-                        buf.set_string(right_area.x + 1, gt_y, &div_left, border_style);
-                        buf.set_string(sep_col, gt_y, &b.bottom_tee, border_style);
-
-                        let div_right_start = sep_col + 1;
-                        let div_right_end = right_area.x + right_area.width - 1;
-                        let div_right_len = div_right_end.saturating_sub(div_right_start) as usize;
-                        let div_right = b.border_horizontal_bottom.repeat(div_right_len);
-                        buf.set_string(div_right_start, gt_y, &div_right, border_style);
+                            if r_y < max_y {
+                                buf.set_string(
+                                    r_x,
+                                    r_y,
+                                    "Title:  [ Terminal ]",
+                                    preview_styles.accent,
+                                );
+                                r_y += 1;
+                            }
+                            if r_y < max_y {
+                                buf.set_string(r_x, r_y, "Icon:   [ 💻 ]", preview_styles.text);
+                                r_y += 1;
+                            }
+                            if r_y < max_y {
+                                buf.set_string(
+                                    r_x,
+                                    r_y,
+                                    "Action: [ alacritty ]",
+                                    preview_styles.shortcut_key,
+                                );
+                                r_y += 1;
+                            }
+                            if r_y < max_y {
+                                buf.set_string(
+                                    r_x,
+                                    r_y,
+                                    "Type:   [ command ]",
+                                    preview_styles.accent,
+                                );
+                                r_y += 2;
+                            }
+                            if r_y < max_y {
+                                let btn_save = " [ Save ] ";
+                                let btn_del = " [ Delete ] ";
+                                buf.set_string(
+                                    r_x,
+                                    r_y,
+                                    btn_save,
+                                    preview_styles.accent.add_modifier(Modifier::BOLD),
+                                );
+                                buf.set_string(
+                                    r_x + btn_save.len() as u16 + 2,
+                                    r_y,
+                                    btn_del,
+                                    preview_styles.window_close_button,
+                                );
+                            }
+                        }
 
                         // Footer help gutter
                         buf.set_string(
@@ -911,17 +943,6 @@ fn main() -> Result<()> {
                     bottom_spread,
                     Style::default().fg(preview_styles.help_text.fg.unwrap_or(Color::White)),
                 );
-
-                if !state.status_message.is_empty() {
-                    let msg_x =
-                        (area.x + area.width).saturating_sub(state.status_message.len() as u16 + 3);
-                    buf.set_string(
-                        msg_x,
-                        footer_y,
-                        &state.status_message,
-                        Style::default().fg(Color::Green),
-                    );
-                }
 
                 // 4. Render Active Toasts
                 toast_rack.render(area, &preview_styles, buf);
@@ -1190,8 +1211,13 @@ fn main() -> Result<()> {
                                     state.scroll_offset + (m.row - (left_area.y + 2)) as usize;
                                 if clicked_idx < state.tokens.len() {
                                     state.selected_idx = clicked_idx;
-                                    state.status_message =
-                                        format!("Selected: {}", state.tokens[clicked_idx].label);
+                                    let label = state.tokens[clicked_idx].label.clone();
+                                    toast_rack.add(ToastNotification {
+                                        title: Some("Theme Editor".to_string()),
+                                        message: format!("Selected: {}", label),
+                                        severity: ToastSeverity::Information,
+                                        timeout_secs: 1.5,
+                                    });
                                 }
                                 continue;
                             }
@@ -1224,7 +1250,15 @@ fn main() -> Result<()> {
                                     state.preview_mode,
                                     preview_styles.divider_is_screen_width,
                                 ) {
-                                    state.select_token_by_key(key);
+                                    if state.select_token_by_key(key) {
+                                        let label = state.tokens[state.selected_idx].label.clone();
+                                        toast_rack.add(ToastNotification {
+                                            title: Some("Theme Editor".to_string()),
+                                            message: format!("Selected: {}", label),
+                                            severity: ToastSeverity::Information,
+                                            timeout_secs: 1.5,
+                                        });
+                                    }
                                     click_flash =
                                         Some((std::time::Instant::now(), fy, fx_start, fx_end));
                                     need_redraw = true;
@@ -1285,7 +1319,12 @@ fn main() -> Result<()> {
                                     state.current_name = "untitled".to_string();
                                     state.current_theme = ThemeEditorState::create_default_theme();
                                     state.is_modified = true;
-                                    state.status_message = "Created new untitled theme".to_string();
+                                    toast_rack.add(ToastNotification {
+                                        title: Some("Theme Editor".to_string()),
+                                        message: "Created new untitled theme".to_string(),
+                                        severity: ToastSeverity::Information,
+                                        timeout_secs: 2.0,
+                                    });
                                     continue;
                                 }
                                 _ => {}
@@ -1715,34 +1754,16 @@ fn hit_test_preview(
             Some(("text", row, p_inner_x, p_inner_x + p_avail_w))
         }
         PreviewMode::MenuEditor => {
-            let sep_col = p_inner_x + p_avail_w / 2;
             let bot_y = right_area.y + right_area.height.saturating_sub(1);
             let footer_y = bot_y.saturating_sub(1);
-            let gt_y = footer_y.saturating_sub(1);
+            let panels_y = p_inner_y;
+            let panels_h = footer_y.saturating_sub(panels_y);
+            let left_w = p_avail_w / 2;
+            let right_w = p_avail_w.saturating_sub(left_w);
+            let tree_rect = Rect::new(p_inner_x, panels_y, left_w, panels_h);
+            let insp_rect = Rect::new(p_inner_x + left_w, panels_y, right_w, panels_h);
 
-            if col == sep_col {
-                if row == right_area.y {
-                    return Some(("top_tee", row, col, col + 1));
-                }
-                if row == gt_y {
-                    return Some(("bottom_tee", row, col, col + 1));
-                }
-                return Some(("border_vertical", row, col, col + 1));
-            }
-            if row == gt_y {
-                if col == right_area.x {
-                    return Some(("left_tee", row, col, col + 1));
-                }
-                if col == right_area.x + right_area.width - 1 {
-                    return Some(("right_tee", row, col, col + 1));
-                }
-                return Some((
-                    "border_horizontal",
-                    row,
-                    right_area.x + 1,
-                    right_area.x + right_area.width - 1,
-                ));
-            }
+            // Bottom border and help gutter
             if row == footer_y {
                 return Some(("gutter", row, p_inner_x, p_inner_x + p_avail_w));
             }
@@ -1754,20 +1775,85 @@ fn hit_test_preview(
                     right_area.x + right_area.width,
                 ));
             }
-            if col < sep_col {
-                if row == right_area.y + 1 {
-                    return Some(("accent", row, p_inner_x, sep_col));
-                }
-                if row == right_area.y + 3 {
-                    return Some(("highlight", row, p_inner_x, sep_col));
-                }
-                Some(("text", row, p_inner_x, sep_col))
-            } else {
-                if row == right_area.y + 1 {
-                    return Some(("accent", row, sep_col + 1, p_inner_x + p_avail_w));
-                }
-                Some(("text", row, sep_col + 1, p_inner_x + p_avail_w))
+
+            // Interior panel borders -> Accent color
+            if (row == panels_y || row == panels_y + panels_h.saturating_sub(1))
+                && col >= p_inner_x
+                && col < p_inner_x + p_avail_w
+            {
+                return Some(("accent", row, p_inner_x, p_inner_x + p_avail_w));
             }
+            if (col == tree_rect.x
+                || col == tree_rect.x + tree_rect.width.saturating_sub(1)
+                || col == insp_rect.x
+                || col == insp_rect.x + insp_rect.width.saturating_sub(1))
+                && row >= panels_y
+                && row < panels_y + panels_h
+            {
+                return Some(("accent", row, col, col + 1));
+            }
+
+            // Inside Tree panel
+            if col > tree_rect.x
+                && col < tree_rect.x + tree_rect.width.saturating_sub(1)
+                && row > tree_rect.y
+                && row < tree_rect.y + tree_rect.height.saturating_sub(1)
+            {
+                if row == tree_rect.y + 1 {
+                    return Some((
+                        "title",
+                        row,
+                        tree_rect.x + 1,
+                        tree_rect.x + tree_rect.width.saturating_sub(1),
+                    ));
+                }
+                if row == tree_rect.y + 3 {
+                    return Some((
+                        "highlight",
+                        row,
+                        tree_rect.x + 1,
+                        tree_rect.x + tree_rect.width.saturating_sub(1),
+                    ));
+                }
+                return Some((
+                    "text",
+                    row,
+                    tree_rect.x + 1,
+                    tree_rect.x + tree_rect.width.saturating_sub(1),
+                ));
+            }
+
+            // Inside Inspector panel
+            if col > insp_rect.x
+                && col < insp_rect.x + insp_rect.width.saturating_sub(1)
+                && row > insp_rect.y
+                && row < insp_rect.y + insp_rect.height.saturating_sub(1)
+            {
+                if row == insp_rect.y + 1 || row == insp_rect.y + 4 {
+                    return Some((
+                        "accent",
+                        row,
+                        insp_rect.x + 1,
+                        insp_rect.x + insp_rect.width.saturating_sub(1),
+                    ));
+                }
+                if row == insp_rect.y + 3 {
+                    return Some((
+                        "shortcut_key",
+                        row,
+                        insp_rect.x + 1,
+                        insp_rect.x + insp_rect.width.saturating_sub(1),
+                    ));
+                }
+                return Some((
+                    "text",
+                    row,
+                    insp_rect.x + 1,
+                    insp_rect.x + insp_rect.width.saturating_sub(1),
+                ));
+            }
+
+            Some(("border", row, col, col + 1))
         }
         PreviewMode::Toast => {
             let toast_w = (p_avail_w.saturating_sub(6)).clamp(28, 48);

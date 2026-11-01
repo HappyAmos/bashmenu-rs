@@ -624,7 +624,7 @@ impl ThemeEditorState {
             TokenKind::ToastTimeout => key == "toast_timeout",
         }) {
             self.selected_idx = idx;
-            self.status_message = format!("Selected: {}", self.tokens[idx].label);
+            self.status_message.clear();
             return true;
         }
 
@@ -651,7 +651,7 @@ impl ThemeEditorState {
             _ => false,
         }) {
             self.selected_idx = idx;
-            self.status_message = format!("Selected: {}", self.tokens[idx].label);
+            self.status_message.clear();
             return true;
         }
         false

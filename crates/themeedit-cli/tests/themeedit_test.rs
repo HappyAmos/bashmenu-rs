@@ -371,74 +371,66 @@ fn test_themeedit_preview_menu_editor_border_intact() {
     use ratatui::widgets::{Block, Borders, Widget};
 
     let styles = ResolvedThemeStyles::default();
-    let area = Rect::new(0, 0, 50, 20);
+    let area = Rect::new(0, 0, 60, 20);
     let mut buf = Buffer::empty(area);
 
     let preview_block = Block::default()
         .borders(Borders::ALL)
-        .title(" [ Visual Menu Editor ] ");
+        .title(" [ Visual Menu Editor ] ")
+        .border_style(ratatui::style::Style::default().fg(styles.border));
     preview_block.render(area, &mut buf);
 
-    let b = &styles.borders;
     let bot_y = area.y + area.height - 1;
     let footer_y = bot_y.saturating_sub(1);
-    let gt_y = footer_y.saturating_sub(1);
+    let p_inner_x = area.x + 2;
+    let p_inner_y = area.y + 2;
     let p_avail_w = area.width.saturating_sub(4);
-    let sep_col = area.x + 2 + p_avail_w / 2;
+    let panels_h = footer_y.saturating_sub(p_inner_y);
+    let left_w = p_avail_w / 2;
+    let right_w = p_avail_w.saturating_sub(left_w);
 
-    // Simulate rendering gutter divider and help gutter
-    buf.set_string(area.x, gt_y, &b.left_tee, ratatui::style::Style::default());
-    buf.set_string(
-        area.x + area.width - 1,
-        gt_y,
-        &b.right_tee,
-        ratatui::style::Style::default(),
-    );
-    buf.set_string(
-        sep_col,
-        gt_y,
-        &b.bottom_tee,
-        ratatui::style::Style::default(),
+    let tree_rect = Rect::new(p_inner_x, p_inner_y, left_w, panels_h);
+    let insp_rect = Rect::new(p_inner_x + left_w, p_inner_y, right_w, panels_h);
+
+    let tree_block = Block::default()
+        .borders(Borders::ALL)
+        .title(" [ Menu Structure ] ")
+        .border_style(styles.accent);
+    tree_block.render(tree_rect, &mut buf);
+
+    let insp_block = Block::default()
+        .borders(Borders::ALL)
+        .title(" ── Property Inspector ── ")
+        .border_style(styles.accent);
+    insp_block.render(insp_rect, &mut buf);
+
+    // Verify outer border corners intact
+    assert_ne!(buf[(area.x, bot_y)].symbol(), " ");
+    assert_ne!(buf[(area.x + area.width - 1, bot_y)].symbol(), " ");
+
+    // Verify interior panel titles rendered
+    let mut tree_title_found = false;
+    for x in tree_rect.x..tree_rect.x + tree_rect.width {
+        if buf[(x, tree_rect.y)].symbol() == "[" {
+            tree_title_found = true;
+            break;
+        }
+    }
+    assert!(
+        tree_title_found,
+        "Tree panel title [ Menu Structure ] must be rendered"
     );
 
-    buf.set_string(
-        area.x,
-        footer_y,
-        &b.border_vertical_left,
-        ratatui::style::Style::default(),
-    );
-    buf.set_string(
-        area.x + area.width - 1,
-        footer_y,
-        &b.border_vertical_right,
-        ratatui::style::Style::default(),
-    );
-
-    // Verify bottom border is still intact and not overwritten
-    assert_ne!(
-        buf[(area.x, bot_y)].symbol(),
-        " ",
-        "Bottom-left border must not be empty"
-    );
-    assert_ne!(
-        buf[(area.x + area.width - 1, bot_y)].symbol(),
-        " ",
-        "Bottom-right border must not be empty"
-    );
-    assert_eq!(
-        buf[(area.x, gt_y)].symbol(),
-        &b.left_tee,
-        "Gutter top border must have left_tee"
-    );
-    assert_eq!(
-        buf[(area.x + area.width - 1, gt_y)].symbol(),
-        &b.right_tee,
-        "Gutter top border must have right_tee"
-    );
-    assert_eq!(
-        buf[(sep_col, gt_y)].symbol(),
-        &b.bottom_tee,
-        "Center separator meeting gutter divider must be bottom_tee"
+    let mut insp_title_found = false;
+    for x in insp_rect.x..insp_rect.x + insp_rect.width {
+        if buf[(x, insp_rect.y)].symbol() == "─" {
+            insp_title_found = true;
+            break;
+        }
+    }
+    assert!(
+        insp_title_found,
+        "Property inspector panel title must be rendered"
     );
 }
 
