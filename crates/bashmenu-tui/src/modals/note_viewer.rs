@@ -195,6 +195,45 @@ impl NoteViewerModal {
                 if super::frame::is_close_button_clicked(inner, mouse.row, mouse.column) {
                     NoteViewerAction::Close
                 } else {
+                    let sb_x = inner.x + inner.width.saturating_sub(1);
+                    if mouse.column == sb_x {
+                        let footer_tokens = [
+                            "[SPACE] Toggle",
+                            "|",
+                            "[H] Hide Done",
+                            "|",
+                            "[E] Edit",
+                            "|",
+                            "[M] Rename",
+                            "|",
+                            "[D] Delete",
+                            "|",
+                            "[C] Copy",
+                            "|",
+                            "[ESC] Close",
+                        ];
+                        let max_footer_w = inner.width.saturating_sub(4) as usize;
+                        let footer_lines = wrap_footer_tokens(&footer_tokens, max_footer_w);
+                        let footer_h = footer_lines.len().max(1);
+                        let content_h =
+                            inner.height.saturating_sub(1 + footer_h as u16 + 1) as usize;
+                        let content_start_y = inner.y + 1;
+                        let content_end_y = content_start_y + content_h as u16;
+
+                        if mouse.row >= content_start_y && mouse.row < content_end_y {
+                            let total_lines = self.content.lines().count();
+                            let max_scroll = total_lines.saturating_sub(content_h);
+                            if mouse.row == content_start_y {
+                                self.scroll_offset = self.scroll_offset.saturating_sub(1);
+                            } else if mouse.row == content_end_y - 1 {
+                                self.scroll_offset = (self.scroll_offset + 1).min(max_scroll);
+                            } else if content_h >= 3 && max_scroll > 0 {
+                                let track_len = content_h - 2;
+                                let rel_y = (mouse.row - (content_start_y + 1)) as usize;
+                                self.scroll_offset = (rel_y * max_scroll) / track_len;
+                            }
+                        }
+                    }
                     NoteViewerAction::None
                 }
             }
@@ -504,6 +543,62 @@ impl NoteViewerModal {
             );
 
             buf.set_line(inner.x + 2, y, &styled_line, avail_w as u16);
+        }
+
+        // Render scrollbar if note has more lines than window height (content_h)
+        if visible_entries.len() > content_h && content_h > 0 {
+            let sb_x = inner.x + inner.width.saturating_sub(1);
+            let content_start_y = inner.y + 1;
+            let sb_fg = styles
+                .scrollbar
+                .fg
+                .unwrap_or(styles.accent.fg.unwrap_or(Color::Cyan));
+            let sb_bg = styles.background;
+            let arrow_style = Style::default()
+                .fg(sb_fg)
+                .bg(sb_bg)
+                .add_modifier(Modifier::BOLD);
+            let thumb_style = Style::default().fg(sb_fg).bg(sb_bg);
+            let track_style = Style::default().fg(Color::DarkGray).bg(sb_bg);
+
+            if content_h >= 3 {
+                // Top arrow
+                buf.set_string(sb_x, content_start_y, "▲", arrow_style);
+                // Bottom arrow
+                buf.set_string(
+                    sb_x,
+                    content_start_y + content_h as u16 - 1,
+                    "▼",
+                    arrow_style,
+                );
+
+                let track_len = content_h - 2;
+                let total_lines = visible_entries.len();
+                let thumb_size = ((track_len as f64 * content_h as f64) / total_lines as f64)
+                    .round()
+                    .clamp(1.0, track_len as f64) as usize;
+                let available_track = track_len.saturating_sub(thumb_size);
+                let scroll_ratio = if max_scroll > 0 {
+                    eff_scroll as f64 / max_scroll as f64
+                } else {
+                    0.0
+                };
+                let thumb_start = (scroll_ratio * available_track as f64).round() as usize;
+
+                for t_idx in 0..track_len {
+                    let y = content_start_y + 1 + t_idx as u16;
+                    if t_idx >= thumb_start && t_idx < thumb_start + thumb_size {
+                        buf.set_string(sb_x, y, "█", thumb_style);
+                    } else {
+                        buf.set_string(sb_x, y, "░", track_style);
+                    }
+                }
+            } else if content_h == 2 {
+                buf.set_string(sb_x, content_start_y, "▲", arrow_style);
+                buf.set_string(sb_x, content_start_y + 1, "▼", arrow_style);
+            } else if content_h == 1 {
+                buf.set_string(sb_x, content_start_y, "█", thumb_style);
+            }
         }
 
         // Render wrapped footer help lines with equal spacing

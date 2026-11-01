@@ -858,3 +858,108 @@ fn test_input_modal_status_gutter_no_overflow_and_word_navigation() {
     modal.handle_key_with_modifiers(KeyCode::Left, KeyModifiers::CONTROL);
     assert_eq!(modal.cursor_pos, next_pos);
 }
+
+#[test]
+fn test_note_viewer_and_editor_scrollbar_when_lines_exceed_window_height() {
+    use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
+
+    let styles = ResolvedThemeStyles::default();
+    let area = Rect::new(0, 0, 80, 24);
+
+    // 1. Short note: does NOT have more lines than window height -> NO scrollbar
+    let short_note = "Short line 1\nShort line 2\n";
+    let viewer_short = NoteViewerModal::new("Short Note", "/tmp/short.yml", short_note);
+    let mut buf = Buffer::empty(area);
+    let inner_short = viewer_short.render(area, &styles, &mut buf);
+    let sb_x_short = inner_short.x + inner_short.width - 1;
+    // Right border is at sb_x_short + 1
+    assert_eq!(buf[(sb_x_short + 1, inner_short.y + 1)].symbol(), "│");
+    // Column sb_x_short should NOT have scrollbar arrow '▲'
+    assert_ne!(
+        buf[(sb_x_short, inner_short.y + 1)].symbol(),
+        "▲",
+        "Short note should not render scrollbar arrow"
+    );
+
+    // 2. Long note: 50 lines -> HAS more lines than window height -> Renders scrollbar
+    let mut long_lines = Vec::new();
+    for i in 1..=50 {
+        long_lines.push(format!("Note entry line number {}", i));
+    }
+    let long_note = long_lines.join("\n");
+    let mut viewer_long = NoteViewerModal::new("Long Note", "/tmp/long.yml", &long_note);
+    let mut buf_long = Buffer::empty(area);
+    let inner_long = viewer_long.render(area, &styles, &mut buf_long);
+
+    let sb_x = inner_long.x + inner_long.width - 1;
+    // Right border must be at sb_x + 1
+    assert_eq!(
+        buf_long[(sb_x + 1, inner_long.y + 1)].symbol(),
+        "│",
+        "Right border must be at sb_x + 1"
+    );
+
+    // Scrollbar top arrow must be at sb_x, 1 character left of right border
+    let content_start_y = inner_long.y + 1;
+    assert_eq!(
+        buf_long[(sb_x, content_start_y)].symbol(),
+        "▲",
+        "Top arrow '▲' must be rendered 1 char left of right border"
+    );
+
+    // Scrollbar thumb '█' must be rendered in column sb_x
+    let mut found_thumb = false;
+    let mut found_track = false;
+    let mut down_arrow_y = 0;
+    for y in content_start_y..inner_long.y + inner_long.height {
+        let sym = buf_long[(sb_x, y)].symbol();
+        if sym == "█" {
+            found_thumb = true;
+        } else if sym == "░" {
+            found_track = true;
+        } else if sym == "▼" {
+            down_arrow_y = y;
+        }
+    }
+    assert!(found_thumb, "Scrollbar thumb '█' must be rendered");
+    assert!(found_track, "Scrollbar track '░' must be rendered");
+    assert!(
+        down_arrow_y > 0,
+        "Scrollbar bottom arrow '▼' must be rendered"
+    );
+
+    // Test mouse interaction on scrollbar:
+    // Clicking ▼ scrolls down
+    let click_down = MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: sb_x,
+        row: down_arrow_y,
+        modifiers: crossterm::event::KeyModifiers::NONE,
+    };
+    viewer_long.handle_mouse(click_down, area);
+    assert!(
+        viewer_long.scroll_offset > 0,
+        "Clicking scrollbar down arrow must advance scroll_offset"
+    );
+
+    // Clicking ▲ scrolls back up
+    let click_up = MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: sb_x,
+        row: content_start_y,
+        modifiers: crossterm::event::KeyModifiers::NONE,
+    };
+    viewer_long.handle_mouse(click_up, area);
+    assert_eq!(
+        viewer_long.scroll_offset, 0,
+        "Clicking scrollbar up arrow must reduce scroll_offset"
+    );
+
+    // 3. NoteEditorModal: long note also renders scrollbar
+    let mut editor_long = NoteEditorModal::new("Edit Long Note", "/tmp/long.yml", &long_note);
+    let mut buf_ed = Buffer::empty(area);
+    let inner_ed = editor_long.render(area, &styles, &mut buf_ed);
+    let sb_x_ed = inner_ed.x + inner_ed.width - 1;
+    assert_eq!(buf_ed[(sb_x_ed + 1, inner_ed.y + 1)].symbol(), "│");
+    assert_eq!(buf_ed[(sb_x_ed, inner_ed.y + 1)].symbol(), "▲");
+}

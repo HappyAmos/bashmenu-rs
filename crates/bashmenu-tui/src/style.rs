@@ -31,6 +31,7 @@ pub struct ResolvedThemeStyles {
     pub toast_info: Color,
     pub toast_warning: Color,
     pub toast_error: Color,
+    pub scrollbar: Style,
 }
 
 impl Default for ResolvedThemeStyles {
@@ -67,6 +68,7 @@ impl Default for ResolvedThemeStyles {
             toast_info: Color::Rgb(78, 191, 113),
             toast_warning: Color::Rgb(255, 184, 108),
             toast_error: Color::Rgb(255, 85, 85),
+            scrollbar: Style::default().fg(Color::Cyan),
         }
     }
 }
@@ -248,6 +250,9 @@ impl ResolvedThemeStyles {
             }
             if let Some(st) = parse_style_pair(p.get("window_close_button")) {
                 resolved.window_close_button = st.add_modifier(Modifier::BOLD);
+            }
+            if let Some(st) = parse_style_pair(p.get("scrollbar")) {
+                resolved.scrollbar = st;
             }
             if let Some(c) = p.get("toast_info").and_then(parse_color_value) {
                 if c != Color::Reset {

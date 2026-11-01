@@ -648,9 +648,10 @@ fn main() -> Result<()> {
                         }
 
                         // Scrollbar indicator on right border
-                        buf.set_string(mod_x + mod_w - 1, mod_y + 3, "▲", preview_styles.accent);
-                        buf.set_string(mod_x + mod_w - 1, mod_y + 4, "█", preview_styles.accent);
-                        buf.set_string(mod_x + mod_w - 1, mod_y + 5, "▼", preview_styles.accent);
+                        let sb_st = preview_styles.scrollbar;
+                        buf.set_string(mod_x + mod_w - 1, mod_y + 3, "▲", sb_st);
+                        buf.set_string(mod_x + mod_w - 1, mod_y + 4, "█", sb_st);
+                        buf.set_string(mod_x + mod_w - 1, mod_y + 5, "▼", sb_st);
                     }
                     PreviewMode::MenuEditor => {
                         // Visual Menu Editor Split View
@@ -1650,7 +1651,7 @@ fn hit_test_preview(
                         return Some(("right_tee", row, col, col + 1));
                     }
                     if row >= mod_y + 3 && row <= mod_y + 5 {
-                        return Some(("accent", row, col, col + 1));
+                        return Some(("scrollbar", row, col, col + 1));
                     }
                     return Some(("border_vertical", row, col, col + 1));
                 }

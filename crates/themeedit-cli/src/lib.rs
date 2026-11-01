@@ -146,6 +146,10 @@ impl ThemeEditorState {
                 label: "Gutter Color".to_string(),
                 kind: TokenKind::Color("gutter".to_string()),
             },
+            TokenItem {
+                label: "Scrollbar Color".to_string(),
+                kind: TokenKind::Color("scrollbar".to_string()),
+            },
             // Indicator
             TokenItem {
                 label: "Cursor Indicator".to_string(),
