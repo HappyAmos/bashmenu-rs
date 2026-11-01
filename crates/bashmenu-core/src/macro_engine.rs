@@ -450,6 +450,13 @@ static CMD_CACHE: std::sync::LazyLock<
     std::sync::Mutex<HashMap<String, (std::time::Instant, String)>>,
 > = std::sync::LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
 
+/// Clears the `{command:<cmd>}` substitution TTL cache so subsequent evaluations run fresh.
+pub fn clear_command_cache() {
+    if let Ok(mut cache) = CMD_CACHE.lock() {
+        cache.clear();
+    }
+}
+
 fn eval_command_substitution(cmd_str: &str) -> String {
     let trimmed = cmd_str.trim();
     if trimmed.is_empty() {

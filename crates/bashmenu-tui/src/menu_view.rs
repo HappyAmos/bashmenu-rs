@@ -170,17 +170,89 @@ impl MenuView {
         self.show_shortcuts
     }
 
-    /// Reload the menu with a new schema
+    /// Reload the menu with a new schema while preserving active submenu/notebook navigation state.
     pub fn reload_menu(&mut self, menu: MenuSchema) {
-        self.stack = vec![MenuLevel {
+        let old_stack = std::mem::take(&mut self.stack);
+        let root_sel = old_stack.first().map(|l| l.selected_idx).unwrap_or(0);
+        let root_scroll = old_stack.first().map(|l| l.scroll_offset).unwrap_or(0);
+
+        let mut new_stack = vec![MenuLevel {
             title: menu.title,
             items: menu.items,
-            selected_idx: 0,
-            scroll_offset: 0,
+            selected_idx: root_sel,
+            scroll_offset: root_scroll,
             is_notebook: false,
             notebook_file: None,
         }];
+
+        if let Some(root) = new_stack.first_mut() {
+            if !root.items.is_empty() && root.selected_idx >= root.items.len() {
+                root.selected_idx = root.items.len() - 1;
+            }
+        }
+
+        for level_idx in 1..old_stack.len() {
+            let prev_old = &old_stack[level_idx - 1];
+            let curr_old = &old_stack[level_idx];
+
+            if curr_old.is_notebook {
+                if let Some(ref fp) = curr_old.notebook_file {
+                    if let Ok(nb) = bashmenu_core::load_notebook(fp) {
+                        let sub = bashmenu_core::build_notebook_submenu(fp, &nb);
+                        let mut sel = curr_old.selected_idx;
+                        if !sub.items.is_empty() && sel >= sub.items.len() {
+                            sel = sub.items.len() - 1;
+                        }
+                        new_stack.push(MenuLevel {
+                            title: sub.title,
+                            items: sub.items,
+                            selected_idx: sel,
+                            scroll_offset: curr_old.scroll_offset,
+                            is_notebook: true,
+                            notebook_file: Some(fp.clone()),
+                        });
+                    }
+                }
+                break;
+            }
+
+            let parent_items = &new_stack.last().unwrap().items;
+            let matching_sub = parent_items
+                .get(prev_old.selected_idx)
+                .and_then(|it| it.submenu.as_ref())
+                .or_else(|| {
+                    parent_items
+                        .iter()
+                        .find(|it| {
+                            it.submenu
+                                .as_ref()
+                                .map(|s| s.title == curr_old.title)
+                                .unwrap_or(false)
+                        })
+                        .and_then(|it| it.submenu.as_ref())
+                });
+
+            if let Some(sub) = matching_sub {
+                let mut sel = curr_old.selected_idx;
+                if !sub.items.is_empty() && sel >= sub.items.len() {
+                    sel = sub.items.len() - 1;
+                }
+                new_stack.push(MenuLevel {
+                    title: sub.title.clone(),
+                    items: sub.items.clone(),
+                    selected_idx: sel,
+                    scroll_offset: curr_old.scroll_offset,
+                    is_notebook: false,
+                    notebook_file: None,
+                });
+            } else {
+                break;
+            }
+        }
+
+        self.stack = new_stack;
         self.ensure_selectable();
+        self.marquee_tracker.reset();
     }
 
     /// Whether the currently displayed menu level is a notebook notes collection
@@ -670,6 +742,13 @@ impl MenuView {
                     }
                     if act == "menuedit" || act == "menuedit.py" {
                         return MenuAction::EditMenu;
+                    }
+                    if act == "reload"
+                        || act == "action_reload"
+                        || act == "refresh"
+                        || act == "action_refresh"
+                    {
+                        return MenuAction::Reload;
                     }
                 }
                 MenuAction::Execute(Box::new(item))
@@ -1213,4 +1292,79 @@ fn wrap_gutter_tokens(tokens: &[&str], max_w: usize, max_lines: usize) -> Vec<St
         }
     }
     lines
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_reload_menu_preserves_navigation_and_selection() {
+        let sub_items = vec![
+            MenuItem {
+                label: "Sub Item 1".to_string(),
+                r#type: MenuItemType::Command,
+                ..Default::default()
+            },
+            MenuItem {
+                label: "Sub Item 2".to_string(),
+                r#type: MenuItemType::Command,
+                ..Default::default()
+            },
+        ];
+        let schema = MenuSchema {
+            title: "Main Menu".to_string(),
+            items: vec![
+                MenuItem {
+                    label: "Top Item".to_string(),
+                    r#type: MenuItemType::Command,
+                    ..Default::default()
+                },
+                MenuItem {
+                    label: "Tools".to_string(),
+                    r#type: MenuItemType::Submenu,
+                    submenu: Some(bashmenu_core::Submenu {
+                        title: "Tools Submenu".to_string(),
+                        items: sub_items.clone(),
+                    }),
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        };
+
+        let mut view = MenuView::new(
+            schema.clone(),
+            ResolvedThemeStyles::default(),
+            false,
+            String::new(),
+        );
+        // Move down to "Tools" and enter submenu
+        view.handle_key(KeyCode::Down);
+        view.handle_key(KeyCode::Enter);
+        assert_eq!(view.active_title_chain(), vec!["Tools", "Sub Item 1"]);
+
+        // Move down to "Sub Item 2"
+        view.handle_key(KeyCode::Down);
+        assert_eq!(view.selected_path(), vec![1, 1]);
+
+        // Reload with an updated schema
+        let mut updated_schema = schema;
+        updated_schema.items[1]
+            .submenu
+            .as_mut()
+            .unwrap()
+            .items
+            .push(MenuItem {
+                label: "Sub Item 3".to_string(),
+                r#type: MenuItemType::Command,
+                ..Default::default()
+            });
+        view.reload_menu(updated_schema);
+
+        // Navigation stack and selection index are preserved
+        assert_eq!(view.active_title_chain(), vec!["Tools", "Sub Item 2"]);
+        assert_eq!(view.selected_path(), vec![1, 1]);
+        assert_eq!(view.selected_item().unwrap().label, "Sub Item 2");
+    }
 }

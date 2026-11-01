@@ -2,11 +2,11 @@
 
 use anyhow::Result;
 use bashmenu_core::{
-    add_or_update_note, build_notebook_submenu, delete_note, extract_toasts, get_note_by_title,
-    interpolate_placeholders, load_config, load_menu, load_notebook, load_themes, rename_note,
-    resolve_notebook_path, save_config, save_notebook, BashMenuConfig, ConfirmAction,
-    ExecutionMode, MacroContext, MenuItem, MenuItemType, MenuSchema, NoteItem, PluginEngine,
-    ToastNotification,
+    add_or_update_note, build_notebook_submenu, clear_command_cache, delete_note, extract_toasts,
+    get_note_by_title, interpolate_placeholders, load_config, load_menu, load_notebook,
+    load_themes, rename_note, resolve_notebook_path, save_config, save_notebook, BashMenuConfig,
+    ConfirmAction, ExecutionMode, MacroContext, MenuItem, MenuItemType, MenuSchema, NoteItem,
+    PluginEngine, ToastNotification,
 };
 use bashmenu_tui::{
     install_panic_hook, ConfirmChoice, ConfirmModal, FilePickerModal, HelpModal, InputModal,
@@ -195,14 +195,23 @@ fn main() -> Result<()> {
         }
         if plugins_updated {
             let avail_w = size.width.saturating_sub(6) as usize;
-            let rows = plugin_engine.format_display_rows(&config, avail_w, '─');
+            let div_ch = styles.divider_char.chars().next().unwrap_or('─');
+            let rows = plugin_engine.format_display_rows(&config, avail_w, div_ch);
             menu_view.set_plugin_rows(rows);
             need_redraw = true;
         }
 
-        // Periodic check to trigger expired plugins
+        // Periodic check to trigger expired plugins and refresh status gutter
         if last_plugin_check.elapsed() >= Duration::from_secs(1) {
             plugin_engine.trigger_refresh(&config, false);
+            if let Some(ref gutter_tmpl) = config.settings.status_gutter {
+                let mut ctx = MacroContext::new(&config);
+                ctx.window_width = size.width as usize;
+                ctx.window_height = size.height as usize;
+                ctx.screen_width = size.width as usize;
+                let gutter_str = interpolate_placeholders(gutter_tmpl, &ctx);
+                menu_view.set_status_gutter(gutter_str);
+            }
             last_plugin_check = Instant::now();
         }
 
@@ -850,6 +859,7 @@ fn main() -> Result<()> {
                                 let _ = Command::new(&editor_bin).status();
                                 Ok(())
                             });
+                            pending_action = Some(MenuAction::Reload);
                         }
                         MenuAction::EditMenu => {
                             let menuedit_bin = locate_tool("menuedit");
@@ -876,28 +886,57 @@ fn main() -> Result<()> {
                                 let _ = cmd.status();
                                 Ok(())
                             });
-                            if let Ok(new_menu) = load_menu(&menu_path) {
-                                menu_view.reload_menu(new_menu);
-                            }
+                            pending_action = Some(MenuAction::Reload);
                         }
                         MenuAction::Reload => {
+                            clear_command_cache();
+                            plugin_engine.clear_cache();
+
                             if let Ok(new_config) = load_config(&config_path) {
                                 config = new_config;
-                                menu_view.set_config(config.clone());
                             }
+                            use_nerd = config.settings.use_nerd_fonts.unwrap_or(false);
+                            menu_view.set_use_nerd_fonts(use_nerd);
+                            menu_view.set_config(config.clone());
+                            menu_view.set_show_shortcuts(
+                                config.settings.show_menu_shortcuts.unwrap_or(true),
+                            );
+
                             if let Ok(new_menu) = load_menu(&menu_path) {
                                 menu_view.reload_menu(new_menu);
                             }
+
                             if let Ok(new_themes) = load_themes(&themes_path) {
                                 themes = new_themes;
                             }
-                            if let Some(t) = themes.get(&config.theme) {
-                                styles = ResolvedThemeStyles::from_theme(t, use_nerd);
-                                menu_view.set_styles(styles.clone());
-                                let wp_config = config.resolve_wallpaper(Some(t));
-                                menu_view.set_wallpaper(wp_config);
-                            }
+                            let active_theme = themes.get(&config.theme);
+                            styles = if let Some(t) = active_theme {
+                                ResolvedThemeStyles::from_theme(t, use_nerd)
+                            } else {
+                                ResolvedThemeStyles::default()
+                            };
+                            menu_view.set_styles(styles.clone());
+
+                            let wp_config = config.resolve_wallpaper(active_theme);
+                            menu_view.set_wallpaper(wp_config);
+
+                            let mut ctx = MacroContext::new(&config);
+                            ctx.window_width = size.width as usize;
+                            ctx.window_height = size.height as usize;
+                            ctx.screen_width = size.width as usize;
+                            let gutter_str = config
+                                .settings
+                                .status_gutter
+                                .as_deref()
+                                .map(|tmpl| interpolate_placeholders(tmpl, &ctx))
+                                .unwrap_or_default();
+                            menu_view.set_status_gutter(gutter_str);
+
+                            menu_view.set_plugin_rows(Vec::new());
                             plugin_engine.trigger_refresh(&config, true);
+
+                            let _ = guard.terminal_mut().clear();
+                            need_redraw = true;
                         }
                         MenuAction::ToggleShortcuts => {
                             let show = menu_view.toggle_shortcuts();
@@ -929,13 +968,7 @@ fn main() -> Result<()> {
                                     .status();
                                 Ok(())
                             });
-                            if let Ok(new_themes) = load_themes(&themes_path) {
-                                themes = new_themes;
-                                if let Some(t) = themes.get(&config.theme) {
-                                    styles = ResolvedThemeStyles::from_theme(t, use_nerd);
-                                    menu_view.set_styles(styles.clone());
-                                }
-                            }
+                            pending_action = Some(MenuAction::Reload);
                         }
                         MenuAction::OpenNotebook(item) => {
                             let mut ctx = MacroContext::new(&config);
@@ -1152,6 +1185,7 @@ fn main() -> Result<()> {
                                     let _ = cmd.status();
                                     Ok(())
                                 });
+                                pending_action = Some(MenuAction::Reload);
                             } else {
                                 let action_str = item.action.as_deref().unwrap_or_default();
                                 let command_str = item.command.as_deref().unwrap_or_default();
@@ -1170,13 +1204,7 @@ fn main() -> Result<()> {
                                             .status();
                                         Ok(())
                                     });
-                                    if let Ok(new_themes) = load_themes(&themes_path) {
-                                        themes = new_themes;
-                                    }
-                                    if let Some(t) = themes.get(&config.theme) {
-                                        styles = ResolvedThemeStyles::from_theme(t, use_nerd);
-                                        menu_view.set_styles(styles.clone());
-                                    }
+                                    pending_action = Some(MenuAction::Reload);
                                 } else if action_str == "menuedit"
                                     || action_str == "menuedit.py"
                                     || command_str == "menuedit"
@@ -1207,9 +1235,7 @@ fn main() -> Result<()> {
                                         let _ = cmd.status();
                                         Ok(())
                                     });
-                                    if let Ok(new_menu) = load_menu(&menu_path) {
-                                        menu_view.reload_menu(new_menu);
-                                    }
+                                    pending_action = Some(MenuAction::Reload);
                                 } else if item.r#type == MenuItemType::Other("toast".to_string())
                                     || matches!(item.r#type, MenuItemType::Other(ref s) if s == "toast")
                                 {
