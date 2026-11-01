@@ -128,12 +128,39 @@ impl FilePickerModal {
         }
     }
 
-    /// Handles keyboard input. Returns:
+    /// Handles keyboard input with modifiers. Returns:
     /// - `Some(Some(path))` when file/dir selected
     /// - `Some(None)` when cancelled
     /// - `None` while open
-    pub fn handle_key(&mut self, code: KeyCode) -> Option<Option<PathBuf>> {
+    pub fn handle_key_with_modifiers(
+        &mut self,
+        code: KeyCode,
+        modifiers: crossterm::event::KeyModifiers,
+    ) -> Option<Option<PathBuf>> {
         if self.creating_new {
+            if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
+                match code {
+                    KeyCode::Char('v') | KeyCode::Char('V') => {
+                        if let Some(text) = crate::clipboard::get_clipboard_text() {
+                            let clean: String =
+                                text.chars().filter(|c| *c != '\n' && *c != '\r').collect();
+                            self.new_name_input.push_str(&clean);
+                        }
+                        return None;
+                    }
+                    KeyCode::Char('c') | KeyCode::Char('C') => {
+                        if !self.new_name_input.is_empty() {
+                            crate::clipboard::set_clipboard_text(&self.new_name_input);
+                        }
+                        return None;
+                    }
+                    KeyCode::Char('u') | KeyCode::Char('U') => {
+                        self.new_name_input.clear();
+                        return None;
+                    }
+                    _ => {}
+                }
+            }
             match code {
                 KeyCode::Esc => {
                     self.creating_new = false;
@@ -185,6 +212,11 @@ impl FilePickerModal {
                 _ => None,
             }
         }
+    }
+
+    /// Handles keyboard input (without explicit modifiers).
+    pub fn handle_key(&mut self, code: KeyCode) -> Option<Option<PathBuf>> {
+        self.handle_key_with_modifiers(code, crossterm::event::KeyModifiers::NONE)
     }
 
     /// Handles immediate mouse interaction

@@ -823,3 +823,101 @@ fn test_menuedit_execution_mode_selector_and_window_percent() {
         Some(true)
     );
 }
+
+#[test]
+fn test_menuedit_inputs_selection_and_clipboard() {
+    bashmenu_tui::clipboard::set_test_mode(true);
+    use crossterm::event::{KeyCode, KeyModifiers};
+    use menuedit_cli::{FocusControl, ItemEditModal, MultiLineInput, TextInput};
+
+    // 1. TextInput direct tests
+    let mut ti = TextInput::new("Hello World");
+    assert_eq!(ti.cursor, 11);
+    assert_eq!(ti.selection_range(), None);
+
+    // Shift+Left 5 times selects "World"
+    for _ in 0..5 {
+        ti.handle_key_with_modifiers(KeyCode::Left, KeyModifiers::SHIFT);
+    }
+    assert_eq!(ti.cursor, 6);
+    assert_eq!(ti.selection_range(), Some((6, 11)));
+
+    // Ctrl+C copies "World"
+    ti.handle_key_with_modifiers(KeyCode::Char('c'), KeyModifiers::CONTROL);
+    assert_eq!(
+        bashmenu_tui::clipboard::get_clipboard_text().as_deref(),
+        Some("World")
+    );
+
+    // Ctrl+A selects all
+    ti.handle_key_with_modifiers(KeyCode::Char('a'), KeyModifiers::CONTROL);
+    assert_eq!(ti.selection_range(), Some((0, 11)));
+
+    // Ctrl+X cuts all
+    ti.handle_key_with_modifiers(KeyCode::Char('x'), KeyModifiers::CONTROL);
+    assert_eq!(ti.as_string(), "");
+    assert_eq!(
+        bashmenu_tui::clipboard::get_clipboard_text().as_deref(),
+        Some("Hello World")
+    );
+
+    // Ctrl+V pastes
+    ti.handle_key_with_modifiers(KeyCode::Char('v'), KeyModifiers::CONTROL);
+    assert_eq!(ti.as_string(), "Hello World");
+
+    // 2. MultiLineInput tests
+    let mut ml = MultiLineInput::new("First Line\nSecond Line\nThird Line");
+    ml.cursor_row = 0;
+    ml.cursor_col = 0;
+
+    // Shift+Down selects line 0 and first char of line 1
+    ml.handle_key_with_modifiers(KeyCode::Down, KeyModifiers::SHIFT);
+    assert_eq!(ml.cursor_row, 1);
+    assert_eq!(ml.selection_range(), Some(((0, 0), (1, 0))));
+
+    // Ctrl+C copies selection
+    ml.handle_key_with_modifiers(KeyCode::Char('c'), KeyModifiers::CONTROL);
+    assert_eq!(
+        bashmenu_tui::clipboard::get_clipboard_text().as_deref(),
+        Some("First Line\n")
+    );
+
+    // Ctrl+A selects all
+    ml.handle_key_with_modifiers(KeyCode::Char('a'), KeyModifiers::CONTROL);
+    assert_eq!(ml.selection_range(), Some(((0, 0), (2, 10))));
+
+    // Ctrl+X cuts all
+    ml.handle_key_with_modifiers(KeyCode::Char('x'), KeyModifiers::CONTROL);
+    assert_eq!(ml.as_string(), "");
+
+    // Ctrl+V pastes multiline
+    ml.handle_key_with_modifiers(KeyCode::Char('v'), KeyModifiers::CONTROL);
+    assert_eq!(ml.as_string(), "First Line\nSecond Line\nThird Line");
+
+    // 3. ItemEditModal routing to focused control
+    let item = MenuItem {
+        label: "Title A".to_string(),
+        r#type: MenuItemType::Command,
+        command: Some("echo 1".to_string()),
+        ..Default::default()
+    };
+    let mut modal = ItemEditModal::new(&item);
+
+    // Focus on TitleInput
+    modal.active_control_idx = modal
+        .focus_controls()
+        .iter()
+        .position(|c| *c == FocusControl::TitleInput)
+        .unwrap();
+
+    // Ctrl+A in TitleInput selects all in TitleInput (rather than opening ASCII table)
+    modal.handle_key(KeyCode::Char('a'), KeyModifiers::CONTROL);
+    assert_eq!(modal.title_input.selection_range(), Some((0, 7)));
+
+    // Ctrl+C copies title
+    modal.handle_key(KeyCode::Char('c'), KeyModifiers::CONTROL);
+    assert_eq!(
+        bashmenu_tui::clipboard::get_clipboard_text().as_deref(),
+        Some("Title A")
+    );
+}

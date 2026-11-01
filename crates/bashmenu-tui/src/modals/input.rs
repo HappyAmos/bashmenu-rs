@@ -15,6 +15,7 @@ pub struct InputModal {
     pub value: String,
     pub cursor_pos: usize,
     pub scroll_offset: usize,
+    pub selection_anchor: Option<usize>,
 }
 
 impl InputModal {
@@ -26,6 +27,35 @@ impl InputModal {
             value: initial_val.to_string(),
             cursor_pos: char_count,
             scroll_offset: 0,
+            selection_anchor: None,
+        }
+    }
+
+    /// Returns the active selection character index range `(start, end)` if any.
+    pub fn selection_range(&self) -> Option<(usize, usize)> {
+        self.selection_anchor.and_then(|anchor| {
+            let count = self.value.chars().count();
+            let c = self.cursor_pos.min(count);
+            let a = anchor.min(count);
+            if a != c {
+                Some((a.min(c), a.max(c)))
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Deletes currently selected text range, returning true if a selection was removed.
+    pub fn delete_selection(&mut self) -> bool {
+        if let Some((start, end)) = self.selection_range() {
+            let mut chars: Vec<char> = self.value.chars().collect();
+            chars.drain(start..end);
+            self.value = chars.into_iter().collect();
+            self.cursor_pos = start;
+            self.selection_anchor = None;
+            true
+        } else {
+            false
         }
     }
 
@@ -40,8 +70,79 @@ impl InputModal {
             self.cursor_pos = char_count;
         }
 
+        let is_shift = modifiers.contains(KeyModifiers::SHIFT);
+        let is_ctrl = modifiers.contains(KeyModifiers::CONTROL);
+
+        // Ctrl shortcuts
+        if is_ctrl {
+            match code {
+                KeyCode::Char('a') | KeyCode::Char('A') => {
+                    self.selection_anchor = Some(0);
+                    self.cursor_pos = self.value.chars().count();
+                    return None;
+                }
+                KeyCode::Char('c') | KeyCode::Char('C') => {
+                    if let Some((start, end)) = self.selection_range() {
+                        let snippet: String =
+                            self.value.chars().skip(start).take(end - start).collect();
+                        crate::clipboard::set_clipboard_text(&snippet);
+                    }
+                    return None;
+                }
+                KeyCode::Char('x') | KeyCode::Char('X') => {
+                    if let Some((start, end)) = self.selection_range() {
+                        let snippet: String =
+                            self.value.chars().skip(start).take(end - start).collect();
+                        crate::clipboard::set_clipboard_text(&snippet);
+                        self.delete_selection();
+                    }
+                    return None;
+                }
+                KeyCode::Char('v') | KeyCode::Char('V') => {
+                    if let Some(text) = crate::clipboard::get_clipboard_text() {
+                        self.delete_selection();
+                        let clean: String =
+                            text.chars().filter(|c| *c != '\n' && *c != '\r').collect();
+                        if !clean.is_empty() {
+                            let mut chars: Vec<char> = self.value.chars().collect();
+                            for (idx, ch) in clean.chars().enumerate() {
+                                chars.insert(self.cursor_pos + idx, ch);
+                            }
+                            self.cursor_pos += clean.chars().count();
+                            self.value = chars.into_iter().collect();
+                        }
+                    }
+                    return None;
+                }
+                KeyCode::Left => {
+                    if is_shift {
+                        if self.selection_anchor.is_none() {
+                            self.selection_anchor = Some(self.cursor_pos);
+                        }
+                    } else {
+                        self.selection_anchor = None;
+                    }
+                    self.move_word_left();
+                    return None;
+                }
+                KeyCode::Right => {
+                    if is_shift {
+                        if self.selection_anchor.is_none() {
+                            self.selection_anchor = Some(self.cursor_pos);
+                        }
+                    } else {
+                        self.selection_anchor = None;
+                    }
+                    self.move_word_right();
+                    return None;
+                }
+                _ => {}
+            }
+        }
+
         match code {
             KeyCode::Char(c) => {
+                self.delete_selection();
                 let mut chars: Vec<char> = self.value.chars().collect();
                 chars.insert(self.cursor_pos, c);
                 self.cursor_pos += 1;
@@ -49,7 +150,7 @@ impl InputModal {
                 None
             }
             KeyCode::Backspace => {
-                if self.cursor_pos > 0 {
+                if !self.delete_selection() && self.cursor_pos > 0 {
                     let mut chars: Vec<char> = self.value.chars().collect();
                     if self.cursor_pos <= chars.len() {
                         chars.remove(self.cursor_pos - 1);
@@ -60,38 +161,60 @@ impl InputModal {
                 None
             }
             KeyCode::Delete => {
-                let mut chars: Vec<char> = self.value.chars().collect();
-                if self.cursor_pos < chars.len() {
-                    chars.remove(self.cursor_pos);
-                    self.value = chars.into_iter().collect();
+                if !self.delete_selection() {
+                    let mut chars: Vec<char> = self.value.chars().collect();
+                    if self.cursor_pos < chars.len() {
+                        chars.remove(self.cursor_pos);
+                        self.value = chars.into_iter().collect();
+                    }
                 }
                 None
             }
-            KeyCode::Left if modifiers.contains(KeyModifiers::CONTROL) => {
-                self.move_word_left();
-                None
-            }
-            KeyCode::Right if modifiers.contains(KeyModifiers::CONTROL) => {
-                self.move_word_right();
-                None
-            }
             KeyCode::Left => {
+                if is_shift {
+                    if self.selection_anchor.is_none() {
+                        self.selection_anchor = Some(self.cursor_pos);
+                    }
+                } else {
+                    self.selection_anchor = None;
+                }
                 if self.cursor_pos > 0 {
                     self.cursor_pos -= 1;
                 }
                 None
             }
             KeyCode::Right => {
+                if is_shift {
+                    if self.selection_anchor.is_none() {
+                        self.selection_anchor = Some(self.cursor_pos);
+                    }
+                } else {
+                    self.selection_anchor = None;
+                }
                 if self.cursor_pos < self.value.chars().count() {
                     self.cursor_pos += 1;
                 }
                 None
             }
             KeyCode::Home => {
+                if is_shift {
+                    if self.selection_anchor.is_none() {
+                        self.selection_anchor = Some(self.cursor_pos);
+                    }
+                } else {
+                    self.selection_anchor = None;
+                }
                 self.cursor_pos = 0;
                 None
             }
             KeyCode::End => {
+                if is_shift {
+                    if self.selection_anchor.is_none() {
+                        self.selection_anchor = Some(self.cursor_pos);
+                    }
+                } else {
+                    self.selection_anchor = None;
+                }
                 self.cursor_pos = self.value.chars().count();
                 None
             }
@@ -259,21 +382,29 @@ impl InputModal {
             };
 
             let vis_chars: Vec<char> = self.value.chars().skip(scroll).take(input_w).collect();
-            let mut field_str: String = vis_chars.iter().collect();
-            if vis_chars.len() < input_w {
-                field_str.push_str(&" ".repeat(input_w - vis_chars.len()));
-            }
+            let sel_range = self.selection_range();
 
-            buf.set_string(input_x, input_y, &field_str, styles.highlight);
+            for i in 0..input_w {
+                let char_idx = scroll + i;
+                let ch = if i < vis_chars.len() {
+                    vis_chars[i]
+                } else {
+                    ' '
+                };
+                let is_selected = sel_range
+                    .map(|(s, e)| char_idx >= s && char_idx < e)
+                    .unwrap_or(false);
+                let is_cur = char_idx == safe_cursor;
 
-            // Render cursor indicator
-            let rel_cursor = safe_cursor.saturating_sub(scroll);
-            if rel_cursor < input_w {
-                let cx = input_x + rel_cursor as u16;
-                let ch = self.value.chars().nth(safe_cursor).unwrap_or(' ');
-                buf[(cx, input_y)]
-                    .set_char(ch)
-                    .set_style(styles.highlight.add_modifier(Modifier::REVERSED));
+                let cell_style = if is_selected || is_cur {
+                    styles.highlight.add_modifier(Modifier::REVERSED)
+                } else {
+                    styles.highlight
+                };
+
+                let cell = &mut buf[(input_x + i as u16, input_y)];
+                cell.set_char(ch);
+                cell.set_style(cell_style);
             }
         }
 

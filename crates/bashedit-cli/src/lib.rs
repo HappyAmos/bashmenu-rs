@@ -801,26 +801,13 @@ impl EditorBuffer {
 }
 
 pub fn get_shared_cutbuffer_path() -> PathBuf {
-    if let Ok(home) = std::env::var("HOME") {
-        PathBuf::from(home).join(".cache/bashmenu/cutbuffer.txt")
-    } else {
-        std::env::temp_dir().join("bashmenu_cutbuffer.txt")
-    }
+    bashmenu_tui::clipboard::get_shared_cutbuffer_path()
 }
 
 pub fn get_clipboard_text() -> Option<String> {
-    let path = get_shared_cutbuffer_path();
-    if path.exists() {
-        fs::read_to_string(path).ok()
-    } else {
-        None
-    }
+    bashmenu_tui::get_clipboard_text()
 }
 
 pub fn set_clipboard_text(text: &str) {
-    let path = get_shared_cutbuffer_path();
-    if let Some(parent) = path.parent() {
-        let _ = fs::create_dir_all(parent);
-    }
-    let _ = fs::write(path, text);
+    bashmenu_tui::set_clipboard_text(text);
 }

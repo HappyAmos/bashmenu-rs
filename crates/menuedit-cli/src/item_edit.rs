@@ -21,13 +21,18 @@ use ratatui::style::{Color, Modifier, Style};
 pub struct TextInput {
     pub chars: Vec<char>,
     pub cursor: usize,
+    pub selection_anchor: Option<usize>,
 }
 
 impl TextInput {
     pub fn new(s: &str) -> Self {
         let chars: Vec<char> = s.chars().collect();
         let cursor = chars.len();
-        Self { chars, cursor }
+        Self {
+            chars,
+            cursor,
+            selection_anchor: None,
+        }
     }
 
     pub fn as_string(&self) -> String {
@@ -37,17 +42,135 @@ impl TextInput {
     pub fn set_text(&mut self, s: &str) {
         self.chars = s.chars().collect();
         self.cursor = self.chars.len();
+        self.selection_anchor = None;
     }
 
-    pub fn handle_key(&mut self, code: KeyCode) -> bool {
+    pub fn selection_range(&self) -> Option<(usize, usize)> {
+        self.selection_anchor.and_then(|anchor| {
+            let c = self.cursor.min(self.chars.len());
+            let a = anchor.min(self.chars.len());
+            if a != c {
+                Some((a.min(c), a.max(c)))
+            } else {
+                None
+            }
+        })
+    }
+
+    pub fn delete_selection(&mut self) -> bool {
+        if let Some((start, end)) = self.selection_range() {
+            self.chars.drain(start..end);
+            self.cursor = start;
+            self.selection_anchor = None;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn handle_key_with_modifiers(&mut self, code: KeyCode, modifiers: KeyModifiers) -> bool {
+        let is_shift = modifiers.contains(KeyModifiers::SHIFT);
+        let is_ctrl = modifiers.contains(KeyModifiers::CONTROL);
+
+        if is_ctrl {
+            match code {
+                KeyCode::Char('a') | KeyCode::Char('A') => {
+                    self.selection_anchor = Some(0);
+                    self.cursor = self.chars.len();
+                    return true;
+                }
+                KeyCode::Char('c') | KeyCode::Char('C') => {
+                    if let Some((start, end)) = self.selection_range() {
+                        let snippet: String = self.chars[start..end].iter().collect();
+                        bashmenu_tui::clipboard::set_clipboard_text(&snippet);
+                    }
+                    return true;
+                }
+                KeyCode::Char('x') | KeyCode::Char('X') => {
+                    if let Some((start, end)) = self.selection_range() {
+                        let snippet: String = self.chars[start..end].iter().collect();
+                        bashmenu_tui::clipboard::set_clipboard_text(&snippet);
+                        self.delete_selection();
+                        return true;
+                    }
+                    return false;
+                }
+                KeyCode::Char('v') | KeyCode::Char('V') => {
+                    if let Some(text) = bashmenu_tui::clipboard::get_clipboard_text() {
+                        self.delete_selection();
+                        let clean: Vec<char> =
+                            text.chars().filter(|c| *c != '\n' && *c != '\r').collect();
+                        for (idx, ch) in clean.into_iter().enumerate() {
+                            self.chars.insert(self.cursor + idx, ch);
+                        }
+                        self.cursor += text.chars().filter(|c| *c != '\n' && *c != '\r').count();
+                        self.selection_anchor = None;
+                        return true;
+                    }
+                    return false;
+                }
+                KeyCode::Left => {
+                    if is_shift {
+                        if self.selection_anchor.is_none() {
+                            self.selection_anchor = Some(self.cursor);
+                        }
+                    } else {
+                        self.selection_anchor = None;
+                    }
+                    while self.cursor > 0 && self.chars[self.cursor - 1].is_whitespace() {
+                        self.cursor -= 1;
+                    }
+                    while self.cursor > 0 && !self.chars[self.cursor - 1].is_whitespace() {
+                        self.cursor -= 1;
+                    }
+                    return true;
+                }
+                KeyCode::Right => {
+                    if is_shift {
+                        if self.selection_anchor.is_none() {
+                            self.selection_anchor = Some(self.cursor);
+                        }
+                    } else {
+                        self.selection_anchor = None;
+                    }
+                    while self.cursor < self.chars.len() && !self.chars[self.cursor].is_whitespace()
+                    {
+                        self.cursor += 1;
+                    }
+                    while self.cursor < self.chars.len() && self.chars[self.cursor].is_whitespace()
+                    {
+                        self.cursor += 1;
+                    }
+                    return true;
+                }
+                _ => {}
+            }
+        }
+
+        match code {
+            KeyCode::Left | KeyCode::Right | KeyCode::Home | KeyCode::End => {
+                if is_shift {
+                    if self.selection_anchor.is_none() {
+                        self.selection_anchor = Some(self.cursor);
+                    }
+                } else {
+                    self.selection_anchor = None;
+                }
+            }
+            _ => {}
+        }
+
         match code {
             KeyCode::Char(c) => {
+                self.delete_selection();
                 self.chars.insert(self.cursor, c);
                 self.cursor += 1;
                 true
             }
             KeyCode::Backspace => {
-                if self.cursor > 0 {
+                if self.delete_selection() {
+                    true
+                } else if self.cursor > 0 {
                     self.cursor -= 1;
                     self.chars.remove(self.cursor);
                     true
@@ -56,7 +179,9 @@ impl TextInput {
                 }
             }
             KeyCode::Delete => {
-                if self.cursor < self.chars.len() {
+                if self.delete_selection() {
+                    true
+                } else if self.cursor < self.chars.len() {
                     self.chars.remove(self.cursor);
                     true
                 } else {
@@ -90,6 +215,10 @@ impl TextInput {
             _ => false,
         }
     }
+
+    pub fn handle_key(&mut self, code: KeyCode) -> bool {
+        self.handle_key_with_modifiers(code, KeyModifiers::NONE)
+    }
 }
 
 /// Interactive Unicode multi-line text input state.
@@ -99,6 +228,7 @@ pub struct MultiLineInput {
     pub cursor_row: usize,
     pub cursor_col: usize,
     pub scroll_row: usize,
+    pub selection_anchor: Option<(usize, usize)>,
 }
 
 impl Default for MultiLineInput {
@@ -108,6 +238,7 @@ impl Default for MultiLineInput {
             cursor_row: 0,
             cursor_col: 0,
             scroll_row: 0,
+            selection_anchor: None,
         }
     }
 }
@@ -129,6 +260,7 @@ impl MultiLineInput {
             cursor_row: 0,
             cursor_col: 0,
             scroll_row: 0,
+            selection_anchor: None,
         }
     }
 
@@ -182,9 +314,305 @@ impl MultiLineInput {
         }
     }
 
-    pub fn handle_key(&mut self, code: KeyCode) -> bool {
+    pub fn selection_range(&self) -> Option<((usize, usize), (usize, usize))> {
+        let (ar, ac) = self.selection_anchor?;
+        let (cr, cc) = (self.cursor_row, self.cursor_col);
+        if (ar, ac) == (cr, cc) {
+            return None;
+        }
+        if (ar, ac) < (cr, cc) {
+            Some(((ar, ac), (cr, cc)))
+        } else {
+            Some(((cr, cc), (ar, ac)))
+        }
+    }
+
+    pub fn is_pos_selected(&self, row: usize, col: usize) -> bool {
+        if let Some((start, end)) = self.selection_range() {
+            let pos = (row, col);
+            pos >= start && pos < end
+        } else {
+            false
+        }
+    }
+
+    pub fn get_selected_text(&self) -> Option<String> {
+        let (start, end) = self.selection_range()?;
+        let (start_r, start_c) = start;
+        let (end_r, end_c) = end;
+
+        if start_r == end_r {
+            if start_r < self.lines.len() {
+                let line = &self.lines[start_r];
+                let s = start_c.min(line.len());
+                let e = end_c.min(line.len());
+                return Some(line[s..e].iter().collect());
+            }
+            return None;
+        }
+
+        let mut result = Vec::new();
+        for r in start_r..=end_r {
+            if r >= self.lines.len() {
+                break;
+            }
+            let line = &self.lines[r];
+            if r == start_r {
+                let s = start_c.min(line.len());
+                result.push(line[s..].iter().collect::<String>());
+            } else if r == end_r {
+                let e = end_c.min(line.len());
+                result.push(line[..e].iter().collect::<String>());
+            } else {
+                result.push(line.iter().collect::<String>());
+            }
+        }
+        Some(result.join("\n"))
+    }
+
+    pub fn delete_selection(&mut self) -> bool {
+        let (start, end) = match self.selection_range() {
+            Some(range) => range,
+            None => {
+                self.selection_anchor = None;
+                return false;
+            }
+        };
+        let (start_r, start_c) = start;
+        let (end_r, end_c) = end;
+
+        if start_r == end_r {
+            if start_r < self.lines.len() {
+                let s = start_c.min(self.lines[start_r].len());
+                let e = end_c.min(self.lines[start_r].len());
+                self.lines[start_r].drain(s..e);
+            }
+        } else {
+            let mut prefix: Vec<char> = if start_r < self.lines.len() {
+                let s = start_c.min(self.lines[start_r].len());
+                self.lines[start_r][..s].to_vec()
+            } else {
+                Vec::new()
+            };
+            let suffix: Vec<char> = if end_r < self.lines.len() {
+                let e = end_c.min(self.lines[end_r].len());
+                self.lines[end_r][e..].to_vec()
+            } else {
+                Vec::new()
+            };
+            prefix.extend(suffix);
+
+            let drain_end = (end_r + 1).min(self.lines.len());
+            if start_r < drain_end {
+                self.lines.drain(start_r..drain_end);
+            }
+            self.lines.insert(start_r, prefix);
+        }
+
+        if self.lines.is_empty() {
+            self.lines.push(Vec::new());
+        }
+
+        self.cursor_row = start_r.min(self.lines.len().saturating_sub(1));
+        self.cursor_col = start_c.min(self.lines[self.cursor_row].len());
+        self.selection_anchor = None;
+        true
+    }
+
+    pub fn paste_text(&mut self, text: &str) {
+        self.delete_selection();
+        let paste_lines: Vec<&str> = text.split('\n').collect();
+        if paste_lines.is_empty() {
+            return;
+        }
+
+        if paste_lines.len() == 1 {
+            let clean: Vec<char> = paste_lines[0].chars().filter(|c| *c != '\r').collect();
+            if self.cursor_row >= self.lines.len() {
+                self.lines.push(Vec::new());
+                self.cursor_row = self.lines.len() - 1;
+            }
+            let len = self.lines[self.cursor_row].len();
+            if self.cursor_col > len {
+                self.cursor_col = len;
+            }
+            for (idx, ch) in clean.into_iter().enumerate() {
+                self.lines[self.cursor_row].insert(self.cursor_col + idx, ch);
+            }
+            self.cursor_col += text.chars().filter(|c| *c != '\r' && *c != '\n').count();
+        } else {
+            if self.cursor_row >= self.lines.len() {
+                self.lines.push(Vec::new());
+                self.cursor_row = self.lines.len() - 1;
+            }
+            let line_len = self.lines[self.cursor_row].len();
+            if self.cursor_col > line_len {
+                self.cursor_col = line_len;
+            }
+            let remainder: Vec<char> = self.lines[self.cursor_row]
+                .drain(self.cursor_col..)
+                .collect();
+
+            let first_clean: Vec<char> = paste_lines[0].chars().filter(|c| *c != '\r').collect();
+            self.lines[self.cursor_row].extend(first_clean);
+
+            for (i, p_line) in paste_lines[1..paste_lines.len() - 1].iter().enumerate() {
+                let clean: Vec<char> = p_line.chars().filter(|c| *c != '\r').collect();
+                self.lines.insert(self.cursor_row + 1 + i, clean);
+            }
+
+            let last_clean: Vec<char> = paste_lines
+                .last()
+                .unwrap()
+                .chars()
+                .filter(|c| *c != '\r')
+                .collect();
+            let new_col = last_clean.len();
+            let mut final_line = last_clean;
+            final_line.extend(remainder);
+            self.lines
+                .insert(self.cursor_row + paste_lines.len() - 1, final_line);
+
+            self.cursor_row += paste_lines.len() - 1;
+            self.cursor_col = new_col;
+        }
+        self.selection_anchor = None;
+    }
+
+    pub fn move_word_left(&mut self) {
+        if self.cursor_row >= self.lines.len() {
+            return;
+        }
+        let line = &self.lines[self.cursor_row];
+        let mut col = self.cursor_col.min(line.len());
+        while col > 0 && line[col - 1].is_whitespace() {
+            col -= 1;
+        }
+        while col > 0 && !line[col - 1].is_whitespace() {
+            col -= 1;
+        }
+        self.cursor_col = col;
+    }
+
+    pub fn move_word_right(&mut self) {
+        if self.cursor_row >= self.lines.len() {
+            return;
+        }
+        let line = &self.lines[self.cursor_row];
+        let mut col = self.cursor_col;
+        while col < line.len() && !line[col].is_whitespace() {
+            col += 1;
+        }
+        while col < line.len() && line[col].is_whitespace() {
+            col += 1;
+        }
+        self.cursor_col = col;
+    }
+
+    pub fn handle_key_with_modifiers(&mut self, code: KeyCode, modifiers: KeyModifiers) -> bool {
+        let is_ctrl = modifiers.contains(KeyModifiers::CONTROL);
+        let is_shift = modifiers.contains(KeyModifiers::SHIFT);
+
+        if is_ctrl {
+            match code {
+                KeyCode::Char('a') | KeyCode::Char('A') => {
+                    self.selection_anchor = Some((0, 0));
+                    self.cursor_row = self.lines.len().saturating_sub(1);
+                    self.cursor_col = self.lines.get(self.cursor_row).map_or(0, |l| l.len());
+                    return true;
+                }
+                KeyCode::Char('c') | KeyCode::Char('C') => {
+                    if let Some(snippet) = self.get_selected_text() {
+                        bashmenu_tui::clipboard::set_clipboard_text(&snippet);
+                    }
+                    return true;
+                }
+                KeyCode::Char('x') | KeyCode::Char('X') => {
+                    if let Some(snippet) = self.get_selected_text() {
+                        bashmenu_tui::clipboard::set_clipboard_text(&snippet);
+                        self.delete_selection();
+                    }
+                    return true;
+                }
+                KeyCode::Char('v') | KeyCode::Char('V') => {
+                    if let Some(text) = bashmenu_tui::clipboard::get_clipboard_text() {
+                        self.paste_text(&text);
+                    }
+                    return true;
+                }
+                KeyCode::Left => {
+                    if is_shift {
+                        if self.selection_anchor.is_none() {
+                            self.selection_anchor = Some((self.cursor_row, self.cursor_col));
+                        }
+                    } else {
+                        self.selection_anchor = None;
+                    }
+                    self.move_word_left();
+                    return true;
+                }
+                KeyCode::Right => {
+                    if is_shift {
+                        if self.selection_anchor.is_none() {
+                            self.selection_anchor = Some((self.cursor_row, self.cursor_col));
+                        }
+                    } else {
+                        self.selection_anchor = None;
+                    }
+                    self.move_word_right();
+                    return true;
+                }
+                KeyCode::Home => {
+                    if is_shift {
+                        if self.selection_anchor.is_none() {
+                            self.selection_anchor = Some((self.cursor_row, self.cursor_col));
+                        }
+                    } else {
+                        self.selection_anchor = None;
+                    }
+                    self.cursor_row = 0;
+                    self.cursor_col = 0;
+                    return true;
+                }
+                KeyCode::End => {
+                    if is_shift {
+                        if self.selection_anchor.is_none() {
+                            self.selection_anchor = Some((self.cursor_row, self.cursor_col));
+                        }
+                    } else {
+                        self.selection_anchor = None;
+                    }
+                    self.cursor_row = self.lines.len().saturating_sub(1);
+                    self.cursor_col = self.lines.get(self.cursor_row).map_or(0, |l| l.len());
+                    return true;
+                }
+                _ => {}
+            }
+        }
+
+        match code {
+            KeyCode::Left
+            | KeyCode::Right
+            | KeyCode::Up
+            | KeyCode::Down
+            | KeyCode::Home
+            | KeyCode::End
+            | KeyCode::PageUp
+            | KeyCode::PageDown => {
+                if is_shift {
+                    if self.selection_anchor.is_none() {
+                        self.selection_anchor = Some((self.cursor_row, self.cursor_col));
+                    }
+                } else {
+                    self.selection_anchor = None;
+                }
+            }
+            _ => {}
+        }
+
         match code {
             KeyCode::Char(c) => {
+                self.delete_selection();
                 if self.cursor_row >= self.lines.len() {
                     self.lines.push(Vec::new());
                     self.cursor_row = self.lines.len() - 1;
@@ -198,6 +626,7 @@ impl MultiLineInput {
                 true
             }
             KeyCode::Enter => {
+                self.delete_selection();
                 if self.cursor_row >= self.lines.len() {
                     self.lines.push(Vec::new());
                     self.cursor_row = self.lines.len() - 1;
@@ -215,7 +644,9 @@ impl MultiLineInput {
                 true
             }
             KeyCode::Backspace => {
-                if self.cursor_col > 0 {
+                if self.delete_selection() {
+                    true
+                } else if self.cursor_col > 0 {
                     self.cursor_col -= 1;
                     if self.cursor_row < self.lines.len()
                         && self.cursor_col < self.lines[self.cursor_row].len()
@@ -234,7 +665,9 @@ impl MultiLineInput {
                 }
             }
             KeyCode::Delete => {
-                if self.cursor_row < self.lines.len()
+                if self.delete_selection() {
+                    true
+                } else if self.cursor_row < self.lines.len()
                     && self.cursor_col < self.lines[self.cursor_row].len()
                 {
                     self.lines[self.cursor_row].remove(self.cursor_col);
@@ -273,6 +706,8 @@ impl MultiLineInput {
                     false
                 }
             }
+            KeyCode::Up => self.move_up(),
+            KeyCode::Down => self.move_down(),
             KeyCode::Home => {
                 self.cursor_col = 0;
                 true
@@ -283,8 +718,28 @@ impl MultiLineInput {
                 }
                 true
             }
+            KeyCode::PageUp => {
+                self.cursor_row = self.cursor_row.saturating_sub(5);
+                let len = self.lines.get(self.cursor_row).map_or(0, |l| l.len());
+                if self.cursor_col > len {
+                    self.cursor_col = len;
+                }
+                true
+            }
+            KeyCode::PageDown => {
+                self.cursor_row = (self.cursor_row + 5).min(self.lines.len().saturating_sub(1));
+                let len = self.lines.get(self.cursor_row).map_or(0, |l| l.len());
+                if self.cursor_col > len {
+                    self.cursor_col = len;
+                }
+                true
+            }
             _ => false,
         }
+    }
+
+    pub fn handle_key(&mut self, code: KeyCode) -> bool {
+        self.handle_key_with_modifiers(code, KeyModifiers::NONE)
     }
 }
 
@@ -749,6 +1204,56 @@ impl ItemEditModal {
 
     /// Handles keyboard events
     pub fn handle_key(&mut self, code: KeyCode, modifiers: KeyModifiers) -> ItemEditResult {
+        let ctrl = self.current_control();
+
+        // Check if focused text input or multiline input intercepts Ctrl+A / Ctrl+C / Ctrl+X / Ctrl+V
+        if modifiers.contains(KeyModifiers::CONTROL) {
+            match code {
+                KeyCode::Char('a')
+                | KeyCode::Char('A')
+                | KeyCode::Char('c')
+                | KeyCode::Char('C')
+                | KeyCode::Char('x')
+                | KeyCode::Char('X')
+                | KeyCode::Char('v')
+                | KeyCode::Char('V') => {
+                    if ctrl == FocusControl::RadioOptionsInput {
+                        if self
+                            .radio_options_input
+                            .handle_key_with_modifiers(code, modifiers)
+                        {
+                            self.radio_options_input.ensure_cursor_visible(5);
+                            return ItemEditResult::Continue;
+                        }
+                    } else {
+                        let input_ref = match ctrl {
+                            FocusControl::CharInput => Some(&mut self.char_input),
+                            FocusControl::LengthInput => Some(&mut self.length_input),
+                            FocusControl::TitleInput => Some(&mut self.title_input),
+                            FocusControl::IconInput => Some(&mut self.icon_input),
+                            FocusControl::ActionInput => Some(&mut self.action_input),
+                            FocusControl::PromptInput => Some(&mut self.prompt_input),
+                            FocusControl::TemplateInput => Some(&mut self.template_input),
+                            FocusControl::TargetInput => Some(&mut self.target_input),
+                            FocusControl::BlockIdInput => Some(&mut self.block_id_input),
+                            FocusControl::StartDirInput => Some(&mut self.start_dir_input),
+                            FocusControl::TabstopInput => Some(&mut self.tabstop_input),
+                            FocusControl::WindowPercentInput => {
+                                Some(&mut self.window_percent_input)
+                            }
+                            _ => None,
+                        };
+                        if let Some(inp) = input_ref {
+                            if inp.handle_key_with_modifiers(code, modifiers) {
+                                return ItemEditResult::Continue;
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
         // Global modal hotkeys
         if modifiers.contains(KeyModifiers::CONTROL) {
             match code {
@@ -772,8 +1277,6 @@ impl ItemEditModal {
             KeyCode::Esc => return ItemEditResult::Cancel,
             _ => {}
         }
-
-        let ctrl = self.current_control();
 
         // Check if currently focused on a button or selector
         match ctrl {
@@ -872,11 +1375,34 @@ impl ItemEditModal {
                 }
             }
             FocusControl::RadioOptionsInput if code == KeyCode::Enter => {
-                self.radio_options_input.handle_key(KeyCode::Enter);
+                self.radio_options_input
+                    .handle_key_with_modifiers(KeyCode::Enter, modifiers);
                 self.radio_options_input.ensure_cursor_visible(5);
                 return ItemEditResult::Continue;
             }
             _ => {}
+        }
+
+        // Shift+directional navigation inside RadioOptionsInput
+        if ctrl == FocusControl::RadioOptionsInput
+            && modifiers.contains(KeyModifiers::SHIFT)
+            && matches!(
+                code,
+                KeyCode::Up
+                    | KeyCode::Down
+                    | KeyCode::Left
+                    | KeyCode::Right
+                    | KeyCode::Home
+                    | KeyCode::End
+                    | KeyCode::PageUp
+                    | KeyCode::PageDown
+            )
+            && self
+                .radio_options_input
+                .handle_key_with_modifiers(code, modifiers)
+        {
+            self.radio_options_input.ensure_cursor_visible(5);
+            return ItemEditResult::Continue;
         }
 
         // Field navigation
@@ -894,7 +1420,7 @@ impl ItemEditModal {
                 }
                 return ItemEditResult::Continue;
             }
-            KeyCode::Down => {
+            KeyCode::Down if !modifiers.contains(KeyModifiers::SHIFT) => {
                 if ctrl == FocusControl::RadioOptionsInput && self.radio_options_input.move_down() {
                     self.radio_options_input.ensure_cursor_visible(5);
                     return ItemEditResult::Continue;
@@ -902,7 +1428,7 @@ impl ItemEditModal {
                 self.active_control_idx = (self.active_control_idx + 1) % controls.len();
                 return ItemEditResult::Continue;
             }
-            KeyCode::Up => {
+            KeyCode::Up if !modifiers.contains(KeyModifiers::SHIFT) => {
                 if ctrl == FocusControl::RadioOptionsInput && self.radio_options_input.move_up() {
                     self.radio_options_input.ensure_cursor_visible(5);
                     return ItemEditResult::Continue;
@@ -918,7 +1444,11 @@ impl ItemEditModal {
         }
 
         // Multi-line radio options editing
-        if ctrl == FocusControl::RadioOptionsInput && self.radio_options_input.handle_key(code) {
+        if ctrl == FocusControl::RadioOptionsInput
+            && self
+                .radio_options_input
+                .handle_key_with_modifiers(code, modifiers)
+        {
             self.radio_options_input.ensure_cursor_visible(5);
             return ItemEditResult::Continue;
         }
@@ -941,7 +1471,7 @@ impl ItemEditModal {
         };
 
         if let Some(inp) = input_ref {
-            if inp.handle_key(code) {
+            if inp.handle_key_with_modifiers(code, modifiers) {
                 return ItemEditResult::Continue;
             }
         }
@@ -1335,12 +1865,14 @@ impl ItemEditModal {
                 ctrl: FocusControl::CharInput,
                 text: self.char_input.as_string(),
                 cursor: self.char_input.cursor,
+                selection: self.char_input.selection_range(),
             });
             form_lines.push(FormRow::Label("Length Directive (length):"));
             form_lines.push(FormRow::Input {
                 ctrl: FocusControl::LengthInput,
                 text: self.length_input.as_string(),
                 cursor: self.length_input.cursor,
+                selection: self.length_input.selection_range(),
             });
             form_lines.push(FormRow::Label("Preview:"));
             // Live divider preview
@@ -1370,6 +1902,7 @@ impl ItemEditModal {
                 ctrl: FocusControl::TitleInput,
                 text: self.title_input.as_string(),
                 cursor: self.title_input.cursor,
+                selection: self.title_input.selection_range(),
             });
 
             form_lines.push(FormRow::Label("Icon / Glyph ({nf:<char>:<hex>:<emoji>}):"));
@@ -1377,6 +1910,7 @@ impl ItemEditModal {
                 ctrl: FocusControl::IconInput,
                 text: self.icon_input.as_string(),
                 cursor: self.icon_input.cursor,
+                selection: self.icon_input.selection_range(),
             });
 
             form_lines.push(FormRow::Label(self.get_action_label_text()));
@@ -1384,6 +1918,7 @@ impl ItemEditModal {
                 input_ctrl: FocusControl::ActionInput,
                 text: self.action_input.as_string(),
                 cursor: self.action_input.cursor,
+                selection: self.action_input.selection_range(),
                 btn_ctrl: FocusControl::ActionBrowseBtn,
             });
 
@@ -1392,6 +1927,7 @@ impl ItemEditModal {
                 ctrl: FocusControl::PromptInput,
                 text: self.prompt_input.as_string(),
                 cursor: self.prompt_input.cursor,
+                selection: self.prompt_input.selection_range(),
             });
 
             if self.is_radio() {
@@ -1401,6 +1937,7 @@ impl ItemEditModal {
                 let v_rows = 5;
                 let scroll_r = self.radio_options_input.scroll_row;
                 let total_lines = self.radio_options_input.lines.len();
+                let sel_range = self.radio_options_input.selection_range();
                 for i in 0..v_rows {
                     let actual_line_idx = scroll_r + i;
                     let text = if actual_line_idx < total_lines {
@@ -1416,6 +1953,22 @@ impl ItemEditModal {
                     } else {
                         None
                     };
+                    let line_sel = if let Some(((start_r, start_c), (end_r, end_c))) = sel_range {
+                        let line_len = text.chars().count();
+                        if actual_line_idx < start_r || actual_line_idx > end_r {
+                            None
+                        } else if actual_line_idx == start_r && actual_line_idx == end_r {
+                            Some((start_c, end_c))
+                        } else if actual_line_idx == start_r {
+                            Some((start_c, line_len))
+                        } else if actual_line_idx == end_r {
+                            Some((0, end_c))
+                        } else {
+                            Some((0, line_len))
+                        }
+                    } else {
+                        None
+                    };
                     let has_more_above = i == 0 && scroll_r > 0;
                     let has_more_below = i == v_rows - 1 && scroll_r + v_rows < total_lines;
 
@@ -1423,6 +1976,7 @@ impl ItemEditModal {
                         ctrl: FocusControl::RadioOptionsInput,
                         text,
                         cursor,
+                        selection: line_sel,
                         is_focused_line: is_cursor_row,
                         has_more_above,
                         has_more_below,
@@ -1435,6 +1989,7 @@ impl ItemEditModal {
                 input_ctrl: FocusControl::TemplateInput,
                 text: self.template_input.as_string(),
                 cursor: self.template_input.cursor,
+                selection: self.template_input.selection_range(),
                 btn_ctrl: FocusControl::TemplateBrowseBtn,
             });
 
@@ -1443,6 +1998,7 @@ impl ItemEditModal {
                 input_ctrl: FocusControl::TargetInput,
                 text: self.target_input.as_string(),
                 cursor: self.target_input.cursor,
+                selection: self.target_input.selection_range(),
                 btn_ctrl: FocusControl::TargetBrowseBtn,
             });
 
@@ -1451,6 +2007,7 @@ impl ItemEditModal {
                 ctrl: FocusControl::BlockIdInput,
                 text: self.block_id_input.as_string(),
                 cursor: self.block_id_input.cursor,
+                selection: self.block_id_input.selection_range(),
             });
 
             form_lines.push(FormRow::Label(
@@ -1460,6 +2017,7 @@ impl ItemEditModal {
                 input_ctrl: FocusControl::StartDirInput,
                 text: self.start_dir_input.as_string(),
                 cursor: self.start_dir_input.cursor,
+                selection: self.start_dir_input.selection_range(),
                 btn_ctrl: FocusControl::StartDirBrowseBtn,
             });
 
@@ -1468,6 +2026,7 @@ impl ItemEditModal {
                 ctrl: FocusControl::TabstopInput,
                 text: self.tabstop_input.as_string(),
                 cursor: self.tabstop_input.cursor,
+                selection: self.tabstop_input.selection_range(),
             });
 
             form_lines.push(FormRow::Label("Execution Mode:"));
@@ -1482,6 +2041,7 @@ impl ItemEditModal {
                     ctrl: FocusControl::WindowPercentInput,
                     text: self.window_percent_input.as_string(),
                     cursor: self.window_percent_input.cursor,
+                    selection: self.window_percent_input.selection_range(),
                 });
             }
 
@@ -1629,11 +2189,13 @@ enum FormRow {
         ctrl: FocusControl,
         text: String,
         cursor: usize,
+        selection: Option<(usize, usize)>,
     },
     MultiLineInputRow {
         ctrl: FocusControl,
         text: String,
         cursor: Option<usize>,
+        selection: Option<(usize, usize)>,
         is_focused_line: bool,
         has_more_above: bool,
         has_more_below: bool,
@@ -1642,6 +2204,7 @@ enum FormRow {
         input_ctrl: FocusControl,
         text: String,
         cursor: usize,
+        selection: Option<(usize, usize)>,
         btn_ctrl: FocusControl,
     },
     ExecMode {
@@ -1694,7 +2257,12 @@ impl FormRow {
                     styles.text.add_modifier(Modifier::BOLD),
                 );
             }
-            FormRow::Input { ctrl, text, cursor } => {
+            FormRow::Input {
+                ctrl,
+                text,
+                cursor,
+                selection,
+            } => {
                 let is_active = *ctrl == active_ctrl;
                 let box_style = if is_active {
                     styles.highlight.add_modifier(Modifier::BOLD)
@@ -1705,6 +2273,23 @@ impl FormRow {
                 buf.set_string(inner.x + 2, y, &display, box_style);
 
                 if is_active {
+                    if let Some((start, end)) = selection {
+                        let text_len = text.chars().count();
+                        let s = (*start).min(text_len);
+                        let e = (*end).min(text_len);
+                        for idx in s..e {
+                            let cur_x = inner.x + 3 + idx as u16;
+                            if cur_x < inner.x + inner.width - 2 {
+                                buf[(cur_x, y)].set_style(
+                                    Style::default()
+                                        .fg(Color::Black)
+                                        .bg(Color::White)
+                                        .add_modifier(Modifier::REVERSED),
+                                );
+                            }
+                        }
+                    }
+
                     let cur_x = inner.x + 3 + *cursor as u16;
                     if cur_x < inner.x + inner.width - 2 {
                         buf[(cur_x, y)].set_style(
@@ -1720,6 +2305,7 @@ impl FormRow {
                 ctrl,
                 text,
                 cursor,
+                selection,
                 is_focused_line,
                 has_more_above,
                 has_more_below,
@@ -1758,6 +2344,24 @@ impl FormRow {
                 let display_str = format!(" {} ", line_content);
                 buf.set_string(inner.x + 2, y, &display_str, box_style);
 
+                if is_ctrl_active {
+                    if let Some((start, end)) = selection {
+                        let s = (*start).min(content_w);
+                        let e = (*end).min(content_w);
+                        for idx in s..e {
+                            let cur_x = inner.x + 3 + idx as u16;
+                            if cur_x < inner.x + 2 + content_w as u16 + 1 {
+                                buf[(cur_x, y)].set_style(
+                                    Style::default()
+                                        .fg(Color::Black)
+                                        .bg(Color::White)
+                                        .add_modifier(Modifier::REVERSED),
+                                );
+                            }
+                        }
+                    }
+                }
+
                 if line_active {
                     if let Some(col) = cursor {
                         let cur_x = inner.x + 3 + *col as u16;
@@ -1776,6 +2380,7 @@ impl FormRow {
                 input_ctrl,
                 text,
                 cursor,
+                selection,
                 btn_ctrl,
             } => {
                 let is_inp_active = *input_ctrl == active_ctrl;
@@ -1793,6 +2398,23 @@ impl FormRow {
                 buf.set_string(inner.x + 2, y, &display, inp_style);
 
                 if is_inp_active {
+                    if let Some((start, end)) = selection {
+                        let text_len = text.chars().count();
+                        let s = (*start).min(text_len);
+                        let e = (*end).min(text_len);
+                        for idx in s..e {
+                            let cur_x = inner.x + 3 + idx as u16;
+                            if cur_x < inner.x + 2 + inp_w as u16 + 2 {
+                                buf[(cur_x, y)].set_style(
+                                    Style::default()
+                                        .fg(Color::Black)
+                                        .bg(Color::White)
+                                        .add_modifier(Modifier::REVERSED),
+                                );
+                            }
+                        }
+                    }
+
                     let cur_x = inner.x + 3 + *cursor as u16;
                     if cur_x < inner.x + 2 + inp_w as u16 + 2 {
                         buf[(cur_x, y)].set_style(

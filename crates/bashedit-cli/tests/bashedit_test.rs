@@ -366,3 +366,32 @@ fn test_save_as_file_picker_workflow() {
     let _ = fs::remove_file(&chosen_path);
     let _ = fs::remove_dir_all(&tmp_dir);
 }
+
+#[test]
+fn test_editor_buffer_shift_directional_selection() {
+    let mut buf = EditorBuffer::new_empty();
+    buf.lines = vec!["Line 1: abc".to_string(), "Line 2: def".to_string()];
+    buf.cursor_row = 0;
+    buf.cursor_col = 0;
+
+    // Simulate Shift+Right 4 times
+    buf.mark_active = true;
+    buf.mark_row = 0;
+    buf.mark_col = 0;
+    for _ in 0..4 {
+        buf.move_right();
+    }
+    assert_eq!(buf.cursor_col, 4);
+    assert_eq!(buf.get_selection_range(), Some(((0, 0), (0, 4))));
+
+    // Simulate Shift+Down
+    buf.move_down();
+    assert_eq!(buf.cursor_row, 1);
+    assert_eq!(buf.get_selection_range(), Some(((0, 0), (1, 4))));
+
+    // Delete selection
+    assert!(buf.delete_selection());
+    assert_eq!(buf.lines.len(), 1);
+    assert_eq!(buf.lines[0], " 2: def");
+    assert!(!buf.mark_active);
+}

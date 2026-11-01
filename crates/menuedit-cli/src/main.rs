@@ -647,7 +647,9 @@ fn main() -> Result<()> {
                             },
                             ChildModal::GlyphSearch(m) => match ev {
                                 Event::Key(k) => {
-                                    if let Some(res) = m.handle_key(k.code) {
+                                    if let Some(res) =
+                                        m.handle_key_with_modifiers(k.code, k.modifiers)
+                                    {
                                         if let Some(term) = res {
                                             let output_text = run_glyphs_search(&term);
                                             *child_opt =
@@ -834,7 +836,7 @@ fn main() -> Result<()> {
                 },
                 ActiveModal::GlyphSearch(modal) => match ev {
                     Event::Key(k) => {
-                        if let Some(res) = modal.handle_key(k.code) {
+                        if let Some(res) = modal.handle_key_with_modifiers(k.code, k.modifiers) {
                             if let Some(term) = res {
                                 let output_text = run_glyphs_search(&term);
                                 active_modal = ActiveModal::Help(HelpModal::new(

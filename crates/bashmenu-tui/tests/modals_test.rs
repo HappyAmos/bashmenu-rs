@@ -1184,3 +1184,115 @@ fn test_stream_output_modal_lifecycle_and_rendering() {
     let act = modal.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
     assert_eq!(act, StreamOutputAction::Close);
 }
+
+#[test]
+fn test_input_modal_selection_and_clipboard() {
+    bashmenu_tui::clipboard::set_test_mode(true);
+    use bashmenu_tui::InputModal;
+    use crossterm::event::{KeyCode, KeyModifiers};
+
+    let mut modal = InputModal::new("Test Input", "Enter value:", "hello world");
+
+    // Initially cursor at end (11)
+    assert_eq!(modal.cursor_pos, 11);
+    assert_eq!(modal.selection_range(), None);
+
+    // Shift+Left 5 times selects "world"
+    for _ in 0..5 {
+        modal.handle_key_with_modifiers(KeyCode::Left, KeyModifiers::SHIFT);
+    }
+    assert_eq!(modal.cursor_pos, 6);
+    assert_eq!(modal.selection_range(), Some((6, 11)));
+
+    // Ctrl+C copies "world"
+    modal.handle_key_with_modifiers(KeyCode::Char('c'), KeyModifiers::CONTROL);
+    assert_eq!(
+        bashmenu_tui::clipboard::get_clipboard_text().as_deref(),
+        Some("world")
+    );
+
+    // Typing 'earth' overwrites selection
+    for ch in "earth".chars() {
+        modal.handle_key_with_modifiers(KeyCode::Char(ch), KeyModifiers::NONE);
+    }
+    assert_eq!(modal.value, "hello earth");
+    assert_eq!(modal.selection_range(), None);
+
+    // Ctrl+A selects all
+    modal.handle_key_with_modifiers(KeyCode::Char('a'), KeyModifiers::CONTROL);
+    assert_eq!(modal.selection_range(), Some((0, 11)));
+
+    // Ctrl+X cuts all
+    modal.handle_key_with_modifiers(KeyCode::Char('x'), KeyModifiers::CONTROL);
+    assert_eq!(modal.value, "");
+    assert_eq!(modal.cursor_pos, 0);
+    assert_eq!(
+        bashmenu_tui::clipboard::get_clipboard_text().as_deref(),
+        Some("hello earth")
+    );
+
+    // Ctrl+V pastes "hello earth"
+    modal.handle_key_with_modifiers(KeyCode::Char('v'), KeyModifiers::CONTROL);
+    assert_eq!(modal.value, "hello earth");
+    assert_eq!(modal.cursor_pos, 11);
+
+    // Home clears selection and jumps to 0
+    modal.handle_key_with_modifiers(KeyCode::Home, KeyModifiers::NONE);
+    assert_eq!(modal.cursor_pos, 0);
+
+    // Shift+End selects to end
+    modal.handle_key_with_modifiers(KeyCode::End, KeyModifiers::SHIFT);
+    assert_eq!(modal.selection_range(), Some((0, 11)));
+
+    // Backspace removes selection
+    modal.handle_key_with_modifiers(KeyCode::Backspace, KeyModifiers::NONE);
+    assert_eq!(modal.value, "");
+    assert_eq!(modal.cursor_pos, 0);
+}
+
+#[test]
+fn test_note_editor_selection_and_clipboard() {
+    bashmenu_tui::clipboard::set_test_mode(true);
+    use bashmenu_tui::NoteEditorModal;
+    use crossterm::event::{KeyCode, KeyModifiers};
+
+    let text = "Line 1: Alpha\nLine 2: Beta\nLine 3: Gamma";
+    let mut editor = NoteEditorModal::new("Editor Test", "/tmp/test.md", text);
+
+    // Move to 0,0
+    editor.cursor_row = 0;
+    editor.cursor_col = 0;
+
+    // Shift+Down selects line 0 and first character of line 1
+    editor.handle_key(KeyCode::Down, KeyModifiers::SHIFT);
+    assert_eq!(editor.cursor_row, 1);
+    assert_eq!(editor.cursor_col, 0);
+    assert_eq!(editor.selection_range(), Some(((0, 0), (1, 0))));
+
+    // Ctrl+C copies selected text
+    editor.handle_key(KeyCode::Char('c'), KeyModifiers::CONTROL);
+    assert_eq!(
+        bashmenu_tui::clipboard::get_clipboard_text().as_deref(),
+        Some("Line 1: Alpha\n")
+    );
+
+    // Ctrl+A selects all
+    editor.handle_key(KeyCode::Char('a'), KeyModifiers::CONTROL);
+    assert_eq!(
+        editor.selection_range(),
+        Some(((0, 0), (2, "Line 3: Gamma".len())))
+    );
+
+    // Ctrl+X cuts all
+    editor.handle_key(KeyCode::Char('x'), KeyModifiers::CONTROL);
+    assert_eq!(editor.lines, vec![""]);
+    assert_eq!(editor.cursor_row, 0);
+    assert_eq!(editor.cursor_col, 0);
+
+    // Paste back via Ctrl+V
+    editor.handle_key(KeyCode::Char('v'), KeyModifiers::CONTROL);
+    assert_eq!(
+        editor.lines,
+        vec!["Line 1: Alpha", "Line 2: Beta", "Line 3: Gamma"]
+    );
+}

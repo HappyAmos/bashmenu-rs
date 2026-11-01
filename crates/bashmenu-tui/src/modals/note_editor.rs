@@ -41,6 +41,7 @@ pub struct NoteEditorModal {
     pub is_modified: bool,
     pub last_inner_w: usize,
     pub last_inner_rect: Rect,
+    pub selection_anchor: Option<(usize, usize)>,
 }
 
 impl NoteEditorModal {
@@ -65,7 +66,137 @@ impl NoteEditorModal {
             is_modified: false,
             last_inner_w: 76,
             last_inner_rect: Rect::default(),
+            selection_anchor: None,
         }
+    }
+
+    /// Computes ordered `((start_y, start_x), (end_y, end_x))` bounds of active selection
+    pub fn selection_range(&self) -> Option<((usize, usize), (usize, usize))> {
+        self.selection_anchor.and_then(|anchor| {
+            let cur = (self.cursor_row, self.cursor_col);
+            if anchor != cur {
+                if anchor < cur {
+                    Some((anchor, cur))
+                } else {
+                    Some((cur, anchor))
+                }
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Checks if a logical row and column is within active selection
+    pub fn is_pos_selected(&self, row: usize, col: usize) -> bool {
+        if let Some(((sy, sx), (ey, ex))) = self.selection_range() {
+            if row < sy || row > ey {
+                false
+            } else if sy == ey {
+                row == sy && col >= sx && col < ex
+            } else if row == sy {
+                col >= sx
+            } else if row == ey {
+                col < ex
+            } else {
+                true
+            }
+        } else {
+            false
+        }
+    }
+
+    /// Extracts the text currently selected
+    pub fn get_selected_text(&self) -> Option<String> {
+        let ((sy, sx), (ey, ex)) = self.selection_range()?;
+        if sy == ey {
+            let line = self.lines.get(sy)?;
+            let chars: Vec<char> = line.chars().collect();
+            let s_idx = sx.min(chars.len());
+            let e_idx = ex.min(chars.len());
+            Some(chars[s_idx..e_idx].iter().collect())
+        } else {
+            let mut cut = Vec::new();
+            if let Some(first) = self.lines.get(sy) {
+                cut.push(first.chars().skip(sx).collect());
+            }
+            for r in (sy + 1)..ey {
+                if let Some(mid) = self.lines.get(r) {
+                    cut.push(mid.clone());
+                }
+            }
+            if let Some(last) = self.lines.get(ey) {
+                cut.push(last.chars().take(ex).collect());
+            }
+            Some(cut.join("\n"))
+        }
+    }
+
+    /// Deletes the currently selected text
+    pub fn delete_selection(&mut self) -> bool {
+        let Some(((sy, sx), (ey, ex))) = self.selection_range() else {
+            return false;
+        };
+        if sy == ey {
+            if sy < self.lines.len() {
+                let mut chars: Vec<char> = self.lines[sy].chars().collect();
+                let s_idx = sx.min(chars.len());
+                let e_idx = ex.min(chars.len());
+                chars.drain(s_idx..e_idx);
+                self.lines[sy] = chars.into_iter().collect();
+            }
+        } else if sy < self.lines.len() && ey < self.lines.len() {
+            let start_prefix: String = self.lines[sy].chars().take(sx).collect();
+            let end_suffix: String = self.lines[ey].chars().skip(ex).collect();
+            self.lines[sy] = format!("{}{}", start_prefix, end_suffix);
+            self.lines.drain((sy + 1)..=ey);
+        }
+        self.cursor_row = sy;
+        self.cursor_col = sx;
+        self.selection_anchor = None;
+        self.is_modified = true;
+        true
+    }
+
+    /// Pastes text at cursor, replacing selection if active
+    pub fn paste_text(&mut self, text: &str) {
+        self.delete_selection();
+        let paste_lines: Vec<&str> = text.split('\n').collect();
+        if paste_lines.is_empty() {
+            return;
+        }
+        if paste_lines.len() == 1 {
+            let s = paste_lines[0].trim_end_matches('\r');
+            for c in s.chars() {
+                self.insert_char(c);
+            }
+        } else {
+            if self.cursor_row >= self.lines.len() {
+                self.lines.push(String::new());
+            }
+            let current = self.current_line().to_string();
+            let chars: Vec<char> = current.chars().collect();
+            let col = self.cursor_col.min(chars.len());
+            let prefix: String = chars[..col].iter().collect();
+            let suffix: String = chars[col..].iter().collect();
+
+            let first_line = paste_lines[0].trim_end_matches('\r');
+            self.lines[self.cursor_row] = format!("{}{}", prefix, first_line);
+
+            let mut insert_row = self.cursor_row + 1;
+            for line in &paste_lines[1..paste_lines.len() - 1] {
+                self.lines
+                    .insert(insert_row, line.trim_end_matches('\r').to_string());
+                insert_row += 1;
+            }
+
+            let last_line = paste_lines.last().unwrap().trim_end_matches('\r');
+            self.lines
+                .insert(insert_row, format!("{}{}", last_line, suffix));
+            self.cursor_row = insert_row;
+            self.cursor_col = last_line.chars().count();
+        }
+        self.selection_anchor = None;
+        self.is_modified = true;
     }
 
     /// Sets initial cursor position (row, col)
@@ -210,37 +341,144 @@ impl NoteEditorModal {
 
     /// Handles keyboard input
     pub fn handle_key(&mut self, code: KeyCode, modifiers: KeyModifiers) -> NoteEditorAction {
-        // Ctrl+S: Save note
-        if (code == KeyCode::Char('s') || code == KeyCode::Char('S'))
-            && modifiers.contains(KeyModifiers::CONTROL)
-        {
-            return NoteEditorAction::Save(self.lines.join("\n"));
+        let is_shift = modifiers.contains(KeyModifiers::SHIFT);
+        let is_ctrl = modifiers.contains(KeyModifiers::CONTROL);
+
+        // Ctrl shortcuts
+        if is_ctrl {
+            match code {
+                KeyCode::Char('s') | KeyCode::Char('S') => {
+                    return NoteEditorAction::Save(self.lines.join("\n"));
+                }
+                KeyCode::Char('a') | KeyCode::Char('A') => {
+                    self.selection_anchor = Some((0, 0));
+                    self.cursor_row = self.lines.len().saturating_sub(1);
+                    self.cursor_col = self.lines[self.cursor_row].chars().count();
+                    return NoteEditorAction::None;
+                }
+                KeyCode::Char('c') | KeyCode::Char('C') => {
+                    if let Some(text) = self.get_selected_text() {
+                        crate::clipboard::set_clipboard_text(&text);
+                    } else if self.cursor_row < self.lines.len() {
+                        crate::clipboard::set_clipboard_text(&self.lines[self.cursor_row]);
+                    }
+                    return NoteEditorAction::None;
+                }
+                KeyCode::Char('x') | KeyCode::Char('X') => {
+                    if let Some(text) = self.get_selected_text() {
+                        crate::clipboard::set_clipboard_text(&text);
+                        self.delete_selection();
+                    } else if self.cursor_row < self.lines.len() {
+                        crate::clipboard::set_clipboard_text(&self.lines[self.cursor_row]);
+                        if self.lines.len() > 1 {
+                            self.lines.remove(self.cursor_row);
+                            if self.cursor_row >= self.lines.len() {
+                                self.cursor_row = self.lines.len() - 1;
+                            }
+                            self.cursor_col = 0;
+                        } else {
+                            self.lines[0].clear();
+                            self.cursor_col = 0;
+                        }
+                        self.is_modified = true;
+                    }
+                    return NoteEditorAction::None;
+                }
+                KeyCode::Char('v') | KeyCode::Char('V') => {
+                    if let Some(text) = crate::clipboard::get_clipboard_text() {
+                        self.paste_text(&text);
+                    }
+                    return NoteEditorAction::None;
+                }
+                KeyCode::Left => {
+                    if is_shift {
+                        if self.selection_anchor.is_none() {
+                            self.selection_anchor = Some((self.cursor_row, self.cursor_col));
+                        }
+                    } else {
+                        self.selection_anchor = None;
+                    }
+                    self.move_word_left();
+                    return NoteEditorAction::None;
+                }
+                KeyCode::Right => {
+                    if is_shift {
+                        if self.selection_anchor.is_none() {
+                            self.selection_anchor = Some((self.cursor_row, self.cursor_col));
+                        }
+                    } else {
+                        self.selection_anchor = None;
+                    }
+                    self.move_word_right();
+                    return NoteEditorAction::None;
+                }
+                KeyCode::Home => {
+                    if is_shift {
+                        if self.selection_anchor.is_none() {
+                            self.selection_anchor = Some((self.cursor_row, self.cursor_col));
+                        }
+                    } else {
+                        self.selection_anchor = None;
+                    }
+                    self.cursor_row = 0;
+                    self.cursor_col = 0;
+                    return NoteEditorAction::None;
+                }
+                KeyCode::End => {
+                    if is_shift {
+                        if self.selection_anchor.is_none() {
+                            self.selection_anchor = Some((self.cursor_row, self.cursor_col));
+                        }
+                    } else {
+                        self.selection_anchor = None;
+                    }
+                    self.cursor_row = self.lines.len().saturating_sub(1);
+                    self.cursor_col = self.lines[self.cursor_row].chars().count();
+                    return NoteEditorAction::None;
+                }
+                _ => {}
+            }
         }
 
-        // Ctrl+C: Copy to clipboard via OSC 52
-        if (code == KeyCode::Char('c') || code == KeyCode::Char('C'))
-            && modifiers.contains(KeyModifiers::CONTROL)
-        {
-            let text = self.lines.join("\n");
-            let b64 = base64_encode(text.as_bytes());
-            print!("\x1b]52;c;{}\x07", b64);
-            return NoteEditorAction::None;
+        match code {
+            KeyCode::Left
+            | KeyCode::Right
+            | KeyCode::Up
+            | KeyCode::Down
+            | KeyCode::Home
+            | KeyCode::End
+            | KeyCode::PageUp
+            | KeyCode::PageDown => {
+                if is_shift {
+                    if self.selection_anchor.is_none() {
+                        self.selection_anchor = Some((self.cursor_row, self.cursor_col));
+                    }
+                } else {
+                    self.selection_anchor = None;
+                }
+            }
+            _ => {}
         }
 
         match code {
             KeyCode::Esc => NoteEditorAction::Cancel,
             KeyCode::Enter => {
+                self.delete_selection();
                 self.handle_enter();
                 self.is_modified = true;
                 NoteEditorAction::None
             }
             KeyCode::Backspace => {
-                self.handle_backspace();
+                if !self.delete_selection() {
+                    self.handle_backspace();
+                }
                 self.is_modified = true;
                 NoteEditorAction::None
             }
             KeyCode::Delete => {
-                self.handle_delete();
+                if !self.delete_selection() {
+                    self.handle_delete();
+                }
                 self.is_modified = true;
                 NoteEditorAction::None
             }
@@ -330,6 +568,7 @@ impl NoteEditorModal {
                 NoteEditorAction::None
             }
             KeyCode::Tab => {
+                self.delete_selection();
                 self.insert_str("    ");
                 self.is_modified = true;
                 NoteEditorAction::None
@@ -338,6 +577,7 @@ impl NoteEditorModal {
                 if !modifiers.contains(KeyModifiers::CONTROL)
                     && !modifiers.contains(KeyModifiers::ALT) =>
             {
+                self.delete_selection();
                 self.insert_char(c);
                 self.is_modified = true;
                 NoteEditorAction::None
@@ -385,8 +625,15 @@ impl NoteEditorModal {
                 let sb_x = inner.x + inner.width.saturating_sub(1);
                 if mouse.column == sb_x {
                     let (vlines, _) = self.compute_visual_lines(self.last_inner_w);
-                    let footer_tokens =
-                        ["[Ctrl+S] Save", "|", "[Ctrl+C] Copy", "|", "[ESC] Cancel"];
+                    let footer_tokens = [
+                        "[Ctrl+S] Save",
+                        "|",
+                        "[Ctrl+C] Copy",
+                        "|",
+                        "[Ctrl+V] Paste",
+                        "|",
+                        "[ESC] Cancel",
+                    ];
                     let max_footer_w = inner.width.saturating_sub(4) as usize;
                     let footer_lines = wrap_footer_tokens(&footer_tokens, max_footer_w);
                     let footer_h = footer_lines.len().max(1);
@@ -569,7 +816,15 @@ impl NoteEditorModal {
         let inner = render_modal_frame(area, dialog_w, dialog_h, &modal_title, styles, buf);
         self.last_inner_rect = inner;
 
-        let footer_tokens = ["[Ctrl+S] Save", "|", "[Ctrl+C] Copy", "|", "[ESC] Cancel"];
+        let footer_tokens = [
+            "[Ctrl+S] Save",
+            "|",
+            "[Ctrl+C] Copy",
+            "|",
+            "[Ctrl+V] Paste",
+            "|",
+            "[ESC] Cancel",
+        ];
         let max_footer_w = inner.width.saturating_sub(4) as usize;
         let footer_lines = wrap_footer_tokens(&footer_tokens, max_footer_w);
         let footer_h = footer_lines.len().max(1);
@@ -620,8 +875,12 @@ impl NoteEditorModal {
             }
 
             for (col_idx, &c) in vline.chars.iter().enumerate() {
+                let logical_col = vline.start_col + col_idx;
+                let is_selected = self.is_pos_selected(vline.logical_row, logical_col);
                 let is_cursor = vline.cursor_col_in_chunk == Some(col_idx);
-                let cell_style = if is_cursor {
+                let cell_style = if is_selected {
+                    line_style.add_modifier(Modifier::REVERSED)
+                } else if is_cursor {
                     styles.highlight.add_modifier(Modifier::BOLD)
                 } else {
                     line_style
@@ -725,30 +984,6 @@ fn parse_ordered_list(text: &str) -> Option<(&str, &str)> {
     } else {
         None
     }
-}
-
-fn base64_encode(bytes: &[u8]) -> String {
-    const B64_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
-    for chunk in bytes.chunks(3) {
-        let b0 = chunk[0];
-        let b1 = if chunk.len() > 1 { chunk[1] } else { 0 };
-        let b2 = if chunk.len() > 2 { chunk[2] } else { 0 };
-
-        out.push(B64_CHARS[(b0 >> 2) as usize] as char);
-        out.push(B64_CHARS[(((b0 & 0x03) << 4) | (b1 >> 4)) as usize] as char);
-        if chunk.len() > 1 {
-            out.push(B64_CHARS[(((b1 & 0x0f) << 2) | (b2 >> 6)) as usize] as char);
-        } else {
-            out.push('=');
-        }
-        if chunk.len() > 2 {
-            out.push(B64_CHARS[(b2 & 0x3f) as usize] as char);
-        } else {
-            out.push('=');
-        }
-    }
-    out
 }
 
 fn detect_list_margin(line: &str) -> Option<usize> {

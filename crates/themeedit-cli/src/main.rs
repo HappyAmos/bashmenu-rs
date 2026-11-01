@@ -361,7 +361,7 @@ fn main() -> Result<()> {
                 },
                 ActiveModal::SaveAs(modal) => match ev {
                     Event::Key(k) => {
-                        if let Some(res) = modal.handle_key(k.code) {
+                        if let Some(res) = modal.handle_key_with_modifiers(k.code, k.modifiers) {
                             if let Some(new_name) = res {
                                 let trimmed = new_name.trim();
                                 if !trimmed.is_empty() {

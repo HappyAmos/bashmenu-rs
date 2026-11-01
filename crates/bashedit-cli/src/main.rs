@@ -620,6 +620,19 @@ fn main() -> Result<()> {
                 continue;
             }
 
+            if let Event::Paste(text) = &ev {
+                if matches!(active_modal, ActiveModal::None) {
+                    let active_tab = &mut tabs[active_tab_idx];
+                    active_tab.delete_selection();
+                    let paste_lines: Vec<String> = text
+                        .split('\n')
+                        .map(|s| s.trim_end_matches('\r').to_string())
+                        .collect();
+                    active_tab.paste(&paste_lines);
+                    continue;
+                }
+            }
+
             // If exit was chosen from exit modal:
             if let Event::Key(k) = &ev {
                 if matches!(active_modal, ActiveModal::None) {
@@ -791,11 +804,67 @@ fn main() -> Result<()> {
                                 continue;
                             }
                             KeyCode::Left => {
+                                if k.modifiers.contains(KeyModifiers::SHIFT) {
+                                    if !tabs[active_tab_idx].mark_active {
+                                        tabs[active_tab_idx].mark_active = true;
+                                        tabs[active_tab_idx].mark_row =
+                                            tabs[active_tab_idx].cursor_row;
+                                        tabs[active_tab_idx].mark_col =
+                                            tabs[active_tab_idx].cursor_col;
+                                    }
+                                } else {
+                                    tabs[active_tab_idx].mark_active = false;
+                                }
                                 tabs[active_tab_idx].move_word_left();
                                 continue;
                             }
                             KeyCode::Right => {
+                                if k.modifiers.contains(KeyModifiers::SHIFT) {
+                                    if !tabs[active_tab_idx].mark_active {
+                                        tabs[active_tab_idx].mark_active = true;
+                                        tabs[active_tab_idx].mark_row =
+                                            tabs[active_tab_idx].cursor_row;
+                                        tabs[active_tab_idx].mark_col =
+                                            tabs[active_tab_idx].cursor_col;
+                                    }
+                                } else {
+                                    tabs[active_tab_idx].mark_active = false;
+                                }
                                 tabs[active_tab_idx].move_word_right();
+                                continue;
+                            }
+                            KeyCode::Home => {
+                                if k.modifiers.contains(KeyModifiers::SHIFT) {
+                                    if !tabs[active_tab_idx].mark_active {
+                                        tabs[active_tab_idx].mark_active = true;
+                                        tabs[active_tab_idx].mark_row =
+                                            tabs[active_tab_idx].cursor_row;
+                                        tabs[active_tab_idx].mark_col =
+                                            tabs[active_tab_idx].cursor_col;
+                                    }
+                                } else {
+                                    tabs[active_tab_idx].mark_active = false;
+                                }
+                                tabs[active_tab_idx].cursor_row = 0;
+                                tabs[active_tab_idx].cursor_col = 0;
+                                continue;
+                            }
+                            KeyCode::End => {
+                                if k.modifiers.contains(KeyModifiers::SHIFT) {
+                                    if !tabs[active_tab_idx].mark_active {
+                                        tabs[active_tab_idx].mark_active = true;
+                                        tabs[active_tab_idx].mark_row =
+                                            tabs[active_tab_idx].cursor_row;
+                                        tabs[active_tab_idx].mark_col =
+                                            tabs[active_tab_idx].cursor_col;
+                                    }
+                                } else {
+                                    tabs[active_tab_idx].mark_active = false;
+                                }
+                                let last_row = tabs[active_tab_idx].lines.len().saturating_sub(1);
+                                tabs[active_tab_idx].cursor_row = last_row;
+                                tabs[active_tab_idx].cursor_col =
+                                    tabs[active_tab_idx].lines[last_row].chars().count();
                                 continue;
                             }
                             KeyCode::Up => {
@@ -843,6 +912,30 @@ fn main() -> Result<()> {
 
                     // Standard editing keys
                     let active_tab = &mut tabs[active_tab_idx];
+                    let is_shift = k.modifiers.contains(KeyModifiers::SHIFT);
+
+                    match k.code {
+                        KeyCode::Left
+                        | KeyCode::Right
+                        | KeyCode::Up
+                        | KeyCode::Down
+                        | KeyCode::Home
+                        | KeyCode::End
+                        | KeyCode::PageUp
+                        | KeyCode::PageDown => {
+                            if is_shift {
+                                if !active_tab.mark_active {
+                                    active_tab.mark_active = true;
+                                    active_tab.mark_row = active_tab.cursor_row;
+                                    active_tab.mark_col = active_tab.cursor_col;
+                                }
+                            } else {
+                                active_tab.mark_active = false;
+                            }
+                        }
+                        _ => {}
+                    }
+
                     match k.code {
                         KeyCode::Esc => {
                             let has_modified = tabs.iter().any(|t| t.is_modified);

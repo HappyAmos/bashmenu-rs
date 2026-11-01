@@ -3,6 +3,7 @@
 pub mod ansi;
 pub mod bbcode;
 pub mod borders;
+pub mod clipboard;
 pub mod gutter;
 pub mod marquee;
 pub mod menu_view;
@@ -18,6 +19,7 @@ pub use bbcode::{
     truncate_to_width, visible_text_len,
 };
 pub use borders::ResolvedWindowBorders;
+pub use clipboard::{base64_encode, get_clipboard_text, set_clipboard_text};
 pub use gutter::{
     format_spread_gutter_line, parse_help_tokens, spread_gutter_line_layout,
     wrap_spread_help_gutter, wrap_spread_help_gutter_layout,
