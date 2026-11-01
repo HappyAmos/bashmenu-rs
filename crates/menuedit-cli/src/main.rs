@@ -187,7 +187,6 @@ fn main() -> Result<()> {
     let mut tree_scroll = 0;
     let mut inspector_scroll = 0;
     let mut is_modified = false;
-    let mut status_message = "Ready".to_string();
     let mut active_modal = ActiveModal::None;
 
     loop {
@@ -454,16 +453,6 @@ fn main() -> Result<()> {
                 }
             }
 
-            if !status_message.is_empty() {
-                let msg_x = (area.x + area.width).saturating_sub(status_message.len() as u16 + 3);
-                buf.set_string(
-                    msg_x,
-                    footer_y2,
-                    &status_message,
-                    Style::default().fg(Color::Green),
-                );
-            }
-
             // Render Active Modals
             match &mut active_modal {
                 ActiveModal::None => {}
@@ -527,7 +516,12 @@ fn main() -> Result<()> {
                                     if let Some(item) = find_item_mut(&mut menu, &path) {
                                         mutate_item_type(item, &chosen_type);
                                         is_modified = true;
-                                        status_message = format!("Mutated type to {}", chosen_type);
+                                        toast_rack.add(ToastNotification {
+                                            title: Some("Menu Editor".to_string()),
+                                            message: format!("Mutated type to {}", chosen_type),
+                                            severity: ToastSeverity::Information,
+                                            timeout_secs: 1.5,
+                                        });
                                     }
                                 } else {
                                     let new_item = if chosen_type == "{divider}" {
@@ -548,7 +542,12 @@ fn main() -> Result<()> {
                                     let new_path =
                                         insert_item_after(&mut menu, &cur_path, new_item.clone());
                                     is_modified = true;
-                                    status_message = format!("Added new {}", chosen_type);
+                                    toast_rack.add(ToastNotification {
+                                        title: Some("Menu Editor".to_string()),
+                                        message: format!("Added new {}", chosen_type),
+                                        severity: ToastSeverity::Information,
+                                        timeout_secs: 1.5,
+                                    });
                                     active_modal = ActiveModal::ItemEdit(
                                         Box::new(ItemEditModal::new(&new_item)),
                                         new_path,
@@ -695,7 +694,12 @@ fn main() -> Result<()> {
                                 if let Some(item_slot) = find_item_mut(&mut menu, path) {
                                     *item_slot = *updated;
                                     is_modified = true;
-                                    status_message = "Updated item properties".to_string();
+                                    toast_rack.add(ToastNotification {
+                                        title: Some("Menu Editor".to_string()),
+                                        message: "Updated item properties".to_string(),
+                                        severity: ToastSeverity::Information,
+                                        timeout_secs: 1.5,
+                                    });
                                 }
                                 active_modal = ActiveModal::None;
                             }
@@ -753,7 +757,12 @@ fn main() -> Result<()> {
                             if confirmed {
                                 if let Some(deleted) = delete_item(&mut menu, path) {
                                     is_modified = true;
-                                    status_message = format!("Deleted '{}'", deleted.label);
+                                    toast_rack.add(ToastNotification {
+                                        title: Some("Menu Editor".to_string()),
+                                        message: format!("Deleted '{}'", deleted.label),
+                                        severity: ToastSeverity::Information,
+                                        timeout_secs: 1.5,
+                                    });
                                     selected_node_idx = selected_node_idx.saturating_sub(1);
                                 }
                             }
@@ -765,7 +774,12 @@ fn main() -> Result<()> {
                             if confirmed {
                                 if let Some(deleted) = delete_item(&mut menu, path) {
                                     is_modified = true;
-                                    status_message = format!("Deleted '{}'", deleted.label);
+                                    toast_rack.add(ToastNotification {
+                                        title: Some("Menu Editor".to_string()),
+                                        message: format!("Deleted '{}'", deleted.label),
+                                        severity: ToastSeverity::Information,
+                                        timeout_secs: 1.5,
+                                    });
                                     selected_node_idx = selected_node_idx.saturating_sub(1);
                                 }
                             }
@@ -885,7 +899,12 @@ fn main() -> Result<()> {
                                         }
                                         MenuEditFooterAction::ToggleAll => {
                                             toggle_all_nodes(&menu, &mut expanded_paths);
-                                            status_message = "Toggled all branches".to_string();
+                                            toast_rack.add(ToastNotification {
+                                                title: Some("Menu Editor".to_string()),
+                                                message: "Toggled all branches".to_string(),
+                                                severity: ToastSeverity::Information,
+                                                timeout_secs: 1.5,
+                                            });
                                         }
                                         MenuEditFooterAction::Ascii => {
                                             active_modal = ActiveModal::AsciiPicker(
@@ -964,7 +983,12 @@ fn main() -> Result<()> {
                                                     move_down_sibling(&mut menu, &node.path)
                                                 {
                                                     is_modified = true;
-                                                    status_message = "Moved item down".to_string();
+                                                    toast_rack.add(ToastNotification {
+                                                        title: Some("Menu Editor".to_string()),
+                                                        message: "Moved item down".to_string(),
+                                                        severity: ToastSeverity::Information,
+                                                        timeout_secs: 1.5,
+                                                    });
                                                     let new_vis =
                                                         flatten_tree(&menu, &expanded_paths);
                                                     if let Some(pos) =
@@ -982,7 +1006,12 @@ fn main() -> Result<()> {
                                                     move_up_sibling(&mut menu, &node.path)
                                                 {
                                                     is_modified = true;
-                                                    status_message = "Moved item up".to_string();
+                                                    toast_rack.add(ToastNotification {
+                                                        title: Some("Menu Editor".to_string()),
+                                                        message: "Moved item up".to_string(),
+                                                        severity: ToastSeverity::Information,
+                                                        timeout_secs: 1.5,
+                                                    });
                                                     let new_vis =
                                                         flatten_tree(&menu, &expanded_paths);
                                                     if let Some(pos) =
@@ -1002,8 +1031,13 @@ fn main() -> Result<()> {
                                                     &mut expanded_paths,
                                                 ) {
                                                     is_modified = true;
-                                                    status_message =
-                                                        "Indented item into submenu".to_string();
+                                                    toast_rack.add(ToastNotification {
+                                                        title: Some("Menu Editor".to_string()),
+                                                        message: "Indented item into submenu"
+                                                            .to_string(),
+                                                        severity: ToastSeverity::Information,
+                                                        timeout_secs: 1.5,
+                                                    });
                                                     let new_vis =
                                                         flatten_tree(&menu, &expanded_paths);
                                                     if let Some(pos) =
@@ -1021,9 +1055,13 @@ fn main() -> Result<()> {
                                                     outdent_item(&mut menu, &node.path)
                                                 {
                                                     is_modified = true;
-                                                    status_message =
-                                                        "Outdented item to parent level"
-                                                            .to_string();
+                                                    toast_rack.add(ToastNotification {
+                                                        title: Some("Menu Editor".to_string()),
+                                                        message: "Outdented item to parent level"
+                                                            .to_string(),
+                                                        severity: ToastSeverity::Information,
+                                                        timeout_secs: 1.5,
+                                                    });
                                                     let new_vis =
                                                         flatten_tree(&menu, &expanded_paths);
                                                     if let Some(pos) =
@@ -1199,7 +1237,12 @@ fn main() -> Result<()> {
                                 }
                                 KeyCode::F(2) => {
                                     toggle_all_nodes(&menu, &mut expanded_paths);
-                                    status_message = "Toggled all branches".to_string();
+                                    toast_rack.add(ToastNotification {
+                                        title: Some("Menu Editor".to_string()),
+                                        message: "Toggled all branches".to_string(),
+                                        severity: ToastSeverity::Information,
+                                        timeout_secs: 1.5,
+                                    });
                                 }
                                 KeyCode::F(3) => {
                                     active_modal = ActiveModal::AsciiPicker(AsciiGridModal::new(
@@ -1263,7 +1306,12 @@ fn main() -> Result<()> {
                                             move_down_sibling(&mut menu, &node.path)
                                         {
                                             is_modified = true;
-                                            status_message = "Moved item down".to_string();
+                                            toast_rack.add(ToastNotification {
+                                                title: Some("Menu Editor".to_string()),
+                                                message: "Moved item down".to_string(),
+                                                severity: ToastSeverity::Information,
+                                                timeout_secs: 1.5,
+                                            });
                                             let new_vis = flatten_tree(&menu, &expanded_paths);
                                             if let Some(pos) =
                                                 new_vis.iter().position(|n| n.path == new_p)
@@ -1278,7 +1326,12 @@ fn main() -> Result<()> {
                                         if let Some(new_p) = move_up_sibling(&mut menu, &node.path)
                                         {
                                             is_modified = true;
-                                            status_message = "Moved item up".to_string();
+                                            toast_rack.add(ToastNotification {
+                                                title: Some("Menu Editor".to_string()),
+                                                message: "Moved item up".to_string(),
+                                                severity: ToastSeverity::Information,
+                                                timeout_secs: 1.5,
+                                            });
                                             let new_vis = flatten_tree(&menu, &expanded_paths);
                                             if let Some(pos) =
                                                 new_vis.iter().position(|n| n.path == new_p)
@@ -1294,8 +1347,12 @@ fn main() -> Result<()> {
                                             indent_item(&mut menu, &node.path, &mut expanded_paths)
                                         {
                                             is_modified = true;
-                                            status_message =
-                                                "Indented item into submenu".to_string();
+                                            toast_rack.add(ToastNotification {
+                                                title: Some("Menu Editor".to_string()),
+                                                message: "Indented item into submenu".to_string(),
+                                                severity: ToastSeverity::Information,
+                                                timeout_secs: 1.5,
+                                            });
                                             let new_vis = flatten_tree(&menu, &expanded_paths);
                                             if let Some(pos) =
                                                 new_vis.iter().position(|n| n.path == new_p)
@@ -1309,8 +1366,13 @@ fn main() -> Result<()> {
                                     if let Some(node) = visible_nodes.get(selected_node_idx) {
                                         if let Some(new_p) = outdent_item(&mut menu, &node.path) {
                                             is_modified = true;
-                                            status_message =
-                                                "Outdented item to parent level".to_string();
+                                            toast_rack.add(ToastNotification {
+                                                title: Some("Menu Editor".to_string()),
+                                                message: "Outdented item to parent level"
+                                                    .to_string(),
+                                                severity: ToastSeverity::Information,
+                                                timeout_secs: 1.5,
+                                            });
                                             let new_vis = flatten_tree(&menu, &expanded_paths);
                                             if let Some(pos) =
                                                 new_vis.iter().position(|n| n.path == new_p)
