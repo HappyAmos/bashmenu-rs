@@ -120,7 +120,7 @@ pub const BASHEDIT_HELP_TEXT: &str = "\
 | `F3` | View ASCII Character Table |
 | `F4` | View Terminal Colors |
 | `F5` | Show Available Placeholders & Macros |
-| `F6` | Toggle Markdown Preview |
+| `F6` | Markdown Preview (via bmpager --markdown) |
 | `F7` / `Alt+N` | Toggle Line Numbers |
 | `F8` | Show Markdown Syntax Quick Reference |
 | `^O` / `^R` | Open File Picker |

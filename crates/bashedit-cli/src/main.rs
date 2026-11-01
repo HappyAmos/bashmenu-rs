@@ -20,6 +20,7 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::time::Duration;
 
 #[derive(Parser, Debug)]
@@ -100,9 +101,51 @@ enum ActiveModal {
     HelpManual(HelpModal),
     PlaceholdersHelp(HelpModal),
     MarkdownReference(HelpModal),
-    MarkdownPreview(HelpModal),
     AsciiTable(AsciiGridModal),
     ViewColors(ColorGridModal),
+}
+
+fn locate_tool(name: &str) -> PathBuf {
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let candidate = dir.join(name);
+            if candidate.is_file() {
+                return candidate;
+            }
+        }
+    }
+    if let Ok(dir) = std::env::var("BASHMENU_DIR") {
+        let candidate = PathBuf::from(&dir).join("target/release").join(name);
+        if candidate.is_file() {
+            return candidate;
+        }
+    }
+    if let Ok(home) = std::env::var("HOME") {
+        let candidate = PathBuf::from(home).join(".local/bin").join(name);
+        if candidate.is_file() {
+            return candidate;
+        }
+    }
+    PathBuf::from(name)
+}
+
+fn launch_markdown_preview(guard: &mut TerminalGuard, tab: &EditorBuffer) {
+    let pager_bin = locate_tool("bmpager");
+    let temp_dir = std::env::temp_dir();
+    let temp_file = temp_dir.join(format!("bashedit_md_preview_{}.md", std::process::id()));
+    let md_text = tab.lines.join("\n");
+    if std::fs::write(&temp_file, &md_text).is_ok() {
+        let _ = guard.suspend(|| {
+            let _ = Command::new(&pager_bin)
+                .arg("--markdown")
+                .arg("--no-file")
+                .arg(&temp_file)
+                .status();
+            Ok(())
+        });
+        let _ = std::fs::remove_file(&temp_file);
+        let _ = guard.terminal_mut().clear();
+    }
 }
 
 fn resolve_path_tilde(path: &Path) -> PathBuf {
@@ -677,11 +720,7 @@ fn main() -> Result<()> {
                             continue;
                         }
                         KeyCode::F(6) => {
-                            let md_text = tabs[active_tab_idx].lines.join("\n");
-                            active_modal = ActiveModal::MarkdownPreview(HelpModal::new(
-                                "Markdown Preview",
-                                &md_text,
-                            ));
+                            launch_markdown_preview(&mut guard, &tabs[active_tab_idx]);
                             continue;
                         }
                         KeyCode::F(7) => {
@@ -1101,10 +1140,7 @@ fn main() -> Result<()> {
                                             ));
                                     }
                                     FooterAction::MarkdownPreview => {
-                                        let md_text = tabs[active_tab_idx].lines.join("\n");
-                                        active_modal = ActiveModal::MarkdownPreview(
-                                            HelpModal::new("Markdown Preview", &md_text),
-                                        );
+                                        launch_markdown_preview(&mut guard, &tabs[active_tab_idx]);
                                     }
                                     FooterAction::ToggleLineno => {
                                         show_line_numbers = !show_line_numbers;
@@ -1301,10 +1337,6 @@ fn render_modal(
             None
         }
         ActiveModal::MarkdownReference(modal) => {
-            modal.render(area, styles, buf);
-            None
-        }
-        ActiveModal::MarkdownPreview(modal) => {
             modal.render(area, styles, buf);
             None
         }
@@ -1574,17 +1606,6 @@ fn handle_active_modal(
             true
         }
         ActiveModal::MarkdownReference(modal) => {
-            let dismiss = match ev {
-                Event::Key(k) => modal.handle_key(k.code),
-                Event::Mouse(m) => modal.handle_mouse(*m, area),
-                _ => false,
-            };
-            if dismiss {
-                *active_modal = ActiveModal::None;
-            }
-            true
-        }
-        ActiveModal::MarkdownPreview(modal) => {
             let dismiss = match ev {
                 Event::Key(k) => modal.handle_key(k.code),
                 Event::Mouse(m) => modal.handle_mouse(*m, area),
