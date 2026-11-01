@@ -73,11 +73,11 @@ done
 
 # Symlink assets and scripts into user config directory if present
 if [ -d "$SCRIPT_DIR/assets" ]; then
-    ln -sf "$SCRIPT_DIR/assets" "$CONFIG_DIR/assets"
+    ln -sfn "$SCRIPT_DIR/assets" "$CONFIG_DIR/assets"
     echo "  [+] Symlinked assets -> $CONFIG_DIR/assets"
 fi
 if [ -d "$SCRIPT_DIR/scripts" ]; then
-    ln -sf "$SCRIPT_DIR/scripts" "$CONFIG_DIR/scripts"
+    ln -sfn "$SCRIPT_DIR/scripts" "$CONFIG_DIR/scripts"
     echo "  [+] Symlinked scripts -> $CONFIG_DIR/scripts"
 fi
 

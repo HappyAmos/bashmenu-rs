@@ -428,7 +428,7 @@ cyberpunk:
   indicator: '{nf:>:#f07c0:}'
   divider:
     char: "\u2501"
-    length: '{screen_width}'
+    length: '{window_width}'
   window:
     border_horizontal: "\u2501"
     border_vertical: "\u2503"
@@ -854,7 +854,7 @@ qbasic:
   indicator: '{ascii:240}'
   divider:
     char: '{ascii:196}'
-    length: '{screen_width}'
+    length: '{window_width}'
   window:
     border_horizontal: '{ascii:205}'
     border_vertical: '{ascii:186}'
@@ -1073,7 +1073,7 @@ pacman:
   indicator: '{nf:):#f0baf:}'
   divider:
     char: '{ascii:205}'
-    length: '{window_width}'
+    length: '{screen_width}'
   window:
     border_horizontal_top: '{ascii:223}'
     border_horizontal_bottom: '{ascii:220}'
@@ -1296,7 +1296,7 @@ industry:
   indicator: '{nf:#:#f0b46:}'
   divider:
     char: '{ascii:205}'
-    length: '{screen_width}'
+    length: '{window_width}'
   window:
     border_horizontal: '{ascii:205}'
     border_vertical: '{ascii:186}'
@@ -1935,7 +1935,7 @@ synthwave:
   indicator: '{nf:>:#f147d:}'
   divider:
     char: '~'
-    length: '{screen_width}'
+    length: '{window_width}'
   window:
     border_horizontal: "\u2500"
     border_vertical: "\u2502"

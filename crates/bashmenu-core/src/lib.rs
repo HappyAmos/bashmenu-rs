@@ -31,6 +31,6 @@ pub use plugin::{
     PluginCacheEntry, PluginConfig, PluginDef, PluginDisplayRow, PluginEngine, PluginLayout,
 };
 pub use theme::{
-    load_themes, save_themes, Theme, ThemeCollection, WallpaperConfig, WallpaperSetting,
-    WindowBorders,
+    load_themes, save_themes, DividerConfig, MarqueeConfig, Theme, ThemeCollection,
+    WallpaperConfig, WallpaperSetting, WindowBorders,
 };

@@ -228,4 +228,133 @@ fn test_themeedit_t_connectors_and_click_selection() {
 
     assert!(state.select_token_by_key("indicator"));
     assert_eq!(state.tokens[state.selected_idx].label, "Cursor Indicator");
+
+    // Verify new divider and marquee tokens
+    assert!(state.select_token_by_key("divider_char"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Divider Character");
+
+    assert!(state.select_token_by_key("divider_length"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Divider Width Mode");
+
+    assert!(state.select_token_by_key("marquee_char"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Marquee Character");
+
+    assert!(state.select_token_by_key("marquee_gap"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Marquee Gap Count");
+}
+
+#[test]
+fn test_themeedit_divider_and_marquee_configuration() {
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(fixture_path, Some("pacman".to_string()));
+
+    // Pacman has screen_width
+    let div_len_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Divider Width Mode")
+        .unwrap()
+        .clone();
+    assert_eq!(
+        state.get_token_value_display(&div_len_token),
+        "{screen_width}"
+    );
+
+    // Toggle to window_width
+    state.toggle_divider_length();
+    assert_eq!(
+        state.get_token_value_display(&div_len_token),
+        "{window_width}"
+    );
+    assert!(state.is_modified);
+
+    // Toggle back to screen_width
+    state.toggle_divider_length();
+    assert_eq!(
+        state.get_token_value_display(&div_len_token),
+        "{screen_width}"
+    );
+
+    // Set divider char
+    state.set_divider_char('═');
+    let div_char_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Divider Character")
+        .unwrap()
+        .clone();
+    assert_eq!(state.get_token_value_display(&div_char_token), "'═'");
+
+    // Marquee char and gap
+    state.set_marquee_char('~');
+    let marq_char_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Marquee Character")
+        .unwrap()
+        .clone();
+    assert_eq!(state.get_token_value_display(&marq_char_token), "'~'");
+
+    let marq_gap_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Marquee Gap Count")
+        .unwrap()
+        .clone();
+    state.cycle_marquee_gap();
+    assert_eq!(state.get_token_value_display(&marq_gap_token), "4");
+}
+
+#[test]
+fn test_themeedit_qbasic_ascii_indicator_and_divider() {
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    let state = ThemeEditorState::new(fixture_path, Some("qbasic".to_string()));
+
+    // QBasic indicator has {ascii:240} which translates to ≡
+    let ind_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Cursor Indicator")
+        .unwrap();
+    let ind_display = state.get_token_value_display(ind_token);
+    assert!(
+        ind_display.contains('≡'),
+        "Expected indicator display to contain '≡', got: {}",
+        ind_display
+    );
+
+    // QBasic divider length is window_width
+    let div_len_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Divider Width Mode")
+        .unwrap();
+    assert_eq!(
+        state.get_token_value_display(div_len_token),
+        "{window_width}"
+    );
+}
+
+#[test]
+fn test_themeedit_scroll_offset_adjustment() {
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(fixture_path, Some("dracula".to_string()));
+
+    assert_eq!(state.scroll_offset, 0);
+    assert_eq!(state.selected_idx, 0);
+
+    // Viewport height 10
+    state.adjust_scroll(10);
+    assert_eq!(state.scroll_offset, 0);
+
+    // Move selection down to index 15
+    state.selected_idx = 15;
+    state.adjust_scroll(10);
+    // scroll_offset should shift so 15 is visible: 15 - 10 + 1 = 6
+    assert_eq!(state.scroll_offset, 6);
+
+    // Move selection back up to index 2
+    state.selected_idx = 2;
+    state.adjust_scroll(10);
+    assert_eq!(state.scroll_offset, 2);
 }

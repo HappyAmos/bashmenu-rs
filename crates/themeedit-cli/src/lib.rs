@@ -1,7 +1,9 @@
 //! Library module for ThemeEdit core state, actions, and theme manipulation.
 
 use anyhow::Result;
-use bashmenu_core::{load_themes, save_themes, Theme, ThemeCollection, WindowBorders};
+use bashmenu_core::{
+    load_themes, save_themes, DividerConfig, MarqueeConfig, Theme, ThemeCollection, WindowBorders,
+};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -10,6 +12,10 @@ pub enum TokenKind {
     Color(String),
     Border(String),
     Indicator,
+    DividerChar,
+    DividerLength,
+    MarqueeChar,
+    MarqueeGap,
 }
 
 #[derive(Debug, Clone)]
@@ -55,6 +61,7 @@ pub struct ThemeEditorState {
     pub is_modified: bool,
     pub tokens: Vec<TokenItem>,
     pub selected_idx: usize,
+    pub scroll_offset: usize,
     pub status_message: String,
     pub preview_mode: PreviewMode,
 }
@@ -139,6 +146,24 @@ impl ThemeEditorState {
                 label: "Cursor Indicator".to_string(),
                 kind: TokenKind::Indicator,
             },
+            // Divider
+            TokenItem {
+                label: "Divider Character".to_string(),
+                kind: TokenKind::DividerChar,
+            },
+            TokenItem {
+                label: "Divider Width Mode".to_string(),
+                kind: TokenKind::DividerLength,
+            },
+            // Marquee
+            TokenItem {
+                label: "Marquee Character".to_string(),
+                kind: TokenKind::MarqueeChar,
+            },
+            TokenItem {
+                label: "Marquee Gap Count".to_string(),
+                kind: TokenKind::MarqueeGap,
+            },
             // Borders
             TokenItem {
                 label: "Horizontal Border".to_string(),
@@ -214,6 +239,7 @@ impl ThemeEditorState {
             is_modified: false,
             tokens,
             selected_idx: 0,
+            scroll_offset: 0,
             status_message: "Ready".to_string(),
             preview_mode: PreviewMode::default(),
         }
@@ -336,12 +362,51 @@ impl ThemeEditorState {
                 }
                 "Default".to_string()
             }
-            TokenKind::Indicator => self
+            TokenKind::Indicator => {
+                let raw = self.current_theme.indicator.as_deref().unwrap_or("> ");
+                let parsed = bashmenu_core::parse_ascii_val(raw);
+                if parsed != raw {
+                    format!("'{}' ({})", parsed, raw)
+                } else {
+                    format!("'{}'", raw)
+                }
+            }
+            TokenKind::DividerChar => {
+                let raw = self
+                    .current_theme
+                    .divider
+                    .as_ref()
+                    .and_then(|d| d.char.as_deref())
+                    .unwrap_or("─");
+                let parsed = bashmenu_core::parse_ascii_val(raw);
+                format!("'{}'", parsed)
+            }
+            TokenKind::DividerLength => self
                 .current_theme
-                .indicator
-                .as_deref()
-                .unwrap_or("> ")
+                .divider
+                .as_ref()
+                .and_then(|d| d.length.as_deref())
+                .unwrap_or("{window_width}")
                 .to_string(),
+            TokenKind::MarqueeChar => {
+                let raw = self
+                    .current_theme
+                    .marquee
+                    .as_ref()
+                    .map(|m| m.char.as_str())
+                    .unwrap_or("•");
+                let parsed = bashmenu_core::parse_ascii_val(raw);
+                format!("'{}'", parsed)
+            }
+            TokenKind::MarqueeGap => {
+                let gap = self
+                    .current_theme
+                    .marquee
+                    .as_ref()
+                    .map(|m| m.gap)
+                    .unwrap_or(4);
+                format!("{}", gap)
+            }
         }
     }
 
@@ -392,6 +457,72 @@ impl ThemeEditorState {
         }
     }
 
+    pub fn set_divider_char(&mut self, ch: char) {
+        if self.current_theme.divider.is_none() {
+            self.current_theme.divider = Some(DividerConfig::default());
+        }
+        if let Some(div) = &mut self.current_theme.divider {
+            div.char = Some(ch.to_string());
+            self.is_modified = true;
+            self.status_message = format!("Updated divider character to '{}'", ch);
+        }
+    }
+
+    pub fn toggle_divider_length(&mut self) {
+        if self.current_theme.divider.is_none() {
+            self.current_theme.divider = Some(DividerConfig::default());
+        }
+        if let Some(div) = &mut self.current_theme.divider {
+            let current = div.length.as_deref().unwrap_or("{window_width}");
+            let new_len = if current == "{screen_width}" {
+                "{window_width}"
+            } else {
+                "{screen_width}"
+            };
+            div.length = Some(new_len.to_string());
+            self.is_modified = true;
+            self.status_message = format!("Updated divider length to {}", new_len);
+        }
+    }
+
+    pub fn set_marquee_char(&mut self, ch: char) {
+        if self.current_theme.marquee.is_none() {
+            self.current_theme.marquee = Some(MarqueeConfig::default());
+        }
+        if let Some(marq) = &mut self.current_theme.marquee {
+            marq.char = ch.to_string();
+            self.is_modified = true;
+            self.status_message = format!("Updated marquee character to '{}'", ch);
+        }
+    }
+
+    pub fn cycle_marquee_gap(&mut self) {
+        if self.current_theme.marquee.is_none() {
+            self.current_theme.marquee = Some(MarqueeConfig::default());
+        }
+        if let Some(marq) = &mut self.current_theme.marquee {
+            let gaps = [1, 2, 3, 4, 5, 6, 8, 10];
+            let next_gap = match gaps.iter().position(|&g| g == marq.gap) {
+                Some(idx) => gaps[(idx + 1) % gaps.len()],
+                None => 4,
+            };
+            marq.gap = next_gap;
+            self.is_modified = true;
+            self.status_message = format!("Updated marquee gap to {}", next_gap);
+        }
+    }
+
+    pub fn adjust_scroll(&mut self, viewport_h: usize) {
+        if viewport_h == 0 {
+            return;
+        }
+        if self.selected_idx < self.scroll_offset {
+            self.scroll_offset = self.selected_idx;
+        } else if self.selected_idx >= self.scroll_offset + viewport_h {
+            self.scroll_offset = self.selected_idx.saturating_sub(viewport_h - 1);
+        }
+    }
+
     pub fn save_to_disk(&mut self) -> Result<()> {
         self.themes
             .insert(self.current_name.clone(), self.current_theme.clone());
@@ -408,6 +539,10 @@ impl ThemeEditorState {
             TokenKind::Color(k) => k == key,
             TokenKind::Border(k) => k == key,
             TokenKind::Indicator => key == "indicator",
+            TokenKind::DividerChar => key == "divider_char",
+            TokenKind::DividerLength => key == "divider_length",
+            TokenKind::MarqueeChar => key == "marquee_char",
+            TokenKind::MarqueeGap => key == "marquee_gap",
         }) {
             self.selected_idx = idx;
             self.status_message = format!("Selected: {}", self.tokens[idx].label);
@@ -426,7 +561,9 @@ impl ThemeEditorState {
                     || (k == "gutter_top_tee" && key == "top_tee")
                     || (k == "gutter_bottom_tee" && key == "bottom_tee")
             }
-            TokenKind::Indicator => false,
+            TokenKind::DividerChar => key == "divider",
+            TokenKind::MarqueeChar => key == "marquee",
+            _ => false,
         }) {
             self.selected_idx = idx;
             self.status_message = format!("Selected: {}", self.tokens[idx].label);

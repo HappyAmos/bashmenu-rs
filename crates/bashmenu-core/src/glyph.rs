@@ -67,8 +67,9 @@ fn is_hex_token(token: &str) -> bool {
 /// 3. Character tier: Selected if defined or if Nerd Fonts disabled.
 /// 4. Fallback: Empty string if unconfigured.
 pub fn resolve_glyph(glyph_def: &str, use_nerd_fonts: bool) -> String {
-    if !glyph_def.starts_with("{nf:") || !glyph_def.ends_with('}') {
-        return glyph_def.to_string();
+    let parsed_def = parse_ascii_val(glyph_def);
+    if !parsed_def.starts_with("{nf:") || !parsed_def.ends_with('}') {
+        return parsed_def;
     }
 
     let inner = &glyph_def[4..glyph_def.len() - 1];

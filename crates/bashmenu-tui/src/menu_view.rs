@@ -683,16 +683,27 @@ impl MenuView {
             }
 
             if item.is_divider() {
-                buf.set_string(area.x, row_y, &b.left_tee, border_style);
-                buf.set_string(area.x + area.width - 1, row_y, &b.right_tee, border_style);
-                let div_char = "─";
-                let div_line = div_char.repeat(avail_w);
-                buf.set_line(
-                    inner_x,
-                    row_y,
-                    &Line::from(vec![Span::styled(div_line, self.styles.divider)]),
-                    avail_w as u16,
-                );
+                let div_char = &self.styles.divider_char;
+                if self.styles.divider_is_screen_width {
+                    buf.set_string(area.x, row_y, &b.left_tee, border_style);
+                    buf.set_string(area.x + area.width - 1, row_y, &b.right_tee, border_style);
+                    let div_w = area.width.saturating_sub(2) as usize;
+                    let div_line = div_char.repeat(div_w);
+                    buf.set_line(
+                        area.x + 1,
+                        row_y,
+                        &Line::from(vec![Span::styled(div_line, self.styles.divider)]),
+                        div_w as u16,
+                    );
+                } else {
+                    let div_line = div_char.repeat(avail_w);
+                    buf.set_line(
+                        inner_x,
+                        row_y,
+                        &Line::from(vec![Span::styled(div_line, self.styles.divider)]),
+                        avail_w as u16,
+                    );
+                }
                 continue;
             }
 
@@ -842,14 +853,27 @@ impl MenuView {
             for (p_idx, prow) in self.plugin_rows.iter().take(active_plugin_rows).enumerate() {
                 let py = plugin_start_y + p_idx as u16;
                 if prow.is_divider {
-                    buf.set_string(area.x, py, &b.left_tee, border_style);
-                    buf.set_string(area.x + area.width - 1, py, &b.right_tee, border_style);
-                    buf.set_line(
-                        inner_x,
-                        py,
-                        &Line::from(vec![Span::styled(&prow.text, self.styles.divider)]),
-                        avail_w as u16,
-                    );
+                    let div_char = &self.styles.divider_char;
+                    if self.styles.divider_is_screen_width {
+                        buf.set_string(area.x, py, &b.left_tee, border_style);
+                        buf.set_string(area.x + area.width - 1, py, &b.right_tee, border_style);
+                        let div_w = area.width.saturating_sub(2) as usize;
+                        let div_line = div_char.repeat(div_w);
+                        buf.set_line(
+                            area.x + 1,
+                            py,
+                            &Line::from(vec![Span::styled(div_line, self.styles.divider)]),
+                            div_w as u16,
+                        );
+                    } else {
+                        let div_line = div_char.repeat(avail_w);
+                        buf.set_line(
+                            inner_x,
+                            py,
+                            &Line::from(vec![Span::styled(div_line, self.styles.divider)]),
+                            avail_w as u16,
+                        );
+                    }
                 } else {
                     let spans = parse_bbcode_spans(&prow.text, self.styles.text);
                     buf.set_line(inner_x, py, &Line::from(spans), avail_w as u16);

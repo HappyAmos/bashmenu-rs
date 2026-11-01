@@ -125,7 +125,16 @@ fn main() -> Result<()> {
                 let right_area = Rect::new(right_x, area.y + 2, right_w, area.height - 4);
 
                 // 1. Render Left Panel: Token List
-                let list_title = " Theme Tokens ";
+                let visible_rows = (left_area.height.saturating_sub(2)) as usize;
+                state.adjust_scroll(visible_rows);
+
+                let scroll_up_ind = if state.scroll_offset > 0 { " ▲" } else { "" };
+                let scroll_dn_ind = if state.scroll_offset + visible_rows < state.tokens.len() {
+                    " ▼"
+                } else {
+                    ""
+                };
+                let list_title = format!(" Theme Tokens{}{}", scroll_up_ind, scroll_dn_ind);
                 buf.set_string(
                     left_area.x,
                     left_area.y,
@@ -135,13 +144,16 @@ fn main() -> Result<()> {
                         .add_modifier(Modifier::BOLD),
                 );
 
-                for (idx, token) in state.tokens.iter().enumerate() {
-                    let row_y = left_area.y + 2 + idx as u16;
-                    if row_y >= left_area.y + left_area.height {
-                        break;
-                    }
+                for (v_idx, token) in state
+                    .tokens
+                    .iter()
+                    .enumerate()
+                    .skip(state.scroll_offset)
+                    .take(visible_rows)
+                {
+                    let row_y = left_area.y + 2 + (v_idx - state.scroll_offset) as u16;
 
-                    let is_sel = idx == state.selected_idx;
+                    let is_sel = v_idx == state.selected_idx;
                     let val_str = state.get_token_value_display(token);
 
                     let cursor = if is_sel { "▶ " } else { "  " };
@@ -339,25 +351,37 @@ fn main() -> Result<()> {
                         buf.set_line(p_inner_x, content_start_y + 2, &note_line, p_avail_w);
 
                         // Divider rule
-                        buf.set_string(
-                            right_area.x,
-                            content_start_y + 3,
-                            &b.left_tee,
-                            border_style,
-                        );
-                        buf.set_string(
-                            right_area.x + right_area.width - 1,
-                            content_start_y + 3,
-                            &b.right_tee,
-                            border_style,
-                        );
-                        let div_str = "─".repeat(p_avail_w as usize);
-                        buf.set_line(
-                            p_inner_x,
-                            content_start_y + 3,
-                            &Line::from(vec![Span::styled(div_str, preview_styles.divider)]),
-                            p_avail_w,
-                        );
+                        let div_char = &preview_styles.divider_char;
+                        if preview_styles.divider_is_screen_width {
+                            buf.set_string(
+                                right_area.x,
+                                content_start_y + 3,
+                                &b.left_tee,
+                                border_style,
+                            );
+                            buf.set_string(
+                                right_area.x + right_area.width - 1,
+                                content_start_y + 3,
+                                &b.right_tee,
+                                border_style,
+                            );
+                            let div_w = right_area.width.saturating_sub(2) as usize;
+                            let div_str = div_char.repeat(div_w);
+                            buf.set_line(
+                                right_area.x + 1,
+                                content_start_y + 3,
+                                &Line::from(vec![Span::styled(div_str, preview_styles.divider)]),
+                                div_w as u16,
+                            );
+                        } else {
+                            let div_str = div_char.repeat(p_avail_w as usize);
+                            buf.set_line(
+                                p_inner_x,
+                                content_start_y + 3,
+                                &Line::from(vec![Span::styled(div_str, preview_styles.divider)]),
+                                p_avail_w,
+                            );
+                        }
 
                         // Exit item
                         let exit_line = Line::from(vec![
@@ -371,20 +395,36 @@ fn main() -> Result<()> {
                         // 6. Pseudo Plugins pinned above gutter
                         if content_avail_h >= 8 {
                             let plugin_start_y = gt_y.saturating_sub(3);
-                            buf.set_string(right_area.x, plugin_start_y, &b.left_tee, border_style);
-                            buf.set_string(
-                                right_area.x + right_area.width - 1,
-                                plugin_start_y,
-                                &b.right_tee,
-                                border_style,
-                            );
-                            let p_div = "─".repeat(p_avail_w as usize);
-                            buf.set_line(
-                                p_inner_x,
-                                plugin_start_y,
-                                &Line::from(vec![Span::styled(p_div, preview_styles.divider)]),
-                                p_avail_w,
-                            );
+                            if preview_styles.divider_is_screen_width {
+                                buf.set_string(
+                                    right_area.x,
+                                    plugin_start_y,
+                                    &b.left_tee,
+                                    border_style,
+                                );
+                                buf.set_string(
+                                    right_area.x + right_area.width - 1,
+                                    plugin_start_y,
+                                    &b.right_tee,
+                                    border_style,
+                                );
+                                let div_w = right_area.width.saturating_sub(2) as usize;
+                                let p_div = div_char.repeat(div_w);
+                                buf.set_line(
+                                    right_area.x + 1,
+                                    plugin_start_y,
+                                    &Line::from(vec![Span::styled(p_div, preview_styles.divider)]),
+                                    div_w as u16,
+                                );
+                            } else {
+                                let p_div = div_char.repeat(p_avail_w as usize);
+                                buf.set_line(
+                                    p_inner_x,
+                                    plugin_start_y,
+                                    &Line::from(vec![Span::styled(p_div, preview_styles.divider)]),
+                                    p_avail_w,
+                                );
+                            }
 
                             let plugin_row1 = Line::from(vec![
                                 Span::styled(" ☁️  Weather: ", preview_styles.accent),
@@ -771,7 +811,13 @@ fn main() -> Result<()> {
                     Event::Key(k) => {
                         if let Some(res) = modal.handle_key(k.code) {
                             if let Some(ch) = res {
-                                state.set_border_token(key, ch);
+                                if key == "divider_char" {
+                                    state.set_divider_char(ch);
+                                } else if key == "marquee_char" {
+                                    state.set_marquee_char(ch);
+                                } else {
+                                    state.set_border_token(key, ch);
+                                }
                             }
                             active_modal = ActiveModal::None;
                         }
@@ -779,7 +825,13 @@ fn main() -> Result<()> {
                     Event::Mouse(m) => {
                         if let Some(res) = modal.handle_mouse(m, last_grid_origin) {
                             if let Some(ch) = res {
-                                state.set_border_token(key, ch);
+                                if key == "divider_char" {
+                                    state.set_divider_char(ch);
+                                } else if key == "marquee_char" {
+                                    state.set_marquee_char(ch);
+                                } else {
+                                    state.set_border_token(key, ch);
+                                }
                             }
                             active_modal = ActiveModal::None;
                         }
@@ -836,6 +888,31 @@ fn main() -> Result<()> {
                 },
                 ActiveModal::None => match ev {
                     Event::Mouse(m) => {
+                        let left_w = (area.width * 45 / 100).clamp(30, 42);
+                        let left_area = Rect::new(area.x + 2, area.y + 2, left_w, area.height - 4);
+                        let right_x = area.x + left_w + 1;
+                        let right_w = (area.x + area.width).saturating_sub(right_x + 2);
+                        let right_area = Rect::new(right_x, area.y + 2, right_w, area.height - 4);
+
+                        if m.kind == MouseEventKind::ScrollUp {
+                            if m.column >= left_area.x
+                                && m.column < left_area.x + left_area.width
+                                && state.selected_idx > 0
+                            {
+                                state.selected_idx -= 1;
+                            }
+                            continue;
+                        }
+                        if m.kind == MouseEventKind::ScrollDown {
+                            if m.column >= left_area.x
+                                && m.column < left_area.x + left_area.width
+                                && state.selected_idx + 1 < state.tokens.len()
+                            {
+                                state.selected_idx += 1;
+                            }
+                            continue;
+                        }
+
                         if m.kind == MouseEventKind::Down(MouseButton::Left) {
                             // Universal close button [X]
                             if m.row == area.y && m.column >= area.x + area.width - 5 {
@@ -850,21 +927,15 @@ fn main() -> Result<()> {
                                 continue;
                             }
 
-                            let left_w = (area.width * 45 / 100).clamp(30, 42);
-                            let left_area =
-                                Rect::new(area.x + 2, area.y + 2, left_w, area.height - 4);
-                            let right_x = area.x + left_w + 1;
-                            let right_w = (area.x + area.width).saturating_sub(right_x + 2);
-                            let right_area =
-                                Rect::new(right_x, area.y + 2, right_w, area.height - 4);
-
                             // 1. Click on left token list
+                            let visible_rows = (left_area.height.saturating_sub(2)) as usize;
                             if m.column >= left_area.x
                                 && m.column < left_area.x + left_area.width
-                                && m.row > left_area.y
-                                && m.row < left_area.y + left_area.height - 1
+                                && m.row >= left_area.y + 2
+                                && m.row < left_area.y + 2 + visible_rows as u16
                             {
-                                let clicked_idx = (m.row.saturating_sub(left_area.y + 1)) as usize;
+                                let clicked_idx =
+                                    state.scroll_offset + (m.row - (left_area.y + 2)) as usize;
                                 if clicked_idx < state.tokens.len() {
                                     state.selected_idx = clicked_idx;
                                     state.status_message =
@@ -899,6 +970,7 @@ fn main() -> Result<()> {
                                     m.row,
                                     right_area,
                                     state.preview_mode,
+                                    preview_styles.divider_is_screen_width,
                                 ) {
                                     state.select_token_by_key(key);
                                     click_flash =
@@ -974,6 +1046,19 @@ fn main() -> Result<()> {
                                     state.selected_idx += 1;
                                 }
                             }
+                            KeyCode::PageUp => {
+                                state.selected_idx = state.selected_idx.saturating_sub(5);
+                            }
+                            KeyCode::PageDown => {
+                                state.selected_idx = (state.selected_idx + 5)
+                                    .min(state.tokens.len().saturating_sub(1));
+                            }
+                            KeyCode::Home => {
+                                state.selected_idx = 0;
+                            }
+                            KeyCode::End => {
+                                state.selected_idx = state.tokens.len().saturating_sub(1);
+                            }
                             KeyCode::Enter => {
                                 let token = state.tokens[state.selected_idx].clone();
                                 match token.kind {
@@ -990,16 +1075,33 @@ fn main() -> Result<()> {
                                         );
                                     }
                                     TokenKind::Indicator => {
-                                        // Toggle indicator
+                                        // Cycle indicator
                                         state.current_theme.indicator =
-                                            if state.current_theme.indicator.as_deref()
-                                                == Some("▶ ")
-                                            {
-                                                Some("> ".to_string())
-                                            } else {
-                                                Some("▶ ".to_string())
+                                            match state.current_theme.indicator.as_deref() {
+                                                Some("> ") => Some("▶ ".to_string()),
+                                                Some("▶ ") => Some("{ascii:240}".to_string()),
+                                                Some("{ascii:240}") => Some("• ".to_string()),
+                                                _ => Some("> ".to_string()),
                                             };
                                         state.is_modified = true;
+                                    }
+                                    TokenKind::DividerChar => {
+                                        active_modal = ActiveModal::AsciiPicker(
+                                            "divider_char".to_string(),
+                                            AsciiGridModal::new("Pick CP437 Divider Char", 196),
+                                        );
+                                    }
+                                    TokenKind::DividerLength => {
+                                        state.toggle_divider_length();
+                                    }
+                                    TokenKind::MarqueeChar => {
+                                        active_modal = ActiveModal::AsciiPicker(
+                                            "marquee_char".to_string(),
+                                            AsciiGridModal::new("Pick CP437 Marquee Char", 7),
+                                        );
+                                    }
+                                    TokenKind::MarqueeGap => {
+                                        state.cycle_marquee_gap();
                                     }
                                 }
                             }
@@ -1035,6 +1137,7 @@ fn hit_test_preview(
     row: u16,
     right_area: Rect,
     mode: PreviewMode,
+    is_screen_width: bool,
 ) -> Option<(&'static str, u16, u16, u16)> {
     let w = right_area.width as usize;
     let avail_both = (w.saturating_sub(6)).max(4);
@@ -1085,10 +1188,18 @@ fn hit_test_preview(
             // 3. Left border
             if col == right_area.x {
                 if row == content_start_y + 3 {
-                    return Some(("left_tee", row, col, col + 1));
+                    if is_screen_width {
+                        return Some(("left_tee", row, col, col + 1));
+                    } else {
+                        return Some(("border_vertical", row, col, col + 1));
+                    }
                 }
                 if content_avail_h >= 6 && row == plugin_start_y {
-                    return Some(("left_tee", row, col, col + 1));
+                    if is_screen_width {
+                        return Some(("left_tee", row, col, col + 1));
+                    } else {
+                        return Some(("border_vertical", row, col, col + 1));
+                    }
                 }
                 if row == gt_y {
                     return Some(("gutter_left_tee", row, col, col + 1));
@@ -1098,10 +1209,18 @@ fn hit_test_preview(
             // 4. Right border
             if col == right_area.x + right_area.width - 1 {
                 if row == content_start_y + 3 {
-                    return Some(("right_tee", row, col, col + 1));
+                    if is_screen_width {
+                        return Some(("right_tee", row, col, col + 1));
+                    } else {
+                        return Some(("border_vertical", row, col, col + 1));
+                    }
                 }
                 if content_avail_h >= 6 && row == plugin_start_y {
-                    return Some(("right_tee", row, col, col + 1));
+                    if is_screen_width {
+                        return Some(("right_tee", row, col, col + 1));
+                    } else {
+                        return Some(("border_vertical", row, col, col + 1));
+                    }
                 }
                 if row == gt_y {
                     return Some(("gutter_right_tee", row, col, col + 1));

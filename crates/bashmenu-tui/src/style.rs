@@ -19,6 +19,10 @@ pub struct ResolvedThemeStyles {
     pub selection: Style,
     pub shortcut_key: Style,
     pub divider: Style,
+    pub divider_char: String,
+    pub divider_is_screen_width: bool,
+    pub marquee_char: String,
+    pub marquee_gap: usize,
     pub window_close_button: Style,
     pub indicator_symbol: String,
     pub borders: ResolvedWindowBorders,
@@ -46,6 +50,10 @@ impl Default for ResolvedThemeStyles {
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
             divider: Style::default().fg(Color::Cyan),
+            divider_char: "─".to_string(),
+            divider_is_screen_width: false,
+            marquee_char: "•".to_string(),
+            marquee_gap: 4,
             window_close_button: Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
             indicator_symbol: "► ".to_string(),
             borders: ResolvedWindowBorders::default(),
@@ -158,8 +166,34 @@ impl ResolvedThemeStyles {
         if let Some(ind) = &theme.indicator {
             let resolved_sym = bashmenu_core::resolve_glyph(ind, use_nerd_fonts);
             if !resolved_sym.is_empty() {
-                resolved.indicator_symbol = format!("{} ", resolved_sym);
+                resolved.indicator_symbol = if resolved_sym.ends_with(' ') {
+                    resolved_sym
+                } else {
+                    format!("{} ", resolved_sym)
+                };
             }
+        }
+
+        // Divider configuration
+        if let Some(div) = &theme.divider {
+            if let Some(ch) = &div.char {
+                let parsed = bashmenu_core::parse_ascii_val(ch);
+                if !parsed.is_empty() {
+                    resolved.divider_char = parsed;
+                }
+            }
+            if let Some(len) = &div.length {
+                resolved.divider_is_screen_width = len.contains("screen_width");
+            }
+        }
+
+        // Marquee configuration
+        if let Some(marq) = &theme.marquee {
+            let parsed = bashmenu_core::parse_ascii_val(&marq.char);
+            if !parsed.is_empty() {
+                resolved.marquee_char = parsed;
+            }
+            resolved.marquee_gap = marq.gap;
         }
 
         // Prefer 256 colors, fallback to 16
