@@ -23,6 +23,8 @@ pub const PLACEHOLDER_HELP_TEXT: &str = "\
 {host}                       │ System hostname
 {hostname}                   │ Alias for {host}
 {home}                       │ User home directory path (~ / /home/username)
+{dev_dir}                    │ Repository root directory where project resides
+{dev}                        │ Alias for {dev_dir}
 {bashmenu_dir}               │ Application root directory
 {scripts_dir}                │ Scripts directory path
 {scripts}                    │ Alias for {scripts_dir}

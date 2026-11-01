@@ -197,3 +197,36 @@ fn test_profile_and_editor_placeholders_expansion() {
     assert!(help_action.ends_with("/bashmenu.md"));
     assert!(help_action.contains("/scripts/rich.sh"));
 }
+
+#[test]
+fn test_dev_dir_placeholder_resolution() {
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/bashmenu.yml");
+    let config = load_config(fixture).expect("load config");
+    let ctx = MacroContext::new(&config);
+
+    // dev_dir must be resolved to the repository root directory (where Cargo.toml with workspace resides)
+    assert!(
+        ctx.dev_dir.is_dir(),
+        "ctx.dev_dir must exist and be a directory: {:?}",
+        ctx.dev_dir
+    );
+    assert!(
+        ctx.dev_dir.join("Cargo.toml").exists(),
+        "ctx.dev_dir must contain Cargo.toml: {:?}",
+        ctx.dev_dir
+    );
+    assert!(
+        ctx.dev_dir.join("crates/bashmenu-core").exists(),
+        "ctx.dev_dir must contain crates/bashmenu-core: {:?}",
+        ctx.dev_dir
+    );
+
+    // Verify {dev_dir} and {dev} placeholders expand to ctx.dev_dir
+    let dev_dir_expanded = interpolate_placeholders("{dev_dir}/scripts/weather.sh", &ctx);
+    let expected = format!("{}/scripts/weather.sh", ctx.dev_dir.display());
+    assert_eq!(dev_dir_expanded, expected);
+
+    let dev_alias_expanded = interpolate_placeholders("{dev}/Cargo.toml", &ctx);
+    let expected_alias = format!("{}/Cargo.toml", ctx.dev_dir.display());
+    assert_eq!(dev_alias_expanded, expected_alias);
+}

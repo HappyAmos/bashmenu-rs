@@ -139,6 +139,11 @@ fn test_grid_pickers_navigation() {
         "Expected color modal to display 3-digit decimal badge 'Color: 017', got: {}",
         color_text
     );
+    assert!(
+        color_text.contains(" X"),
+        "Expected color modal to display uppercase 'X' indicator for selected color, got: {}",
+        color_text
+    );
 
     let mut ascii_buf = Buffer::empty(area);
     ascii_modal.render(area, &styles, &mut ascii_buf);

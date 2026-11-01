@@ -78,6 +78,46 @@ pub struct ThemeEditorState {
     pub preview_mode: PreviewMode,
 }
 
+/// Converts a Ratatui Color to an ANSI 256 color index (0..=255)
+pub fn color_to_u8(color: ratatui::style::Color) -> u8 {
+    match color {
+        ratatui::style::Color::Reset => 0,
+        ratatui::style::Color::Black => 0,
+        ratatui::style::Color::Red => 1,
+        ratatui::style::Color::Green => 2,
+        ratatui::style::Color::Yellow => 3,
+        ratatui::style::Color::Blue => 4,
+        ratatui::style::Color::Magenta => 5,
+        ratatui::style::Color::Cyan => 6,
+        ratatui::style::Color::Gray => 7,
+        ratatui::style::Color::DarkGray => 8,
+        ratatui::style::Color::LightRed => 9,
+        ratatui::style::Color::LightGreen => 10,
+        ratatui::style::Color::LightYellow => 11,
+        ratatui::style::Color::LightBlue => 12,
+        ratatui::style::Color::LightMagenta => 13,
+        ratatui::style::Color::LightCyan => 14,
+        ratatui::style::Color::White => 15,
+        ratatui::style::Color::Indexed(code) => code,
+        ratatui::style::Color::Rgb(r, g, b) => {
+            if r == g && g == b {
+                if r < 8 {
+                    16
+                } else if r > 248 {
+                    231
+                } else {
+                    ((r as u16 - 8) * 24 / 247) as u8 + 232
+                }
+            } else {
+                let qr = (r as u16 * 5 / 255) as u8;
+                let qg = (g as u16 * 5 / 255) as u8;
+                let qb = (b as u16 * 5 / 255) as u8;
+                16 + 36 * qr + 6 * qg + qb
+            }
+        }
+    }
+}
+
 impl ThemeEditorState {
     pub fn new(themes_path: PathBuf, target_theme: Option<String>) -> Self {
         let themes = if themes_path.exists() {
@@ -548,9 +588,34 @@ impl ThemeEditorState {
                         return n as u8;
                     }
                 }
+                if let Some(c) = bashmenu_tui::parse_color_value(val) {
+                    return color_to_u8(c);
+                }
             }
         }
-        255
+        // Fallback to resolved styles from active theme
+        let styles = ResolvedThemeStyles::from_theme(&self.current_theme, true);
+        match key {
+            "background" => color_to_u8(styles.background),
+            "text" => styles.text.fg.map(color_to_u8).unwrap_or(255),
+            "highlight" => styles.highlight.bg.map(color_to_u8).unwrap_or(255),
+            "border" => color_to_u8(styles.border),
+            "divider" => styles.divider.fg.map(color_to_u8).unwrap_or(255),
+            "accent" => styles.accent.fg.map(color_to_u8).unwrap_or(255),
+            "shortcut_key" => styles.shortcut_key.fg.map(color_to_u8).unwrap_or(255),
+            "help_text" => styles.help_text.fg.map(color_to_u8).unwrap_or(255),
+            "gutter" => styles.gutter.fg.map(color_to_u8).unwrap_or(255),
+            "window_close_button" => styles
+                .window_close_button
+                .fg
+                .map(color_to_u8)
+                .unwrap_or(255),
+            "scrollbar" => styles.scrollbar.fg.map(color_to_u8).unwrap_or(255),
+            "toast_info" => color_to_u8(styles.toast_info),
+            "toast_warning" => color_to_u8(styles.toast_warning),
+            "toast_error" => color_to_u8(styles.toast_error),
+            _ => 255,
+        }
     }
 
     pub fn set_border_token(&mut self, key: &str, ch: char) {

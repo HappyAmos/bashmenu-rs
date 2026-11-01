@@ -2,6 +2,7 @@
 
 use super::frame::render_modal_frame;
 use crate::style::ResolvedThemeStyles;
+use crate::wallpaper::color_to_rgb;
 use bashmenu_core::cp437_to_char;
 use crossterm::event::{KeyCode, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
@@ -113,16 +114,28 @@ impl ColorGridModal {
                 let py = grid_y + row as u16;
 
                 let is_selected = code == self.selected_code;
-                let cell_style = if is_selected {
-                    Style::default()
-                        .fg(Color::Black)
-                        .bg(Color::Indexed(code))
-                        .add_modifier(Modifier::BOLD | Modifier::UNDERLINED)
+                let (cell_str, cell_style) = if is_selected {
+                    let (r, g, b) = color_to_rgb(Color::Indexed(code));
+                    let lum = (r as u32 * 299 + g as u32 * 587 + b as u32 * 114) / 1000;
+                    let fg_color = if lum > 128 {
+                        Color::Black
+                    } else {
+                        Color::White
+                    };
+                    (
+                        " X",
+                        Style::default()
+                            .fg(fg_color)
+                            .bg(Color::Indexed(code))
+                            .add_modifier(Modifier::BOLD),
+                    )
                 } else {
-                    Style::default().bg(Color::Indexed(code)).fg(Color::Reset)
+                    (
+                        "  ",
+                        Style::default().bg(Color::Indexed(code)).fg(Color::Reset),
+                    )
                 };
 
-                let cell_str = "  ";
                 buf.set_string(px, py, cell_str, cell_style);
             }
         }

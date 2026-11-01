@@ -12,7 +12,7 @@ use crate::config::BashMenuConfig;
 use crate::glyph::{parse_ascii_val, resolve_glyph};
 use regex::{Captures, Regex};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Runtime context passed into the macro interpolation engine
 #[derive(Debug, Clone)]
@@ -23,6 +23,8 @@ pub struct MacroContext<'a> {
     pub bashmenu_dir: PathBuf,
     /// User home directory
     pub home_dir: PathBuf,
+    /// Development/repository root directory where bashmenu-rs resides
+    pub dev_dir: PathBuf,
     /// Terminal viewport width
     pub window_width: usize,
     /// Terminal viewport height
@@ -54,17 +56,138 @@ impl<'a> MacroContext<'a> {
                     }
                 }
             });
+        let dev_dir = resolve_dev_dir(&home_dir, &bashmenu_dir);
 
         Self {
             config,
             bashmenu_dir,
             home_dir,
+            dev_dir,
             window_width: 80,
             window_height: 24,
             screen_width: 80,
             extra_vars: HashMap::new(),
         }
     }
+}
+
+/// Resolves the repository / project github directory where bashmenu-rs resides on the PC.
+///
+/// Detection strategy (non-hardcoded):
+/// 1. Environment variable override: `BASHMENU_DEV_DIR` or `DEV_DIR`.
+/// 2. Current working directory or ancestors containing `.git` and (`crates/bashmenu-core` or `Cargo.toml`).
+/// 3. Canonical symlinks in `~/.config/bashmenu` (e.g. `assets`, `scripts`, `bashmenu.md`) pointing into the repository root.
+/// 4. `CARGO_MANIFEST_DIR` if running under tests / cargo build.
+/// 5. Walk up from current executable path `std::env::current_exe()`.
+/// 6. Common user development directories under `home_dir`: `github/bashmenu-rs`, `projects/bashmenu-rs`, etc.
+/// 7. Top-level git directory via `git rev-parse --show-toplevel`.
+/// 8. Fallback to `bashmenu_dir`.
+pub fn resolve_dev_dir(home_dir: &Path, bashmenu_dir: &Path) -> PathBuf {
+    // 1. Environment variable override
+    if let Ok(val) = std::env::var("BASHMENU_DEV_DIR").or_else(|_| std::env::var("DEV_DIR")) {
+        let p = PathBuf::from(val.trim());
+        if p.exists() {
+            return p;
+        }
+    }
+
+    // 2. Current working directory and ancestors
+    if let Ok(cwd) = std::env::current_dir() {
+        for ancestor in cwd.ancestors() {
+            if (ancestor.join(".git").exists() || ancestor.join(".git").is_file())
+                && (ancestor.join("crates/bashmenu-core").exists()
+                    || (ancestor.join("Cargo.toml").exists()
+                        && ancestor.join("bashmenu.mnu").exists()))
+            {
+                return ancestor.to_path_buf();
+            }
+        }
+    }
+
+    // 3. Check symlinks in bashmenu_dir (assets, scripts, bashmenu.md) pointing to the repo root
+    for link_name in &["assets", "scripts", "bashmenu.md"] {
+        let link_path = bashmenu_dir.join(link_name);
+        if let Ok(target) = std::fs::read_link(&link_path) {
+            let abs_target = if target.is_relative() {
+                bashmenu_dir.join(&target)
+            } else {
+                target
+            };
+            if let Ok(canon) = abs_target.canonicalize() {
+                if let Some(parent) = canon.parent() {
+                    if parent.join(".git").exists() || parent.join("Cargo.toml").exists() {
+                        return parent.to_path_buf();
+                    }
+                }
+            }
+        }
+    }
+
+    // 4. Check CARGO_MANIFEST_DIR (test harnesses and dev runs)
+    if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
+        let p = PathBuf::from(manifest_dir);
+        for ancestor in p.ancestors() {
+            if (ancestor.join(".git").exists() || ancestor.join(".git").is_file())
+                && (ancestor.join("crates/bashmenu-core").exists()
+                    || (ancestor.join("Cargo.toml").exists()
+                        && ancestor.join("bashmenu.mnu").exists()))
+            {
+                return ancestor.to_path_buf();
+            }
+        }
+    }
+
+    // 5. Check executable path ancestors
+    if let Ok(exe) = std::env::current_exe() {
+        if let Ok(canon) = exe.canonicalize() {
+            for ancestor in canon.ancestors() {
+                if (ancestor.join(".git").exists() || ancestor.join(".git").is_file())
+                    && (ancestor.join("crates/bashmenu-core").exists()
+                        || (ancestor.join("Cargo.toml").exists()
+                            && ancestor.join("bashmenu.mnu").exists()))
+                {
+                    return ancestor.to_path_buf();
+                }
+            }
+        }
+    }
+
+    // 6. Common user development directories under home
+    let common_subpaths = [
+        "github/bashmenu-rs",
+        "github/bashmenu",
+        "src/bashmenu-rs",
+        "projects/bashmenu-rs",
+        "code/bashmenu-rs",
+        "dev/bashmenu-rs",
+        "git/bashmenu-rs",
+        "Repositories/bashmenu-rs",
+    ];
+    for sub in &common_subpaths {
+        let cand = home_dir.join(sub);
+        if cand.is_dir() && (cand.join(".git").exists() || cand.join("Cargo.toml").exists()) {
+            return cand;
+        }
+    }
+
+    // 7. Fallback to git rev-parse if git CLI is present
+    if let Ok(output) = std::process::Command::new("git")
+        .args(["rev-parse", "--show-toplevel"])
+        .output()
+    {
+        if output.status.success() {
+            let s = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !s.is_empty() {
+                let p = PathBuf::from(s);
+                if p.is_dir() {
+                    return p;
+                }
+            }
+        }
+    }
+
+    // 8. Fallback to bashmenu_dir
+    bashmenu_dir.to_path_buf()
 }
 
 struct LocalTimeStrings {
@@ -422,6 +545,11 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
 
     if res.contains("{home}") {
         direct_map.insert("{home}", ctx.home_dir.to_string_lossy().to_string());
+    }
+    if res.contains("{dev_dir}") || res.contains("{dev}") {
+        let dev_str = ctx.dev_dir.to_string_lossy().to_string();
+        direct_map.insert("{dev_dir}", dev_str.clone());
+        direct_map.insert("{dev}", dev_str);
     }
     if res.contains("{bashmenu_dir}") {
         direct_map.insert(

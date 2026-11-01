@@ -21,8 +21,8 @@ pub use glyph::{
     CP437_TABLE,
 };
 pub use macro_engine::{
-    extract_toasts, interpolate_placeholders, resolve_config_dot_path, MacroContext,
-    ToastNotification, ToastSeverity,
+    extract_toasts, interpolate_placeholders, resolve_config_dot_path, resolve_dev_dir,
+    MacroContext, ToastNotification, ToastSeverity,
 };
 pub use menu::{load_menu, save_menu, MenuItem, MenuItemType, MenuSchema, Submenu};
 pub use notebook::{

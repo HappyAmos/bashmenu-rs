@@ -571,6 +571,7 @@ fn main() -> Result<()> {
                                     let clicked_idx =
                                         state.scroll_offset + (m.row - (left_area.y + 2)) as usize;
                                     if clicked_idx < state.tokens.len() {
+                                        let was_selected = clicked_idx == state.selected_idx;
                                         state.selected_idx = clicked_idx;
                                         let token = state.tokens[clicked_idx].clone();
                                         toast_rack.add(ToastNotification {
@@ -596,6 +597,14 @@ fn main() -> Result<()> {
                                         );
                                         click_flash = Some((std::time::Instant::now(), spans));
                                         need_redraw = true;
+
+                                        // If clicked again on the already selected item, or clicked on the value column, open picker
+                                        if was_selected || m.column >= left_area.x + 22 {
+                                            open_selected_token_picker(
+                                                &mut state,
+                                                &mut active_modal,
+                                            );
+                                        }
                                     }
                                     continue;
                                 }
@@ -832,87 +841,7 @@ fn main() -> Result<()> {
                                     }
                                 }
                                 KeyCode::Enter => {
-                                    let token = state.tokens[state.selected_idx].clone();
-                                    match token.kind {
-                                        TokenKind::Color(key) => {
-                                            let initial_code = state.get_color_token_u8(&key);
-                                            let title = if key == "background" {
-                                                "Pick Background Color"
-                                            } else {
-                                                "Pick 256 Color"
-                                            };
-                                            active_modal = ActiveModal::ColorPicker(
-                                                key,
-                                                ColorGridModal::new(title, initial_code),
-                                            );
-                                        }
-                                        TokenKind::WallpaperImage => {
-                                            let start_dir = if let Ok(cwd) = std::env::current_dir()
-                                            {
-                                                let wp_dir = cwd.join("assets/wallpapers");
-                                                if wp_dir.is_dir() {
-                                                    wp_dir
-                                                } else {
-                                                    cwd
-                                                }
-                                            } else {
-                                                PathBuf::from(".")
-                                            };
-                                            active_modal =
-                                                ActiveModal::WallpaperPicker(FilePickerModal::new(
-                                                    "Choose Wallpaper Image",
-                                                    &start_dir,
-                                                    false,
-                                                ));
-                                        }
-                                        TokenKind::Border(key) => {
-                                            active_modal = ActiveModal::AsciiPicker(
-                                                key,
-                                                AsciiGridModal::new("Pick CP437 Border Char", 196),
-                                            );
-                                        }
-                                        TokenKind::Indicator => {
-                                            // Cycle indicator
-                                            state.current_theme.indicator =
-                                                match state.current_theme.indicator.as_deref() {
-                                                    Some("> ") => Some("▶ ".to_string()),
-                                                    Some("▶ ") => Some("{ascii:240}".to_string()),
-                                                    Some("{ascii:240}") => Some("• ".to_string()),
-                                                    _ => Some("> ".to_string()),
-                                                };
-                                            state.is_modified = true;
-                                        }
-                                        TokenKind::DividerChar => {
-                                            active_modal = ActiveModal::AsciiPicker(
-                                                "divider_char".to_string(),
-                                                AsciiGridModal::new("Pick CP437 Divider Char", 196),
-                                            );
-                                        }
-                                        TokenKind::DividerLength => {
-                                            state.toggle_divider_length();
-                                        }
-                                        TokenKind::MarqueeChar => {
-                                            active_modal = ActiveModal::AsciiPicker(
-                                                "marquee_char".to_string(),
-                                                AsciiGridModal::new("Pick CP437 Marquee Char", 7),
-                                            );
-                                        }
-                                        TokenKind::MarqueeGap => {
-                                            state.cycle_marquee_gap();
-                                        }
-                                        TokenKind::ToastChar => {
-                                            active_modal = ActiveModal::AsciiPicker(
-                                                "toast_char".to_string(),
-                                                AsciiGridModal::new(
-                                                    "Pick Toast Left Bar Glyph",
-                                                    221,
-                                                ),
-                                            );
-                                        }
-                                        TokenKind::ToastTimeout => {
-                                            state.cycle_toast_timeout();
-                                        }
-                                    }
+                                    open_selected_token_picker(&mut state, &mut active_modal);
                                 }
                                 KeyCode::Esc | KeyCode::Char('q') => {
                                     if state.is_modified {
@@ -940,6 +869,78 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn open_selected_token_picker(state: &mut ThemeEditorState, active_modal: &mut ActiveModal) {
+    let token = state.tokens[state.selected_idx].clone();
+    match token.kind {
+        TokenKind::Color(key) => {
+            let initial_code = state.get_color_token_u8(&key);
+            let title = if key == "background" {
+                "Pick Background Color"
+            } else {
+                "Pick 256 Color"
+            };
+            *active_modal = ActiveModal::ColorPicker(key, ColorGridModal::new(title, initial_code));
+        }
+        TokenKind::WallpaperImage => {
+            let start_dir = if let Ok(cwd) = std::env::current_dir() {
+                let wp_dir = cwd.join("assets/wallpapers");
+                if wp_dir.is_dir() {
+                    wp_dir
+                } else {
+                    cwd
+                }
+            } else {
+                PathBuf::from(".")
+            };
+            *active_modal = ActiveModal::WallpaperPicker(FilePickerModal::new(
+                "Choose Wallpaper Image",
+                &start_dir,
+                false,
+            ));
+        }
+        TokenKind::Border(key) => {
+            *active_modal =
+                ActiveModal::AsciiPicker(key, AsciiGridModal::new("Pick CP437 Border Char", 196));
+        }
+        TokenKind::Indicator => {
+            state.current_theme.indicator = match state.current_theme.indicator.as_deref() {
+                Some("> ") => Some("▶ ".to_string()),
+                Some("▶ ") => Some("{ascii:240}".to_string()),
+                Some("{ascii:240}") => Some("• ".to_string()),
+                _ => Some("> ".to_string()),
+            };
+            state.is_modified = true;
+        }
+        TokenKind::DividerChar => {
+            *active_modal = ActiveModal::AsciiPicker(
+                "divider_char".to_string(),
+                AsciiGridModal::new("Pick CP437 Divider Char", 196),
+            );
+        }
+        TokenKind::DividerLength => {
+            state.toggle_divider_length();
+        }
+        TokenKind::MarqueeChar => {
+            *active_modal = ActiveModal::AsciiPicker(
+                "marquee_char".to_string(),
+                AsciiGridModal::new("Pick CP437 Marquee Char", 7),
+            );
+        }
+        TokenKind::MarqueeGap => {
+            state.cycle_marquee_gap();
+        }
+        TokenKind::ToastChar => {
+            *active_modal = ActiveModal::AsciiPicker(
+                "toast_char".to_string(),
+                AsciiGridModal::new("Pick Toast Left Bar Glyph", 221),
+            );
+        }
+        TokenKind::ToastTimeout => {
+            state.cycle_toast_timeout();
+        }
+    }
 }
 
 fn hit_test_preview(

@@ -28,7 +28,7 @@ pub use modals::{
     NoteEditorAction, NoteEditorModal, NoteViewerAction, NoteViewerModal, RadioModal,
     ThemePickerModal, ToggleChoice, ToggleModal,
 };
-pub use style::ResolvedThemeStyles;
+pub use style::{parse_color_value, ResolvedThemeStyles};
 pub use terminal::TerminalGuard;
 pub use toast::{ActiveToast, ToastRack};
 pub use wallpaper::{

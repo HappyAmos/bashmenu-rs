@@ -790,3 +790,47 @@ fn test_modals_and_toast_preview_wallpaper_compositing() {
         );
     }
 }
+
+#[test]
+fn test_color_picker_configured_color_selection_and_x_indicator() {
+    use bashmenu_tui::{ColorGridModal, ResolvedThemeStyles};
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use themeedit_cli::ThemeEditorState;
+
+    let fixture_path = get_fixture_path("bashmenu.themes");
+
+    // Test with dracula theme: border is [61, -1] -> 61, background is COLOR_BLACK -> 0
+    let state = ThemeEditorState::new(fixture_path.clone(), Some("dracula".to_string()));
+    assert_eq!(state.get_color_token_u8("border"), 61);
+    assert_eq!(state.get_color_token_u8("background"), 0);
+    assert_eq!(state.get_color_token_u8("title"), 201);
+
+    // Test with qbasic theme: border is [51, 19] -> 51, background is 19 -> 19
+    let qstate = ThemeEditorState::new(fixture_path.clone(), Some("qbasic".to_string()));
+    assert_eq!(qstate.get_color_token_u8("border"), 51);
+    assert_eq!(qstate.get_color_token_u8("background"), 19);
+
+    // Verify ColorGridModal displays the uppercase 'X' on the configured color
+    let modal = ColorGridModal::new("Pick 256 Color", state.get_color_token_u8("border"));
+    assert_eq!(modal.selected_code, 61);
+
+    let styles = ResolvedThemeStyles::from_theme(&state.current_theme, true);
+    let area = Rect::new(0, 0, 80, 30);
+    let mut buf = Buffer::empty(area);
+    modal.render(area, &styles, &mut buf);
+
+    let mut rendered_x = false;
+    for y in 0..area.height {
+        for x in 0..area.width {
+            if buf[(x, y)].symbol() == "X" {
+                rendered_x = true;
+                break;
+            }
+        }
+    }
+    assert!(
+        rendered_x,
+        "Color picker modal must render uppercase 'X' indicator on the selected color"
+    );
+}
