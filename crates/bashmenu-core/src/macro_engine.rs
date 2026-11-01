@@ -428,6 +428,355 @@ static ENV_RE: std::sync::LazyLock<Regex> =
     std::sync::LazyLock::new(|| Regex::new(r"\{env:([a-zA-Z0-9_]+)\}").unwrap());
 static DOT_RE: std::sync::LazyLock<Regex> =
     std::sync::LazyLock::new(|| Regex::new(r"\{([a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)+)\}").unwrap());
+static COMMAND_RE: std::sync::LazyLock<Regex> =
+    std::sync::LazyLock::new(|| Regex::new(r"\{command:((?:[^{}]|\{[^{}]*\})+)\}").unwrap());
+static FILE_PICKER_MACRO_RE: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
+    Regex::new(r"\{(file_picker(?:_new)?)(?::((?:[^{}]|\{[^{}]*\})+))?\}").unwrap()
+});
+static DIR_PICKER_MACRO_RE: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
+    Regex::new(r"\{(dir_picker(?:_new)?)(?::((?:[^{}]|\{[^{}]*\})+))?\}").unwrap()
+});
+static PICKER_MACRO_RE: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
+    Regex::new(r"\{(file_picker(?:_new)?|dir_picker(?:_new)?)(?::((?:[^{}]|\{[^{}]*\})+))?\}")
+        .unwrap()
+});
+static PRECEDING_QUOTED_DIR_RE: std::sync::LazyLock<Regex> =
+    std::sync::LazyLock::new(|| Regex::new(r#"["'`]([^"'`]+)/$"#).unwrap());
+static PRECEDING_UNQUOTED_DIR_RE: std::sync::LazyLock<Regex> =
+    std::sync::LazyLock::new(|| Regex::new(r"(?:^|[\s=])(\S+)/$").unwrap());
+
+const CMD_CACHE_TTL_SECS: u64 = 30;
+static CMD_CACHE: std::sync::LazyLock<
+    std::sync::Mutex<HashMap<String, (std::time::Instant, String)>>,
+> = std::sync::LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
+
+fn eval_command_substitution(cmd_str: &str) -> String {
+    let trimmed = cmd_str.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+    if let Ok(cache) = CMD_CACHE.lock() {
+        if let Some((ts, cached_out)) = cache.get(trimmed) {
+            if ts.elapsed() < std::time::Duration::from_secs(CMD_CACHE_TTL_SECS) {
+                return cached_out.clone();
+            }
+        }
+    }
+    let output = std::process::Command::new("/bin/bash")
+        .arg("-c")
+        .arg(trimmed)
+        .output()
+        .ok()
+        .map(|out| String::from_utf8_lossy(&out.stdout).trim().to_string())
+        .unwrap_or_default();
+    if let Ok(mut cache) = CMD_CACHE.lock() {
+        cache.insert(
+            trimmed.to_string(),
+            (std::time::Instant::now(), output.clone()),
+        );
+    }
+    output
+}
+
+/// Parsed specification for a `{file_picker...}` or `{dir_picker...}` interactive macro.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PickerSpec {
+    /// True if this is a directory picker (`dir_picker` / `dir_picker_new`)
+    pub is_dir: bool,
+    /// True if creation of new files/folders (`'n'`) is allowed
+    pub is_new: bool,
+    /// Optional path modifier (`stem`, `name`, `base`, `dir`, `ext`, `parent`)
+    pub modifier: Option<String>,
+    /// Resolved starting directory for the picker modal
+    pub start_dir: PathBuf,
+}
+
+fn expand_tilde_path(raw: &str, home_dir: &Path) -> PathBuf {
+    let trimmed = raw.trim();
+    if trimmed == "~" {
+        home_dir.to_path_buf()
+    } else if let Some(rest) = trimmed.strip_prefix("~/") {
+        home_dir.join(rest)
+    } else {
+        PathBuf::from(trimmed)
+    }
+}
+
+/// Parses a picker macro type and optional colon-delimited specification into
+/// `(is_new, modifier, start_dir_string)`.
+pub fn parse_picker_macro(
+    macro_type: &str,
+    spec: Option<&str>,
+    ctx: Option<&MacroContext>,
+) -> (bool, Option<String>, Option<String>) {
+    let mut is_new = macro_type.ends_with("_new");
+    let mut modifier = None;
+    let mut start_dir = None;
+
+    if let Some(raw_spec) = spec {
+        let resolved_spec = if let Some(c) = ctx {
+            if raw_spec.contains('{') {
+                interpolate_placeholders(raw_spec, c)
+            } else {
+                raw_spec.to_string()
+            }
+        } else {
+            raw_spec.to_string()
+        };
+
+        let mut tokens: Vec<&str> = resolved_spec.split(':').collect();
+        if let Some(pos) = tokens.iter().position(|&t| t == "new") {
+            is_new = true;
+            tokens.remove(pos);
+        }
+
+        if let Some(&last) = tokens.last() {
+            if matches!(last, "stem" | "name" | "base" | "dir" | "ext" | "parent") {
+                modifier = Some(last.to_string());
+                tokens.pop();
+            }
+        }
+
+        if !tokens.is_empty() {
+            if tokens[0] == "path" {
+                tokens.remove(0);
+            }
+            if !tokens.is_empty() {
+                start_dir = Some(tokens.join(":"));
+            }
+        }
+    }
+
+    (is_new, modifier, start_dir)
+}
+
+/// Extracts the first `{file_picker...}` or `{dir_picker...}` specification from an action string.
+pub fn extract_picker_spec(
+    action_str: &str,
+    ctx: &MacroContext,
+    default_start_dir: Option<&str>,
+) -> Option<PickerSpec> {
+    let m = PICKER_MACRO_RE.captures(action_str)?;
+    let full_match = m.get(0)?;
+    let macro_type = m.get(1)?.as_str();
+    let spec_opt = m.get(2).map(|s| s.as_str());
+    let is_dir = macro_type.starts_with("dir_picker");
+    let (is_new, modifier, parsed_start) = parse_picker_macro(macro_type, spec_opt, Some(ctx));
+
+    let start_dir_str = if let Some(sd) = parsed_start {
+        if sd.contains('{') {
+            interpolate_placeholders(&sd, ctx)
+        } else {
+            sd
+        }
+    } else {
+        let preceding = &action_str[..full_match.start()];
+        let resolved_prec = if preceding.contains('{') {
+            interpolate_placeholders(preceding, ctx)
+        } else {
+            preceding.to_string()
+        };
+        let cand_opt = PRECEDING_QUOTED_DIR_RE
+            .captures(&resolved_prec)
+            .or_else(|| PRECEDING_UNQUOTED_DIR_RE.captures(&resolved_prec))
+            .and_then(|c| c.get(1))
+            .map(|m| m.as_str().to_string());
+
+        if let Some(cand) = cand_opt {
+            let expanded = expand_tilde_path(&cand, &ctx.home_dir);
+            if expanded.is_dir() || default_start_dir.is_none() {
+                cand
+            } else {
+                let def = default_start_dir.unwrap_or("~");
+                interpolate_placeholders(def, ctx)
+            }
+        } else {
+            let def = default_start_dir.unwrap_or("~");
+            interpolate_placeholders(def, ctx)
+        }
+    };
+
+    Some(PickerSpec {
+        is_dir,
+        is_new,
+        modifier,
+        start_dir: expand_tilde_path(&start_dir_str, &ctx.home_dir),
+    })
+}
+
+/// Substitutes `{file_picker...}` macros and their modifiers (`:stem`, `:name`, `:base`, `:dir`, `:ext`, `:path:`)
+/// with the chosen file path.
+pub fn apply_file_picker_macros(
+    template_str: &str,
+    chosen_path: &Path,
+    ctx: Option<&MacroContext>,
+) -> String {
+    if !template_str.contains("{file_picker") {
+        return template_str.to_string();
+    }
+    let fpath = chosen_path.to_string_lossy().to_string();
+    let p_name = chosen_path
+        .file_name()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let p_base = chosen_path
+        .file_stem()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let p_dir = chosen_path
+        .parent()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let p_stem = if p_dir.is_empty() || p_dir == "." {
+        p_base.clone()
+    } else {
+        chosen_path
+            .parent()
+            .unwrap()
+            .join(&p_base)
+            .to_string_lossy()
+            .to_string()
+    };
+    let p_ext = chosen_path
+        .extension()
+        .map(|e| format!(".{}", e.to_string_lossy()))
+        .unwrap_or_default();
+
+    let mut res = template_str.to_string();
+
+    // Avoid duplicating a preceding directory prefix when the macro has no modifier
+    if let Some(caps) = FILE_PICKER_MACRO_RE.captures(&res) {
+        if let (Some(full), Some(m_type)) = (caps.get(0), caps.get(1)) {
+            let (_, modifier, _) =
+                parse_picker_macro(m_type.as_str(), caps.get(2).map(|m| m.as_str()), ctx);
+            if modifier.is_none() {
+                let preceding = &res[..full.start()];
+                let dir_cap = PRECEDING_QUOTED_DIR_RE
+                    .captures(preceding)
+                    .or_else(|| PRECEDING_UNQUOTED_DIR_RE.captures(preceding));
+                if let Some(dc) = dir_cap {
+                    if let Some(dir_match) = dc.get(1) {
+                        let cand = dir_match.as_str();
+                        let cand_resolved = match ctx {
+                            Some(c) if cand.contains('{') => interpolate_placeholders(cand, c),
+                            _ => cand.to_string(),
+                        };
+                        let home_fallback = PathBuf::from("/");
+                        let home_ref = ctx.map(|c| c.home_dir.as_path()).unwrap_or(&home_fallback);
+                        let cand_path = expand_tilde_path(&cand_resolved, home_ref);
+                        let cand_clean = cand_path
+                            .to_string_lossy()
+                            .trim_end_matches('/')
+                            .to_string();
+                        let parent_clean = p_dir.trim_end_matches('/').to_string();
+                        if (!cand_clean.is_empty() && cand_clean == parent_clean)
+                            || cand_path.is_dir()
+                        {
+                            res = format!(
+                                "{}{}{}",
+                                &res[..dir_match.start()],
+                                fpath,
+                                &res[full.end()..]
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    FILE_PICKER_MACRO_RE
+        .replace_all(&res, |caps: &Captures| {
+            let m_type = &caps[1];
+            let spec_opt = caps.get(2).map(|m| m.as_str());
+            let (_, modifier, _) = parse_picker_macro(m_type, spec_opt, ctx);
+            match modifier.as_deref() {
+                Some("stem") => p_stem.clone(),
+                Some("name") => p_name.clone(),
+                Some("base") => p_base.clone(),
+                Some("dir") => p_dir.clone(),
+                Some("ext") => p_ext.clone(),
+                _ => fpath.clone(),
+            }
+        })
+        .into_owned()
+}
+
+/// Substitutes `{dir_picker...}` macros and their modifiers (`:name`, `:dir`, `:parent`, `:path:`)
+/// with the chosen directory path.
+pub fn apply_dir_picker_macros(
+    template_str: &str,
+    chosen_path: &Path,
+    ctx: Option<&MacroContext>,
+) -> String {
+    if !template_str.contains("{dir_picker") {
+        return template_str.to_string();
+    }
+    let dpath = chosen_path.to_string_lossy().to_string();
+    let p_name = chosen_path
+        .file_name()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let p_dir = chosen_path
+        .parent()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    let mut res = template_str.to_string();
+
+    if let Some(caps) = DIR_PICKER_MACRO_RE.captures(&res) {
+        if let (Some(full), Some(m_type)) = (caps.get(0), caps.get(1)) {
+            let (_, modifier, _) =
+                parse_picker_macro(m_type.as_str(), caps.get(2).map(|m| m.as_str()), ctx);
+            if modifier.is_none() {
+                let preceding = &res[..full.start()];
+                let dir_cap = PRECEDING_QUOTED_DIR_RE
+                    .captures(preceding)
+                    .or_else(|| PRECEDING_UNQUOTED_DIR_RE.captures(preceding));
+                if let Some(dc) = dir_cap {
+                    if let Some(dir_match) = dc.get(1) {
+                        let cand = dir_match.as_str();
+                        let cand_resolved = match ctx {
+                            Some(c) if cand.contains('{') => interpolate_placeholders(cand, c),
+                            _ => cand.to_string(),
+                        };
+                        let home_fallback = PathBuf::from("/");
+                        let home_ref = ctx.map(|c| c.home_dir.as_path()).unwrap_or(&home_fallback);
+                        let cand_path = expand_tilde_path(&cand_resolved, home_ref);
+                        let cand_clean = cand_path
+                            .to_string_lossy()
+                            .trim_end_matches('/')
+                            .to_string();
+                        let parent_clean = p_dir.trim_end_matches('/').to_string();
+                        if (!cand_clean.is_empty() && cand_clean == parent_clean)
+                            || cand_path.is_dir()
+                        {
+                            res = format!(
+                                "{}{}{}",
+                                &res[..dir_match.start()],
+                                dpath,
+                                &res[full.end()..]
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    DIR_PICKER_MACRO_RE
+        .replace_all(&res, |caps: &Captures| {
+            let m_type = &caps[1];
+            let spec_opt = caps.get(2).map(|m| m.as_str());
+            let (_, modifier, _) = parse_picker_macro(m_type, spec_opt, ctx);
+            match modifier.as_deref() {
+                Some("name") => p_name.clone(),
+                Some("dir") | Some("parent") => p_dir.clone(),
+                _ => dpath.clone(),
+            }
+        })
+        .into_owned()
+}
 static TOAST_RE: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
     Regex::new(r#"\{toast:\s*(?:(\d+(?:\.\d+)?)\s*:\s*)?(?:"([^"]*)"|'([^']*)'|([^}]+))\s*\}"#)
         .unwrap()
@@ -747,6 +1096,10 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
         direct_map.insert("{time_12}", times.time_12);
         direct_map.insert("{time_12_short}", times.time_12_short);
     }
+    if res.contains("{utc_seconds}") {
+        let now = unsafe { libc::time(std::ptr::null_mut()) };
+        direct_map.insert("{utc_seconds}", now.to_string());
+    }
 
     if res.contains("{localip}") {
         direct_map.insert("{localip}", get_primary_ip());
@@ -786,6 +1139,21 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
                 } else {
                     caps[0].to_string()
                 }
+            })
+            .to_string();
+    }
+
+    // 7. Command substitution: {command:<cmd>} with 30s TTL caching
+    if res.contains("{command:") {
+        res = COMMAND_RE
+            .replace_all(&res, |caps: &Captures| {
+                let raw_cmd = &caps[1];
+                let resolved_cmd = if raw_cmd.contains('{') && depth < 3 {
+                    interpolate_internal(raw_cmd, ctx, depth + 1)
+                } else {
+                    raw_cmd.to_string()
+                };
+                eval_command_substitution(&resolved_cmd)
             })
             .to_string();
     }

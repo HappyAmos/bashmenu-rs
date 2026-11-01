@@ -1,6 +1,10 @@
 //! Menu definitions, schema normalization, and serialization for `bashmenu.mnu`.
 
 use crate::error::{BashMenuError, Result};
+use crate::macro_engine::{
+    apply_dir_picker_macros, apply_file_picker_macros, extract_picker_spec, MacroContext,
+    PickerSpec,
+};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
 use std::fs;
@@ -315,6 +319,54 @@ impl MenuItem {
                     .filter(|s| !s.trim().is_empty())
             })
             .unwrap_or("Enter parameter:")
+    }
+
+    /// Returns the first `{file_picker...}` or `{dir_picker...}` specification found across
+    /// `file`, `action`, `command`, or `script`.
+    pub fn first_picker_spec(&self, ctx: &MacroContext) -> Option<PickerSpec> {
+        let def_start = self.start_dir.as_deref();
+        for field in [
+            self.file.as_deref(),
+            self.action.as_deref(),
+            self.command.as_deref(),
+            self.script.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            if field.contains("{file_picker") || field.contains("{dir_picker") {
+                if let Some(spec) = extract_picker_spec(field, ctx, def_start) {
+                    return Some(spec);
+                }
+            }
+        }
+        None
+    }
+
+    /// Substitutes `{file_picker...}` or `{dir_picker...}` macros across `file`, `action`, `command`, and `script`.
+    pub fn apply_picker_result(
+        &mut self,
+        chosen_path: &Path,
+        is_dir: bool,
+        ctx: Option<&MacroContext>,
+    ) {
+        let apply_fn = if is_dir {
+            apply_dir_picker_macros
+        } else {
+            apply_file_picker_macros
+        };
+        if let Some(ref mut s) = self.file {
+            *s = apply_fn(s, chosen_path, ctx);
+        }
+        if let Some(ref mut s) = self.action {
+            *s = apply_fn(s, chosen_path, ctx);
+        }
+        if let Some(ref mut s) = self.command {
+            *s = apply_fn(s, chosen_path, ctx);
+        }
+        if let Some(ref mut s) = self.script {
+            *s = apply_fn(s, chosen_path, ctx);
+        }
     }
 
     /// Radio selection options as (value, label) pairs

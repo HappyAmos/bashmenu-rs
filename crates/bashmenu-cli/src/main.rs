@@ -64,7 +64,7 @@ enum ActiveModal {
     ConfigInput(String, InputModal),
     ParamInput(Box<bashmenu_core::MenuItem>, InputModal),
     Radio(String, RadioModal),
-    EditorFilePicker(Box<bashmenu_core::MenuItem>, FilePickerModal),
+    ItemFilePicker(Box<bashmenu_core::MenuItem>, bool, FilePickerModal),
     StreamOutput(StreamOutputModal),
 }
 
@@ -273,7 +273,7 @@ fn main() -> Result<()> {
                     ActiveModal::Radio(_, modal) => {
                         modal.render(f.area(), &styles, f.buffer_mut());
                     }
-                    ActiveModal::EditorFilePicker(_, modal) => {
+                    ActiveModal::ItemFilePicker(_, _, modal) => {
                         modal.render(f.area(), &styles, f.buffer_mut());
                     }
                     ActiveModal::StreamOutput(modal) => {
@@ -778,7 +778,7 @@ fn main() -> Result<()> {
                         active_modal = ActiveModal::None;
                     }
                 }
-                ActiveModal::EditorFilePicker(item, modal) => {
+                ActiveModal::ItemFilePicker(item, is_dir, modal) => {
                     let chosen = match ev {
                         Event::Key(key) => modal.handle_key(key.code),
                         Event::Mouse(mouse) => modal.handle_mouse(mouse, area),
@@ -786,18 +786,18 @@ fn main() -> Result<()> {
                     };
                     if let Some(opt_path) = chosen {
                         if let Some(target_path) = opt_path {
-                            let editor_bin = locate_tool("bashedit");
-                            let _ = guard.suspend(|| {
-                                let mut cmd = Command::new(&editor_bin);
-                                cmd.arg(target_path.to_string_lossy().as_ref());
-                                if let Some(ts) = item.tabstop {
-                                    cmd.arg("--tabstop").arg(ts.to_string());
-                                }
-                                let _ = cmd.status();
-                                Ok(())
-                            });
+                            let mut ctx = MacroContext::new(&config);
+                            ctx.window_width = size.width as usize;
+                            ctx.window_height = size.height as usize;
+                            ctx.screen_width = size.width as usize;
+
+                            let mut resolved_item = item.clone();
+                            resolved_item.apply_picker_result(&target_path, *is_dir, Some(&ctx));
+                            active_modal = ActiveModal::None;
+                            pending_action = Some(MenuAction::Execute(resolved_item));
+                        } else {
+                            active_modal = ActiveModal::None;
                         }
-                        active_modal = ActiveModal::None;
                     }
                 }
                 ActiveModal::StreamOutput(modal) => {
@@ -1113,6 +1113,22 @@ fn main() -> Result<()> {
                                 let modal =
                                     InputModal::new(title, prompt, "").with_masked(item.masked());
                                 active_modal = ActiveModal::ParamInput(item, modal);
+                            } else if let Some(picker_spec) = item.first_picker_spec(&ctx) {
+                                let default_title = if picker_spec.is_dir {
+                                    "Select Directory"
+                                } else {
+                                    "Select File"
+                                };
+                                let raw_title = item.title().unwrap_or(default_title);
+                                let title = interpolate_placeholders(raw_title, &ctx);
+                                let picker = FilePickerModal::new(
+                                    title,
+                                    &picker_spec.start_dir,
+                                    picker_spec.is_dir,
+                                )
+                                .with_allow_new(picker_spec.is_new);
+                                active_modal =
+                                    ActiveModal::ItemFilePicker(item, picker_spec.is_dir, picker);
                             } else if item.r#type == MenuItemType::Editor {
                                 let target_raw = item
                                     .file
@@ -1122,39 +1138,20 @@ fn main() -> Result<()> {
                                     .or(item.script.as_ref())
                                     .map(|s| s.as_str())
                                     .unwrap_or_default();
-                                if target_raw.contains("{file_picker")
-                                    || target_raw.contains("{dir_picker")
-                                {
-                                    let is_dir_picker = target_raw.contains("dir_picker");
-                                    let allow_new = target_raw.contains("file_picker_new")
-                                        || target_raw.contains("dir_picker_new");
-                                    let start_dir = item.start_dir.as_deref().unwrap_or(".");
-                                    let exp_start = interpolate_placeholders(start_dir, &ctx);
-                                    let raw_title = item.title().unwrap_or("Select File");
-                                    let title = interpolate_placeholders(raw_title, &ctx);
-                                    let picker = FilePickerModal::new(
-                                        title,
-                                        &PathBuf::from(exp_start),
-                                        is_dir_picker,
-                                    )
-                                    .with_allow_new(allow_new);
-                                    active_modal = ActiveModal::EditorFilePicker(item, picker);
-                                } else {
-                                    let target = interpolate_placeholders(target_raw, &ctx);
-                                    let editor_bin = locate_tool("bashedit");
-                                    let _ = guard.suspend(|| {
-                                        let mut cmd = Command::new(&editor_bin);
-                                        let trimmed = target.trim();
-                                        if !trimmed.is_empty() {
-                                            cmd.arg(trimmed);
-                                        }
-                                        if let Some(ts) = item.tabstop {
-                                            cmd.arg("--tabstop").arg(ts.to_string());
-                                        }
-                                        let _ = cmd.status();
-                                        Ok(())
-                                    });
-                                }
+                                let target = interpolate_placeholders(target_raw, &ctx);
+                                let editor_bin = locate_tool("bashedit");
+                                let _ = guard.suspend(|| {
+                                    let mut cmd = Command::new(&editor_bin);
+                                    let trimmed = target.trim();
+                                    if !trimmed.is_empty() {
+                                        cmd.arg(trimmed);
+                                    }
+                                    if let Some(ts) = item.tabstop {
+                                        cmd.arg("--tabstop").arg(ts.to_string());
+                                    }
+                                    let _ = cmd.status();
+                                    Ok(())
+                                });
                             } else {
                                 let action_str = item.action.as_deref().unwrap_or_default();
                                 let command_str = item.command.as_deref().unwrap_or_default();

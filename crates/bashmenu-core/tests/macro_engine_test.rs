@@ -230,3 +230,126 @@ fn test_dev_dir_placeholder_resolution() {
     let expected_alias = format!("{}/Cargo.toml", ctx.dev_dir.display());
     assert_eq!(dev_alias_expanded, expected_alias);
 }
+
+#[test]
+fn test_utc_seconds_and_command_placeholders() {
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/bashmenu.yml");
+    let config = load_config(fixture).expect("load config");
+    let mut ctx = MacroContext::new(&config);
+    ctx.home_dir = std::path::PathBuf::from("/home/testuser");
+
+    // 1. {utc_seconds} resolves to a valid positive Unix timestamp integer
+    let utc_str = interpolate_placeholders("{utc_seconds}", &ctx);
+    let ts: i64 = utc_str
+        .parse()
+        .expect("{utc_seconds} must parse as integer");
+    assert!(ts > 1_700_000_000, "Timestamp should be recent: {}", ts);
+
+    // 2. {command:<cmd>} executes via bash and trims output
+    let cmd_out = interpolate_placeholders("Result: {command:printf 'hello_world'}", &ctx);
+    assert_eq!(cmd_out, "Result: hello_world");
+
+    // 3. {command:<cmd>} with nested placeholder inside command
+    let nested_out = interpolate_placeholders("Home is {command:echo {home}}", &ctx);
+    assert_eq!(nested_out, "Home is /home/testuser");
+}
+
+#[test]
+fn test_file_and_dir_picker_macros_and_modifiers() {
+    use bashmenu_core::{
+        apply_dir_picker_macros, apply_file_picker_macros, extract_picker_spec, MenuItem,
+    };
+    use std::path::PathBuf;
+
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/bashmenu.yml");
+    let config = load_config(fixture).expect("load config");
+    let mut ctx = MacroContext::new(&config);
+    ctx.home_dir = PathBuf::from("/home/testuser");
+    ctx.bashmenu_dir = PathBuf::from("/home/testuser/.config/bashmenu");
+
+    // 1. Extract picker specs
+    let spec1 = extract_picker_spec("cd {dir_picker_new} && opencode", &ctx, Some("~/github"))
+        .expect("extract dir_picker_new");
+    assert!(spec1.is_dir);
+    assert!(spec1.is_new);
+    assert_eq!(spec1.modifier, None);
+    assert_eq!(spec1.start_dir, PathBuf::from("/home/testuser/github"));
+
+    let spec2 = extract_picker_spec(
+        "cat {file_picker:path:{bashmenu_dir}/scripts:name}",
+        &ctx,
+        None,
+    )
+    .expect("extract file_picker with path and modifier");
+    assert!(!spec2.is_dir);
+    assert!(!spec2.is_new);
+    assert_eq!(spec2.modifier.as_deref(), Some("name"));
+    assert_eq!(
+        spec2.start_dir,
+        PathBuf::from("/home/testuser/.config/bashmenu/scripts")
+    );
+
+    // 2. Apply file_picker modifiers
+    let chosen_file = Path::new("/tmp/photos/vacation.png");
+    assert_eq!(
+        apply_file_picker_macros("open {file_picker}", chosen_file, Some(&ctx)),
+        "open /tmp/photos/vacation.png"
+    );
+    assert_eq!(
+        apply_file_picker_macros("stem={file_picker:stem}", chosen_file, Some(&ctx)),
+        "stem=/tmp/photos/vacation"
+    );
+    assert_eq!(
+        apply_file_picker_macros("name={file_picker:name}", chosen_file, Some(&ctx)),
+        "name=vacation.png"
+    );
+    assert_eq!(
+        apply_file_picker_macros("base={file_picker:base}", chosen_file, Some(&ctx)),
+        "base=vacation"
+    );
+    assert_eq!(
+        apply_file_picker_macros("dir={file_picker:dir}", chosen_file, Some(&ctx)),
+        "dir=/tmp/photos"
+    );
+    assert_eq!(
+        apply_file_picker_macros("ext={file_picker:ext}", chosen_file, Some(&ctx)),
+        "ext=.png"
+    );
+
+    // 3. Apply dir_picker modifiers
+    let chosen_dir = Path::new("/home/testuser/github/bashmenu-rs");
+    assert_eq!(
+        apply_dir_picker_macros("cd {dir_picker_new} && opencode", chosen_dir, Some(&ctx)),
+        "cd /home/testuser/github/bashmenu-rs && opencode"
+    );
+    assert_eq!(
+        apply_dir_picker_macros("folder={dir_picker:name}", chosen_dir, Some(&ctx)),
+        "folder=bashmenu-rs"
+    );
+    assert_eq!(
+        apply_dir_picker_macros("parent={dir_picker:dir}", chosen_dir, Some(&ctx)),
+        "parent=/home/testuser/github"
+    );
+    assert_eq!(
+        apply_dir_picker_macros("parent={dir_picker:parent}", chosen_dir, Some(&ctx)),
+        "parent=/home/testuser/github"
+    );
+
+    // 4. MenuItem helper methods
+    let mut item = MenuItem {
+        label: "OpenCode CLI".to_string(),
+        command: Some("cd {dir_picker_new} && opencode".to_string()),
+        action: Some("cd {dir_picker_new} && opencode".to_string()),
+        start_dir: Some("~/github".to_string()),
+        ..Default::default()
+    };
+    let item_spec = item.first_picker_spec(&ctx).expect("should find picker");
+    assert!(item_spec.is_dir);
+    assert!(item_spec.is_new);
+    item.apply_picker_result(chosen_dir, true, Some(&ctx));
+    assert!(item.first_picker_spec(&ctx).is_none());
+    assert_eq!(
+        item.command.as_deref(),
+        Some("cd /home/testuser/github/bashmenu-rs && opencode")
+    );
+}
