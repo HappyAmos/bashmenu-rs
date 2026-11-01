@@ -1,7 +1,7 @@
 use bashmenu_tui::{
     AsciiGridModal, ColorGridModal, ConfirmModal, FilePickerModal, InputModal, MessageModal,
-    NoteEditorAction, NoteEditorModal, NoteViewerModal, RadioModal, ResolvedThemeStyles,
-    ToggleChoice, ToggleModal,
+    NoteEditorAction, NoteEditorModal, NoteViewerAction, NoteViewerModal, RadioModal,
+    ResolvedThemeStyles, ToggleChoice, ToggleModal,
 };
 use crossterm::event::KeyCode;
 use ratatui::buffer::Buffer;
@@ -662,6 +662,94 @@ fn test_note_viewer_and_editor_checkbox_margin_wrapping() {
         vlines[1].indent_margin, 6,
         "Continuation chunk must have 6 spaces margin"
     );
+}
+
+#[test]
+fn test_note_viewer_and_editor_unordered_list_margin_wrapping() {
+    let styles = ResolvedThemeStyles::default();
+    let area = Rect::new(0, 0, 40, 20);
+
+    // 1. NoteViewerModal wraps bullet items with indent and margin
+    let note =
+        "  - This is an indented bullet item that will wrap onto multiple visual lines cleanly";
+    let mut viewer = NoteViewerModal::new("Viewer", "/tmp/v.yml", note);
+    let mut buf = Buffer::empty(area);
+    viewer.render(area, &styles, &mut buf);
+
+    // First visual line should have "  • " (2 spaces indent)
+    // Continuation line should have "    " (2 indent + 2 marker = 4 spaces margin)
+    let mut found_bullet_continuation = false;
+    for y in 0..area.height {
+        let line_chars: String = (0..area.width)
+            .map(|x| buf.cell((x, y)).unwrap().symbol().to_string())
+            .collect();
+        if line_chars.contains("    ")
+            && (line_chars.contains("bullet")
+                || line_chars.contains("wrap")
+                || line_chars.contains("lines"))
+        {
+            found_bullet_continuation = true;
+            break;
+        }
+    }
+    assert!(
+        found_bullet_continuation,
+        "NoteViewer must prepend unordered list continuation lines with margin spaces matching indentation"
+    );
+
+    // 2. NoteEditorModal compute_visual_lines wraps bullet items with margin
+    let editor = NoteEditorModal::new("Editor", "/tmp/e.yml", note);
+    let (vlines, _) = editor.compute_visual_lines(30);
+    assert!(
+        vlines.len() >= 2,
+        "Long bullet item must wrap into multiple visual lines"
+    );
+    assert_eq!(
+        vlines[0].indent_margin, 0,
+        "First chunk has no extra indent margin"
+    );
+    assert_eq!(
+        vlines[1].indent_margin, 4,
+        "Continuation chunk must have 4 spaces margin (2 indent + 2 marker)"
+    );
+}
+
+#[test]
+fn test_note_viewer_full_edit_action() {
+    use crossterm::event::KeyCode;
+
+    let mut viewer = NoteViewerModal::new("Test Note", "/tmp/notes.yml", "# Content");
+
+    // Pressing 'f' triggers FullEdit
+    assert_eq!(
+        viewer.handle_key(KeyCode::Char('f')),
+        NoteViewerAction::FullEdit
+    );
+    // Pressing 'F' triggers FullEdit
+    assert_eq!(
+        viewer.handle_key(KeyCode::Char('F')),
+        NoteViewerAction::FullEdit
+    );
+    // Pressing F3 triggers FullEdit
+    assert_eq!(viewer.handle_key(KeyCode::F(3)), NoteViewerAction::FullEdit);
+
+    // Render should include [F] Full Edit in footer
+    let styles = ResolvedThemeStyles::default();
+    let area = Rect::new(0, 0, 80, 24);
+    let mut buf = Buffer::empty(area);
+    viewer.render(area, &styles, &mut buf);
+
+    let mut found_full_edit = false;
+    for y in 0..area.height {
+        let line_chars: String = (0..area.width)
+            .map(|x| buf.cell((x, y)).unwrap().symbol().to_string())
+            .collect();
+        if line_chars.contains("[F] Full Edit") {
+            found_full_edit = true;
+            break;
+        }
+    }
+    assert!(found_full_edit, "Footer must contain '[F] Full Edit'");
 }
 
 #[test]

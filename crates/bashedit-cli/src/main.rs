@@ -94,7 +94,7 @@ enum ActiveModal {
         modal: ConfirmModal,
     },
     ConfirmExit(ConfirmModal),
-    SaveAs(InputModal),
+    SaveAs(FilePickerModal),
     Search(InputModal),
     OpenFile(FilePickerModal),
     HelpManual(HelpModal),
@@ -115,6 +115,23 @@ fn resolve_path_tilde(path: &Path) -> PathBuf {
     } else {
         path.to_path_buf()
     }
+}
+
+fn make_save_as_modal(tab: &EditorBuffer) -> FilePickerModal {
+    let home_dir = std::env::var("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("."));
+    let start_dir = tab
+        .file_path
+        .as_ref()
+        .and_then(|p| p.parent())
+        .map(|p| p.to_path_buf())
+        .unwrap_or(home_dir);
+    let mut picker = FilePickerModal::new("Save File As", &start_dir, false).with_allow_new(true);
+    if let Some(ref path) = tab.file_path {
+        picker = picker.with_initial_selection(path);
+    }
+    picker
 }
 
 fn main() -> Result<()> {
@@ -682,11 +699,7 @@ fn main() -> Result<()> {
                             KeyCode::Char('s') => {
                                 let tab = &mut tabs[active_tab_idx];
                                 if tab.file_path.is_none() {
-                                    active_modal = ActiveModal::SaveAs(InputModal::new(
-                                        "Save File As",
-                                        "Enter destination file path:",
-                                        "",
-                                    ));
+                                    active_modal = ActiveModal::SaveAs(make_save_as_modal(tab));
                                 } else {
                                     let res = tab.save_to_disk();
                                     show_save_toast(&mut toast_rack, res, tab);
@@ -694,16 +707,8 @@ fn main() -> Result<()> {
                                 continue;
                             }
                             KeyCode::Char('a') => {
-                                let default_path = tabs[active_tab_idx]
-                                    .file_path
-                                    .as_ref()
-                                    .map(|p| p.to_string_lossy().to_string())
-                                    .unwrap_or_default();
-                                active_modal = ActiveModal::SaveAs(InputModal::new(
-                                    "Save File As",
-                                    "Enter destination file path:",
-                                    &default_path,
-                                ));
+                                active_modal =
+                                    ActiveModal::SaveAs(make_save_as_modal(&tabs[active_tab_idx]));
                                 continue;
                             }
                             KeyCode::Char('n') | KeyCode::Char('e') => {
@@ -1049,26 +1054,16 @@ fn main() -> Result<()> {
                                     FooterAction::SaveFile => {
                                         let tab = &mut tabs[active_tab_idx];
                                         if tab.file_path.is_none() {
-                                            active_modal = ActiveModal::SaveAs(InputModal::new(
-                                                "Save File As",
-                                                "Enter destination file path:",
-                                                "",
-                                            ));
+                                            active_modal =
+                                                ActiveModal::SaveAs(make_save_as_modal(tab));
                                         } else {
                                             let res = tab.save_to_disk();
                                             show_save_toast(&mut toast_rack, res, tab);
                                         }
                                     }
                                     FooterAction::SaveFileAs => {
-                                        let default_path = tabs[active_tab_idx]
-                                            .file_path
-                                            .as_ref()
-                                            .map(|p| p.to_string_lossy().to_string())
-                                            .unwrap_or_default();
-                                        active_modal = ActiveModal::SaveAs(InputModal::new(
-                                            "Save File As",
-                                            "Enter destination file path:",
-                                            &default_path,
+                                        active_modal = ActiveModal::SaveAs(make_save_as_modal(
+                                            &tabs[active_tab_idx],
                                         ));
                                     }
                                     FooterAction::Search => {
@@ -1330,16 +1325,7 @@ fn handle_active_modal(
                 if confirmed {
                     let tab = &mut tabs[target_idx];
                     if tab.file_path.is_none() {
-                        let default_path = tab
-                            .file_path
-                            .as_ref()
-                            .map(|p| p.to_string_lossy().to_string())
-                            .unwrap_or_default();
-                        *active_modal = ActiveModal::SaveAs(InputModal::new(
-                            "Save File As",
-                            "Enter destination file path:",
-                            &default_path,
-                        ));
+                        *active_modal = ActiveModal::SaveAs(make_save_as_modal(tab));
                         return true;
                     }
                     let res = tab.save_to_disk();
@@ -1379,20 +1365,16 @@ fn handle_active_modal(
         }
         ActiveModal::SaveAs(modal) => {
             let submitted = match ev {
-                Event::Key(k) => modal.handle_key_with_modifiers(k.code, k.modifiers),
+                Event::Key(k) => modal.handle_key(k.code),
                 Event::Mouse(m) => modal.handle_mouse(*m, area),
                 _ => None,
             };
             if let Some(opt_path) = submitted {
-                if let Some(path_str) = opt_path {
-                    let trimmed = path_str.trim();
-                    if !trimmed.is_empty() {
-                        let new_path = resolve_path_tilde(Path::new(trimmed));
-                        let tab = &mut tabs[*active_tab_idx];
-                        tab.set_file_path(new_path);
-                        let res = tab.save_to_disk();
-                        show_save_toast(toast_rack, res, tab);
-                    }
+                if let Some(path) = opt_path {
+                    let tab = &mut tabs[*active_tab_idx];
+                    tab.set_file_path(path);
+                    let res = tab.save_to_disk();
+                    show_save_toast(toast_rack, res, tab);
                 }
                 *active_modal = ActiveModal::None;
             }

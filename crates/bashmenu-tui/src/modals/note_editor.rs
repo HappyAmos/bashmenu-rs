@@ -164,7 +164,7 @@ impl NoteEditorModal {
                     indent_margin: 0,
                 });
             } else {
-                let margin = detect_checkbox_margin(line);
+                let margin = detect_list_margin(line);
                 let chunks = if let Some(m) = margin {
                     wrap_chars_by_word_with_margin(&chars, w, w.saturating_sub(m).max(10))
                 } else {
@@ -751,7 +751,7 @@ fn base64_encode(bytes: &[u8]) -> String {
     out
 }
 
-fn detect_checkbox_margin(line: &str) -> Option<usize> {
+fn detect_list_margin(line: &str) -> Option<usize> {
     let indent_len = line.chars().take_while(|c| c.is_whitespace()).count();
     let trimmed = line.trim_start();
     if trimmed.starts_with("- [ ] ")
@@ -762,6 +762,11 @@ fn detect_checkbox_margin(line: &str) -> Option<usize> {
         || trimmed.starts_with("* [X] ")
     {
         Some(indent_len + 6)
+    } else if (trimmed.starts_with("- ") || trimmed.starts_with("* ") || trimmed.starts_with("+ "))
+        && !trimmed.starts_with("- [")
+        && !trimmed.starts_with("* [")
+    {
+        Some(indent_len + 2)
     } else {
         None
     }

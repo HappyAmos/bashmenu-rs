@@ -66,6 +66,16 @@ impl FilePickerModal {
         self
     }
 
+    /// Builder method to pre-select an initial path/file if present in directory
+    pub fn with_initial_selection(mut self, path: &Path) -> Self {
+        if let Some(fname) = path.file_name().and_then(|s| s.to_str()) {
+            if let Some(idx) = self.items.iter().position(|item| item.name == fname) {
+                self.selected_idx = idx;
+            }
+        }
+        self
+    }
+
     /// Reload directory entries
     pub fn refresh_entries(&mut self) {
         self.items.clear();
@@ -201,6 +211,12 @@ impl FilePickerModal {
                 if clicked_idx < self.items.len() {
                     self.selected_idx = clicked_idx;
                     return self.activate_selected();
+                }
+            } else if self.allow_new && !self.creating_new {
+                let btn_y = inner_area.y + inner_area.height.saturating_sub(1);
+                if row == btn_y {
+                    self.creating_new = true;
+                    self.new_name_input.clear();
                 }
             }
         } else if mouse.kind == MouseEventKind::ScrollDown {

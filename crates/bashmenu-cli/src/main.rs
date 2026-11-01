@@ -15,6 +15,7 @@ use bashmenu_tui::{
 };
 use clap::Parser;
 use crossterm::event::{self, Event};
+use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -372,6 +373,74 @@ fn main() -> Result<()> {
                                 NoteEditorModal::new(&modal.title, &modal.filepath, &modal.content)
                                     .with_cursor(modal.selected_line, 0),
                             );
+                        }
+                        NoteViewerAction::FullEdit => {
+                            let editor_bin = locate_tool("bashedit");
+                            let temp_dir = std::env::temp_dir();
+                            let sanitized_title: String = modal
+                                .title
+                                .chars()
+                                .map(|c| {
+                                    if c.is_alphanumeric() || c == '-' || c == '_' {
+                                        c
+                                    } else {
+                                        '_'
+                                    }
+                                })
+                                .collect();
+                            let temp_file = temp_dir.join(format!(
+                                "note_{}_{}.md",
+                                std::process::id(),
+                                sanitized_title
+                            ));
+
+                            if fs::write(&temp_file, &modal.content).is_ok() {
+                                let original_content = modal.content.clone();
+                                let _ = guard.suspend(|| {
+                                    let mut cmd = Command::new(&editor_bin);
+                                    cmd.arg(&temp_file);
+                                    let _ = cmd.status();
+                                    Ok(())
+                                });
+
+                                if let Ok(new_content) = fs::read_to_string(&temp_file) {
+                                    if new_content != original_content {
+                                        if let Ok(mut nb) = load_notebook(&modal.filepath) {
+                                            add_or_update_note(
+                                                &mut nb,
+                                                NoteItem {
+                                                    title: modal.title.clone(),
+                                                    content: new_content.clone(),
+                                                    ..Default::default()
+                                                },
+                                            );
+                                            let _ = save_notebook(&modal.filepath, &nb);
+                                            let sub = build_notebook_submenu(&modal.filepath, &nb);
+                                            menu_view.reload_current_notebook(
+                                                sub.items,
+                                                Some(modal.title.as_str()),
+                                            );
+                                        }
+                                        modal.content = new_content;
+                                        modal.selected_line = 0;
+                                        modal.scroll_offset = 0;
+                                        toast_rack.add(ToastNotification::new(
+                                            "Notebook saved from editor",
+                                            Some("Note Updated".to_string()),
+                                            3.0,
+                                        ));
+                                    }
+                                }
+                                let _ = fs::remove_file(&temp_file);
+                                if let Some(parent) = temp_file.parent() {
+                                    if let Some(fname) = temp_file.file_name() {
+                                        let swap_file = parent
+                                            .join(format!(".{}.swp", fname.to_string_lossy()));
+                                        let _ = fs::remove_file(swap_file);
+                                    }
+                                }
+                            }
+                            need_redraw = true;
                         }
                         NoteViewerAction::Rename => {
                             active_modal = ActiveModal::RenameNoteTitle(

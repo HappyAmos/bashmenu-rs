@@ -321,3 +321,48 @@ fn test_editor_legend_row_spread() {
     assert_eq!(ranges_r2[0].0, 0);
     assert_eq!(ranges_r2[7].1, avail_w);
 }
+
+#[test]
+fn test_save_as_file_picker_workflow() {
+    use bashmenu_tui::FilePickerModal;
+    use crossterm::event::KeyCode;
+
+    let tmp_dir = std::env::temp_dir().join(format!("bashedit_saveas_{}", std::process::id()));
+    let _ = fs::create_dir_all(&tmp_dir);
+
+    // Create an untitled buffer
+    let mut buf = EditorBuffer::new_empty();
+    assert!(buf.file_path.is_none());
+    buf.insert_char('H');
+    buf.insert_char('i');
+
+    // Simulate opening FilePickerModal for Save As
+    let mut picker = FilePickerModal::new("Save File As", &tmp_dir, false).with_allow_new(true);
+
+    // User presses 'n' to enter new filename
+    assert!(picker.handle_key(KeyCode::Char('n')).is_none());
+    assert!(picker.creating_new);
+
+    // User types "saved_note.txt"
+    for c in "saved_note.txt".chars() {
+        assert!(picker.handle_key(KeyCode::Char(c)).is_none());
+    }
+
+    // User presses Enter
+    let res = picker.handle_key(KeyCode::Enter);
+    let chosen_path = res
+        .expect("Should return some result")
+        .expect("Should have chosen a path");
+    assert_eq!(chosen_path, tmp_dir.join("saved_note.txt"));
+
+    // Buffer saves to that chosen path
+    buf.set_file_path(chosen_path.clone());
+    assert_eq!(buf.file_path, Some(chosen_path.clone()));
+    buf.save_to_disk().unwrap();
+    assert!(chosen_path.exists());
+    assert_eq!(fs::read_to_string(&chosen_path).unwrap(), "Hi");
+
+    // Clean up
+    let _ = fs::remove_file(&chosen_path);
+    let _ = fs::remove_dir_all(&tmp_dir);
+}

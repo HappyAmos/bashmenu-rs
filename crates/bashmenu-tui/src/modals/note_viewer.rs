@@ -17,6 +17,8 @@ pub enum NoteViewerAction {
     Close,
     /// Request opening full text editor for note content
     Edit,
+    /// Request opening built-in full-screen text editor (bashedit)
+    FullEdit,
     /// Request renaming the current note
     Rename,
     /// Request deleting the current note
@@ -69,6 +71,7 @@ impl NoteViewerModal {
         match code {
             KeyCode::Esc | KeyCode::Char('q') | KeyCode::Enter => NoteViewerAction::Close,
             KeyCode::Char('e') | KeyCode::Char('E') => NoteViewerAction::Edit,
+            KeyCode::Char('f') | KeyCode::Char('F') | KeyCode::F(3) => NoteViewerAction::FullEdit,
             KeyCode::Char('m') | KeyCode::Char('M') => NoteViewerAction::Rename,
             KeyCode::Char('d') | KeyCode::Char('D') => NoteViewerAction::Delete,
             KeyCode::Char('h') | KeyCode::Char('H') => {
@@ -222,6 +225,8 @@ impl NoteViewerModal {
                     "|",
                     "[E] Edit",
                     "|",
+                    "[F] Full Edit",
+                    "|",
                     "[M] Rename",
                     "|",
                     "[D] Delete",
@@ -286,6 +291,11 @@ impl NoteViewerModal {
                             if let Some(pos) = line_str.find("[E] Edit") {
                                 if rel_col >= pos && rel_col < pos + 8 {
                                     return NoteViewerAction::Edit;
+                                }
+                            }
+                            if let Some(pos) = line_str.find("[F] Full Edit") {
+                                if rel_col >= pos && rel_col < pos + 13 {
+                                    return NoteViewerAction::FullEdit;
                                 }
                             }
                             if let Some(pos) = line_str.find("[M] Rename") {
@@ -354,6 +364,8 @@ impl NoteViewerModal {
             toggle_action,
             "|",
             "[E] Edit",
+            "|",
+            "[F] Full Edit",
             "|",
             "[M] Rename",
             "|",
@@ -571,20 +583,26 @@ impl NoteViewerModal {
                 }
 
                 // 8. Bullet Lists (- , * , + )
-                if let Some(bullet_rest) = parse_bullet_line(line) {
-                    let wrapped = textwrap_simple(bullet_rest, avail_w.saturating_sub(3));
+                if let Some((indent_len, bullet_rest)) = parse_bullet_line(line) {
+                    let margin = indent_len + 2;
+                    let wrapped = textwrap_simple(bullet_rest, avail_w.saturating_sub(margin));
                     if wrapped.is_empty() {
-                        visible_entries.push((
-                            idx,
-                            Line::from(vec![Span::styled("• ", Style::default().fg(Color::Cyan))]),
-                        ));
+                        let mut spans = Vec::new();
+                        if indent_len > 0 {
+                            spans.push(Span::styled(" ".repeat(indent_len), styles.text));
+                        }
+                        spans.push(Span::styled("• ", Style::default().fg(Color::Cyan)));
+                        visible_entries.push((idx, Line::from(spans)));
                     } else {
                         for (w_idx, wl) in wrapped.iter().enumerate() {
                             let mut spans = Vec::new();
                             if w_idx == 0 {
+                                if indent_len > 0 {
+                                    spans.push(Span::styled(" ".repeat(indent_len), styles.text));
+                                }
                                 spans.push(Span::styled("• ", Style::default().fg(Color::Cyan)));
                             } else {
-                                spans.push(Span::styled("  ", styles.text));
+                                spans.push(Span::styled(" ".repeat(margin), styles.text));
                             }
                             spans.extend(parse_markdown_spans(wl, styles.text));
                             visible_entries.push((idx, Line::from(spans)));
@@ -802,15 +820,16 @@ fn parse_checkbox_line(line: &str) -> Option<(usize, bool, &str)> {
     }
 }
 
-fn parse_bullet_line(line: &str) -> Option<&str> {
+fn parse_bullet_line(line: &str) -> Option<(usize, &str)> {
     let trimmed = line.trim_start();
+    let indent_len = line.len() - trimmed.len();
     if let Some(rest) = trimmed
         .strip_prefix("- ")
         .or_else(|| trimmed.strip_prefix("* "))
         .or_else(|| trimmed.strip_prefix("+ "))
     {
         if !rest.starts_with("[ ]") && !rest.starts_with("[x]") && !rest.starts_with("[X]") {
-            return Some(rest);
+            return Some((indent_len, rest));
         }
     }
     None
