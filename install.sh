@@ -80,6 +80,10 @@ if [ -d "$SCRIPT_DIR/scripts" ]; then
     ln -sfn "$SCRIPT_DIR/scripts" "$CONFIG_DIR/scripts"
     echo "  [+] Symlinked scripts -> $CONFIG_DIR/scripts"
 fi
+if [ -f "$SCRIPT_DIR/bashmenu.md" ]; then
+    ln -sfn "$SCRIPT_DIR/bashmenu.md" "$CONFIG_DIR/bashmenu.md"
+    echo "  [+] Symlinked bashmenu.md -> $CONFIG_DIR/bashmenu.md"
+fi
 
 # Initialize user notebooks directory if missing
 if [ -d "$SCRIPT_DIR/notebooks" ]; then

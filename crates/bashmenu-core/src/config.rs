@@ -367,6 +367,10 @@ pub fn resolve_app_path<P: AsRef<Path>>(target: P) -> PathBuf {
         }
     }
 
+    if target.exists() {
+        return target.to_path_buf();
+    }
+
     let fixture_paths = [
         PathBuf::from("tests/fixtures").join(target),
         PathBuf::from("../../tests/fixtures").join(target),

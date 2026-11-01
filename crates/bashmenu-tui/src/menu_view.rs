@@ -3,7 +3,7 @@
 use crate::bbcode::{
     parse_bbcode_spans, split_label_brackets, truncate_to_width, visible_text_len,
 };
-use crate::gutter::wrap_spread_help_gutter;
+use crate::gutter::{wrap_spread_help_gutter, wrap_spread_help_gutter_layout};
 use crate::style::ResolvedThemeStyles;
 use crate::wallpaper::{composite_buffer, WallpaperCompositor};
 use bashmenu_core::{
@@ -387,6 +387,64 @@ impl MenuView {
         }
     }
 
+    fn get_help_raw(&self) -> &'static str {
+        if self.is_current_notebook() {
+            "[N]: New Note | [ENTER]: Read | [M]: Rename | [D]: Delete | [UP/DN]: Nav | [F1]: Help | [F2]: Themes | [F7]: Gutter | [F8]: ThemeEdit | [ESC]: Back"
+        } else if self.show_shortcuts {
+            "[UP/DN]: Nav | [0-9/a-z]: Direct | [F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [F8]: ThemeEdit | [ESC]: Back"
+        } else {
+            "[UP/DN]: Nav | [ENTER]: Select | [F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [F8]: ThemeEdit | [ESC]: Back"
+        }
+    }
+
+    fn action_for_gutter_token(&mut self, tok: &str) -> MenuAction {
+        if tok.contains("[F1]") || tok.contains("Help") {
+            MenuAction::Help
+        } else if tok.contains("[F2]") || tok.contains("Themes") {
+            MenuAction::ThemeSelector
+        } else if tok.contains("[F3]") || tok.contains("Editor") {
+            MenuAction::LaunchEditor
+        } else if tok.contains("[F4]") || tok.contains("Edit") {
+            MenuAction::EditMenu
+        } else if tok.contains("[F5]") || tok.contains("Refresh") {
+            MenuAction::Reload
+        } else if tok.contains("[F6]") || tok.contains("Keys") {
+            MenuAction::ToggleShortcuts
+        } else if tok.contains("[F7]") || tok.contains("Gutter") {
+            MenuAction::ConfigureGutter
+        } else if tok.contains("[F8]") || tok.contains("ThemeEdit") {
+            MenuAction::LaunchThemeEditor
+        } else if tok.contains("[ESC]") || tok.contains("Back") {
+            self.go_back()
+        } else if tok.contains("[ENTER]") || tok.contains("Select") || tok.contains("Read") {
+            self.activate_selected()
+        } else if tok.contains("[N]") || tok.contains("New Note") {
+            MenuAction::NewNote(String::new())
+        } else if tok.contains("[M]") || tok.contains("Rename") {
+            if let Some(item) = self
+                .current_level()
+                .items
+                .get(self.current_level().selected_idx)
+            {
+                MenuAction::RenameNote(item.label.clone())
+            } else {
+                MenuAction::None
+            }
+        } else if tok.contains("[D]") || tok.contains("Delete") {
+            if let Some(item) = self
+                .current_level()
+                .items
+                .get(self.current_level().selected_idx)
+            {
+                MenuAction::DeleteNote(item.label.clone())
+            } else {
+                MenuAction::None
+            }
+        } else {
+            MenuAction::None
+        }
+    }
+
     /// Handles immediate mouse event (invoking MouseDown immediately)
     pub fn handle_mouse(&mut self, mouse: MouseEvent, area: Rect) -> MenuAction {
         match mouse.kind {
@@ -400,8 +458,58 @@ impl MenuView {
                     && row > area.y
                     && row < area.y + area.height - 1
                 {
+                    let w = area.width as usize;
+                    let avail_both = (w.saturating_sub(11)).max(4);
+                    let left_gutter_w = avail_both / 2;
+                    let right_gutter_w = avail_both - left_gutter_w;
+                    let sep_x = (left_gutter_w + 5).min(w.saturating_sub(2));
+
+                    let help_raw = self.get_help_raw();
+                    let help_tokens: Vec<&str> = help_raw
+                        .split('|')
+                        .map(|s| s.trim())
+                        .filter(|s| !s.is_empty())
+                        .collect();
+                    let help_layout =
+                        wrap_spread_help_gutter_layout(&help_tokens, left_gutter_w, 2);
+
+                    let status_tokens: Vec<&str> = if self.status_gutter.is_empty() {
+                        Vec::new()
+                    } else {
+                        self.status_gutter
+                            .split('|')
+                            .map(|s| s.trim())
+                            .filter(|s| !s.is_empty())
+                            .collect()
+                    };
+                    let status_lines = wrap_gutter_tokens(&status_tokens, right_gutter_w, 2);
+                    let gutter_rows = (help_layout.len().max(status_lines.len())).clamp(1, 2);
+                    let gutter_border_y =
+                        area.y + area.height.saturating_sub(2 + gutter_rows as u16);
+
+                    // 1. Check if click is on gutter row
+                    if row > gutter_border_y && row < gutter_border_y + 1 + gutter_rows as u16 {
+                        if col >= area.x + 3 && col < area.x + sep_x as u16 {
+                            let line_idx = (row - (gutter_border_y + 1)) as usize;
+                            let rel_x = (col - (area.x + 3)) as usize;
+                            if let Some((_, items)) = help_layout.get(line_idx) {
+                                for (i, (tok_str, start_c, _)) in items.iter().enumerate() {
+                                    let next_start = items
+                                        .get(i + 1)
+                                        .map(|(_, s, _)| *s)
+                                        .unwrap_or(left_gutter_w);
+                                    if rel_x >= *start_c && rel_x < next_start {
+                                        return self.action_for_gutter_token(tok_str);
+                                    }
+                                }
+                            }
+                        }
+                        return MenuAction::None;
+                    }
+
+                    // 2. Check if click is on menu item rows
                     let item_start_y = area.y + 2; // Below border and margin
-                    if row >= item_start_y {
+                    if row >= item_start_y && row < gutter_border_y {
                         let row_idx = (row - item_start_y) as usize;
                         let level = self.current_level();
                         let item_idx = level.scroll_offset + row_idx;
@@ -545,13 +653,7 @@ impl MenuView {
         let left_seg_len = sep_x.saturating_sub(1);
         let right_seg_len = w.saturating_sub(2 + sep_x);
 
-        let help_raw = if self.is_current_notebook() {
-            "[N]: New Note | [ENTER]: Read | [M]: Rename | [D]: Delete | [UP/DN]: Nav | [F1]: Help | [F2]: Themes | [F7]: Gutter | [F8]: ThemeEdit | [ESC]: Back"
-        } else if self.show_shortcuts {
-            "[UP/DN]: Nav | [0-9/a-z]: Direct | [F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [F8]: ThemeEdit | [ESC]: Back"
-        } else {
-            "[UP/DN]: Nav | [ENTER]: Select | [F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [F8]: ThemeEdit | [ESC]: Back"
-        };
+        let help_raw = self.get_help_raw();
         let help_tokens: Vec<&str> = help_raw
             .split('|')
             .map(|s| s.trim())

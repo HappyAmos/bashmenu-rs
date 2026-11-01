@@ -578,7 +578,13 @@ fn main() -> Result<()> {
 
                     match action {
                         MenuAction::Help => {
-                            let doc_path = resolve_file_path(Path::new("bashmenu.md"), cli.local);
+                            let ctx = MacroContext::new(&config);
+                            let cand = ctx.bashmenu_dir.join("bashmenu.md");
+                            let doc_path = if cand.exists() {
+                                cand
+                            } else {
+                                resolve_file_path(Path::new("bashmenu.md"), cli.local)
+                            };
                             let help_content = std::fs::read_to_string(&doc_path).unwrap_or_else(|_| {
                                 "BashMenu Documentation\n\nNavigation:\n  Up/Down, k/j: Navigate items\n  Enter: Select item\n  Esc/q: Back or exit\n\nFunction Keys:\n  F1: Help manual\n  F2: Theme picker\n  F3: Text editor\n  F4: Menu editor\n  F5: Reload config and menus\n  F6: Toggle shortcut numbers\n  F7: Configure status gutter\n  F8: Theme editor".to_string()
                             });

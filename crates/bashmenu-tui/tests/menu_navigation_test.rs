@@ -674,3 +674,39 @@ fn test_notebook_menu_interaction() {
     assert_eq!(action, MenuAction::None);
     assert!(!view.is_current_notebook());
 }
+
+#[test]
+fn test_gutter_mouse_click_actions() {
+    let schema = create_sample_menu();
+    let styles = ResolvedThemeStyles::default();
+    let mut view = MenuView::new(schema, styles, false, "Status".to_string());
+
+    let area = Rect::new(0, 0, 100, 24);
+
+    // Click in gutter area (row 22, col across gutter)
+    // Find the column where [F1]: Help is placed
+    // With 100 width, left_gutter_w = (100 - 11) / 2 = 44
+    let mut found_f1 = false;
+    for r in 20..24 {
+        for c in 3..45 {
+            let mouse = MouseEvent {
+                kind: MouseEventKind::Down(MouseButton::Left),
+                column: c,
+                row: r,
+                modifiers: KeyModifiers::empty(),
+            };
+            let action = view.handle_mouse(mouse, area);
+            if action == MenuAction::Help {
+                found_f1 = true;
+                break;
+            }
+        }
+        if found_f1 {
+            break;
+        }
+    }
+    assert!(
+        found_f1,
+        "Expected clicking on [F1]: Help in gutter to return MenuAction::Help"
+    );
+}

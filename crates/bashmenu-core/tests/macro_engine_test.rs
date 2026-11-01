@@ -190,4 +190,10 @@ fn test_profile_and_editor_placeholders_expansion() {
         "date_time_12_short must include AM/PM: {}",
         dt12
     );
+
+    // Verify bashmenu.md expansion
+    let help_action =
+        interpolate_placeholders("{scripts_dir}/rich.sh {bashmenu_dir}/bashmenu.md", &ctx);
+    assert!(help_action.ends_with("/bashmenu.md"));
+    assert!(help_action.contains("/scripts/rich.sh"));
 }

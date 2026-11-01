@@ -106,13 +106,21 @@ pub fn format_spread_gutter_line(items: &[&str], max_w: usize) -> String {
     spread_gutter_line_layout(items, max_w).0
 }
 
+/// Represents an item on a gutter line with its `(token_string, start_col, end_col)` character range.
+pub type GutterItemRange = (String, usize, usize);
+
+/// A formatted gutter line along with character ranges for interactive mouse hit-testing.
+pub type GutterLineLayout = (String, Vec<GutterItemRange>);
+
 /// Wraps help items into at most `max_lines` (typically 1 or 2),
 /// treating the pipe character `|` as a word/delimiter boundary.
 ///
-/// - If all items fit on 1 line: returns 1 line spread evenly across `max_w`.
-/// - If items exceed 1 line and `max_lines >= 2`: distributes items as evenly as
-///   possible across 2 lines and spreads each line across `max_w`.
-pub fn wrap_spread_help_gutter(items: &[&str], max_w: usize, max_lines: usize) -> Vec<String> {
+/// Returns a vector of tuples: `(line_string, items_with_ranges)` where each item range is `(token_str, start_col, end_col)`.
+pub fn wrap_spread_help_gutter_layout(
+    items: &[&str],
+    max_w: usize,
+    max_lines: usize,
+) -> Vec<GutterLineLayout> {
     if items.is_empty() || max_w == 0 || max_lines == 0 {
         return Vec::new();
     }
@@ -128,29 +136,36 @@ pub fn wrap_spread_help_gutter(items: &[&str], max_w: usize, max_lines: usize) -
     let min_1_line_len = total_item_len + cleaned_refs.len().saturating_sub(1) * 3;
 
     if min_1_line_len <= max_w || max_lines == 1 {
-        if min_1_line_len <= max_w {
-            return vec![format_spread_gutter_line(&cleaned_refs, max_w)];
-        }
-        // If max_lines == 1 and doesn't fit, pack what fits
-        let mut fit_items = Vec::new();
-        let mut cur_len = 0;
-        for &item in &cleaned_refs {
-            let needed = if fit_items.is_empty() {
-                visible_text_len(item)
-            } else {
-                3 + visible_text_len(item)
-            };
-            if cur_len + needed <= max_w {
-                fit_items.push(item);
-                cur_len += needed;
-            } else {
-                break;
+        let items_to_spread = if min_1_line_len <= max_w {
+            cleaned_refs
+        } else {
+            let mut fit = Vec::new();
+            let mut cur_len = 0;
+            for &item in &cleaned_refs {
+                let needed = if fit.is_empty() {
+                    visible_text_len(item)
+                } else {
+                    3 + visible_text_len(item)
+                };
+                if cur_len + needed <= max_w {
+                    fit.push(item);
+                    cur_len += needed;
+                } else {
+                    break;
+                }
             }
-        }
-        if fit_items.is_empty() && !cleaned_refs.is_empty() {
-            fit_items.push(cleaned_refs[0]);
-        }
-        return vec![format_spread_gutter_line(&fit_items, max_w)];
+            if fit.is_empty() && !cleaned_refs.is_empty() {
+                fit.push(cleaned_refs[0]);
+            }
+            fit
+        };
+        let (line_str, ranges) = spread_gutter_line_layout(&items_to_spread, max_w);
+        let items_with_ranges: Vec<(String, usize, usize)> = items_to_spread
+            .iter()
+            .zip(ranges)
+            .map(|(&txt, (s, e))| (txt.to_string(), s, e))
+            .collect();
+        return vec![(line_str, items_with_ranges)];
     }
 
     // 2. Needs 2 lines (max_lines >= 2)
@@ -181,10 +196,19 @@ pub fn wrap_spread_help_gutter(items: &[&str], max_w: usize, max_lines: usize) -
     }
 
     if let Some(k) = best_k {
-        return vec![
-            format_spread_gutter_line(&cleaned_refs[..k], max_w),
-            format_spread_gutter_line(&cleaned_refs[k..], max_w),
-        ];
+        let (l1_str, r1) = spread_gutter_line_layout(&cleaned_refs[..k], max_w);
+        let (l2_str, r2) = spread_gutter_line_layout(&cleaned_refs[k..], max_w);
+        let items1: Vec<(String, usize, usize)> = cleaned_refs[..k]
+            .iter()
+            .zip(r1)
+            .map(|(&txt, (s, e))| (txt.to_string(), s, e))
+            .collect();
+        let items2: Vec<(String, usize, usize)> = cleaned_refs[k..]
+            .iter()
+            .zip(r2)
+            .map(|(&txt, (s, e))| (txt.to_string(), s, e))
+            .collect();
+        return vec![(l1_str, items1), (l2_str, items2)];
     }
 
     // Fallback: Greedy 2-line packing if items cannot cleanly split without overflow
@@ -228,12 +252,37 @@ pub fn wrap_spread_help_gutter(items: &[&str], max_w: usize, max_lines: usize) -
 
     let mut result = Vec::new();
     if !l1_items.is_empty() {
-        result.push(format_spread_gutter_line(&l1_items, max_w));
+        let (s, r) = spread_gutter_line_layout(&l1_items, max_w);
+        let items: Vec<(String, usize, usize)> = l1_items
+            .iter()
+            .zip(r)
+            .map(|(&txt, (s_c, e_c))| (txt.to_string(), s_c, e_c))
+            .collect();
+        result.push((s, items));
     }
     if !l2_items.is_empty() {
-        result.push(format_spread_gutter_line(&l2_items, max_w));
+        let (s, r) = spread_gutter_line_layout(&l2_items, max_w);
+        let items: Vec<(String, usize, usize)> = l2_items
+            .iter()
+            .zip(r)
+            .map(|(&txt, (s_c, e_c))| (txt.to_string(), s_c, e_c))
+            .collect();
+        result.push((s, items));
     }
     result
+}
+
+/// Wraps help items into at most `max_lines` (typically 1 or 2),
+/// treating the pipe character `|` as a word/delimiter boundary.
+///
+/// - If all items fit on 1 line: returns 1 line spread evenly across `max_w`.
+/// - If items exceed 1 line and `max_lines >= 2`: distributes items as evenly as
+///   possible across 2 lines and spreads each line across `max_w`.
+pub fn wrap_spread_help_gutter(items: &[&str], max_w: usize, max_lines: usize) -> Vec<String> {
+    wrap_spread_help_gutter_layout(items, max_w, max_lines)
+        .into_iter()
+        .map(|(line, _)| line)
+        .collect()
 }
 
 #[cfg(test)]

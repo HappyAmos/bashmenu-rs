@@ -16,7 +16,7 @@ pub use bbcode::{
 pub use borders::ResolvedWindowBorders;
 pub use gutter::{
     format_spread_gutter_line, parse_help_tokens, spread_gutter_line_layout,
-    wrap_spread_help_gutter,
+    wrap_spread_help_gutter, wrap_spread_help_gutter_layout,
 };
 pub use menu_view::{MenuAction, MenuView};
 pub use modals::{
