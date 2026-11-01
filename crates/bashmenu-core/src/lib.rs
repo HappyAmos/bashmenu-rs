@@ -20,7 +20,10 @@ pub use glyph::{
     cp437_to_char, format_icon_slot, normalize_variation_selectors, parse_ascii_val, resolve_glyph,
     CP437_TABLE,
 };
-pub use macro_engine::{interpolate_placeholders, resolve_config_dot_path, MacroContext};
+pub use macro_engine::{
+    extract_toasts, interpolate_placeholders, resolve_config_dot_path, MacroContext,
+    ToastNotification, ToastSeverity,
+};
 pub use menu::{load_menu, save_menu, MenuItem, MenuItemType, MenuSchema, Submenu};
 pub use notebook::{
     add_or_update_note, build_notebook_submenu, delete_note, get_note_by_title, get_notes,

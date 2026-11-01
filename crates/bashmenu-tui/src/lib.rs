@@ -3,10 +3,12 @@
 pub mod bbcode;
 pub mod borders;
 pub mod gutter;
+pub mod marquee;
 pub mod menu_view;
 pub mod modals;
 pub mod style;
 pub mod terminal;
+pub mod toast;
 pub mod wallpaper;
 
 pub use bbcode::{
@@ -18,6 +20,7 @@ pub use gutter::{
     format_spread_gutter_line, parse_help_tokens, spread_gutter_line_layout,
     wrap_spread_help_gutter, wrap_spread_help_gutter_layout,
 };
+pub use marquee::{format_marquee_spacer, get_marquee_slice, MarqueeTracker};
 pub use menu_view::{MenuAction, MenuView};
 pub use modals::{
     compute_modal_inner, is_close_button_clicked, render_modal_frame, AsciiGridModal,
@@ -27,6 +30,7 @@ pub use modals::{
 };
 pub use style::ResolvedThemeStyles;
 pub use terminal::TerminalGuard;
+pub use toast::{ActiveToast, ToastRack};
 pub use wallpaper::{
     color_to_rgb, composite_buffer, resolve_wallpaper_path, WallpaperCell, WallpaperCompositor,
     WallpaperGrid,

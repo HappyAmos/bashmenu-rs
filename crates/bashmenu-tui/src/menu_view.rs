@@ -4,6 +4,7 @@ use crate::bbcode::{
     parse_bbcode_spans, split_label_brackets, truncate_to_width, visible_text_len,
 };
 use crate::gutter::{wrap_spread_help_gutter, wrap_spread_help_gutter_layout};
+use crate::marquee::{get_marquee_slice, MarqueeTracker};
 use crate::style::ResolvedThemeStyles;
 use crate::wallpaper::{composite_buffer, WallpaperCompositor};
 use bashmenu_core::{
@@ -78,6 +79,7 @@ pub struct MenuView {
     plugin_rows: Vec<PluginDisplayRow>,
     pub config: BashMenuConfig,
     wallpaper: Option<WallpaperCompositor>,
+    marquee_tracker: MarqueeTracker,
 }
 
 impl MenuView {
@@ -109,6 +111,7 @@ impl MenuView {
             plugin_rows: Vec::new(),
             config,
             wallpaper: None,
+            marquee_tracker: MarqueeTracker::new(4),
         };
         view.ensure_selectable();
         view
@@ -266,6 +269,16 @@ impl MenuView {
         }
     }
 
+    /// Advances the marquee ticker. Returns true if offset changed (redraw needed).
+    pub fn tick_marquee(&mut self) -> bool {
+        self.marquee_tracker.tick()
+    }
+
+    /// Resets the marquee ticker.
+    pub fn reset_marquee(&mut self) {
+        self.marquee_tracker.reset();
+    }
+
     /// Move selection cursor down
     pub fn move_down(&mut self) {
         let level = self.current_level_mut();
@@ -273,6 +286,7 @@ impl MenuView {
             return;
         }
 
+        let orig_idx = level.selected_idx;
         let mut idx = level.selected_idx;
         while idx + 1 < level.items.len() {
             idx += 1;
@@ -280,6 +294,9 @@ impl MenuView {
                 level.selected_idx = idx;
                 break;
             }
+        }
+        if level.selected_idx != orig_idx {
+            self.marquee_tracker.reset();
         }
     }
 
@@ -290,6 +307,7 @@ impl MenuView {
             return;
         }
 
+        let orig_idx = level.selected_idx;
         let mut idx = level.selected_idx;
         while idx > 0 {
             idx -= 1;
@@ -297,6 +315,9 @@ impl MenuView {
                 level.selected_idx = idx;
                 break;
             }
+        }
+        if level.selected_idx != orig_idx {
+            self.marquee_tracker.reset();
         }
     }
 
@@ -315,6 +336,7 @@ impl MenuView {
                 let level = self.current_level_mut();
                 level.selected_idx = 0;
                 self.ensure_selectable();
+                self.marquee_tracker.reset();
                 MenuAction::None
             }
             KeyCode::End => {
@@ -323,6 +345,7 @@ impl MenuView {
                     level.selected_idx = level.items.len() - 1;
                     self.ensure_selectable();
                 }
+                self.marquee_tracker.reset();
                 MenuAction::None
             }
             KeyCode::Enter => self.activate_selected(),
@@ -879,9 +902,24 @@ impl MenuView {
             let submenu_w = if is_submenu { 3 } else { 0 };
             let avail_for_content = avail_w.saturating_sub(prefix_w + submenu_w);
 
+            let mq_char = &self.styles.marquee_char;
+            let mq_gap = self.styles.marquee_gap;
+
             if right_bracket.is_empty() {
                 let left_vis = visible_text_len(left_label);
-                let text_to_parse = if left_vis > avail_for_content {
+                let text_to_parse = if is_active {
+                    if left_vis > avail_for_content {
+                        get_marquee_slice(
+                            left_label,
+                            avail_for_content,
+                            self.marquee_tracker.offset,
+                            mq_char,
+                            mq_gap,
+                        )
+                    } else {
+                        left_label.to_string()
+                    }
+                } else if left_vis > avail_for_content {
                     truncate_to_width(left_label, avail_for_content)
                 } else {
                     left_label.to_string()
@@ -904,18 +942,47 @@ impl MenuView {
                     let max_left = left_vis.min(half).max(1);
                     let max_right = avail_for_content.saturating_sub(max_left + 1);
 
-                    let trunc_left = truncate_to_width(left_label, max_left);
-                    let trunc_right = truncate_to_width(right_bracket, max_right);
-                    let trunc_left_vis = visible_text_len(&trunc_left);
-                    let trunc_right_vis = visible_text_len(&trunc_right);
+                    let (left_str, right_str) = if is_active {
+                        let l = if left_vis > max_left {
+                            get_marquee_slice(
+                                left_label,
+                                max_left,
+                                self.marquee_tracker.offset,
+                                mq_char,
+                                mq_gap,
+                            )
+                        } else {
+                            left_label.to_string()
+                        };
+                        let r = if right_vis > max_right {
+                            get_marquee_slice(
+                                right_bracket,
+                                max_right,
+                                self.marquee_tracker.offset,
+                                mq_char,
+                                mq_gap,
+                            )
+                        } else {
+                            right_bracket.to_string()
+                        };
+                        (l, r)
+                    } else {
+                        (
+                            truncate_to_width(left_label, max_left),
+                            truncate_to_width(right_bracket, max_right),
+                        )
+                    };
+
+                    let trunc_left_vis = visible_text_len(&left_str);
+                    let trunc_right_vis = visible_text_len(&right_str);
                     let spacer_len = avail_for_content
                         .saturating_sub(trunc_left_vis + trunc_right_vis)
                         .max(1);
 
-                    let mut parsed_left = parse_bbcode_spans(&trunc_left, item_style);
+                    let mut parsed_left = parse_bbcode_spans(&left_str, item_style);
                     spans.append(&mut parsed_left);
                     spans.push(Span::styled(" ".repeat(spacer_len), item_style));
-                    let mut parsed_right = parse_bbcode_spans(&trunc_right, item_style);
+                    let mut parsed_right = parse_bbcode_spans(&right_str, item_style);
                     spans.append(&mut parsed_right);
                 }
             }

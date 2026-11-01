@@ -2,15 +2,15 @@
 
 use anyhow::Result;
 use bashmenu_core::{
-    add_or_update_note, build_notebook_submenu, delete_note, get_note_by_title,
+    add_or_update_note, build_notebook_submenu, delete_note, extract_toasts, get_note_by_title,
     interpolate_placeholders, load_config, load_menu, load_notebook, load_themes, rename_note,
     resolve_notebook_path, save_config, save_notebook, BashMenuConfig, MacroContext, MenuItemType,
-    MenuSchema, NoteItem, PluginEngine,
+    MenuSchema, NoteItem, PluginEngine, ToastNotification,
 };
 use bashmenu_tui::{
     install_panic_hook, ConfirmModal, FilePickerModal, HelpModal, InputModal, MenuAction, MenuView,
     NoteEditorAction, NoteEditorModal, NoteViewerAction, NoteViewerModal, RadioModal,
-    ResolvedThemeStyles, TerminalGuard, ThemePickerModal, ToggleChoice, ToggleModal,
+    ResolvedThemeStyles, TerminalGuard, ThemePickerModal, ToastRack, ToggleChoice, ToggleModal,
 };
 use clap::Parser;
 use crossterm::event::{self, Event};
@@ -170,6 +170,8 @@ fn main() -> Result<()> {
     }
     let mut active_modal = ActiveModal::None;
     let mut last_plugin_check = Instant::now();
+    let mut last_marquee_tick = Instant::now();
+    let mut toast_rack = ToastRack::new();
 
     // 7. Interactive Event Loop
     let mut need_redraw = true;
@@ -193,6 +195,19 @@ fn main() -> Result<()> {
         if last_plugin_check.elapsed() >= Duration::from_secs(1) {
             plugin_engine.trigger_refresh(&config, false);
             last_plugin_check = Instant::now();
+        }
+
+        // Periodic check to advance marquee ticker (250ms)
+        if last_marquee_tick.elapsed() >= Duration::from_millis(250) {
+            if matches!(active_modal, ActiveModal::None) && menu_view.tick_marquee() {
+                need_redraw = true;
+            }
+            last_marquee_tick = Instant::now();
+        }
+
+        // Periodic check to advance toast rack expiration
+        if toast_rack.tick() {
+            need_redraw = true;
         }
 
         if need_redraw {
@@ -237,6 +252,8 @@ fn main() -> Result<()> {
                         modal.render(f.area(), &styles, f.buffer_mut());
                     }
                 }
+                // Render non-blocking toast notifications on top
+                toast_rack.render(f.area(), &styles, f.buffer_mut());
             })?;
             need_redraw = false;
         }
@@ -245,6 +262,13 @@ fn main() -> Result<()> {
             let ev = event::read()?;
             if let Event::Mouse(m) = &ev {
                 if m.kind == crossterm::event::MouseEventKind::Moved {
+                    continue;
+                }
+                if m.kind
+                    == crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left)
+                    && toast_rack.handle_mouse(m.column, m.row)
+                {
+                    need_redraw = true;
                     continue;
                 }
             }
@@ -901,17 +925,55 @@ fn main() -> Result<()> {
                                     if let Ok(new_menu) = load_menu(&menu_path) {
                                         menu_view.reload_menu(new_menu);
                                     }
+                                } else if item.r#type == MenuItemType::Other("toast".to_string())
+                                    || matches!(item.r#type, MenuItemType::Other(ref s) if s == "toast")
+                                {
+                                    let timeout = item
+                                        .extra
+                                        .get("timeout")
+                                        .or_else(|| item.extra.get("seconds"))
+                                        .or_else(|| item.extra.get("duration"))
+                                        .and_then(|v| {
+                                            v.as_f64().or_else(|| v.as_i64().map(|i| i as f64))
+                                        })
+                                        .unwrap_or(2.0);
+                                    let raw_msg = item
+                                        .message()
+                                        .or(item.action.as_deref())
+                                        .or(item.script.as_deref())
+                                        .or(item.command.as_deref())
+                                        .unwrap_or_default();
+                                    let (clean, toasts) = extract_toasts(raw_msg, &ctx);
+                                    for t in toasts {
+                                        toast_rack.add(t);
+                                    }
+                                    if !clean.trim().is_empty() {
+                                        let title =
+                                            item.title().map(|t| interpolate_placeholders(t, &ctx));
+                                        let interp_msg = interpolate_placeholders(&clean, &ctx);
+                                        toast_rack.add(ToastNotification::new(
+                                            interp_msg, title, timeout,
+                                        ));
+                                    }
+                                    need_redraw = true;
                                 } else {
                                     let cmd_to_run = item.command.or(item.action).or(item.script);
                                     if let Some(raw_cmd) = cmd_to_run {
-                                        let final_cmd = interpolate_placeholders(&raw_cmd, &ctx);
-                                        let _ = guard.suspend(|| {
-                                            let _ = Command::new("/bin/bash")
-                                                .arg("-c")
-                                                .arg(&final_cmd)
-                                                .status();
-                                            Ok(())
-                                        });
+                                        let (clean_cmd, toasts) = extract_toasts(&raw_cmd, &ctx);
+                                        for t in toasts {
+                                            toast_rack.add(t);
+                                            need_redraw = true;
+                                        }
+                                        let final_cmd = interpolate_placeholders(&clean_cmd, &ctx);
+                                        if !final_cmd.trim().is_empty() {
+                                            let _ = guard.suspend(|| {
+                                                let _ = Command::new("/bin/bash")
+                                                    .arg("-c")
+                                                    .arg(&final_cmd)
+                                                    .status();
+                                                Ok(())
+                                            });
+                                        }
                                     }
                                 }
                             }

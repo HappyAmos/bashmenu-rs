@@ -305,6 +305,80 @@ static ENV_RE: std::sync::LazyLock<Regex> =
     std::sync::LazyLock::new(|| Regex::new(r"\{env:([a-zA-Z0-9_]+)\}").unwrap());
 static DOT_RE: std::sync::LazyLock<Regex> =
     std::sync::LazyLock::new(|| Regex::new(r"\{([a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)+)\}").unwrap());
+static TOAST_RE: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
+    Regex::new(r#"\{toast:\s*(?:(\d+(?:\.\d+)?)\s*:\s*)?(?:"([^"]*)"|'([^']*)'|([^}]+))\s*\}"#)
+        .unwrap()
+});
+
+/// Toast notification severity
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+pub enum ToastSeverity {
+    #[default]
+    Information,
+    Warning,
+    Error,
+}
+
+/// A parsed toast notification from macro evaluation
+#[derive(Debug, Clone, PartialEq)]
+pub struct ToastNotification {
+    pub message: String,
+    pub title: Option<String>,
+    pub severity: ToastSeverity,
+    pub timeout_secs: f64,
+}
+
+impl ToastNotification {
+    pub fn new(message: impl Into<String>, title: Option<String>, timeout_secs: f64) -> Self {
+        Self {
+            message: message.into(),
+            title,
+            severity: ToastSeverity::Information,
+            timeout_secs,
+        }
+    }
+}
+
+/// Extracts `{toast:SECONDS:"MESSAGE"}` tokens, interpolates nested placeholders inside
+/// the message text, and returns the cleaned string along with the extracted toast notifications.
+pub fn extract_toasts(text: &str, ctx: &MacroContext) -> (String, Vec<ToastNotification>) {
+    if !text.contains("{toast:") {
+        return (text.to_string(), Vec::new());
+    }
+
+    let mut notifications = Vec::new();
+    let cleaned = TOAST_RE.replace_all(text, |caps: &Captures| {
+        let timeout = caps
+            .get(1)
+            .and_then(|m| m.as_str().parse::<f64>().ok())
+            .unwrap_or(2.0);
+
+        let raw_msg = caps
+            .get(2)
+            .or_else(|| caps.get(3))
+            .or_else(|| caps.get(4))
+            .map(|m| m.as_str())
+            .unwrap_or("")
+            .trim();
+
+        let interp_msg = if raw_msg.contains('{') {
+            interpolate_placeholders(raw_msg, ctx)
+        } else {
+            raw_msg.to_string()
+        };
+
+        notifications.push(ToastNotification {
+            message: interp_msg,
+            title: None,
+            severity: ToastSeverity::Information,
+            timeout_secs: timeout,
+        });
+
+        ""
+    });
+
+    (cleaned.into_owned(), notifications)
+}
 
 /// Recursively interpolates macro placeholders within a text string.
 pub fn interpolate_placeholders(text: &str, ctx: &MacroContext) -> String {
@@ -316,8 +390,15 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
         return text.to_string();
     }
 
+    // 0. Toast tokens: strip so they do not leak into visible labels/titles
+    let mut res = if text.contains("{toast:") {
+        TOAST_RE.replace_all(text, "").to_string()
+    } else {
+        text.to_string()
+    };
+
     // 1. CP437 ASCII: {ascii:NNN}
-    let mut res = parse_ascii_val(text);
+    res = parse_ascii_val(&res);
 
     // 2. Adaptive glyph: {nf:...}
     if res.contains("{nf:") {
@@ -641,6 +722,36 @@ mod tests {
         assert_eq!(
             interpolate_placeholders("Run: {scripts_dir}/tool.sh", &ctx),
             "Run: /opt/bashmenu/scripts/tool.sh"
+        );
+    }
+
+    #[test]
+    fn test_toast_extraction_and_interpolation() {
+        let config = BashMenuConfig {
+            theme: "dracula".to_string(),
+            ..Default::default()
+        };
+        let ctx = MacroContext::new(&config);
+
+        let input = r#"{toast:2:"Hello, world. Using theme: {theme}"}"#;
+        let (cleaned, toasts) = extract_toasts(input, &ctx);
+        assert_eq!(cleaned, "");
+        assert_eq!(toasts.len(), 1);
+        assert_eq!(toasts[0].timeout_secs, 2.0);
+        assert_eq!(toasts[0].message, "Hello, world. Using theme: dracula");
+
+        // Toast with surrounding command
+        let input2 = r#"echo 'before' {toast:1.5:'Saved!'} && echo 'after'"#;
+        let (cleaned2, toasts2) = extract_toasts(input2, &ctx);
+        assert_eq!(cleaned2, "echo 'before'  && echo 'after'");
+        assert_eq!(toasts2.len(), 1);
+        assert_eq!(toasts2[0].timeout_secs, 1.5);
+        assert_eq!(toasts2[0].message, "Saved!");
+
+        // General interpolation strips {toast:...} so it does not leak into visible text
+        assert_eq!(
+            interpolate_placeholders(r#"Status: {toast:2:"popup"}Ready"#, &ctx),
+            "Status: Ready"
         );
     }
 }

@@ -710,3 +710,112 @@ fn test_gutter_mouse_click_actions() {
         "Expected clicking on [F1]: Help in gutter to return MenuAction::Help"
     );
 }
+
+#[test]
+fn test_menu_marquee_scrolling_and_reset() {
+    let schema = MenuSchema {
+        version: "0.0.1".to_string(),
+        title: "Marquee Menu".to_string(),
+        items: vec![
+            MenuItem {
+                label: "Super Long Menu Item Label Exceeding Available Width".to_string(),
+                r#type: MenuItemType::Command,
+                command: Some("echo 1".to_string()),
+                ..Default::default()
+            },
+            MenuItem {
+                label: "Short Item".to_string(),
+                r#type: MenuItemType::Command,
+                command: Some("echo 2".to_string()),
+                ..Default::default()
+            },
+        ],
+        extra: Default::default(),
+    };
+
+    let styles = ResolvedThemeStyles::default();
+    let mut view = MenuView::new(schema, styles, false, String::new());
+
+    let area = Rect::new(0, 0, 45, 15);
+    let mut buf = Buffer::empty(area);
+
+    // Initial render (pause period, offset = 0)
+    view.render(area, &mut buf);
+    let row_str_0: String = (0..area.width)
+        .map(|x| buf[(x, 2)].symbol().to_string())
+        .collect();
+    assert!(row_str_0.contains("Super Long"));
+
+    // Tick 4 times (pause ticks)
+    for _ in 0..4 {
+        assert!(!view.tick_marquee());
+    }
+
+    // Next tick advances offset
+    assert!(view.tick_marquee());
+    let mut buf2 = Buffer::empty(area);
+    view.render(area, &mut buf2);
+    let row_str_1: String = (0..area.width)
+        .map(|x| buf2[(x, 2)].symbol().to_string())
+        .collect();
+    assert_ne!(row_str_0, row_str_1);
+
+    // Navigation down resets marquee
+    view.move_down();
+    assert_eq!(view.selected_index(), 1);
+
+    // Navigate back up resets marquee to offset 0
+    view.move_up();
+    assert_eq!(view.selected_index(), 0);
+    let mut buf3 = Buffer::empty(area);
+    view.render(area, &mut buf3);
+    let row_str_reset: String = (0..area.width)
+        .map(|x| buf3[(x, 2)].symbol().to_string())
+        .collect();
+    assert_eq!(row_str_0, row_str_reset);
+}
+
+#[test]
+fn test_toast_rack_rendering_and_interaction() {
+    use bashmenu_core::{ToastNotification, ToastSeverity};
+    use bashmenu_tui::ToastRack;
+
+    let mut rack = ToastRack::new();
+    rack.add(ToastNotification {
+        message: "Operation completed successfully".to_string(),
+        title: Some("Success".to_string()),
+        severity: ToastSeverity::Information,
+        timeout_secs: 3.0,
+    });
+
+    let area = Rect::new(0, 0, 80, 24);
+    let mut buf = Buffer::empty(area);
+    let styles = ResolvedThemeStyles::default();
+
+    rack.render(area, &styles, &mut buf);
+
+    // Verify buffer has the indicator character '▌'
+    let mut found_bar = false;
+    for y in 0..area.height {
+        for x in 0..area.width {
+            if buf[(x, y)].symbol() == "▌" {
+                found_bar = true;
+                break;
+            }
+        }
+        if found_bar {
+            break;
+        }
+    }
+    assert!(
+        found_bar,
+        "Expected toast left indicator bar '▌' to be rendered"
+    );
+
+    // Click inside toast to dismiss
+    assert_eq!(rack.len(), 1);
+    let col = area.width - 10;
+    let row = area.height - 4;
+    assert!(rack.handle_mouse(col, row));
+    assert_eq!(rack.len(), 0);
+}
