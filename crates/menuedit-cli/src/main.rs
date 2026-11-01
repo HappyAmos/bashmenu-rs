@@ -1,10 +1,12 @@
 //! Visual split-screen menu tree editor for `bashmenu.mnu`.
 
 use anyhow::Result;
-use bashmenu_core::{load_config, load_menu, save_menu, MenuItem, MenuSchema};
+use bashmenu_core::{
+    load_config, load_menu, save_menu, MenuItem, MenuSchema, ToastNotification, ToastSeverity,
+};
 use bashmenu_tui::{
     compute_modal_inner, install_panic_hook, AsciiGridModal, ConfirmModal, FilePickerModal,
-    HelpModal, InputModal, ResolvedThemeStyles, TerminalGuard,
+    HelpModal, InputModal, ResolvedThemeStyles, TerminalGuard, ToastRack,
 };
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers, MouseButton, MouseEventKind};
@@ -146,9 +148,24 @@ fn main() -> Result<()> {
 
     let cfg_path = resolve_menu_path(Path::new("bashmenu.yml"), cli.local);
     let cfg = load_config(&cfg_path).ok();
+    let themes_path = resolve_menu_path(Path::new("bashmenu.themes"), cli.local);
+    let themes = bashmenu_core::load_themes(&themes_path).ok();
+    let use_nerd = cfg
+        .as_ref()
+        .and_then(|c| c.settings.use_nerd_fonts)
+        .unwrap_or(true);
+    let styles = if let (Some(c), Some(th)) = (&cfg, &themes) {
+        if let Some(t) = th.get(&c.theme) {
+            ResolvedThemeStyles::from_theme(t, use_nerd)
+        } else {
+            ResolvedThemeStyles::default()
+        }
+    } else {
+        ResolvedThemeStyles::default()
+    };
     let mut guard = TerminalGuard::init()?;
-    let styles = ResolvedThemeStyles::default();
 
+    let mut toast_rack = ToastRack::new();
     let mut expanded_paths = HashSet::new();
     let mut selected_node_idx = 0;
 
@@ -490,7 +507,12 @@ fn main() -> Result<()> {
                     modal.render(area, &styles, buf);
                 }
             }
+
+            // Render floating toast notifications atop everything
+            toast_rack.render(area, &styles, buf);
         })?;
+
+        toast_rack.tick();
 
         if event::poll(Duration::from_millis(50))? {
             let ev = event::read()?;
@@ -831,6 +853,11 @@ fn main() -> Result<()> {
                     match ev {
                         Event::Mouse(m) => {
                             if m.kind == MouseEventKind::Down(MouseButton::Left) {
+                                // Dismiss active toast on direct click
+                                if toast_rack.handle_mouse(m.column, m.row) {
+                                    continue;
+                                }
+
                                 // Close button [X] at top right
                                 if m.row == area.y && m.column >= area.x + area.width - 5 {
                                     if is_modified {
@@ -1008,10 +1035,20 @@ fn main() -> Result<()> {
                                         }
                                         MenuEditFooterAction::Save => {
                                             if let Err(e) = save_menu(&menu_path, &menu) {
-                                                status_message = format!("Save error: {}", e);
+                                                toast_rack.add(ToastNotification {
+                                                    title: Some("Error".to_string()),
+                                                    message: format!("Failed to save menu: {}", e),
+                                                    severity: ToastSeverity::Error,
+                                                    timeout_secs: 3.0,
+                                                });
                                             } else {
                                                 is_modified = false;
-                                                status_message = "Saved menu to disk".to_string();
+                                                toast_rack.add(ToastNotification {
+                                                    title: Some("Save Menu".to_string()),
+                                                    message: "Saved menu to disk".to_string(),
+                                                    severity: ToastSeverity::Information,
+                                                    timeout_secs: 2.0,
+                                                });
                                             }
                                         }
                                         MenuEditFooterAction::Exit => {
@@ -1062,10 +1099,20 @@ fn main() -> Result<()> {
                                 match k.code {
                                     KeyCode::Char('s') => {
                                         if let Err(e) = save_menu(&menu_path, &menu) {
-                                            status_message = format!("Save error: {}", e);
+                                            toast_rack.add(ToastNotification {
+                                                title: Some("Error".to_string()),
+                                                message: format!("Failed to save menu: {}", e),
+                                                severity: ToastSeverity::Error,
+                                                timeout_secs: 3.0,
+                                            });
                                         } else {
                                             is_modified = false;
-                                            status_message = "Saved menu to disk".to_string();
+                                            toast_rack.add(ToastNotification {
+                                                title: Some("Save Menu".to_string()),
+                                                message: "Saved menu to disk".to_string(),
+                                                severity: ToastSeverity::Information,
+                                                timeout_secs: 2.0,
+                                            });
                                         }
                                         continue;
                                     }
@@ -1274,10 +1321,20 @@ fn main() -> Result<()> {
                                 }
                                 KeyCode::Char('s') => {
                                     if let Err(e) = save_menu(&menu_path, &menu) {
-                                        status_message = format!("Save error: {}", e);
+                                        toast_rack.add(ToastNotification {
+                                            title: Some("Error".to_string()),
+                                            message: format!("Failed to save menu: {}", e),
+                                            severity: ToastSeverity::Error,
+                                            timeout_secs: 3.0,
+                                        });
                                     } else {
                                         is_modified = false;
-                                        status_message = "Saved menu to disk".to_string();
+                                        toast_rack.add(ToastNotification {
+                                            title: Some("Save Menu".to_string()),
+                                            message: "Saved menu to disk".to_string(),
+                                            severity: ToastSeverity::Information,
+                                            timeout_secs: 2.0,
+                                        });
                                     }
                                 }
                                 KeyCode::Esc | KeyCode::Char('q') => {

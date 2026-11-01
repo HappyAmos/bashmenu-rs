@@ -106,6 +106,10 @@ fn test_themeedit_preview_mode_cycling() {
     assert_eq!(state.preview_mode.title(), "Visual Menu Editor");
 
     state.preview_mode = state.preview_mode.next();
+    assert_eq!(state.preview_mode, PreviewMode::Toast);
+    assert_eq!(state.preview_mode.title(), "Toast Notifications");
+
+    state.preview_mode = state.preview_mode.next();
     assert_eq!(state.preview_mode, PreviewMode::Menu);
 }
 
@@ -436,4 +440,137 @@ fn test_themeedit_preview_menu_editor_border_intact() {
         &b.bottom_tee,
         "Center separator meeting gutter divider must be bottom_tee"
     );
+}
+
+#[test]
+fn test_themeedit_toast_tokens_and_customization() {
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(fixture_path, Some("dracula".to_string()));
+
+    // Verify toast tokens exist
+    assert!(state.tokens.iter().any(|t| t.label == "Toast Left Bar"));
+    assert!(state
+        .tokens
+        .iter()
+        .any(|t| t.label == "Toast Default Timeout"));
+    assert!(state.tokens.iter().any(|t| t.label == "Toast Info Accent"));
+    assert!(state
+        .tokens
+        .iter()
+        .any(|t| t.label == "Toast Warning Accent"));
+    assert!(state.tokens.iter().any(|t| t.label == "Toast Error Accent"));
+
+    // Verify custom toast bar char
+    state.set_toast_char('▎');
+    assert!(state.is_modified);
+    let bar_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Toast Left Bar")
+        .unwrap();
+    assert_eq!(state.get_token_value_display(bar_token), "'▎'");
+
+    // Verify cycling toast timeout
+    state.cycle_toast_timeout();
+    let timeout_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Toast Default Timeout")
+        .unwrap();
+    let display = state.get_token_value_display(timeout_token);
+    assert!(display.ends_with('s'));
+
+    // Verify toast color tokens update correctly
+    state.set_color_token("toast_info", 39);
+    state.set_color_token("toast_warning", 214);
+    state.set_color_token("toast_error", 196);
+
+    let info_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Toast Info Accent")
+        .unwrap();
+    assert_eq!(state.get_token_value_display(info_token), "Color 39");
+
+    let warn_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Toast Warning Accent")
+        .unwrap();
+    assert_eq!(state.get_token_value_display(warn_token), "Color 214");
+
+    let err_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Toast Error Accent")
+        .unwrap();
+    assert_eq!(state.get_token_value_display(err_token), "Color 196");
+
+    // Verify token selection by key works for toast keys
+    assert!(state.select_token_by_key("toast_char"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Toast Left Bar");
+
+    assert!(state.select_token_by_key("toast_timeout"));
+    assert_eq!(
+        state.tokens[state.selected_idx].label,
+        "Toast Default Timeout"
+    );
+
+    assert!(state.select_token_by_key("toast_info"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Toast Info Accent");
+}
+
+#[test]
+fn test_themeedit_help_gutter_layout_above_bottom_border() {
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+
+    let area = Rect::new(0, 0, 80, 24);
+    let mut buf = Buffer::empty(area);
+
+    let bot_y = area.y + area.height - 1; // 23
+    let footer_y = bot_y.saturating_sub(1); // 22
+    let gt_y = footer_y.saturating_sub(1); // 21
+    let panel_y = area.y + 2; // 2
+    let panel_h = gt_y.saturating_sub(panel_y); // 19
+
+    // Check that panel_h leaves exact space for gutter divider and gutter row
+    assert_eq!(panel_y + panel_h, gt_y);
+    assert_eq!(gt_y + 1, footer_y);
+    assert_eq!(footer_y + 1, bot_y);
+
+    // Simulate drawing gutter divider and help gutter row
+    buf.set_string(area.x, gt_y, "├", ratatui::style::Style::default());
+    buf.set_string(
+        area.x + area.width - 1,
+        gt_y,
+        "┤",
+        ratatui::style::Style::default(),
+    );
+    buf.set_string(area.x, footer_y, "│", ratatui::style::Style::default());
+    buf.set_string(
+        area.x + area.width - 1,
+        footer_y,
+        "│",
+        ratatui::style::Style::default(),
+    );
+    buf.set_string(area.x, bot_y, "└", ratatui::style::Style::default());
+    buf.set_string(
+        area.x + area.width - 1,
+        bot_y,
+        "┘",
+        ratatui::style::Style::default(),
+    );
+
+    // Bottom border must be undisturbed on row bot_y
+    assert_eq!(buf[(area.x, bot_y)].symbol(), "└");
+    assert_eq!(buf[(area.x + area.width - 1, bot_y)].symbol(), "┘");
+
+    // Help gutter must be on row footer_y (not bottom border)
+    assert_eq!(buf[(area.x, footer_y)].symbol(), "│");
+    assert_eq!(buf[(area.x + area.width - 1, footer_y)].symbol(), "│");
+
+    // Gutter divider must be on row gt_y
+    assert_eq!(buf[(area.x, gt_y)].symbol(), "├");
+    assert_eq!(buf[(area.x + area.width - 1, gt_y)].symbol(), "┤");
 }

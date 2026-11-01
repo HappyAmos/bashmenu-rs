@@ -16,6 +16,8 @@ pub enum TokenKind {
     DividerLength,
     MarqueeChar,
     MarqueeGap,
+    ToastChar,
+    ToastTimeout,
 }
 
 #[derive(Debug, Clone)]
@@ -31,6 +33,7 @@ pub enum PreviewMode {
     TextEditor,
     Modals,
     MenuEditor,
+    Toast,
 }
 
 impl PreviewMode {
@@ -39,7 +42,8 @@ impl PreviewMode {
             PreviewMode::Menu => PreviewMode::TextEditor,
             PreviewMode::TextEditor => PreviewMode::Modals,
             PreviewMode::Modals => PreviewMode::MenuEditor,
-            PreviewMode::MenuEditor => PreviewMode::Menu,
+            PreviewMode::MenuEditor => PreviewMode::Toast,
+            PreviewMode::Toast => PreviewMode::Menu,
         }
     }
 
@@ -49,6 +53,7 @@ impl PreviewMode {
             PreviewMode::TextEditor => "Text Editor",
             PreviewMode::Modals => "Popup Windows / Modals",
             PreviewMode::MenuEditor => "Visual Menu Editor",
+            PreviewMode::Toast => "Toast Notifications",
         }
     }
 }
@@ -229,6 +234,27 @@ impl ThemeEditorState {
                 label: "Gutter Bottom Tee".to_string(),
                 kind: TokenKind::Border("gutter_bottom_tee".to_string()),
             },
+            // Toast Notifications
+            TokenItem {
+                label: "Toast Left Bar".to_string(),
+                kind: TokenKind::ToastChar,
+            },
+            TokenItem {
+                label: "Toast Default Timeout".to_string(),
+                kind: TokenKind::ToastTimeout,
+            },
+            TokenItem {
+                label: "Toast Info Accent".to_string(),
+                kind: TokenKind::Color("toast_info".to_string()),
+            },
+            TokenItem {
+                label: "Toast Warning Accent".to_string(),
+                kind: TokenKind::Color("toast_warning".to_string()),
+            },
+            TokenItem {
+                label: "Toast Error Accent".to_string(),
+                kind: TokenKind::Color("toast_error".to_string()),
+            },
         ];
 
         Self {
@@ -407,6 +433,25 @@ impl ThemeEditorState {
                     .unwrap_or(4);
                 format!("{}", gap)
             }
+            TokenKind::ToastChar => {
+                let c = self
+                    .current_theme
+                    .toast
+                    .as_ref()
+                    .and_then(|t| t.char.clone())
+                    .unwrap_or_else(|| "▌".to_string());
+                let parsed = bashmenu_core::parse_ascii_val(&c);
+                format!("'{}'", if parsed.is_empty() { c } else { parsed })
+            }
+            TokenKind::ToastTimeout => {
+                let t = self
+                    .current_theme
+                    .toast
+                    .as_ref()
+                    .and_then(|t| t.timeout)
+                    .unwrap_or(2.0);
+                format!("{:.1}s", t)
+            }
         }
     }
 
@@ -512,6 +557,34 @@ impl ThemeEditorState {
         }
     }
 
+    pub fn set_toast_char(&mut self, ch: char) {
+        if self.current_theme.toast.is_none() {
+            self.current_theme.toast = Some(bashmenu_core::ToastConfig::default());
+        }
+        if let Some(t) = &mut self.current_theme.toast {
+            t.char = Some(ch.to_string());
+            self.is_modified = true;
+            self.status_message = format!("Updated toast left bar character to '{}'", ch);
+        }
+    }
+
+    pub fn cycle_toast_timeout(&mut self) {
+        if self.current_theme.toast.is_none() {
+            self.current_theme.toast = Some(bashmenu_core::ToastConfig::default());
+        }
+        if let Some(t) = &mut self.current_theme.toast {
+            let timeouts = [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0];
+            let curr = t.timeout.unwrap_or(2.0);
+            let next_t = match timeouts.iter().position(|&v| (v - curr).abs() < 0.05) {
+                Some(idx) => timeouts[(idx + 1) % timeouts.len()],
+                None => 2.0,
+            };
+            t.timeout = Some(next_t);
+            self.is_modified = true;
+            self.status_message = format!("Updated toast timeout to {:.1}s", next_t);
+        }
+    }
+
     pub fn adjust_scroll(&mut self, viewport_h: usize) {
         if viewport_h == 0 {
             return;
@@ -543,6 +616,8 @@ impl ThemeEditorState {
             TokenKind::DividerLength => key == "divider_length",
             TokenKind::MarqueeChar => key == "marquee_char",
             TokenKind::MarqueeGap => key == "marquee_gap",
+            TokenKind::ToastChar => key == "toast_char",
+            TokenKind::ToastTimeout => key == "toast_timeout",
         }) {
             self.selected_idx = idx;
             self.status_message = format!("Selected: {}", self.tokens[idx].label);
@@ -560,9 +635,15 @@ impl ThemeEditorState {
                     || (k == "bottom_tee" && key == "gutter_bottom_tee")
                     || (k == "gutter_top_tee" && key == "top_tee")
                     || (k == "gutter_bottom_tee" && key == "bottom_tee")
+                    || (k == "left_tee" && key == "gutter_left_tee")
+                    || (k == "right_tee" && key == "gutter_right_tee")
+                    || (k == "gutter_left_tee" && key == "left_tee")
+                    || (k == "gutter_right_tee" && key == "right_tee")
             }
             TokenKind::DividerChar => key == "divider",
             TokenKind::MarqueeChar => key == "marquee",
+            TokenKind::ToastChar => key == "toast_char" || key == "toast_bar" || key == "toast",
+            TokenKind::ToastTimeout => key == "toast_timeout" || key == "toast_duration",
             _ => false,
         }) {
             self.selected_idx = idx;

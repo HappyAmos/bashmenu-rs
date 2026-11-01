@@ -94,6 +94,15 @@ pub struct DividerConfig {
     pub length: Option<String>,
 }
 
+/// Theme toast notification configuration
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct ToastConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub char: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timeout: Option<f64>,
+}
+
 fn default_true() -> bool {
     true
 }
@@ -198,6 +207,10 @@ pub struct Theme {
     /// Divider styling
     #[serde(skip_serializing_if = "Option::is_none")]
     pub divider: Option<DividerConfig>,
+
+    /// Toast notification settings
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub toast: Option<ToastConfig>,
 
     /// 256-color palette tier mapping token names to [fg, bg] or color identifiers
     #[serde(rename = "256", skip_serializing_if = "Option::is_none")]

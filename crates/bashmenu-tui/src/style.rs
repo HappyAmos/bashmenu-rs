@@ -26,6 +26,11 @@ pub struct ResolvedThemeStyles {
     pub window_close_button: Style,
     pub indicator_symbol: String,
     pub borders: ResolvedWindowBorders,
+    pub toast_bar_char: String,
+    pub toast_timeout: f64,
+    pub toast_info: Color,
+    pub toast_warning: Color,
+    pub toast_error: Color,
 }
 
 impl Default for ResolvedThemeStyles {
@@ -57,6 +62,11 @@ impl Default for ResolvedThemeStyles {
             window_close_button: Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
             indicator_symbol: "► ".to_string(),
             borders: ResolvedWindowBorders::default(),
+            toast_bar_char: "▌".to_string(),
+            toast_timeout: 2.0,
+            toast_info: Color::Rgb(78, 191, 113),
+            toast_warning: Color::Rgb(255, 184, 108),
+            toast_error: Color::Rgb(255, 85, 85),
         }
     }
 }
@@ -238,6 +248,36 @@ impl ResolvedThemeStyles {
             }
             if let Some(st) = parse_style_pair(p.get("window_close_button")) {
                 resolved.window_close_button = st.add_modifier(Modifier::BOLD);
+            }
+            if let Some(c) = p.get("toast_info").and_then(parse_color_value) {
+                if c != Color::Reset {
+                    resolved.toast_info = c;
+                }
+            }
+            if let Some(c) = p.get("toast_warning").and_then(parse_color_value) {
+                if c != Color::Reset {
+                    resolved.toast_warning = c;
+                }
+            }
+            if let Some(c) = p.get("toast_error").and_then(parse_color_value) {
+                if c != Color::Reset {
+                    resolved.toast_error = c;
+                }
+            }
+        }
+
+        // Toast configuration
+        if let Some(t_cfg) = &theme.toast {
+            if let Some(ch) = &t_cfg.char {
+                let parsed = bashmenu_core::parse_ascii_val(ch);
+                if !parsed.is_empty() {
+                    resolved.toast_bar_char = parsed;
+                }
+            }
+            if let Some(timeout) = t_cfg.timeout {
+                if timeout > 0.0 {
+                    resolved.toast_timeout = timeout;
+                }
             }
         }
 

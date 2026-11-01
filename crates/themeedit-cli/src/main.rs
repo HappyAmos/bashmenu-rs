@@ -5,9 +5,10 @@
 //! Main Menu, Text Editor, Popup Windows, and Visual Menu Editor.
 
 use anyhow::Result;
+use bashmenu_core::{ToastNotification, ToastSeverity};
 use bashmenu_tui::{
     composite_buffer, install_panic_hook, AsciiGridModal, ColorGridModal, ConfirmModal, InputModal,
-    ResolvedThemeStyles, TerminalGuard, WallpaperCompositor,
+    ResolvedThemeStyles, TerminalGuard, ToastRack, WallpaperCompositor,
 };
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers, MouseButton, MouseEventKind};
@@ -76,6 +77,7 @@ fn main() -> Result<()> {
         .map(WallpaperCompositor::new);
     let mut need_redraw = true;
     let mut click_flash: Option<(std::time::Instant, u16, u16, u16)> = None;
+    let mut toast_rack = ToastRack::new();
 
     loop {
         let size = guard.terminal_mut().size()?;
@@ -118,11 +120,18 @@ fn main() -> Result<()> {
                 }
 
                 // Split into Left Panel (Tokens) and Right Panel (Live Preview)
+                // Reserve bottom 2 rows for gutter divider and gutter help bar
+                let bot_y = area.y + area.height - 1;
+                let footer_y = bot_y.saturating_sub(1);
+                let gt_y = footer_y.saturating_sub(1);
+                let panel_y = area.y + 2;
+                let panel_h = gt_y.saturating_sub(panel_y);
+
                 let left_w = (area.width * 45 / 100).clamp(30, 42);
-                let left_area = Rect::new(area.x + 2, area.y + 2, left_w - 3, area.height - 4);
+                let left_area = Rect::new(area.x + 2, panel_y, left_w - 3, panel_h);
                 let right_x = area.x + left_w + 1;
                 let right_w = (area.x + area.width).saturating_sub(right_x + 2);
-                let right_area = Rect::new(right_x, area.y + 2, right_w, area.height - 4);
+                let right_area = Rect::new(right_x, panel_y, right_w, panel_h);
 
                 // 1. Render Left Panel: Token List
                 let visible_rows = (left_area.height.saturating_sub(2)) as usize;
@@ -193,10 +202,15 @@ fn main() -> Result<()> {
                 } else {
                     "4: MenuEdit"
                 };
+                let tab_toast = if state.preview_mode == PreviewMode::Toast {
+                    "▶ 5: Toasts ◀"
+                } else {
+                    "5: Toasts"
+                };
 
                 let preview_title = format!(
-                    " [ Preview: {} | {} | {} | {} ] ",
-                    tab_menu, tab_ed, tab_mod, tab_me
+                    " [ Preview: {} | {} | {} | {} | {} ] ",
+                    tab_menu, tab_ed, tab_mod, tab_me, tab_toast
                 );
 
                 let preview_block = Block::default()
@@ -754,12 +768,134 @@ fn main() -> Result<()> {
                         );
                         buf.set_string(p_inner_x, footer_y, &p_spread, preview_styles.gutter);
                     }
+                    PreviewMode::Toast => {
+                        // Title banner
+                        buf.set_string(
+                            p_inner_x,
+                            p_inner_y,
+                            "▶ Toast Notification Stacking & Accent Styles",
+                            preview_styles.title,
+                        );
+                        buf.set_string(
+                            p_inner_x,
+                            p_inner_y + 1,
+                            "Click any toast accent bar or text to customize color and glyphs",
+                            preview_styles.help_text,
+                        );
+
+                        let bg_color = match preview_styles.background {
+                            Color::Reset => Color::Rgb(52, 63, 73),
+                            c => c,
+                        };
+                        let bar_glyph = &preview_styles.toast_bar_char;
+
+                        // 3 Stacked Sample Toasts docked bottom-right
+                        let toast_w = (p_avail_w.saturating_sub(6)).clamp(28, 48);
+                        let toast_x = right_area.x + right_area.width.saturating_sub(toast_w + 3);
+
+                        let bot_y = right_area.y + right_area.height.saturating_sub(3);
+
+                        // Toast 3 (Error) at bottom
+                        let t3_y = bot_y.saturating_sub(3);
+                        let t3_style = Style::default().fg(preview_styles.toast_error).bg(bg_color);
+                        let t3_text_style = Style::default()
+                            .fg(preview_styles.text.fg.unwrap_or(Color::White))
+                            .bg(bg_color);
+                        buf.set_string(toast_x, t3_y, bar_glyph, t3_style);
+                        buf.set_string(
+                            toast_x + 2,
+                            t3_y,
+                            "Error",
+                            t3_style.add_modifier(Modifier::BOLD),
+                        );
+                        buf.set_string(toast_x, t3_y + 1, bar_glyph, t3_style);
+                        buf.set_string(
+                            toast_x + 2,
+                            t3_y + 1,
+                            "Connection failed on port 8080",
+                            t3_text_style,
+                        );
+
+                        // Toast 2 (Warning) above Toast 3
+                        let t2_y = t3_y.saturating_sub(3);
+                        let t2_style = Style::default()
+                            .fg(preview_styles.toast_warning)
+                            .bg(bg_color);
+                        let t2_text_style = Style::default()
+                            .fg(preview_styles.text.fg.unwrap_or(Color::White))
+                            .bg(bg_color);
+                        buf.set_string(toast_x, t2_y, bar_glyph, t2_style);
+                        buf.set_string(
+                            toast_x + 2,
+                            t2_y,
+                            "Warning",
+                            t2_style.add_modifier(Modifier::BOLD),
+                        );
+                        buf.set_string(toast_x, t2_y + 1, bar_glyph, t2_style);
+                        buf.set_string(
+                            toast_x + 2,
+                            t2_y + 1,
+                            "High memory consumption (88%)",
+                            t2_text_style,
+                        );
+
+                        // Toast 1 (Information) above Toast 2
+                        let t1_y = t2_y.saturating_sub(3);
+                        let t1_style = Style::default().fg(preview_styles.toast_info).bg(bg_color);
+                        let t1_text_style = Style::default()
+                            .fg(preview_styles.text.fg.unwrap_or(Color::White))
+                            .bg(bg_color);
+                        buf.set_string(toast_x, t1_y, bar_glyph, t1_style);
+                        buf.set_string(
+                            toast_x + 2,
+                            t1_y,
+                            "Information",
+                            t1_style.add_modifier(Modifier::BOLD),
+                        );
+                        buf.set_string(toast_x, t1_y + 1, bar_glyph, t1_style);
+                        buf.set_string(
+                            toast_x + 2,
+                            t1_y + 1,
+                            "Saved configuration to disk",
+                            t1_text_style,
+                        );
+
+                        // Bottom configuration summary footer
+                        let summary_y = right_area.y + right_area.height - 2;
+                        let summary_txt = format!(
+                            "Bar: '{}'  Timeout: {:.1}s  [Enter: Cycle / Pick]",
+                            preview_styles.toast_bar_char, preview_styles.toast_timeout
+                        );
+                        buf.set_string(p_inner_x, summary_y, summary_txt, preview_styles.gutter);
+                    }
                 }
 
-                // 3. Render Bottom Footer Status
-                let footer_y = area.y + area.height - 1;
+                // 3. Render Bottom Help Gutter with dedicated divider
+                let b = &preview_styles.borders;
+                let border_style = Style::default().fg(Color::Cyan);
+
+                // Gutter top border divider
+                buf.set_string(area.x, gt_y, &b.left_tee, border_style);
+                buf.set_string(area.x + area.width - 1, gt_y, &b.right_tee, border_style);
+                let div_w = area.width.saturating_sub(2) as usize;
+                buf.set_string(
+                    area.x + 1,
+                    gt_y,
+                    b.border_horizontal_bottom.repeat(div_w),
+                    border_style,
+                );
+
+                // Gutter row side borders
+                buf.set_string(area.x, footer_y, &b.border_vertical_left, border_style);
+                buf.set_string(
+                    area.x + area.width - 1,
+                    footer_y,
+                    &b.border_vertical_right,
+                    border_style,
+                );
+
                 let bottom_items = [
-                    "[TAB/1-4] Switch Preview",
+                    "[TAB/1-5] Switch Preview",
                     "[Enter] Pick",
                     "[Ctrl+S] Save",
                     "[Ctrl+A] Save As",
@@ -772,7 +908,7 @@ fn main() -> Result<()> {
                     area.x + 2,
                     footer_y,
                     bottom_spread,
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(preview_styles.help_text.fg.unwrap_or(Color::White)),
                 );
 
                 if !state.status_message.is_empty() {
@@ -785,6 +921,9 @@ fn main() -> Result<()> {
                         Style::default().fg(Color::Green),
                     );
                 }
+
+                // 4. Render Active Toasts
+                toast_rack.render(area, &preview_styles, buf);
 
                 // 4. Render Active Modal if present
                 match &mut active_modal {
@@ -821,7 +960,12 @@ fn main() -> Result<()> {
             need_redraw = false;
         }
 
-        let poll_dur = if click_flash.is_some() {
+        toast_rack.tick();
+        if !toast_rack.is_empty() {
+            need_redraw = true;
+        }
+
+        let poll_dur = if click_flash.is_some() || !toast_rack.is_empty() {
             Duration::from_millis(30)
         } else {
             Duration::from_millis(50)
@@ -868,6 +1012,8 @@ fn main() -> Result<()> {
                                     state.set_divider_char(ch);
                                 } else if key == "marquee_char" {
                                     state.set_marquee_char(ch);
+                                } else if key == "toast_char" {
+                                    state.set_toast_char(ch);
                                 } else {
                                     state.set_border_token(key, ch);
                                 }
@@ -882,6 +1028,8 @@ fn main() -> Result<()> {
                                     state.set_divider_char(ch);
                                 } else if key == "marquee_char" {
                                     state.set_marquee_char(ch);
+                                } else if key == "toast_char" {
+                                    state.set_toast_char(ch);
                                 } else {
                                     state.set_border_token(key, ch);
                                 }
@@ -898,7 +1046,27 @@ fn main() -> Result<()> {
                                 let trimmed = new_name.trim();
                                 if !trimmed.is_empty() {
                                     state.current_name = trimmed.to_string();
-                                    let _ = state.save_to_disk();
+                                    match state.save_to_disk() {
+                                        Ok(_) => {
+                                            toast_rack.add(ToastNotification {
+                                                title: Some("Save Theme".to_string()),
+                                                message: format!(
+                                                    "Saved theme '{}' to disk",
+                                                    state.current_name
+                                                ),
+                                                severity: ToastSeverity::Information,
+                                                timeout_secs: 2.0,
+                                            });
+                                        }
+                                        Err(e) => {
+                                            toast_rack.add(ToastNotification {
+                                                title: Some("Error".to_string()),
+                                                message: format!("Failed to save theme: {}", e),
+                                                severity: ToastSeverity::Error,
+                                                timeout_secs: 3.0,
+                                            });
+                                        }
+                                    }
                                 }
                             }
                             active_modal = ActiveModal::None;
@@ -910,7 +1078,27 @@ fn main() -> Result<()> {
                                 let trimmed = new_name.trim();
                                 if !trimmed.is_empty() {
                                     state.current_name = trimmed.to_string();
-                                    let _ = state.save_to_disk();
+                                    match state.save_to_disk() {
+                                        Ok(_) => {
+                                            toast_rack.add(ToastNotification {
+                                                title: Some("Save Theme".to_string()),
+                                                message: format!(
+                                                    "Saved theme '{}' to disk",
+                                                    state.current_name
+                                                ),
+                                                severity: ToastSeverity::Information,
+                                                timeout_secs: 2.0,
+                                            });
+                                        }
+                                        Err(e) => {
+                                            toast_rack.add(ToastNotification {
+                                                title: Some("Error".to_string()),
+                                                message: format!("Failed to save theme: {}", e),
+                                                severity: ToastSeverity::Error,
+                                                timeout_secs: 3.0,
+                                            });
+                                        }
+                                    }
                                 }
                             }
                             active_modal = ActiveModal::None;
@@ -941,11 +1129,21 @@ fn main() -> Result<()> {
                 },
                 ActiveModal::None => match ev {
                     Event::Mouse(m) => {
+                        if toast_rack.handle_mouse(m.column, m.row) {
+                            continue;
+                        }
+
+                        let bot_y = area.y + area.height - 1;
+                        let footer_y = bot_y.saturating_sub(1);
+                        let gt_y = footer_y.saturating_sub(1);
+                        let panel_y = area.y + 2;
+                        let panel_h = gt_y.saturating_sub(panel_y);
+
                         let left_w = (area.width * 45 / 100).clamp(30, 42);
-                        let left_area = Rect::new(area.x + 2, area.y + 2, left_w, area.height - 4);
+                        let left_area = Rect::new(area.x + 2, panel_y, left_w, panel_h);
                         let right_x = area.x + left_w + 1;
                         let right_w = (area.x + area.width).saturating_sub(right_x + 2);
-                        let right_area = Rect::new(right_x, area.y + 2, right_w, area.height - 4);
+                        let right_area = Rect::new(right_x, panel_y, right_w, panel_h);
 
                         if m.kind == MouseEventKind::ScrollUp {
                             if m.column >= left_area.x
@@ -1048,7 +1246,27 @@ fn main() -> Result<()> {
                                             &state.current_name,
                                         ));
                                     } else {
-                                        let _ = state.save_to_disk();
+                                        match state.save_to_disk() {
+                                            Ok(_) => {
+                                                toast_rack.add(ToastNotification {
+                                                    title: Some("Save Theme".to_string()),
+                                                    message: format!(
+                                                        "Saved theme '{}' to disk",
+                                                        state.current_name
+                                                    ),
+                                                    severity: ToastSeverity::Information,
+                                                    timeout_secs: 2.0,
+                                                });
+                                            }
+                                            Err(e) => {
+                                                toast_rack.add(ToastNotification {
+                                                    title: Some("Error".to_string()),
+                                                    message: format!("Failed to save theme: {}", e),
+                                                    severity: ToastSeverity::Error,
+                                                    timeout_secs: 3.0,
+                                                });
+                                            }
+                                        }
                                     }
                                     continue;
                                 }
@@ -1088,6 +1306,9 @@ fn main() -> Result<()> {
                             }
                             KeyCode::Char('4') => {
                                 state.preview_mode = PreviewMode::MenuEditor;
+                            }
+                            KeyCode::Char('5') => {
+                                state.preview_mode = PreviewMode::Toast;
                             }
                             KeyCode::Up | KeyCode::Char('k') => {
                                 if state.selected_idx > 0 {
@@ -1156,6 +1377,15 @@ fn main() -> Result<()> {
                                     TokenKind::MarqueeGap => {
                                         state.cycle_marquee_gap();
                                     }
+                                    TokenKind::ToastChar => {
+                                        active_modal = ActiveModal::AsciiPicker(
+                                            "toast_char".to_string(),
+                                            AsciiGridModal::new("Pick Toast Left Bar Glyph", 221),
+                                        );
+                                    }
+                                    TokenKind::ToastTimeout => {
+                                        state.cycle_toast_timeout();
+                                    }
                                 }
                             }
                             KeyCode::Esc | KeyCode::Char('q') => {
@@ -1190,7 +1420,7 @@ fn hit_test_preview(
     row: u16,
     right_area: Rect,
     mode: PreviewMode,
-    is_screen_width: bool,
+    _is_screen_width: bool,
 ) -> Option<(&'static str, u16, u16, u16)> {
     let w = right_area.width as usize;
     let avail_both = (w.saturating_sub(6)).max(4);
@@ -1198,6 +1428,7 @@ fn hit_test_preview(
     let sep_x = (left_gutter_w + 2).min(w.saturating_sub(2));
     let gt_y = right_area.y + right_area.height.saturating_sub(3);
     let p_inner_x = right_area.x + 2;
+    let p_inner_y = right_area.y + 2;
     let p_avail_w = right_area.width.saturating_sub(4);
     let content_start_y = right_area.y + 2;
     let content_avail_h = gt_y.saturating_sub(content_start_y);
@@ -1241,18 +1472,10 @@ fn hit_test_preview(
             // 3. Left border
             if col == right_area.x {
                 if row == content_start_y + 3 {
-                    if is_screen_width {
-                        return Some(("left_tee", row, col, col + 1));
-                    } else {
-                        return Some(("border_vertical", row, col, col + 1));
-                    }
+                    return Some(("left_tee", row, col, col + 1));
                 }
                 if content_avail_h >= 6 && row == plugin_start_y {
-                    if is_screen_width {
-                        return Some(("left_tee", row, col, col + 1));
-                    } else {
-                        return Some(("border_vertical", row, col, col + 1));
-                    }
+                    return Some(("left_tee", row, col, col + 1));
                 }
                 if row == gt_y {
                     return Some(("gutter_left_tee", row, col, col + 1));
@@ -1262,18 +1485,10 @@ fn hit_test_preview(
             // 4. Right border
             if col == right_area.x + right_area.width - 1 {
                 if row == content_start_y + 3 {
-                    if is_screen_width {
-                        return Some(("right_tee", row, col, col + 1));
-                    } else {
-                        return Some(("border_vertical", row, col, col + 1));
-                    }
+                    return Some(("right_tee", row, col, col + 1));
                 }
                 if content_avail_h >= 6 && row == plugin_start_y {
-                    if is_screen_width {
-                        return Some(("right_tee", row, col, col + 1));
-                    } else {
-                        return Some(("border_vertical", row, col, col + 1));
-                    }
+                    return Some(("right_tee", row, col, col + 1));
                 }
                 if row == gt_y {
                     return Some(("gutter_right_tee", row, col, col + 1));
@@ -1514,11 +1729,17 @@ fn hit_test_preview(
                 return Some(("border_vertical", row, col, col + 1));
             }
             if row == gt_y {
+                if col == right_area.x {
+                    return Some(("left_tee", row, col, col + 1));
+                }
+                if col == right_area.x + right_area.width - 1 {
+                    return Some(("right_tee", row, col, col + 1));
+                }
                 return Some((
                     "border_horizontal",
                     row,
-                    right_area.x,
-                    right_area.x + right_area.width,
+                    right_area.x + 1,
+                    right_area.x + right_area.width - 1,
                 ));
             }
             if row == footer_y {
@@ -1546,6 +1767,103 @@ fn hit_test_preview(
                 }
                 Some(("text", row, sep_col + 1, p_inner_x + p_avail_w))
             }
+        }
+        PreviewMode::Toast => {
+            let toast_w = (p_avail_w.saturating_sub(6)).clamp(28, 48);
+            let toast_x = right_area.x + right_area.width.saturating_sub(toast_w + 3);
+            let bot_y = right_area.y + right_area.height.saturating_sub(3);
+            let t3_y = bot_y.saturating_sub(3);
+            let t2_y = t3_y.saturating_sub(3);
+            let t1_y = t2_y.saturating_sub(3);
+            let summary_y = right_area.y + right_area.height - 2;
+
+            if row == summary_y {
+                return Some(("toast_timeout", row, p_inner_x, p_inner_x + p_avail_w));
+            }
+
+            // Check Toast 1 (Info)
+            if row == t1_y || row == t1_y + 1 {
+                if col >= toast_x && col < toast_x + 2 {
+                    return Some(("toast_char", row, toast_x, toast_x + 2));
+                }
+                if col >= toast_x + 2 && col < toast_x + toast_w {
+                    if row == t1_y {
+                        return Some(("toast_info", row, toast_x + 2, toast_x + toast_w));
+                    } else {
+                        return Some(("text", row, toast_x + 2, toast_x + toast_w));
+                    }
+                }
+            }
+
+            // Check Toast 2 (Warning)
+            if row == t2_y || row == t2_y + 1 {
+                if col >= toast_x && col < toast_x + 2 {
+                    return Some(("toast_char", row, toast_x, toast_x + 2));
+                }
+                if col >= toast_x + 2 && col < toast_x + toast_w {
+                    if row == t2_y {
+                        return Some(("toast_warning", row, toast_x + 2, toast_x + toast_w));
+                    } else {
+                        return Some(("text", row, toast_x + 2, toast_x + toast_w));
+                    }
+                }
+            }
+
+            // Check Toast 3 (Error)
+            if row == t3_y || row == t3_y + 1 {
+                if col >= toast_x && col < toast_x + 2 {
+                    return Some(("toast_char", row, toast_x, toast_x + 2));
+                }
+                if col >= toast_x + 2 && col < toast_x + toast_w {
+                    if row == t3_y {
+                        return Some(("toast_error", row, toast_x + 2, toast_x + toast_w));
+                    } else {
+                        return Some(("text", row, toast_x + 2, toast_x + toast_w));
+                    }
+                }
+            }
+
+            // Outer borders
+            if row == right_area.y {
+                if col == right_area.x {
+                    return Some(("border_top_left", row, col, col + 1));
+                }
+                if col == right_area.x + right_area.width - 1 {
+                    return Some(("border_top_right", row, col, col + 1));
+                }
+                return Some((
+                    "border_horizontal",
+                    row,
+                    right_area.x + 1,
+                    right_area.x + right_area.width - 1,
+                ));
+            }
+            if row == right_area.y + right_area.height - 1 {
+                if col == right_area.x {
+                    return Some(("border_bottom_left", row, col, col + 1));
+                }
+                if col == right_area.x + right_area.width - 1 {
+                    return Some(("border_bottom_right", row, col, col + 1));
+                }
+                return Some((
+                    "border_horizontal",
+                    row,
+                    right_area.x + 1,
+                    right_area.x + right_area.width - 1,
+                ));
+            }
+            if col == right_area.x || col == right_area.x + right_area.width - 1 {
+                return Some(("border_vertical", row, col, col + 1));
+            }
+
+            if row == p_inner_y {
+                return Some(("accent", row, p_inner_x, p_inner_x + p_avail_w));
+            }
+            if row == p_inner_y + 1 {
+                return Some(("help_text", row, p_inner_x, p_inner_x + p_avail_w));
+            }
+
+            Some(("text", row, p_inner_x, p_inner_x + p_avail_w))
         }
     }
 }

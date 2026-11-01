@@ -120,6 +120,41 @@ fn test_grid_pickers_navigation() {
 
     // Enter submits CP437 character
     assert_eq!(ascii_modal.handle_key(KeyCode::Enter), Some(Some('─')));
+
+    // Verify 3-digit decimal badge rendering in buffers
+    let styles = ResolvedThemeStyles::default();
+    let area = Rect::new(0, 0, 80, 30);
+    let mut color_buf = Buffer::empty(area);
+    color_modal.render(area, &styles, &mut color_buf);
+    let color_text: String = (0..area.height)
+        .map(|y| {
+            (0..area.width)
+                .map(|x| color_buf[(x, y)].symbol())
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(
+        color_text.contains("Color: 017"),
+        "Expected color modal to display 3-digit decimal badge 'Color: 017', got: {}",
+        color_text
+    );
+
+    let mut ascii_buf = Buffer::empty(area);
+    ascii_modal.render(area, &styles, &mut ascii_buf);
+    let ascii_text: String = (0..area.height)
+        .map(|y| {
+            (0..area.width)
+                .map(|x| ascii_buf[(x, y)].symbol())
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(
+        ascii_text.contains("ASCII: 196"),
+        "Expected ASCII modal to display 3-digit decimal badge 'ASCII: 196', got: {}",
+        ascii_text
+    );
 }
 
 #[test]

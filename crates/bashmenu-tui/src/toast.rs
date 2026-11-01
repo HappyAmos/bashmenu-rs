@@ -131,9 +131,9 @@ impl ToastRack {
             }
 
             let indicator_color = match toast.severity {
-                ToastSeverity::Information => Color::Rgb(78, 191, 113), // #4ebf71 green
-                ToastSeverity::Warning => Color::Rgb(255, 184, 108),    // #ffb86c orange/yellow
-                ToastSeverity::Error => Color::Rgb(255, 85, 85),        // #ff5555 red
+                ToastSeverity::Information => styles.toast_info,
+                ToastSeverity::Warning => styles.toast_warning,
+                ToastSeverity::Error => styles.toast_error,
             };
 
             let title_text = toast.title.as_deref().unwrap_or(match toast.severity {
@@ -169,8 +169,8 @@ impl ToastRack {
             let toast_rect = Rect::new(toast_x, toast_y, toast_w as u16, toast_h);
             toast.bounds = Some(toast_rect);
 
-            // Left indicator character '▌' (U+258C)
-            let left_bar = "▌";
+            // Left indicator character from active theme (default: '▌' / U+258C)
+            let left_bar = &styles.toast_bar_char;
             let bar_style = Style::default().fg(indicator_color).bg(bg_color);
             let content_bg_style = Style::default().bg(bg_color);
             let title_style = Style::default()

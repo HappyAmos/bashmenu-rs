@@ -5,11 +5,12 @@ use bashedit_cli::{
     get_swap_path, is_pid_running, read_swap_file, remove_swap_file, EditorBuffer, SwapHeader,
 };
 use bashmenu_core::{
-    load_config, load_themes, BASHEDIT_HELP_TEXT, MARKDOWN_REFERENCE_TEXT, PLACEHOLDER_HELP_TEXT,
+    load_config, load_themes, ToastNotification, ToastSeverity, BASHEDIT_HELP_TEXT,
+    MARKDOWN_REFERENCE_TEXT, PLACEHOLDER_HELP_TEXT,
 };
 use bashmenu_tui::{
     install_panic_hook, AsciiGridModal, ColorGridModal, ConfirmModal, FilePickerModal, HelpModal,
-    InputModal, ResolvedThemeStyles, TerminalGuard,
+    InputModal, ResolvedThemeStyles, TerminalGuard, ToastRack,
 };
 use clap::Parser;
 use crossterm::event::{
@@ -188,6 +189,7 @@ fn main() -> Result<()> {
     };
 
     let mut last_grid_origin = (0, 0);
+    let mut toast_rack = ToastRack::new();
 
     loop {
         let size = guard.terminal_mut().size()?;
@@ -546,19 +548,33 @@ fn main() -> Result<()> {
                 }),
             );
 
-            // 7. Modals
+            // 7. Active Toasts
+            toast_rack.render(area, &styles, buf);
+
+            // 8. Modals
             if let Some(orig) = render_modal(&mut active_modal, area, &styles, &tabs, buf) {
                 last_grid_origin = orig;
             }
         })?;
 
-        // 8. Event Handling
-        if event::poll(Duration::from_millis(50))? {
+        toast_rack.tick();
+
+        let poll_dur = if !toast_rack.is_empty() {
+            Duration::from_millis(30)
+        } else {
+            Duration::from_millis(50)
+        };
+
+        // 9. Event Handling
+        if event::poll(poll_dur)? {
             let ev = event::read()?;
 
             // Ignore mouse movement and key release events to eliminate latency and tearing
             if let Event::Mouse(m) = &ev {
                 if m.kind == MouseEventKind::Moved {
+                    continue;
+                }
+                if toast_rack.handle_mouse(m.column, m.row) {
                     continue;
                 }
             }
@@ -577,6 +593,7 @@ fn main() -> Result<()> {
                 area,
                 cli.read_only,
                 last_grid_origin,
+                &mut toast_rack,
             );
 
             if handled_modal {
@@ -671,7 +688,8 @@ fn main() -> Result<()> {
                                         "",
                                     ));
                                 } else {
-                                    let _ = tab.save_to_disk();
+                                    let res = tab.save_to_disk();
+                                    show_save_toast(&mut toast_rack, res, tab);
                                 }
                                 continue;
                             }
@@ -1037,7 +1055,8 @@ fn main() -> Result<()> {
                                                 "",
                                             ));
                                         } else {
-                                            let _ = tab.save_to_disk();
+                                            let res = tab.save_to_disk();
+                                            show_save_toast(&mut toast_rack, res, tab);
                                         }
                                     }
                                     FooterAction::SaveFileAs => {
@@ -1213,6 +1232,34 @@ fn render_modal(
     }
 }
 
+fn show_save_toast(toast_rack: &mut ToastRack, res: Result<()>, tab: &EditorBuffer) {
+    let name = tab
+        .file_path
+        .as_ref()
+        .and_then(|p| p.file_name())
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| "file".to_string());
+    match res {
+        Ok(_) => {
+            toast_rack.add(ToastNotification {
+                title: Some("Save File".to_string()),
+                message: format!("Saved '{}' to disk", name),
+                severity: ToastSeverity::Information,
+                timeout_secs: 2.0,
+            });
+        }
+        Err(e) => {
+            toast_rack.add(ToastNotification {
+                title: Some("Error".to_string()),
+                message: format!("Failed to save: {}", e),
+                severity: ToastSeverity::Error,
+                timeout_secs: 3.0,
+            });
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
 fn handle_active_modal(
     active_modal: &mut ActiveModal,
     tabs: &mut Vec<EditorBuffer>,
@@ -1221,6 +1268,7 @@ fn handle_active_modal(
     area: Rect,
     is_cli_read_only: bool,
     last_grid_origin: (u16, u16),
+    toast_rack: &mut ToastRack,
 ) -> bool {
     match active_modal {
         ActiveModal::SwapRecovery {
@@ -1294,7 +1342,8 @@ fn handle_active_modal(
                         ));
                         return true;
                     }
-                    let _ = tab.save_to_disk();
+                    let res = tab.save_to_disk();
+                    show_save_toast(toast_rack, res, tab);
                 }
                 tabs[target_idx].cleanup_swap();
                 if tabs.len() == 1 {
@@ -1341,7 +1390,8 @@ fn handle_active_modal(
                         let new_path = resolve_path_tilde(Path::new(trimmed));
                         let tab = &mut tabs[*active_tab_idx];
                         tab.set_file_path(new_path);
-                        let _ = tab.save_to_disk();
+                        let res = tab.save_to_disk();
+                        show_save_toast(toast_rack, res, tab);
                     }
                 }
                 *active_modal = ActiveModal::None;
