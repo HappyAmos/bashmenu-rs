@@ -741,6 +741,8 @@ fn main() -> Result<()> {
                                     BrowseTarget::Template => ("Select Template File", false),
                                     BrowseTarget::Target => ("Select Target File", false),
                                     BrowseTarget::StartDir => ("Select Start Directory", true),
+                                    BrowseTarget::OnYes => ("Select On-Yes File/Script", false),
+                                    BrowseTarget::OnNo => ("Select On-No File/Script", false),
                                 };
                                 *child_opt = Some(Box::new(ChildModal::FilePicker(
                                     FilePickerModal::new(title, &PathBuf::from("."), only_dirs),
@@ -752,8 +754,8 @@ fn main() -> Result<()> {
                 }
                 ActiveModal::ConfirmDelete(modal, path) => match ev {
                     Event::Key(k) => {
-                        if let Some(confirmed) = modal.handle_key(k.code) {
-                            if confirmed {
+                        if let Some(choice) = modal.handle_key(k.code) {
+                            if choice.is_yes() {
                                 if let Some(deleted) = delete_item(&mut menu, path) {
                                     is_modified = true;
                                     toast_rack.add(ToastNotification {
@@ -769,8 +771,8 @@ fn main() -> Result<()> {
                         }
                     }
                     Event::Mouse(m) => {
-                        if let Some(confirmed) = modal.handle_mouse(m, area) {
-                            if confirmed {
+                        if let Some(choice) = modal.handle_mouse(m, area) {
+                            if choice.is_yes() {
                                 if let Some(deleted) = delete_item(&mut menu, path) {
                                     is_modified = true;
                                     toast_rack.add(ToastNotification {
@@ -789,22 +791,34 @@ fn main() -> Result<()> {
                 },
                 ActiveModal::ConfirmExit(modal) => match ev {
                     Event::Key(k) => {
-                        if let Some(confirmed) = modal.handle_key(k.code) {
-                            if confirmed {
-                                let _ = save_menu(&menu_path, &menu);
-                                break;
-                            } else {
-                                break;
+                        if let Some(choice) = modal.handle_key(k.code) {
+                            match choice {
+                                bashmenu_tui::ConfirmChoice::Yes => {
+                                    let _ = save_menu(&menu_path, &menu);
+                                    break;
+                                }
+                                bashmenu_tui::ConfirmChoice::No => {
+                                    break;
+                                }
+                                bashmenu_tui::ConfirmChoice::Cancel => {
+                                    active_modal = ActiveModal::None;
+                                }
                             }
                         }
                     }
                     Event::Mouse(m) => {
-                        if let Some(confirmed) = modal.handle_mouse(m, area) {
-                            if confirmed {
-                                let _ = save_menu(&menu_path, &menu);
-                                break;
-                            } else {
-                                break;
+                        if let Some(choice) = modal.handle_mouse(m, area) {
+                            match choice {
+                                bashmenu_tui::ConfirmChoice::Yes => {
+                                    let _ = save_menu(&menu_path, &menu);
+                                    break;
+                                }
+                                bashmenu_tui::ConfirmChoice::No => {
+                                    break;
+                                }
+                                bashmenu_tui::ConfirmChoice::Cancel => {
+                                    active_modal = ActiveModal::None;
+                                }
                             }
                         }
                     }

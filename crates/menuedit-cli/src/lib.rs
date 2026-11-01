@@ -93,6 +93,7 @@ pub fn get_type_badge(item: &MenuItem) -> &'static str {
         MenuItemType::Exit => "[EXT]",
         MenuItemType::Back => "[BCK]",
         MenuItemType::ThemeSelector => "[THM]",
+        MenuItemType::Confirm => "[CNF]",
         MenuItemType::Python => "[PY ]",
         MenuItemType::Other(s) => match s.as_str() {
             "confirm" => "[CNF]",
@@ -247,11 +248,11 @@ pub fn format_inspector_text(
         lines.push(format!("Picker Type: {}", pkr));
     }
 
-    if let Some(oy) = item.extra.get("on_yes").and_then(|v| v.as_str()) {
+    if let Some(oy) = item.on_yes() {
         lines.push(format!("On Yes Action: {}", oy));
     }
 
-    if let Some(on) = item.extra.get("on_no").and_then(|v| v.as_str()) {
+    if let Some(on) = item.on_no() {
         lines.push(format!("On No Action: {}", on));
     }
 

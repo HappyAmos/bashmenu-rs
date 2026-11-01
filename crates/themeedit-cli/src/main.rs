@@ -428,8 +428,8 @@ fn main() -> Result<()> {
                 },
                 ActiveModal::ConfirmExit(modal) => match ev {
                     Event::Key(k) => {
-                        if let Some(confirmed) = modal.handle_key(k.code) {
-                            if confirmed {
+                        if let Some(choice) = modal.handle_key(k.code) {
+                            if choice.is_yes() {
                                 break;
                             } else {
                                 active_modal = ActiveModal::None;
@@ -437,8 +437,8 @@ fn main() -> Result<()> {
                         }
                     }
                     Event::Mouse(m) => {
-                        if let Some(confirmed) = modal.handle_mouse(m, area) {
-                            if confirmed {
+                        if let Some(choice) = modal.handle_mouse(m, area) {
+                            if choice.is_yes() {
                                 break;
                             } else {
                                 active_modal = ActiveModal::None;

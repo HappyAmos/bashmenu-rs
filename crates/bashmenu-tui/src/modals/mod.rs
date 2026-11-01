@@ -14,7 +14,7 @@ pub mod stream_output;
 pub mod theme_picker;
 pub mod toggle;
 
-pub use confirm::ConfirmModal;
+pub use confirm::{ConfirmChoice, ConfirmModal};
 pub use file_picker::FilePickerModal;
 pub use frame::{compute_modal_inner, is_close_button_clicked, render_modal_frame};
 pub use grid_picker::{AsciiGridModal, ColorGridModal};

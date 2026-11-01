@@ -24,7 +24,10 @@ pub use macro_engine::{
     extract_toasts, interpolate_placeholders, resolve_config_dot_path, resolve_dev_dir,
     MacroContext, ToastNotification, ToastSeverity,
 };
-pub use menu::{load_menu, save_menu, ExecutionMode, MenuItem, MenuItemType, MenuSchema, Submenu};
+pub use menu::{
+    load_menu, save_menu, ConfirmAction, ConfirmActionDetails, ExecutionMode, MenuItem,
+    MenuItemType, MenuSchema, Submenu,
+};
 pub use notebook::{
     add_or_update_note, build_notebook_submenu, delete_note, get_note_by_title, get_notes,
     load_notebook, rename_note, resolve_notebook_path, save_notebook, NoteItem, NotebookData,

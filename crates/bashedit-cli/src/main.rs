@@ -1413,28 +1413,46 @@ fn handle_active_modal(
                 Event::Mouse(m) => modal.handle_mouse(*m, area),
                 _ => None,
             };
-            if let Some(confirmed) = choice {
+            if let Some(c) = choice {
                 let target_idx = *tab_idx;
-                if confirmed {
-                    let tab = &mut tabs[target_idx];
-                    if tab.file_path.is_none() {
-                        *active_modal = ActiveModal::SaveAs(make_save_as_modal(tab));
-                        return true;
+                match c {
+                    bashmenu_tui::ConfirmChoice::Yes => {
+                        let tab = &mut tabs[target_idx];
+                        if tab.file_path.is_none() {
+                            *active_modal = ActiveModal::SaveAs(make_save_as_modal(tab));
+                            return true;
+                        }
+                        let res = tab.save_to_disk();
+                        show_save_toast(toast_rack, res, tab);
+                        tabs[target_idx].cleanup_swap();
+                        if tabs.len() == 1 {
+                            tabs[0] = EditorBuffer::new_empty();
+                            *active_tab_idx = 0;
+                        } else {
+                            tabs.remove(target_idx);
+                            if *active_tab_idx >= tabs.len() {
+                                *active_tab_idx = tabs.len() - 1;
+                            }
+                        }
+                        *active_modal = ActiveModal::None;
                     }
-                    let res = tab.save_to_disk();
-                    show_save_toast(toast_rack, res, tab);
-                }
-                tabs[target_idx].cleanup_swap();
-                if tabs.len() == 1 {
-                    tabs[0] = EditorBuffer::new_empty();
-                    *active_tab_idx = 0;
-                } else {
-                    tabs.remove(target_idx);
-                    if *active_tab_idx >= tabs.len() {
-                        *active_tab_idx = tabs.len() - 1;
+                    bashmenu_tui::ConfirmChoice::No => {
+                        tabs[target_idx].cleanup_swap();
+                        if tabs.len() == 1 {
+                            tabs[0] = EditorBuffer::new_empty();
+                            *active_tab_idx = 0;
+                        } else {
+                            tabs.remove(target_idx);
+                            if *active_tab_idx >= tabs.len() {
+                                *active_tab_idx = tabs.len() - 1;
+                            }
+                        }
+                        *active_modal = ActiveModal::None;
+                    }
+                    bashmenu_tui::ConfirmChoice::Cancel => {
+                        *active_modal = ActiveModal::None;
                     }
                 }
-                *active_modal = ActiveModal::None;
             }
             true
         }
@@ -1444,8 +1462,8 @@ fn handle_active_modal(
                 Event::Mouse(m) => modal.handle_mouse(*m, area),
                 _ => None,
             };
-            if let Some(confirmed) = choice {
-                if confirmed {
+            if let Some(c) = choice {
+                if c.is_yes() {
                     for t in tabs.iter() {
                         t.cleanup_swap();
                     }

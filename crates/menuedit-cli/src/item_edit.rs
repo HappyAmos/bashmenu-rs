@@ -750,6 +750,8 @@ pub enum BrowseTarget {
     Template,
     Target,
     StartDir,
+    OnYes,
+    OnNo,
 }
 
 /// Result returned from `ItemEditModal::handle_key` or `handle_mouse`.
@@ -778,6 +780,10 @@ pub enum FocusControl {
     IconInput,
     ActionInput,
     ActionBrowseBtn,
+    OnYesInput,
+    OnYesBrowseBtn,
+    OnNoInput,
+    OnNoBrowseBtn,
     PromptInput,
     RadioOptionsInput,
     TemplateInput,
@@ -817,6 +823,8 @@ pub struct ItemEditModal {
     pub icon_input: TextInput,
     pub action_input: TextInput,
     pub prompt_input: TextInput,
+    pub on_yes_input: TextInput,
+    pub on_no_input: TextInput,
     pub radio_options_input: MultiLineInput,
     pub template_input: TextInput,
     pub target_input: TextInput,
@@ -875,6 +883,9 @@ impl ItemEditModal {
             .as_deref()
             .or_else(|| item.extra.get("message").and_then(|v| v.as_str()))
             .unwrap_or_default();
+
+        let on_yes_val = item.on_yes().unwrap_or_default();
+        let on_no_val = item.on_no().unwrap_or_default();
 
         let radio_lines =
             if let Some(opts) = item.extra.get("options").and_then(|v| v.as_sequence()) {
@@ -995,6 +1006,8 @@ impl ItemEditModal {
             icon_input: TextInput::new(icon_val),
             action_input: TextInput::new(action_val),
             prompt_input: TextInput::new(prompt_val),
+            on_yes_input: TextInput::new(on_yes_val),
+            on_no_input: TextInput::new(on_no_val),
             radio_options_input: MultiLineInput::new(&radio_lines),
             template_input: TextInput::new(template_val),
             target_input: TextInput::new(target_val),
@@ -1028,6 +1041,7 @@ impl ItemEditModal {
             MenuItemType::Radio => "radio".to_string(),
             MenuItemType::Editor => "editor".to_string(),
             MenuItemType::Notebook => "notebook".to_string(),
+            MenuItemType::Confirm => "confirm".to_string(),
             MenuItemType::Python => "python".to_string(),
             MenuItemType::Exit => "exit".to_string(),
             MenuItemType::Back => "back".to_string(),
@@ -1036,6 +1050,8 @@ impl ItemEditModal {
             _ => {
                 if item.submenu.is_some() {
                     "submenu".to_string()
+                } else if item.on_yes.is_some() || item.on_no.is_some() {
+                    "confirm".to_string()
                 } else if item.command.is_some() {
                     "command".to_string()
                 } else if item.script.is_some() {
@@ -1055,6 +1071,10 @@ impl ItemEditModal {
         self.current_type == "{divider}" || self.current_type == "divider"
     }
 
+    pub fn is_confirm(&self) -> bool {
+        self.current_type == "confirm"
+    }
+
     pub fn is_radio(&self) -> bool {
         self.current_type == "radio" || self.current_type == "config_radio"
     }
@@ -1069,9 +1089,17 @@ impl ItemEditModal {
         } else {
             controls.push(FocusControl::TitleInput);
             controls.push(FocusControl::IconInput);
-            controls.push(FocusControl::ActionInput);
-            controls.push(FocusControl::ActionBrowseBtn);
-            controls.push(FocusControl::PromptInput);
+            if self.is_confirm() {
+                controls.push(FocusControl::PromptInput);
+                controls.push(FocusControl::OnYesInput);
+                controls.push(FocusControl::OnYesBrowseBtn);
+                controls.push(FocusControl::OnNoInput);
+                controls.push(FocusControl::OnNoBrowseBtn);
+            } else {
+                controls.push(FocusControl::ActionInput);
+                controls.push(FocusControl::ActionBrowseBtn);
+                controls.push(FocusControl::PromptInput);
+            }
             if self.is_radio() {
                 controls.push(FocusControl::RadioOptionsInput);
             }
@@ -1126,12 +1154,19 @@ impl ItemEditModal {
                 "radio" => MenuItemType::Radio,
                 "editor" => MenuItemType::Editor,
                 "notebook" => MenuItemType::Notebook,
+                "confirm" => MenuItemType::Confirm,
                 "python" => MenuItemType::Python,
                 "exit" => MenuItemType::Exit,
                 "back" => MenuItemType::Back,
                 "theme_selector" => MenuItemType::ThemeSelector,
                 other => MenuItemType::Other(other.to_string()),
             };
+        }
+        if new_type == "confirm"
+            && self.on_yes_input.as_string().is_empty()
+            && !self.action_input.as_string().is_empty()
+        {
+            self.on_yes_input.set_text(&self.action_input.as_string());
         }
         let list = self.focus_controls();
         if self.active_control_idx >= list.len() {
@@ -1145,6 +1180,8 @@ impl ItemEditModal {
             BrowseTarget::Template => self.template_input.set_text(path),
             BrowseTarget::Target => self.target_input.set_text(path),
             BrowseTarget::StartDir => self.start_dir_input.set_text(path),
+            BrowseTarget::OnYes => self.on_yes_input.set_text(path),
+            BrowseTarget::OnNo => self.on_no_input.set_text(path),
         }
     }
 
@@ -1233,6 +1270,8 @@ impl ItemEditModal {
                             FocusControl::IconInput => Some(&mut self.icon_input),
                             FocusControl::ActionInput => Some(&mut self.action_input),
                             FocusControl::PromptInput => Some(&mut self.prompt_input),
+                            FocusControl::OnYesInput => Some(&mut self.on_yes_input),
+                            FocusControl::OnNoInput => Some(&mut self.on_no_input),
                             FocusControl::TemplateInput => Some(&mut self.template_input),
                             FocusControl::TargetInput => Some(&mut self.target_input),
                             FocusControl::BlockIdInput => Some(&mut self.block_id_input),
@@ -1298,6 +1337,16 @@ impl ItemEditModal {
             FocusControl::ActionBrowseBtn => {
                 if matches!(code, KeyCode::Enter | KeyCode::Char(' ')) {
                     return ItemEditResult::Browse(BrowseTarget::Action);
+                }
+            }
+            FocusControl::OnYesBrowseBtn => {
+                if matches!(code, KeyCode::Enter | KeyCode::Char(' ')) {
+                    return ItemEditResult::Browse(BrowseTarget::OnYes);
+                }
+            }
+            FocusControl::OnNoBrowseBtn => {
+                if matches!(code, KeyCode::Enter | KeyCode::Char(' ')) {
+                    return ItemEditResult::Browse(BrowseTarget::OnNo);
                 }
             }
             FocusControl::TemplateBrowseBtn => {
@@ -1461,6 +1510,8 @@ impl ItemEditModal {
             FocusControl::IconInput => Some(&mut self.icon_input),
             FocusControl::ActionInput => Some(&mut self.action_input),
             FocusControl::PromptInput => Some(&mut self.prompt_input),
+            FocusControl::OnYesInput => Some(&mut self.on_yes_input),
+            FocusControl::OnNoInput => Some(&mut self.on_no_input),
             FocusControl::TemplateInput => Some(&mut self.template_input),
             FocusControl::TargetInput => Some(&mut self.target_input),
             FocusControl::BlockIdInput => Some(&mut self.block_id_input),
@@ -1557,6 +1608,8 @@ impl ItemEditModal {
         let icon = self.icon_input.as_string().trim().to_string();
         let action = self.action_input.as_string().trim().to_string();
         let prompt = self.prompt_input.as_string().trim().to_string();
+        let on_yes = self.on_yes_input.as_string().trim().to_string();
+        let on_no = self.on_no_input.as_string().trim().to_string();
         let template = self.template_input.as_string().trim().to_string();
         let target = self.target_input.as_string().trim().to_string();
         let block_id = self.block_id_input.as_string().trim().to_string();
@@ -1566,80 +1619,105 @@ impl ItemEditModal {
         item.label = title;
         item.icon = if icon.is_empty() { None } else { Some(icon) };
 
-        // Normalize payload mapping based on current type
-        match self.current_type.as_str() {
-            "command" => {
-                item.command = if action.is_empty() {
-                    None
-                } else {
-                    Some(action.clone())
-                };
-                item.action = item.command.clone();
-                item.script = None;
-                item.file = None;
-            }
-            "script" => {
-                item.script = if action.is_empty() {
-                    None
-                } else {
-                    Some(action.clone())
-                };
-                item.action = item.script.clone();
-                item.command = None;
-                item.file = None;
-            }
-            "editor" | "notebook" => {
-                item.file = if action.is_empty() {
-                    None
-                } else {
-                    Some(action.clone())
-                };
-                item.action = item.file.clone();
-                item.command = None;
-                item.script = None;
-            }
-            "config" | "toggle" | "radio" => {
-                if !action.is_empty() {
-                    item.extra
-                        .insert("key".to_string(), serde_yml::Value::String(action.clone()));
-                } else {
-                    item.extra.remove("key");
+        if self.is_confirm() {
+            item.r#type = MenuItemType::Confirm;
+            item.on_yes = if on_yes.is_empty() {
+                None
+            } else {
+                Some(on_yes.as_str().into())
+            };
+            item.on_no = if on_no.is_empty() {
+                None
+            } else {
+                Some(on_no.as_str().into())
+            };
+            item.extra.remove("on_yes");
+            item.extra.remove("on_no");
+            item.action = None;
+            item.command = None;
+            item.script = None;
+            item.file = None;
+        } else {
+            item.on_yes = None;
+            item.on_no = None;
+            item.extra.remove("on_yes");
+            item.extra.remove("on_no");
+
+            // Normalize payload mapping based on current type
+            match self.current_type.as_str() {
+                "command" => {
+                    item.command = if action.is_empty() {
+                        None
+                    } else {
+                        Some(action.clone())
+                    };
+                    item.action = item.command.clone();
+                    item.script = None;
+                    item.file = None;
                 }
-                item.action = if action.is_empty() {
-                    None
-                } else {
-                    Some(action)
-                };
-            }
-            "python" => {
-                if !action.is_empty() {
-                    item.extra.insert(
-                        "python".to_string(),
-                        serde_yml::Value::String(action.clone()),
-                    );
-                } else {
-                    item.extra.remove("python");
+                "script" => {
+                    item.script = if action.is_empty() {
+                        None
+                    } else {
+                        Some(action.clone())
+                    };
+                    item.action = item.script.clone();
+                    item.command = None;
+                    item.file = None;
                 }
-                item.action = if action.is_empty() {
-                    None
-                } else {
-                    Some(action)
-                };
-            }
-            "submenu" => {
-                if item.submenu.is_none() {
-                    item.submenu = Some(bashmenu_core::Submenu {
-                        title: item.label.clone(),
-                        items: Vec::new(),
-                    });
+                "editor" | "notebook" => {
+                    item.file = if action.is_empty() {
+                        None
+                    } else {
+                        Some(action.clone())
+                    };
+                    item.action = item.file.clone();
+                    item.command = None;
+                    item.script = None;
                 }
-            }
-            _ => {
-                item.action = if action.is_empty() {
-                    None
-                } else {
-                    Some(action)
-                };
+                "config" | "toggle" | "radio" => {
+                    if !action.is_empty() {
+                        item.extra
+                            .insert("key".to_string(), serde_yml::Value::String(action.clone()));
+                    } else {
+                        item.extra.remove("key");
+                    }
+                    item.action = if action.is_empty() {
+                        None
+                    } else {
+                        Some(action)
+                    };
+                }
+                "python" => {
+                    if !action.is_empty() {
+                        item.extra.insert(
+                            "python".to_string(),
+                            serde_yml::Value::String(action.clone()),
+                        );
+                    } else {
+                        item.extra.remove("python");
+                    }
+                    item.action = if action.is_empty() {
+                        None
+                    } else {
+                        Some(action)
+                    };
+                }
+                "submenu" => {
+                    if item.submenu.is_none() {
+                        item.submenu = Some(bashmenu_core::Submenu {
+                            title: item.label.clone(),
+                            items: Vec::new(),
+                        });
+                    }
+                }
+                _ => {
+                    item.action = if action.is_empty() {
+                        None
+                    } else {
+                        Some(action)
+                    };
+                }
             }
         }
 
@@ -1913,22 +1991,50 @@ impl ItemEditModal {
                 selection: self.icon_input.selection_range(),
             });
 
-            form_lines.push(FormRow::Label(self.get_action_label_text()));
-            form_lines.push(FormRow::InputWithBrowse {
-                input_ctrl: FocusControl::ActionInput,
-                text: self.action_input.as_string(),
-                cursor: self.action_input.cursor,
-                selection: self.action_input.selection_range(),
-                btn_ctrl: FocusControl::ActionBrowseBtn,
-            });
+            if self.is_confirm() {
+                form_lines.push(FormRow::Label("Confirmation Message / Prompt Text:"));
+                form_lines.push(FormRow::Input {
+                    ctrl: FocusControl::PromptInput,
+                    text: self.prompt_input.as_string(),
+                    cursor: self.prompt_input.cursor,
+                    selection: self.prompt_input.selection_range(),
+                });
 
-            form_lines.push(FormRow::Label("Message / Prompt Text:"));
-            form_lines.push(FormRow::Input {
-                ctrl: FocusControl::PromptInput,
-                text: self.prompt_input.as_string(),
-                cursor: self.prompt_input.cursor,
-                selection: self.prompt_input.selection_range(),
-            });
+                form_lines.push(FormRow::Label("On Yes Action (on_yes):"));
+                form_lines.push(FormRow::InputWithBrowse {
+                    input_ctrl: FocusControl::OnYesInput,
+                    text: self.on_yes_input.as_string(),
+                    cursor: self.on_yes_input.cursor,
+                    selection: self.on_yes_input.selection_range(),
+                    btn_ctrl: FocusControl::OnYesBrowseBtn,
+                });
+
+                form_lines.push(FormRow::Label("On No Action (on_no):"));
+                form_lines.push(FormRow::InputWithBrowse {
+                    input_ctrl: FocusControl::OnNoInput,
+                    text: self.on_no_input.as_string(),
+                    cursor: self.on_no_input.cursor,
+                    selection: self.on_no_input.selection_range(),
+                    btn_ctrl: FocusControl::OnNoBrowseBtn,
+                });
+            } else {
+                form_lines.push(FormRow::Label(self.get_action_label_text()));
+                form_lines.push(FormRow::InputWithBrowse {
+                    input_ctrl: FocusControl::ActionInput,
+                    text: self.action_input.as_string(),
+                    cursor: self.action_input.cursor,
+                    selection: self.action_input.selection_range(),
+                    btn_ctrl: FocusControl::ActionBrowseBtn,
+                });
+
+                form_lines.push(FormRow::Label("Message / Prompt Text:"));
+                form_lines.push(FormRow::Input {
+                    ctrl: FocusControl::PromptInput,
+                    text: self.prompt_input.as_string(),
+                    cursor: self.prompt_input.cursor,
+                    selection: self.prompt_input.selection_range(),
+                });
+            }
 
             if self.is_radio() {
                 form_lines.push(FormRow::Label(

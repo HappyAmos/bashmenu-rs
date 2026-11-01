@@ -921,3 +921,85 @@ fn test_menuedit_inputs_selection_and_clipboard() {
         Some("Title A")
     );
 }
+
+#[test]
+fn test_menuedit_confirm_item_properties() {
+    use menuedit_cli::{BrowseTarget, FocusControl, ItemEditModal, ItemEditResult};
+
+    let item = MenuItem {
+        label: "Confirm Reboot".to_string(),
+        r#type: MenuItemType::Confirm,
+        prompt: Some("Do you really want to reboot now?".to_string()),
+        on_yes: Some("reboot".into()),
+        on_no: Some("echo 'Reboot cancelled'".into()),
+        ..Default::default()
+    };
+
+    let mut modal = ItemEditModal::new(&item);
+
+    assert_eq!(modal.current_type, "confirm");
+    assert!(modal.is_confirm());
+    assert_eq!(modal.on_yes_input.as_string(), "reboot");
+    assert_eq!(modal.on_no_input.as_string(), "echo 'Reboot cancelled'");
+
+    let controls = modal.focus_controls();
+    assert!(controls.contains(&FocusControl::OnYesInput));
+    assert!(controls.contains(&FocusControl::OnYesBrowseBtn));
+    assert!(controls.contains(&FocusControl::OnNoInput));
+    assert!(controls.contains(&FocusControl::OnNoBrowseBtn));
+
+    // Test browse result routing
+    modal.set_browse_result(BrowseTarget::OnYes, "/usr/bin/custom_reboot");
+    assert_eq!(modal.on_yes_input.as_string(), "/usr/bin/custom_reboot");
+
+    modal.set_browse_result(BrowseTarget::OnNo, "/usr/bin/cancel_script.sh");
+    assert_eq!(modal.on_no_input.as_string(), "/usr/bin/cancel_script.sh");
+
+    // Test hitting enter on OnYesBrowseBtn
+    modal.active_control_idx = modal
+        .focus_controls()
+        .iter()
+        .position(|c| *c == FocusControl::OnYesBrowseBtn)
+        .unwrap();
+    assert_eq!(
+        modal.handle_key(
+            crossterm::event::KeyCode::Enter,
+            crossterm::event::KeyModifiers::NONE
+        ),
+        ItemEditResult::Browse(BrowseTarget::OnYes)
+    );
+
+    // Test hitting enter on OnNoBrowseBtn
+    modal.active_control_idx = modal
+        .focus_controls()
+        .iter()
+        .position(|c| *c == FocusControl::OnNoBrowseBtn)
+        .unwrap();
+    assert_eq!(
+        modal.handle_key(
+            crossterm::event::KeyCode::Enter,
+            crossterm::event::KeyModifiers::NONE
+        ),
+        ItemEditResult::Browse(BrowseTarget::OnNo)
+    );
+
+    // Test build_updated_item
+    let updated = modal.build_updated_item();
+    assert_eq!(updated.r#type, MenuItemType::Confirm);
+    assert_eq!(updated.on_yes(), Some("/usr/bin/custom_reboot"));
+    assert_eq!(updated.on_no(), Some("/usr/bin/cancel_script.sh"));
+    assert_eq!(
+        updated.prompt.as_deref(),
+        Some("Do you really want to reboot now?")
+    );
+
+    // Test rendering
+    let styles = bashmenu_tui::ResolvedThemeStyles::default();
+    let area = ratatui::layout::Rect::new(0, 0, 100, 40);
+    let mut buf = ratatui::buffer::Buffer::empty(area);
+    modal.render(area, &styles, &mut buf);
+    let buf_str = format!("{:?}", buf);
+    assert!(buf_str.contains("CONFIRM"));
+    assert!(buf_str.contains("on_yes"));
+    assert!(buf_str.contains("on_no"));
+}

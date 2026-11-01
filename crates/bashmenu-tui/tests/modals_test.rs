@@ -1,6 +1,6 @@
 use bashmenu_tui::{
-    AsciiGridModal, ColorGridModal, ConfirmModal, FilePickerModal, InputModal, MessageModal,
-    NoteEditorAction, NoteEditorModal, NoteViewerAction, NoteViewerModal, RadioModal,
+    AsciiGridModal, ColorGridModal, ConfirmChoice, ConfirmModal, FilePickerModal, InputModal,
+    MessageModal, NoteEditorAction, NoteEditorModal, NoteViewerAction, NoteViewerModal, RadioModal,
     ResolvedThemeStyles, ToggleChoice, ToggleModal,
 };
 use crossterm::event::KeyCode;
@@ -14,18 +14,47 @@ fn test_confirm_modal_interaction() {
     let styles = ResolvedThemeStyles::default();
     let area = Rect::new(0, 0, 80, 24);
 
-    // Initial state is Yes
+    // Initial state is Yes (index 0)
     assert!(modal.selected_yes);
+    assert_eq!(modal.selected_index, 0);
 
-    // Press Right toggles to No
+    // Press Right cycles to No (index 1)
     assert_eq!(modal.handle_key(KeyCode::Right), None);
     assert!(!modal.selected_yes);
+    assert_eq!(modal.selected_index, 1);
 
-    // Press Enter confirms No
-    assert_eq!(modal.handle_key(KeyCode::Enter), Some(false));
+    // Press Right cycles to Cancel (index 2)
+    assert_eq!(modal.handle_key(KeyCode::Right), None);
+    assert_eq!(modal.selected_index, 2);
+
+    // Press Enter on Cancel returns Some(ConfirmChoice::Cancel)
+    assert_eq!(
+        modal.handle_key(KeyCode::Enter),
+        Some(ConfirmChoice::Cancel)
+    );
+
+    // Reset to index 1 (No) and press Enter
+    modal.selected_index = 1;
+    assert_eq!(modal.handle_key(KeyCode::Enter), Some(ConfirmChoice::No));
 
     // Press 'y' immediately confirms Yes
-    assert_eq!(modal.handle_key(KeyCode::Char('y')), Some(true));
+    assert_eq!(
+        modal.handle_key(KeyCode::Char('y')),
+        Some(ConfirmChoice::Yes)
+    );
+
+    // Press 'n' immediately confirms No
+    assert_eq!(
+        modal.handle_key(KeyCode::Char('n')),
+        Some(ConfirmChoice::No)
+    );
+
+    // Press 'c' or Esc immediately confirms Cancel
+    assert_eq!(
+        modal.handle_key(KeyCode::Char('c')),
+        Some(ConfirmChoice::Cancel)
+    );
+    assert_eq!(modal.handle_key(KeyCode::Esc), Some(ConfirmChoice::Cancel));
 
     // Buffer rendering and drop shadow verification
     let mut buf = Buffer::empty(area);

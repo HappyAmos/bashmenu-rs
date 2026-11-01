@@ -4,14 +4,15 @@ use anyhow::Result;
 use bashmenu_core::{
     add_or_update_note, build_notebook_submenu, delete_note, extract_toasts, get_note_by_title,
     interpolate_placeholders, load_config, load_menu, load_notebook, load_themes, rename_note,
-    resolve_notebook_path, save_config, save_notebook, BashMenuConfig, ExecutionMode, MacroContext,
-    MenuItemType, MenuSchema, NoteItem, PluginEngine, ToastNotification,
+    resolve_notebook_path, save_config, save_notebook, BashMenuConfig, ConfirmAction,
+    ExecutionMode, MacroContext, MenuItem, MenuItemType, MenuSchema, NoteItem, PluginEngine,
+    ToastNotification,
 };
 use bashmenu_tui::{
-    install_panic_hook, ConfirmModal, FilePickerModal, HelpModal, InputModal, MenuAction, MenuView,
-    NoteEditorAction, NoteEditorModal, NoteViewerAction, NoteViewerModal, RadioModal,
-    ResolvedThemeStyles, StreamOutputAction, StreamOutputModal, TerminalGuard, ThemePickerModal,
-    ToastRack, ToggleChoice, ToggleModal,
+    install_panic_hook, ConfirmChoice, ConfirmModal, FilePickerModal, HelpModal, InputModal,
+    MenuAction, MenuView, MessageModal, NoteEditorAction, NoteEditorModal, NoteViewerAction,
+    NoteViewerModal, RadioModal, ResolvedThemeStyles, StreamOutputAction, StreamOutputModal,
+    TerminalGuard, ThemePickerModal, ToastRack, ToggleChoice, ToggleModal,
 };
 use clap::Parser;
 use crossterm::event::{self, Event};
@@ -57,6 +58,8 @@ enum ActiveModal {
     NewNoteTitle(String, InputModal),
     RenameNoteTitle(String, String, InputModal),
     ConfirmDeleteNote(String, String, ConfirmModal),
+    ConfirmItem(Box<bashmenu_core::MenuItem>, ConfirmModal),
+    Message(MessageModal),
     Toggle(String, ToggleModal),
     ConfigInput(String, InputModal),
     Radio(String, RadioModal),
@@ -173,6 +176,7 @@ fn main() -> Result<()> {
         menu_view.set_show_shortcuts(show);
     }
     let mut active_modal = ActiveModal::None;
+    let mut pending_action: Option<MenuAction> = None;
     let mut last_plugin_check = Instant::now();
     let mut last_marquee_tick = Instant::now();
     let mut toast_rack = ToastRack::new();
@@ -250,6 +254,12 @@ fn main() -> Result<()> {
                     ActiveModal::ConfirmDeleteNote(_, _, modal) => {
                         modal.render(f.area(), &styles, f.buffer_mut());
                     }
+                    ActiveModal::ConfirmItem(_, modal) => {
+                        modal.render(f.area(), &styles, f.buffer_mut());
+                    }
+                    ActiveModal::Message(modal) => {
+                        modal.render(f.area(), &styles, f.buffer_mut());
+                    }
                     ActiveModal::Toggle(_, modal) => {
                         modal.render(f.area(), &styles, f.buffer_mut());
                     }
@@ -272,8 +282,12 @@ fn main() -> Result<()> {
             need_redraw = false;
         }
 
-        if event::poll(Duration::from_millis(50))? {
-            let ev = event::read()?;
+        if pending_action.is_some() || event::poll(Duration::from_millis(50))? {
+            let ev = if pending_action.is_some() {
+                Event::FocusGained
+            } else {
+                event::read()?
+            };
             if let Event::Mouse(m) = &ev {
                 if m.kind == crossterm::event::MouseEventKind::Moved {
                     continue;
@@ -556,8 +570,8 @@ fn main() -> Result<()> {
                         Event::Mouse(mouse) => modal.handle_mouse(mouse, area),
                         _ => None,
                     };
-                    if let Some(yes) = confirmed {
-                        if yes {
+                    if let Some(choice) = confirmed {
+                        if choice.is_yes() {
                             if let Ok(mut nb) = load_notebook(filepath.as_str()) {
                                 if delete_note(&mut nb, note_title.as_str()) {
                                     let _ = save_notebook(filepath.as_str(), &nb);
@@ -566,6 +580,97 @@ fn main() -> Result<()> {
                                 }
                             }
                         }
+                        active_modal = ActiveModal::None;
+                    }
+                }
+                ActiveModal::ConfirmItem(item, modal) => {
+                    let choice = match ev {
+                        Event::Key(key) => modal.handle_key(key.code),
+                        Event::Mouse(mouse) => modal.handle_mouse(mouse, area),
+                        _ => None,
+                    };
+                    if let Some(c) = choice {
+                        let selected_action = match c {
+                            ConfirmChoice::Yes => item.on_yes_action().cloned(),
+                            ConfirmChoice::No => item.on_no_action().cloned(),
+                            ConfirmChoice::Cancel => None,
+                        };
+                        let item_label = item.label.clone();
+                        let item_interactive = item.interactive;
+                        let item_quiet = item.quiet;
+                        let item_alt_buffer = item.alt_buffer;
+                        let item_start_dir = item.start_dir.clone();
+                        active_modal = ActiveModal::None;
+                        if let Some(action_obj) = selected_action {
+                            match action_obj {
+                                ConfirmAction::Simple(cmd) => {
+                                    let trimmed = cmd.trim();
+                                    if !trimmed.is_empty() {
+                                        let next_item = MenuItem {
+                                            label: item_label,
+                                            action: Some(trimmed.to_string()),
+                                            command: Some(trimmed.to_string()),
+                                            r#type: MenuItemType::Command,
+                                            interactive: item_interactive,
+                                            quiet: item_quiet,
+                                            alt_buffer: item_alt_buffer,
+                                            start_dir: item_start_dir,
+                                            ..Default::default()
+                                        };
+                                        pending_action =
+                                            Some(MenuAction::Execute(Box::new(next_item)));
+                                    }
+                                }
+                                ConfirmAction::Structured(details) => {
+                                    let act_type = details.r#type.as_deref().unwrap_or("command");
+                                    if act_type == "message" {
+                                        let msg_title =
+                                            details.title.unwrap_or_else(|| "Message".to_string());
+                                        let msg_body =
+                                            details.message.or(details.prompt).unwrap_or_default();
+                                        active_modal = ActiveModal::Message(MessageModal::new(
+                                            &msg_title, &msg_body,
+                                        ));
+                                    } else {
+                                        let cmd = details
+                                            .action
+                                            .or(details.command)
+                                            .or(details.script)
+                                            .unwrap_or_default();
+                                        let trimmed = cmd.trim();
+                                        if !trimmed.is_empty() {
+                                            let next_item = MenuItem {
+                                                label: details.title.unwrap_or(item_label),
+                                                action: Some(trimmed.to_string()),
+                                                command: Some(trimmed.to_string()),
+                                                r#type: if act_type == "script" {
+                                                    MenuItemType::Script
+                                                } else {
+                                                    MenuItemType::Command
+                                                },
+                                                interactive: item_interactive,
+                                                quiet: item_quiet,
+                                                alt_buffer: item_alt_buffer,
+                                                start_dir: item_start_dir,
+                                                extra: details.extra,
+                                                ..Default::default()
+                                            };
+                                            pending_action =
+                                                Some(MenuAction::Execute(Box::new(next_item)));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                ActiveModal::Message(modal) => {
+                    let dismiss = match ev {
+                        Event::Key(key) => modal.handle_key(key.code),
+                        Event::Mouse(mouse) => modal.handle_mouse(mouse, area),
+                        _ => false,
+                    };
+                    if dismiss {
                         active_modal = ActiveModal::None;
                     }
                 }
@@ -685,11 +790,15 @@ fn main() -> Result<()> {
                     }
                 }
                 ActiveModal::None => {
-                    let action = match ev {
-                        Event::Key(key) => menu_view.handle_key(key.code),
-                        Event::Mouse(mouse) => menu_view.handle_mouse(mouse, area),
-                        Event::Resize(_, _) => MenuAction::None,
-                        _ => MenuAction::None,
+                    let action = if let Some(act) = pending_action.take() {
+                        act
+                    } else {
+                        match ev {
+                            Event::Key(key) => menu_view.handle_key(key.code),
+                            Event::Mouse(mouse) => menu_view.handle_mouse(mouse, area),
+                            Event::Resize(_, _) => MenuAction::None,
+                            _ => MenuAction::None,
+                        }
                     };
 
                     match action {
@@ -950,6 +1059,18 @@ fn main() -> Result<()> {
                                     theme_names,
                                     &config.theme,
                                 ));
+                            } else if item.r#type == MenuItemType::Confirm
+                                || matches!(item.r#type, MenuItemType::Other(ref s) if s == "confirm")
+                            {
+                                let raw_title = item.title().unwrap_or("Confirm");
+                                let raw_msg = item
+                                    .message()
+                                    .or(item.prompt.as_deref())
+                                    .unwrap_or("Are you sure?");
+                                let title = interpolate_placeholders(raw_title, &ctx);
+                                let msg = interpolate_placeholders(raw_msg, &ctx);
+                                active_modal =
+                                    ActiveModal::ConfirmItem(item, ConfirmModal::new(title, msg));
                             } else if item.r#type == MenuItemType::Editor {
                                 let target_raw = item
                                     .file

@@ -34,6 +34,9 @@ pub enum MenuItemType {
     /// Selects an option from a radio list
     #[serde(rename = "radio")]
     Radio,
+    /// Launches Yes/No confirmation dialog box
+    #[serde(rename = "confirm")]
+    Confirm,
     /// Executes Python script
     #[serde(rename = "python")]
     Python,
@@ -58,6 +61,65 @@ pub enum MenuItemType {
     /// Custom user-defined type
     #[serde(untagged)]
     Other(String),
+}
+
+/// Action payload for confirm dialog choices (can be a plain command string or structured action object).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ConfirmAction {
+    /// Plain command or script string (e.g. `reboot` or `{scripts_dir}/ping.sh`)
+    Simple(String),
+    /// Structured action with specific type, action, title, and message
+    Structured(ConfirmActionDetails),
+}
+
+impl ConfirmAction {
+    pub fn as_str(&self) -> &str {
+        match self {
+            ConfirmAction::Simple(s) => s.as_str(),
+            ConfirmAction::Structured(d) => d
+                .action
+                .as_deref()
+                .or(d.command.as_deref())
+                .or(d.script.as_deref())
+                .or(d.message.as_deref())
+                .unwrap_or_default(),
+        }
+    }
+}
+
+impl From<&str> for ConfirmAction {
+    fn from(s: &str) -> Self {
+        ConfirmAction::Simple(s.to_string())
+    }
+}
+
+impl From<String> for ConfirmAction {
+    fn from(s: String) -> Self {
+        ConfirmAction::Simple(s)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct ConfirmActionDetails {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub r#type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub action: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub script: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prompt: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stream: Option<bool>,
+    #[serde(flatten)]
+    pub extra: HashMap<String, serde_yml::Value>,
 }
 
 /// A normalized menu item definition.
@@ -89,6 +151,10 @@ pub struct MenuItem {
     pub alt_buffer: Option<bool>,
     /// Editor tabstop width
     pub tabstop: Option<usize>,
+    /// Action to execute when Yes is selected (for confirm dialogs)
+    pub on_yes: Option<ConfirmAction>,
+    /// Action to execute when No is selected (for confirm dialogs)
+    pub on_no: Option<ConfirmAction>,
     /// Nested submenu container
     pub submenu: Option<Submenu>,
     /// Additional custom keys
@@ -103,6 +169,34 @@ impl MenuItem {
             r#type: MenuItemType::Divider,
             ..Default::default()
         }
+    }
+
+    /// Returns the on_yes action for confirm dialogs
+    pub fn on_yes(&self) -> Option<&str> {
+        self.on_yes
+            .as_ref()
+            .map(|a| a.as_str())
+            .filter(|s| !s.is_empty())
+            .or_else(|| self.extra.get("on_yes").and_then(|v| v.as_str()))
+    }
+
+    /// Returns the on_yes action object for confirm dialogs
+    pub fn on_yes_action(&self) -> Option<&ConfirmAction> {
+        self.on_yes.as_ref()
+    }
+
+    /// Returns the on_no action for confirm dialogs
+    pub fn on_no(&self) -> Option<&str> {
+        self.on_no
+            .as_ref()
+            .map(|a| a.as_str())
+            .filter(|s| !s.is_empty())
+            .or_else(|| self.extra.get("on_no").and_then(|v| v.as_str()))
+    }
+
+    /// Returns the on_no action object for confirm dialogs
+    pub fn on_no_action(&self) -> Option<&ConfirmAction> {
+        self.on_no.as_ref()
     }
 
     /// Whether this item represents a divider
@@ -315,6 +409,10 @@ struct RawItemProperties {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tabstop: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub on_yes: Option<ConfirmAction>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub on_no: Option<ConfirmAction>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub submenu: Option<Submenu>,
     #[serde(flatten)]
     pub extra: HashMap<String, serde_yml::Value>,
@@ -386,6 +484,8 @@ impl<'de> Deserialize<'de> for MenuItem {
                     quiet: raw_props.quiet,
                     alt_buffer: raw_props.alt_buffer,
                     tabstop: raw_props.tabstop,
+                    on_yes: raw_props.on_yes,
+                    on_no: raw_props.on_no,
                     submenu: raw_props.submenu,
                     extra: raw_props.extra,
                 });
@@ -430,6 +530,8 @@ impl<'de> Deserialize<'de> for MenuItem {
                         quiet: raw_props.quiet,
                         alt_buffer: raw_props.alt_buffer,
                         tabstop: raw_props.tabstop,
+                        on_yes: raw_props.on_yes,
+                        on_no: raw_props.on_no,
                         submenu: raw_props.submenu,
                         extra: raw_props.extra,
                     });
@@ -467,6 +569,8 @@ impl Serialize for MenuItem {
             quiet: self.quiet,
             alt_buffer: self.alt_buffer,
             tabstop: self.tabstop,
+            on_yes: self.on_yes.clone(),
+            on_no: self.on_no.clone(),
             submenu: self.submenu.clone(),
             extra: self.extra.clone(),
         };

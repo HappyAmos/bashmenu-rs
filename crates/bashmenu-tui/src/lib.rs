@@ -28,8 +28,8 @@ pub use marquee::{format_marquee_spacer, get_marquee_slice, MarqueeTracker};
 pub use menu_view::{MenuAction, MenuView};
 pub use modals::{
     compute_modal_inner, is_close_button_clicked, render_modal_frame, AsciiGridModal,
-    ColorGridModal, ConfirmModal, FilePickerModal, HelpModal, InputModal, MessageModal,
-    NoteEditorAction, NoteEditorModal, NoteViewerAction, NoteViewerModal, RadioModal,
+    ColorGridModal, ConfirmChoice, ConfirmModal, FilePickerModal, HelpModal, InputModal,
+    MessageModal, NoteEditorAction, NoteEditorModal, NoteViewerAction, NoteViewerModal, RadioModal,
     StreamOutputAction, StreamOutputModal, StreamOutputMsg, ThemePickerModal, ToggleChoice,
     ToggleModal,
 };
