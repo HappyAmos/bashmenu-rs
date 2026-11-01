@@ -99,6 +99,39 @@ fn test_bmpager_markdown_flag_passthrough() {
 }
 
 #[test]
+fn test_bmpager_table_rendering_and_wrapping() {
+    let mut child = Command::new("cargo")
+        .args([
+            "run",
+            "-p",
+            "bmpager-cli",
+            "--bin",
+            "bmpager",
+            "--",
+            "--markdown",
+        ])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("failed to spawn bmpager");
+
+    let table_input = "| Script | Description |\n| :--- | :--- |\n| `scripts/ascii.sh` | Standard and Extended ASCII viewing utility with comprehensive character maps. |\n";
+    {
+        let stdin = child.stdin.as_mut().expect("failed to open stdin");
+        stdin.write_all(table_input.as_bytes()).unwrap();
+    }
+
+    let output = child.wait_with_output().expect("failed to read stdout");
+    assert!(output.status.success());
+    let out_str = String::from_utf8_lossy(&output.stdout);
+    assert!(out_str.contains('┌') && out_str.contains('┐'));
+    assert!(out_str.contains('├') && out_str.contains('┤'));
+    assert!(out_str.contains('└') && out_str.contains('┘'));
+    assert!(out_str.contains("scripts/ascii.sh"));
+    assert!(out_str.contains("Standard and Extended"));
+}
+
+#[test]
 fn test_bmpager_file_argument() {
     let output = Command::new("cargo")
         .args([

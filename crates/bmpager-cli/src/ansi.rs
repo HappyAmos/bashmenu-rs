@@ -128,6 +128,77 @@ pub fn clip_ansi_line(line: &str, max_cols: usize, strip_colors: bool) -> String
     out
 }
 
+/// Splits an ANSI string at visual column `max_cols` into `(head, tail)`.
+/// `head` has at most `max_cols` visual width and ends with `\x1b[0m` if formatted.
+pub fn split_ansi_line(line: &str, max_cols: usize) -> (String, String) {
+    if max_cols == 0 {
+        return (String::new(), line.to_string());
+    }
+    let mut out = String::new();
+    let mut used = 0;
+    let bytes = line.as_bytes();
+    let mut i = 0;
+    let mut had_ansi = false;
+
+    while i < bytes.len() && used < max_cols {
+        if bytes[i] == 0x1b {
+            had_ansi = true;
+            if i + 1 < bytes.len() && bytes[i + 1] == b'[' {
+                let start = i;
+                i += 2;
+                while i < bytes.len() {
+                    let b = bytes[i];
+                    i += 1;
+                    if b.is_ascii_alphabetic() {
+                        break;
+                    }
+                }
+                out.push_str(&line[start..i]);
+                continue;
+            }
+            if i + 1 < bytes.len() && bytes[i + 1] == b']' {
+                let start = i;
+                i += 2;
+                while i < bytes.len() {
+                    if bytes[i] == 0x07 {
+                        i += 1;
+                        break;
+                    }
+                    if bytes[i] == 0x1b && i + 1 < bytes.len() && bytes[i + 1] == b'\\' {
+                        i += 2;
+                        break;
+                    }
+                    i += 1;
+                }
+                out.push_str(&line[start..i]);
+                continue;
+            }
+            out.push('\x1b');
+            i += 1;
+            continue;
+        }
+
+        let rem = &line[i..];
+        if let Some(c) = rem.chars().next() {
+            let w = UnicodeWidthChar::width(c).unwrap_or(0);
+            if used + w > max_cols {
+                break;
+            }
+            out.push(c);
+            used += w;
+            i += c.len_utf8();
+        } else {
+            break;
+        }
+    }
+
+    let remainder = line[i..].to_string();
+    if had_ansi || used >= max_cols {
+        out.push_str("\x1b[0m");
+    }
+    (out, remainder)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -150,5 +221,13 @@ mod tests {
         let clipped = clip_ansi_line(input, 5, false);
         assert_eq!(strip_ansi(&clipped), "12345");
         assert!(clipped.ends_with("\x1b[0m"));
+    }
+
+    #[test]
+    fn test_split_ansi_line() {
+        let input = "\x1b[1;34m1234567890\x1b[0m";
+        let (head, tail) = split_ansi_line(input, 5);
+        assert_eq!(strip_ansi(&head), "12345");
+        assert_eq!(strip_ansi(&tail), "67890");
     }
 }

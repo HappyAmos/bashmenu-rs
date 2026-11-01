@@ -6,7 +6,7 @@ use unicode_width::UnicodeWidthStr;
 
 /// Render Markdown string into terminal ANSI text wrapped to `terminal_width`.
 pub fn render_markdown(source: &str, terminal_width: usize) -> String {
-    let width = terminal_width.clamp(40, 120);
+    let width = terminal_width.clamp(40, 160);
     let mut options = Options::empty();
     options.insert(Options::ENABLE_TABLES);
     options.insert(Options::ENABLE_STRIKETHROUGH);
@@ -237,7 +237,25 @@ impl MarkdownRenderer {
                     } else if self.in_code_block {
                         self.code_block_text.push_str(&text);
                     } else if self.in_table {
-                        self.current_cell.push_str(&text);
+                        let mut formatted = String::new();
+                        if self.bold {
+                            formatted.push_str("\x1b[1m");
+                        }
+                        if self.italic {
+                            formatted.push_str("\x1b[3m");
+                        }
+                        if let Some(ref url) = self.link_url {
+                            formatted.push_str(&format!(
+                                "\x1b]8;;{}\x1b\\\x1b[4;36m{}\x1b[0m\x1b]8;;\x1b\\",
+                                url, text
+                            ));
+                        } else {
+                            formatted.push_str(&text);
+                        }
+                        if (self.bold || self.italic) && self.link_url.is_none() {
+                            formatted.push_str("\x1b[0m");
+                        }
+                        self.current_cell.push_str(&formatted);
                     } else {
                         self.handle_styled_text(&text);
                     }
@@ -262,10 +280,16 @@ impl MarkdownRenderer {
                 Event::SoftBreak => {
                     if self.heading_level.is_some() {
                         self.heading_text.push(' ');
+                    } else if self.in_table {
+                        self.current_cell.push(' ');
                     }
                 }
                 Event::HardBreak => {
-                    self.flush_line();
+                    if self.in_table {
+                        self.current_cell.push(' ');
+                    } else {
+                        self.flush_line();
+                    }
                 }
                 _ => {}
             }
@@ -393,26 +417,63 @@ impl MarkdownRenderer {
             return;
         }
 
-        let mut col_widths = vec![3; num_cols];
+        // 1. Calculate natural width and minimum word width per column
+        let mut nat_w = vec![0usize; num_cols];
+        let mut min_w = vec![3usize; num_cols];
+
         for row in &self.table_rows {
-            for (c_idx, cell) in row.iter().enumerate() {
-                let cell_w = UnicodeWidthStr::width(cell.as_str());
-                col_widths[c_idx] = col_widths[c_idx].max(cell_w);
+            for (c, cell) in row.iter().enumerate() {
+                if c >= num_cols {
+                    break;
+                }
+                let vis = crate::ansi::visual_width(cell);
+                nat_w[c] = nat_w[c].max(vis);
+                for word in cell.split_whitespace() {
+                    let w_vis = crate::ansi::visual_width(word);
+                    min_w[c] = min_w[c].max(w_vis);
+                }
             }
         }
 
-        let total_w: usize = col_widths.iter().sum::<usize>() + (num_cols * 3) + 1;
-        if total_w > self.width {
-            let shrink_factor = self.width as f32 / total_w as f32;
-            for w in &mut col_widths {
-                *w = ((*w as f32 * shrink_factor) as usize).max(3);
+        for w in &mut min_w {
+            *w = (*w).clamp(3, 25);
+        }
+
+        let overhead = num_cols * 3 + 1;
+        let avail_text_w = self.width.saturating_sub(overhead);
+
+        let mut col_widths = nat_w.clone();
+        if col_widths.iter().sum::<usize>() > avail_text_w && avail_text_w > 0 {
+            // Shrink columns that exceed min_w down to avail_text_w
+            while col_widths.iter().sum::<usize>() > avail_text_w {
+                let widest_idx = col_widths
+                    .iter()
+                    .enumerate()
+                    .filter(|(c, &w)| w > min_w[*c])
+                    .max_by_key(|(_, &w)| w)
+                    .map(|(c, _)| c);
+
+                if let Some(c) = widest_idx {
+                    col_widths[c] -= 1;
+                } else {
+                    let widest = col_widths
+                        .iter()
+                        .enumerate()
+                        .max_by_key(|(_, &w)| w)
+                        .map(|(c, _)| c)
+                        .unwrap();
+                    if col_widths[widest] <= 3 {
+                        break;
+                    }
+                    col_widths[widest] -= 1;
+                }
             }
         }
 
         let border_color = "\x1b[38;5;242m";
         let reset = "\x1b[0m";
 
-        // Top border
+        // Top border: ┌───┬───┐
         let mut top_line = format!("{}┌", border_color);
         for (i, w) in col_widths.iter().enumerate() {
             top_line.push_str(&"─".repeat(w + 2));
@@ -426,35 +487,55 @@ impl MarkdownRenderer {
         self.output.push_str(&top_line);
         self.output.push('\n');
 
-        // Header or Data rows
+        // Rows
         for (r_idx, row) in self.table_rows.iter().enumerate() {
-            let mut row_line = format!("{}│{}", border_color, reset);
-            for (c_idx, w) in col_widths.iter().enumerate() {
-                let cell = row.get(c_idx).map(|s| s.as_str()).unwrap_or("");
-                let cell_w = UnicodeWidthStr::width(cell);
-                let pad = w.saturating_sub(cell_w);
-                if r_idx == 0 {
-                    row_line.push_str(&format!(
-                        " \x1b[1;37m{}\x1b[0m{} {}│{}",
-                        cell,
-                        " ".repeat(pad),
-                        border_color,
-                        reset
-                    ));
-                } else {
-                    row_line.push_str(&format!(
-                        " {}{} {}│{}",
-                        cell,
-                        " ".repeat(pad),
-                        border_color,
-                        reset
-                    ));
-                }
-            }
-            self.output.push_str(&row_line);
-            self.output.push('\n');
+            let wrapped_cells: Vec<Vec<String>> = (0..num_cols)
+                .map(|c| {
+                    let cell_text = row.get(c).map(|s| s.as_str()).unwrap_or("");
+                    wrap_cell_text(cell_text, col_widths[c])
+                })
+                .collect();
 
-            // Separator after header
+            let row_h = wrapped_cells.iter().map(|l| l.len()).max().unwrap_or(1);
+
+            for h in 0..row_h {
+                let mut row_line = format!("{}│{}", border_color, reset);
+                for c in 0..num_cols {
+                    let cell_line = wrapped_cells[c].get(h).map(|s| s.as_str()).unwrap_or("");
+                    let cell_vis = crate::ansi::visual_width(cell_line);
+                    let pad = col_widths[c].saturating_sub(cell_vis);
+
+                    if r_idx == 0 {
+                        row_line.push_str(&format!(
+                            " \x1b[1;37m{}\x1b[0m{} {}│{}",
+                            cell_line,
+                            " ".repeat(pad),
+                            border_color,
+                            reset
+                        ));
+                    } else if c == 0 {
+                        row_line.push_str(&format!(
+                            " \x1b[1;96m{}\x1b[0m{} {}│{}",
+                            cell_line,
+                            " ".repeat(pad),
+                            border_color,
+                            reset
+                        ));
+                    } else {
+                        row_line.push_str(&format!(
+                            " {}{} {}│{}",
+                            cell_line,
+                            " ".repeat(pad),
+                            border_color,
+                            reset
+                        ));
+                    }
+                }
+                self.output.push_str(&row_line);
+                self.output.push('\n');
+            }
+
+            // Separator line after header row: ├───┼───┤
             if r_idx == 0 && self.table_rows.len() > 1 {
                 let mut sep_line = format!("{}├", border_color);
                 for (i, w) in col_widths.iter().enumerate() {
@@ -471,7 +552,7 @@ impl MarkdownRenderer {
             }
         }
 
-        // Bottom border
+        // Bottom border: └───┴───┘
         let mut bot_line = format!("{}└", border_color);
         for (i, w) in col_widths.iter().enumerate() {
             bot_line.push_str(&"─".repeat(w + 2));
@@ -490,4 +571,88 @@ impl MarkdownRenderer {
         self.flush_line();
         self.output
     }
+}
+
+/// Word-wraps a table cell string to fit within `max_width` visual terminal cells,
+/// preserving ANSI formatting sequences and hard-breaking words that exceed `max_width`.
+fn wrap_cell_text(text: &str, max_width: usize) -> Vec<String> {
+    if max_width == 0 {
+        return vec![String::new()];
+    }
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return vec![String::new()];
+    }
+
+    if crate::ansi::visual_width(trimmed) <= max_width {
+        return vec![trimmed.to_string()];
+    }
+
+    let mut lines = Vec::new();
+    let mut cur_line = String::new();
+    let mut cur_vis = 0;
+
+    for word in trimmed.split_whitespace() {
+        let word_vis = crate::ansi::visual_width(word);
+        if cur_line.is_empty() {
+            if word_vis <= max_width {
+                cur_line.push_str(word);
+                cur_vis = word_vis;
+            } else {
+                let mut rem = word.to_string();
+                while !rem.is_empty() {
+                    let (chunk, tail) = crate::ansi::split_ansi_line(&rem, max_width);
+                    if chunk.is_empty() {
+                        let mut chars = rem.chars();
+                        if let Some(ch) = chars.next() {
+                            lines.push(ch.to_string());
+                            rem = chars.as_str().to_string();
+                        } else {
+                            break;
+                        }
+                    } else {
+                        lines.push(chunk);
+                        rem = tail;
+                    }
+                }
+            }
+        } else if cur_vis + 1 + word_vis <= max_width {
+            cur_line.push(' ');
+            cur_line.push_str(word);
+            cur_vis += 1 + word_vis;
+        } else {
+            lines.push(cur_line);
+            cur_line = String::new();
+            cur_vis = 0;
+            if word_vis <= max_width {
+                cur_line.push_str(word);
+                cur_vis = word_vis;
+            } else {
+                let mut rem = word.to_string();
+                while !rem.is_empty() {
+                    let (chunk, tail) = crate::ansi::split_ansi_line(&rem, max_width);
+                    if chunk.is_empty() {
+                        let mut chars = rem.chars();
+                        if let Some(ch) = chars.next() {
+                            lines.push(ch.to_string());
+                            rem = chars.as_str().to_string();
+                        } else {
+                            break;
+                        }
+                    } else {
+                        lines.push(chunk);
+                        rem = tail;
+                    }
+                }
+            }
+        }
+    }
+
+    if !cur_line.is_empty() {
+        lines.push(cur_line);
+    }
+    if lines.is_empty() {
+        lines.push(String::new());
+    }
+    lines
 }
