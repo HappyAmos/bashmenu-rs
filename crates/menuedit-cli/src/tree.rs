@@ -103,6 +103,140 @@ pub fn find_item<'a>(menu: &'a MenuSchema, path: &[usize]) -> Option<&'a MenuIte
     None
 }
 
+/// Finds the hierarchical index path for a target item based on path, title, or title chain.
+pub fn find_node_path(
+    menu: &MenuSchema,
+    select_path: Option<&str>,
+    select_title: Option<&str>,
+    title_chain: Option<&str>,
+) -> Option<Vec<usize>> {
+    // 1. Try select_path if provided
+    if let Some(path_str) = select_path {
+        let parsed: Result<Vec<usize>, _> = path_str
+            .split(',')
+            .map(|s| s.trim().parse::<usize>())
+            .collect();
+        if let Ok(path) = parsed {
+            if !path.is_empty() && find_item(menu, &path).is_some() {
+                // If select_title is also provided, check if it matches
+                if let Some(target_t) = select_title {
+                    if let Some(item) = find_item(menu, &path) {
+                        let clean_item = bashmenu_tui::strip_bbcode(&item.label)
+                            .trim()
+                            .to_lowercase();
+                        let clean_target =
+                            bashmenu_tui::strip_bbcode(target_t).trim().to_lowercase();
+                        if clean_item == clean_target || item.label.eq_ignore_ascii_case(target_t) {
+                            return Some(path);
+                        }
+                    }
+                } else {
+                    return Some(path);
+                }
+            }
+        }
+    }
+
+    // 2. Try title_chain if provided (e.g. "Options & Settings > Bashmenu Settings")
+    if let Some(chain_str) = title_chain {
+        let sep = if chain_str.contains('>') { '>' } else { ',' };
+        let segments: Vec<&str> = chain_str
+            .split(sep)
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .collect();
+        if !segments.is_empty() {
+            let mut curr_path = Vec::new();
+            let mut curr_items = &menu.items;
+            let mut matched_all = true;
+
+            for seg in &segments {
+                let clean_seg = bashmenu_tui::strip_bbcode(seg).trim().to_lowercase();
+                let found = curr_items.iter().enumerate().find(|(_, it)| {
+                    let clean_it = bashmenu_tui::strip_bbcode(&it.label).trim().to_lowercase();
+                    clean_it == clean_seg || it.label.eq_ignore_ascii_case(seg)
+                });
+
+                if let Some((idx, item)) = found {
+                    curr_path.push(idx);
+                    if let Some(sub) = &item.submenu {
+                        curr_items = &sub.items;
+                    }
+                } else {
+                    matched_all = false;
+                    break;
+                }
+            }
+
+            if matched_all && !curr_path.is_empty() {
+                return Some(curr_path);
+            }
+        }
+    }
+
+    // 3. Fallback to select_title across the entire tree
+    if let Some(target_t) = select_title {
+        let clean_target = bashmenu_tui::strip_bbcode(target_t).trim().to_lowercase();
+        if !clean_target.is_empty() {
+            // Pass 1: exact / clean match
+            if let Some(p) = find_by_title_recursive(&menu.items, &[], &clean_target, false) {
+                return Some(p);
+            }
+            // Pass 2: substring contains match
+            if let Some(p) = find_by_title_recursive(&menu.items, &[], &clean_target, true) {
+                return Some(p);
+            }
+        }
+    }
+
+    // 4. Fallback to select_path without title verification if path was valid
+    if let Some(path_str) = select_path {
+        let parsed: Result<Vec<usize>, _> = path_str
+            .split(',')
+            .map(|s| s.trim().parse::<usize>())
+            .collect();
+        if let Ok(path) = parsed {
+            if !path.is_empty() && find_item(menu, &path).is_some() {
+                return Some(path);
+            }
+        }
+    }
+
+    None
+}
+
+fn find_by_title_recursive(
+    items: &[MenuItem],
+    parent_path: &[usize],
+    target_clean: &str,
+    substring: bool,
+) -> Option<Vec<usize>> {
+    for (idx, item) in items.iter().enumerate() {
+        let mut path = parent_path.to_vec();
+        path.push(idx);
+
+        let clean_it = bashmenu_tui::strip_bbcode(&item.label)
+            .trim()
+            .to_lowercase();
+        let matches = if substring {
+            clean_it.contains(target_clean) || target_clean.contains(&clean_it)
+        } else {
+            clean_it == target_clean || item.label.trim().eq_ignore_ascii_case(target_clean)
+        };
+
+        if matches {
+            return Some(path);
+        }
+
+        if let Some(sub) = &item.submenu {
+            if let Some(res) = find_by_title_recursive(&sub.items, &path, target_clean, substring) {
+                return Some(res);
+            }
+        }
+    }
+    None
+}
+
 /// Retrieves a mutable reference to an item by index path
 pub fn find_item_mut<'a>(menu: &'a mut MenuSchema, path: &[usize]) -> Option<&'a mut MenuItem> {
     if path.is_empty() {

@@ -819,3 +819,37 @@ fn test_toast_rack_rendering_and_interaction() {
     assert!(rack.handle_mouse(col, row));
     assert_eq!(rack.len(), 0);
 }
+
+#[test]
+fn test_menu_selected_path_and_title_chain() {
+    let schema = create_sample_menu();
+    let mut view = MenuView::new(
+        schema,
+        ResolvedThemeStyles::default(),
+        true,
+        "Status".to_string(),
+    );
+
+    // Initial item is "First Command" at index 1
+    assert_eq!(view.selected_index(), 1);
+    assert_eq!(view.selected_path(), vec![1]);
+    assert_eq!(view.active_title_chain(), vec!["First Command"]);
+    assert_eq!(view.selected_item().unwrap().label, "First Command");
+
+    // Navigate to Submenu Test (index 3) and enter it
+    view.handle_key(KeyCode::Char('j'));
+    assert_eq!(view.selected_index(), 3);
+    assert_eq!(view.selected_path(), vec![3]);
+    assert_eq!(view.active_title_chain(), vec!["Submenu Test"]);
+
+    // Enter submenu
+    view.handle_key(KeyCode::Enter);
+    // Now inside submenu, first child is "Child Action" at index 0
+    assert_eq!(view.selected_index(), 0);
+    assert_eq!(view.selected_path(), vec![3, 0]);
+    assert_eq!(
+        view.active_title_chain(),
+        vec!["Submenu Test", "Child Action"]
+    );
+    assert_eq!(view.selected_item().unwrap().label, "Child Action");
+}

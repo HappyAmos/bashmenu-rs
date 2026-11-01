@@ -358,3 +358,82 @@ fn test_themeedit_scroll_offset_adjustment() {
     state.adjust_scroll(10);
     assert_eq!(state.scroll_offset, 2);
 }
+
+#[test]
+fn test_themeedit_preview_menu_editor_border_intact() {
+    use bashmenu_tui::ResolvedThemeStyles;
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::widgets::{Block, Borders, Widget};
+
+    let styles = ResolvedThemeStyles::default();
+    let area = Rect::new(0, 0, 50, 20);
+    let mut buf = Buffer::empty(area);
+
+    let preview_block = Block::default()
+        .borders(Borders::ALL)
+        .title(" [ Visual Menu Editor ] ");
+    preview_block.render(area, &mut buf);
+
+    let b = &styles.borders;
+    let bot_y = area.y + area.height - 1;
+    let footer_y = bot_y.saturating_sub(1);
+    let gt_y = footer_y.saturating_sub(1);
+    let p_avail_w = area.width.saturating_sub(4);
+    let sep_col = area.x + 2 + p_avail_w / 2;
+
+    // Simulate rendering gutter divider and help gutter
+    buf.set_string(area.x, gt_y, &b.left_tee, ratatui::style::Style::default());
+    buf.set_string(
+        area.x + area.width - 1,
+        gt_y,
+        &b.right_tee,
+        ratatui::style::Style::default(),
+    );
+    buf.set_string(
+        sep_col,
+        gt_y,
+        &b.bottom_tee,
+        ratatui::style::Style::default(),
+    );
+
+    buf.set_string(
+        area.x,
+        footer_y,
+        &b.border_vertical_left,
+        ratatui::style::Style::default(),
+    );
+    buf.set_string(
+        area.x + area.width - 1,
+        footer_y,
+        &b.border_vertical_right,
+        ratatui::style::Style::default(),
+    );
+
+    // Verify bottom border is still intact and not overwritten
+    assert_ne!(
+        buf[(area.x, bot_y)].symbol(),
+        " ",
+        "Bottom-left border must not be empty"
+    );
+    assert_ne!(
+        buf[(area.x + area.width - 1, bot_y)].symbol(),
+        " ",
+        "Bottom-right border must not be empty"
+    );
+    assert_eq!(
+        buf[(area.x, gt_y)].symbol(),
+        &b.left_tee,
+        "Gutter top border must have left_tee"
+    );
+    assert_eq!(
+        buf[(area.x + area.width - 1, gt_y)].symbol(),
+        &b.right_tee,
+        "Gutter top border must have right_tee"
+    );
+    assert_eq!(
+        buf[(sep_col, gt_y)].symbol(),
+        &b.bottom_tee,
+        "Center separator meeting gutter divider must be bottom_tee"
+    );
+}

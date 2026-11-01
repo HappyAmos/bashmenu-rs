@@ -18,9 +18,9 @@ pub use item_edit::{
     MultiLineInput, TextInput,
 };
 pub use tree::{
-    delete_item, find_item, find_item_mut, flatten_tree, indent_item, insert_item_after,
-    move_down_sibling, move_up_sibling, mutate_item_type, outdent_item, toggle_all_nodes,
-    VisibleNode,
+    delete_item, find_item, find_item_mut, find_node_path, flatten_tree, indent_item,
+    insert_item_after, move_down_sibling, move_up_sibling, mutate_item_type, outdent_item,
+    toggle_all_nodes, VisibleNode,
 };
 pub use type_picker::{ItemTypePickerModal, ITEM_TYPES};
 

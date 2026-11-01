@@ -490,7 +490,7 @@ fn main() -> Result<()> {
 
                         for (row, (lineno, text)) in code_lines.iter().enumerate() {
                             let y = p_inner_y + 2 + row as u16;
-                            if y >= right_area.y + right_area.height - 2 {
+                            if y >= right_area.y + right_area.height.saturating_sub(3) {
                                 break;
                             }
                             let is_cursor_line = row == 2;
@@ -508,7 +508,22 @@ fn main() -> Result<()> {
                         }
 
                         // 3. Status Bar
-                        let status_y = right_area.y + right_area.height - 2;
+                        let bot_y = right_area.y + right_area.height.saturating_sub(1);
+                        let footer_y = bot_y.saturating_sub(1);
+                        let status_y = footer_y.saturating_sub(1);
+
+                        buf.set_string(
+                            right_area.x,
+                            status_y,
+                            &b.border_vertical_left,
+                            border_style,
+                        );
+                        buf.set_string(
+                            right_area.x + right_area.width - 1,
+                            status_y,
+                            &b.border_vertical_right,
+                            border_style,
+                        );
                         let status_text = format!(
                             " NORMAL │ bashmenu.yml │ utf-8 │ 6L, 128B │ 3:12 {:<width$}",
                             "",
@@ -517,7 +532,18 @@ fn main() -> Result<()> {
                         buf.set_string(p_inner_x, status_y, &status_text, preview_styles.highlight);
 
                         // 4. Editor Command Footer
-                        let footer_y = right_area.y + right_area.height - 1;
+                        buf.set_string(
+                            right_area.x,
+                            footer_y,
+                            &b.border_vertical_left,
+                            border_style,
+                        );
+                        buf.set_string(
+                            right_area.x + right_area.width - 1,
+                            footer_y,
+                            &b.border_vertical_right,
+                            border_style,
+                        );
                         buf.set_string(
                             p_inner_x,
                             footer_y,
@@ -615,6 +641,9 @@ fn main() -> Result<()> {
                     PreviewMode::MenuEditor => {
                         // Visual Menu Editor Split View
                         let sep_col = p_inner_x + p_avail_w / 2;
+                        let bot_y = right_area.y + right_area.height.saturating_sub(1);
+                        let footer_y = bot_y.saturating_sub(1);
+                        let gt_y = footer_y.saturating_sub(1);
 
                         // Left Pane: Tree
                         buf.set_string(p_inner_x, p_inner_y, "▼ Main Menu", preview_styles.title);
@@ -643,17 +672,11 @@ fn main() -> Result<()> {
                             preview_styles.text,
                         );
 
-                        // Center divider with top_tee and bottom_tee
+                        // Center vertical divider
                         buf.set_string(sep_col, right_area.y, &b.top_tee, border_style);
-                        for y in p_inner_y..(p_inner_y + p_avail_h.saturating_sub(1)) {
+                        for y in p_inner_y..gt_y {
                             buf.set_string(sep_col, y, &b.border_vertical_left, border_style);
                         }
-                        buf.set_string(
-                            sep_col,
-                            right_area.y + right_area.height.saturating_sub(2),
-                            &b.bottom_tee,
-                            border_style,
-                        );
 
                         // Right Pane: Property Inspector
                         let r_x = sep_col + 2;
@@ -692,14 +715,44 @@ fn main() -> Result<()> {
                             preview_styles.window_close_button,
                         );
 
-                        // Footer
-                        let footer_y = right_area.y + right_area.height - 1;
+                        // Gutter top border divider (connecting center divider to outer borders)
+                        buf.set_string(right_area.x, gt_y, &b.left_tee, border_style);
+                        buf.set_string(
+                            right_area.x + right_area.width - 1,
+                            gt_y,
+                            &b.right_tee,
+                            border_style,
+                        );
+                        let div_left_len = sep_col.saturating_sub(right_area.x + 1) as usize;
+                        let div_left = b.border_horizontal_bottom.repeat(div_left_len);
+                        buf.set_string(right_area.x + 1, gt_y, &div_left, border_style);
+                        buf.set_string(sep_col, gt_y, &b.bottom_tee, border_style);
+
+                        let div_right_start = sep_col + 1;
+                        let div_right_end = right_area.x + right_area.width - 1;
+                        let div_right_len = div_right_end.saturating_sub(div_right_start) as usize;
+                        let div_right = b.border_horizontal_bottom.repeat(div_right_len);
+                        buf.set_string(div_right_start, gt_y, &div_right, border_style);
+
+                        // Footer help gutter
+                        buf.set_string(
+                            right_area.x,
+                            footer_y,
+                            &b.border_vertical_left,
+                            border_style,
+                        );
+                        buf.set_string(
+                            right_area.x + right_area.width - 1,
+                            footer_y,
+                            &b.border_vertical_right,
+                            border_style,
+                        );
                         let p_footer_items = ["[F1] Help", "[s] Save", "[ESC] Exit"];
                         let p_spread = bashmenu_tui::format_spread_gutter_line(
                             &p_footer_items,
                             p_avail_w as usize,
                         );
-                        buf.set_string(p_inner_x, footer_y, p_spread, preview_styles.gutter);
+                        buf.set_string(p_inner_x, footer_y, &p_spread, preview_styles.gutter);
                     }
                 }
 
@@ -1447,14 +1500,37 @@ fn hit_test_preview(
         }
         PreviewMode::MenuEditor => {
             let sep_col = p_inner_x + p_avail_w / 2;
+            let bot_y = right_area.y + right_area.height.saturating_sub(1);
+            let footer_y = bot_y.saturating_sub(1);
+            let gt_y = footer_y.saturating_sub(1);
+
             if col == sep_col {
                 if row == right_area.y {
                     return Some(("top_tee", row, col, col + 1));
                 }
-                if row == right_area.y + right_area.height.saturating_sub(2) {
+                if row == gt_y {
                     return Some(("bottom_tee", row, col, col + 1));
                 }
                 return Some(("border_vertical", row, col, col + 1));
+            }
+            if row == gt_y {
+                return Some((
+                    "border_horizontal",
+                    row,
+                    right_area.x,
+                    right_area.x + right_area.width,
+                ));
+            }
+            if row == footer_y {
+                return Some(("gutter", row, p_inner_x, p_inner_x + p_avail_w));
+            }
+            if row == bot_y {
+                return Some((
+                    "border_bottom",
+                    row,
+                    right_area.x,
+                    right_area.x + right_area.width,
+                ));
             }
             if col < sep_col {
                 if row == right_area.y + 1 {

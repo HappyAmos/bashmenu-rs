@@ -631,11 +631,27 @@ fn main() -> Result<()> {
                         }
                         MenuAction::EditMenu => {
                             let menuedit_bin = locate_tool("menuedit");
+                            let path_indices = menu_view.selected_path();
+                            let path_str = path_indices
+                                .iter()
+                                .map(|i| i.to_string())
+                                .collect::<Vec<_>>()
+                                .join(",");
+                            let sel_title = menu_view.selected_item().map(|it| it.label.clone());
+                            let title_chain = menu_view.active_title_chain().join(" > ");
                             let _ = guard.suspend(|| {
-                                let _ = Command::new(&menuedit_bin)
-                                    .arg("-f")
-                                    .arg(&menu_path)
-                                    .status();
+                                let mut cmd = Command::new(&menuedit_bin);
+                                cmd.arg("-f").arg(&menu_path);
+                                if !path_str.is_empty() {
+                                    cmd.arg("--select-path").arg(&path_str);
+                                }
+                                if let Some(ref t) = sel_title {
+                                    cmd.arg("--select-title").arg(t);
+                                }
+                                if !title_chain.is_empty() {
+                                    cmd.arg("--title-chain").arg(&title_chain);
+                                }
+                                let _ = cmd.status();
                                 Ok(())
                             });
                             if let Ok(new_menu) = load_menu(&menu_path) {
@@ -915,11 +931,28 @@ fn main() -> Result<()> {
                                     || command_str == "menuedit.py"
                                 {
                                     let menuedit_bin = locate_tool("menuedit");
+                                    let path_indices = menu_view.selected_path();
+                                    let path_str = path_indices
+                                        .iter()
+                                        .map(|i| i.to_string())
+                                        .collect::<Vec<_>>()
+                                        .join(",");
+                                    let sel_title =
+                                        menu_view.selected_item().map(|it| it.label.clone());
+                                    let title_chain = menu_view.active_title_chain().join(" > ");
                                     let _ = guard.suspend(|| {
-                                        let _ = Command::new(&menuedit_bin)
-                                            .arg("-f")
-                                            .arg(&menu_path)
-                                            .status();
+                                        let mut cmd = Command::new(&menuedit_bin);
+                                        cmd.arg("-f").arg(&menu_path);
+                                        if !path_str.is_empty() {
+                                            cmd.arg("--select-path").arg(&path_str);
+                                        }
+                                        if let Some(ref t) = sel_title {
+                                            cmd.arg("--select-title").arg(t);
+                                        }
+                                        if !title_chain.is_empty() {
+                                            cmd.arg("--title-chain").arg(&title_chain);
+                                        }
+                                        let _ = cmd.status();
                                         Ok(())
                                     });
                                     if let Ok(new_menu) = load_menu(&menu_path) {

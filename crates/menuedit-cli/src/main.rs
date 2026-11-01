@@ -9,10 +9,10 @@ use bashmenu_tui::{
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers, MouseButton, MouseEventKind};
 use menuedit_cli::{
-    delete_item, find_item_mut, flatten_tree, format_inspector_text, get_type_badge, indent_item,
-    insert_item_after, move_down_sibling, move_up_sibling, mutate_item_type, outdent_item,
-    toggle_all_nodes, BrowseTarget, ItemEditModal, ItemEditResult, ItemTypePickerModal,
-    ITEM_EDIT_HELP_TEXT, PLACEHOLDER_HELP_TEXT,
+    delete_item, find_item_mut, find_node_path, flatten_tree, format_inspector_text,
+    get_type_badge, indent_item, insert_item_after, move_down_sibling, move_up_sibling,
+    mutate_item_type, outdent_item, toggle_all_nodes, BrowseTarget, ItemEditModal, ItemEditResult,
+    ItemTypePickerModal, ITEM_EDIT_HELP_TEXT, PLACEHOLDER_HELP_TEXT,
 };
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
@@ -66,6 +66,18 @@ struct Cli {
     /// Load and save menu files in current working directory
     #[arg(long)]
     local: bool,
+
+    /// Selected item path (comma-separated indices, e.g. "0,2")
+    #[arg(long)]
+    select_path: Option<String>,
+
+    /// Selected item label or title to focus
+    #[arg(long)]
+    select_title: Option<String>,
+
+    /// Hierarchical title chain for deep node resolution (comma or > separated)
+    #[arg(long)]
+    title_chain: Option<String>,
 }
 
 fn resolve_menu_path(target: &Path, local: bool) -> PathBuf {
@@ -139,6 +151,22 @@ fn main() -> Result<()> {
 
     let mut expanded_paths = HashSet::new();
     let mut selected_node_idx = 0;
+
+    // Resolve initial focus if specified via CLI flags
+    if let Some(target_path) = find_node_path(
+        &menu,
+        cli.select_path.as_deref(),
+        cli.select_title.as_deref(),
+        cli.title_chain.as_deref(),
+    ) {
+        for len in 1..target_path.len() {
+            expanded_paths.insert(target_path[..len].to_vec());
+        }
+        let init_nodes = flatten_tree(&menu, &expanded_paths);
+        if let Some(pos) = init_nodes.iter().position(|n| n.path == target_path) {
+            selected_node_idx = pos;
+        }
+    }
     let mut tree_scroll = 0;
     let mut inspector_scroll = 0;
     let mut is_modified = false;

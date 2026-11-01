@@ -236,6 +236,41 @@ impl MenuView {
         self.current_level().selected_idx
     }
 
+    /// Returns the currently selected MenuItem in the active level
+    pub fn selected_item(&self) -> Option<&MenuItem> {
+        let level = self.current_level();
+        level.items.get(level.selected_idx)
+    }
+
+    /// Returns the hierarchical index path to the currently selected item
+    pub fn selected_path(&self) -> Vec<usize> {
+        let mut path = Vec::new();
+        for level in &self.stack {
+            if level.is_notebook {
+                break;
+            }
+            path.push(level.selected_idx);
+        }
+        path
+    }
+
+    /// Returns the active hierarchical title chain from root down to the selected item
+    pub fn active_title_chain(&self) -> Vec<String> {
+        let mut chain = Vec::new();
+        for level in &self.stack {
+            if level.is_notebook {
+                break;
+            }
+            if let Some(item) = level.items.get(level.selected_idx) {
+                let clean = crate::strip_bbcode(&item.label).trim().to_string();
+                if !clean.is_empty() {
+                    chain.push(clean);
+                }
+            }
+        }
+        chain
+    }
+
     fn current_level(&self) -> &MenuLevel {
         self.stack.last().expect("Menu stack must not be empty")
     }

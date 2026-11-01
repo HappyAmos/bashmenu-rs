@@ -726,3 +726,44 @@ fn test_menuedit_footer_spread_and_position() {
     assert!(footer_y1 < footer_y2);
     assert!(footer_y2 < bot_border_y);
 }
+
+#[test]
+fn test_menuedit_find_node_path_and_ancestor_expansion() {
+    use bashmenu_core::load_menu;
+    use menuedit_cli::{find_node_path, flatten_tree};
+    use std::collections::HashSet;
+
+    let fixture_path = get_fixture_path("bashmenu.mnu");
+    let menu = load_menu(&fixture_path).expect("bashmenu.mnu fixture must load");
+
+    // 1. Resolve by direct path
+    let path = find_node_path(&menu, Some("0"), None, None).expect("Path 0 should resolve");
+    assert_eq!(path, vec![0]);
+
+    // 2. Resolve by title
+    let path_title = find_node_path(&menu, None, Some("Options & Settings"), None)
+        .expect("Options & Settings should resolve");
+    assert!(!path_title.is_empty());
+
+    // 3. Resolve nested item by title chain
+    let nested_path = find_node_path(
+        &menu,
+        None,
+        Some("Bashmenu Settings"),
+        Some("Options & Settings > Bashmenu Settings"),
+    )
+    .expect("Title chain should resolve nested item");
+    assert!(nested_path.len() >= 2);
+
+    // 4. Verify ancestor expansion makes the target node visible in flatten_tree
+    let mut expanded = HashSet::new();
+    for len in 1..nested_path.len() {
+        expanded.insert(nested_path[..len].to_vec());
+    }
+    let visible = flatten_tree(&menu, &expanded);
+    let target_node = visible.iter().find(|n| n.path == nested_path);
+    assert!(
+        target_node.is_some(),
+        "Nested target node must be visible after ancestor expansion"
+    );
+}
