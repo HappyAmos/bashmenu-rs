@@ -87,7 +87,12 @@ fn main() {
         use std::io::{ErrorKind, Write};
         let mut out = stdout();
         for line in &lines {
-            if let Err(e) = writeln!(out, "{}", line) {
+            let out_line = if args.strip_colors {
+                ansi::strip_ansi(line)
+            } else {
+                line.clone()
+            };
+            if let Err(e) = writeln!(out, "{}", out_line) {
                 if e.kind() == ErrorKind::BrokenPipe {
                     exit(0);
                 }

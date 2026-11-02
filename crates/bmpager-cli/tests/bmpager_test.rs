@@ -186,3 +186,54 @@ Here is section 3.1 content.
     let out_str = String::from_utf8_lossy(&output.stdout);
     assert!(out_str.contains("3.1 Main Menu Engine"));
 }
+
+#[test]
+fn test_bmpager_code_block_frame_exact_border_alignment() {
+    use unicode_width::UnicodeWidthStr;
+
+    let mut child = Command::new("cargo")
+        .args([
+            "run",
+            "-p",
+            "bmpager-cli",
+            "--bin",
+            "bmpager",
+            "--",
+            "--markdown",
+            "--no-color",
+        ])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("failed to spawn bmpager");
+
+    let md = "\
+```yaml
+settings:
+  inactivity_timeout:
+    milliseconds: 300000     # Duration in milliseconds (e.g. 5 minutes)
+    # command: 'cmatrix'     # Optional: command to execute (unconfigured by default)
+```
+";
+    {
+        let stdin = child.stdin.as_mut().expect("failed to open stdin");
+        stdin.write_all(md.as_bytes()).unwrap();
+    }
+
+    let output = child.wait_with_output().expect("failed to read stdout");
+    assert!(output.status.success());
+    let out_str = String::from_utf8_lossy(&output.stdout);
+    let lines: Vec<&str> = out_str.lines().filter(|l| !l.trim().is_empty()).collect();
+    assert!(lines.len() >= 6);
+
+    let top_w = UnicodeWidthStr::width(lines[0]);
+    for line in &lines {
+        assert_eq!(
+            UnicodeWidthStr::width(*line),
+            top_w,
+            "Every code block frame row must have identical visual width ({}): {:?}",
+            top_w,
+            line
+        );
+    }
+}

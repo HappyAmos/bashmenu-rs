@@ -385,6 +385,7 @@ impl MarkdownRenderer {
 
         let lines: Vec<&str> = self.code_block_text.lines().collect();
         let box_w = self.width.saturating_sub(2);
+        let max_code_w = box_w.saturating_sub(4);
 
         self.output.push_str(&format!(
             "{}┌{}┐{}\n",
@@ -393,17 +394,28 @@ impl MarkdownRenderer {
             reset
         ));
         for line in lines {
-            let vis = UnicodeWidthStr::width(line);
-            let pad = box_w.saturating_sub(vis + 2);
+            let expanded = line.replace('\t', "    ");
+            let mut clipped = String::new();
+            let mut vis = 0usize;
+            for ch in expanded.chars() {
+                let cw = unicode_width::UnicodeWidthChar::width(ch).unwrap_or(0);
+                if vis + cw > max_code_w {
+                    break;
+                }
+                clipped.push(ch);
+                vis += cw;
+            }
+            let pad = max_code_w.saturating_sub(vis);
             self.output.push_str(&format!(
-                "{}│{}  {}{}{}  {}│{}\n",
+                "{}│{}  {}{}{}  {}{}│{}\n",
                 border_color,
                 reset,
                 text_color,
-                line,
+                clipped,
                 reset,
                 " ".repeat(pad),
-                border_color
+                border_color,
+                reset
             ));
         }
         self.output.push_str(&format!(
