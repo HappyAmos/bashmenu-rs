@@ -64,8 +64,13 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
   - **Zero-Delay Mouse Interaction:** Handle `MouseEventKind::Down(MouseButton::Left)` directly rather than waiting for `MouseUp` or `Click` so users get instantaneous visual feedback without perceptible latency.
   - **Instant Scrolling & Zero-Delay Focus:** Set viewport offsets directly without artificial transition animations.
   - **Pre-Baked / Cached Background Compositing:** In live preview widgets and main menus, cache base composited cell buffers. On cursor movement or highlight flashes, modify only the affected row cells rather than re-rendering background wallpapers or full canvas structures.
+  - **Universal Selection & Clipboard (`bashmenu_tui::clipboard`):** All single-line (`TextInput`) and multi-line text inputs (`bashedit`, `NoteEditorModal`, `menuedit` multi-line fields) must support `Shift + Left/Right/Up/Down/Home/End` selection anchoring and `Ctrl+C`, `Ctrl+V`, `Ctrl+X`.
 - **Inline Macro Parameter Syntax & Help Parity:**
-  - Macro placeholders accept colon-separated inline configurations (e.g. `{file_picker:path:{bashmenu_dir}/assets/wallpapers}` or `{toast:3:"Message"}`).
+  - Macro placeholders accept colon-separated inline configurations:
+    - `{dev_dir}` (dynamic repository root path), `{bashmenu_dir}` (`~/.config/bashmenu`), `{utc_seconds}` (epoch seconds), `{command:<cmd>}` / `{cmd:<cmd>}` (cached shell stdout, cleared via `clear_command_cache()` on `<F5>`).
+    - `{file_picker}` / `{dir_picker}` with `:new`, `:ext`, `:path`, `:dir` modifiers and tilde expansion.
+    - `{param}` and its legacy alias `{prompt}` (interactive input modal; strips `[...]` bracket suffixes from item labels when deriving modal titles unless `title:` is explicitly set).
+    - `{toast:3:"Message"}` (non-blocking toast notification).
   - When introducing or extending inline placeholder parameters, ensure full documentation parity:
     1. Update the Placeholders and Macros reference modal in `bashmenu-tui`.
     2. Update the manpage (`bashmenu.1`) and markdown guide (`bashmenu.md`).
@@ -114,6 +119,8 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
 - **Variation Selector Normalization:** Always strip Unicode Variation Selectors (`.replace('\u{fe0f}', "").replace('\u{fe0e}', "")`) prior to cell width measurement and rendering to prevent cursor drift and border overflow.
 - **Status & Help Gutter Constraints:**
   - 50% Width Limit: Neither status gutter (right) nor help gutter (left) may exceed 50% of available width (`max_gutter_w = std::cmp::max(5, avail_w / 2)`).
+  - Full-Width Editor Help Gutters: In standalone editors (`bashedit`, `menuedit`, `themeedit`), help gutters span the full inner width across up to 2 lines above the bottom border using `wrap_spread_help_gutter` (treating `|` as a word delimiter).
+  - Connected Panel Titles & Scrollbars: Panel titles format as `┌─[ Title ]───`. Scrollable panes reserve 1 row above the bottom border and display a scrollbar 1 column left of the right border when lines exceed viewport height.
   - Pipe Delimiter Wrapping: Items between `|` are treated as atomic badges. Status gutter items wrap bottom-up (overflow on line above).
   - Max Height: Maximum 2 rows (`max_lines = 2`); excess is discarded.
   - Sizing Formula: `gutter_rows = std::cmp::min(2, std::cmp::max(1, std::cmp::max(help_lines.len(), status_lines.len())))`; `total_content_rows = std::cmp::max(1, h.saturating_sub(4 + gutter_rows))`. Total rendered lines strictly equals terminal height `h`.
@@ -146,7 +153,8 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
 ---
 
 ## 5. Themes, Window Borders & Palette Standards
-- **Theme Selection & Conversion:** Selecting a theme updates `theme:` in `bashmenu.yml`. Convert theme color tokens (names, hex, 8-bit ANSI indices 0–255) into `ratatui::style::Color` variants (`Color::Rgb`, `Color::Indexed`, `Color::Reset`).
+- **Theme Selection, Alphabetical Ordering & Conversion:** Selecting a theme updates `theme:` in `bashmenu.yml`. Theme pickers (`ThemePickerModal`), theme cycling, and `save_themes()` must sort theme names alphabetically (case-insensitively). Convert theme color tokens (names, hex, 8-bit ANSI indices 0–255) into `ratatui::style::Color` variants (`Color::Rgb`, `Color::Indexed`, `Color::Reset`). Plugin rows render using `ResolvedThemeStyles.plugin` (`plugin` token, editable as `Plugin Text Color` in `themeedit`).
+- **Theme Editor Lifecycle & Wallpaper Color Derivation (`themeedit`):** Supports `<F2>` Switch, `<F3>` New (`Theme::monochrome()`), `<F4>` Delete, `<F5>` Auto-Derive Colors from Wallpaper (`derive_colors_from_wallpaper`, clearing `menu_editor`/`editor`/`modals` overrides), `<F6>` Rename, `<Ctrl+S>` Save, and `<Ctrl+A>` Save As. Selecting a token flashes preview spans (`get_token_preview_spans`), clicking the preview focuses the token (`hit_test_preview`) with a toast notification, and wallpaper compositing applies across all preview modes (`Menu`, `TextEditor`, `Modals`, `MenuEditor`, `Toast`).
 - **Depth Constraints & Aesthetics:** Run `ymlcheck --themes bashmenu.themes` to validate schemas. 16-color mode indices must stay within `0..15` (or `COLOR_*`), 8-color within `0..7`. Maintain cohesive, low-fatigue palettes (e.g. `tokyo_night`, `nord`, `everforest`).
 - **Window Borders (`window:` in `bashmenu.themes`):**
   - Supported keys: `border_horizontal_top`, `border_horizontal_bottom`, `border_vertical_left`, `border_vertical_right` (fallbacks: `border_horizontal`, `border_vertical`), corners (`border_top_left`, `border_top_right`, `border_bottom_left`, `border_bottom_right`), tees (`left_tee`, `right_tee`, `top_tee`, `bottom_tee`), caps (`title_left_cap`, `title_right_cap`), and `shadow_char`.
@@ -190,7 +198,10 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
   - Lean Defaults: Prune default flags (`stream: false`, `masked: false`, `show_whitespace: false`, `refresh: false`, `no_formatting: false`, `external: false`, `alt_buffer: false`, non-editor `tabstop`, duplicate `command` keys).
   - Centralized Dump: Use `bashmenu_core::menu::dump_menu_yaml()` with 2-space indented sequences.
 - **Visual Menu Editor (`menuedit`):**
-  - Property Inspector: Full schema support (`alt_buffer`, `no_formatting`, `start_dir`, `picker`, `on_yes`/`on_no`, flags, extra properties).
+  - Dynamic Type-Filtered Property Inspector: `ItemEditModal` filters visible controls by item type:
+    - `command` / `script`: 3-way Execution Mode (`Console`, `Streaming`, `Interactive`), `Window Size %` (`StreamOutputModal`), `Alt Buffer`, and `Quiet Mode` (`quiet: true` suppresses `"Press [ENTER] to return to menu..."`). Legacy `interactive: true` defaults to `Console` mode unless `execution_mode: interactive` is explicitly set.
+    - `confirm`: `on_yes:` and `on_no:` action inputs with `[ Browse... ]` pickers, rendered at runtime via a 3-button `ConfirmModal` (`Yes`, `No`, `Cancel`).
+  - Selection Synchronization (`<F4>`): Launching `menuedit` from `bashmenu` passes `--select-path`, `--select-title`, and `--title-chain` to focus the active item automatically, and uses `ToastRack` notifications for status events.
   - Type Mutation (<kbd>Ctrl+T</kbd> / <kbd>t</kbd>): Reconfigure item types post-creation. Migrate payloads to target canonical keys (`command`, `script`, `editor` -> `file`, `config`/`toggle`/`radio` -> `key`, `python`) and prune obsolete keys. Submenu transitions handle container initialization and tree refresh.
   - Help Bar Footer: 2-line vertical container with two 1-line centered horizontal rows:
     - Row 1: `[a] Add`, `[e/ENTER] Edit`, `[t] Type`, `[SPACE] Toggle`, `[d] Delete`, `[m] Move Dn`, `[M] Move Up`.
@@ -228,11 +239,8 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
   - Any key or mouse event resets the idle timer.
   - Run screensavers in alternate screen buffer with terminal raw mode suspended. On termination, re-enable raw mode, repaint UI, and reset timer.
 - **Subprocess Spawning & Terminal Raw Mode Restoration:**
-  - When running `interactive: true` or `alt_buffer: true` commands:
-    1. Leave alternate screen (`LeaveAlternateScreen`), disable raw mode (`disable_raw_mode()`), show cursor (`Show`).
-    2. Spawn `/bin/bash -c "<command>"` and wait for status.
-    3. Re-enable raw mode (`enable_raw_mode()`), enter alternate screen (`EnterAlternateScreen`), hide cursor (`Hide`).
-    4. Force Ratatui full terminal clear (`terminal.clear()?`) to redraw clean buffers.
+  - When spawning child TUIs (`bashedit`, `menuedit`, `themeedit`, `bmpager` — including `<F6>` Markdown preview in `bashedit` via `bmpager --markdown --no-file`) or `alt_buffer: true` console commands, use `guard.suspend_keep_alt(...)` (`BASHMENU_CHILD_ALT=1`) so neither parent nor child leaves the alternate screen buffer. Only leave the alternate screen (`guard.suspend(...)`) when `alt_buffer: false`.
+  - On resume or `<F5>` full system refresh, never call `terminal.clear()` (`\x1b[2J`). Call `guard.request_clear()` to invalidate Ratatui's previous diff buffer (`\u{ffff}` sentinel + `swap_buffers()`) and draw through `guard.draw(...)` wrapped in DEC Mode 2026 Synchronized Output (`\x1b[?2026h\x1b[0m` ... `\x1b[?2026l`).
 
 ---
 
