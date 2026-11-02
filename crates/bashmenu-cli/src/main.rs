@@ -838,13 +838,30 @@ fn main() -> Result<()> {
                             let doc_path = if cand.exists() {
                                 cand
                             } else {
-                                resolve_file_path(Path::new("bashmenu.md"), cli.local)
+                                let dev_cand = ctx.dev_dir.join("bashmenu.md");
+                                if dev_cand.exists() {
+                                    dev_cand
+                                } else {
+                                    resolve_file_path(Path::new("bashmenu.md"), cli.local)
+                                }
                             };
-                            let help_content = std::fs::read_to_string(&doc_path).unwrap_or_else(|_| {
-                                "BashMenu Documentation\n\nNavigation:\n  Up/Down, k/j: Navigate items\n  Enter: Select item\n  Esc/q: Back or exit\n\nFunction Keys:\n  F1: Help manual\n  F2: Theme picker\n  F3: Text editor\n  F4: Menu editor\n  F5: Reload config and menus\n  F6: Toggle shortcut numbers\n  F7: Configure status gutter\n  F8: Theme editor".to_string()
-                            });
-                            active_modal =
-                                ActiveModal::Help(HelpModal::new("BashMenu Help", &help_content));
+                            if doc_path.exists() {
+                                let pager_bin = locate_tool("bmpager");
+                                let _ = guard.suspend_keep_alt(|| {
+                                    let _ = Command::new(&pager_bin)
+                                        .arg("--markdown")
+                                        .arg(&doc_path)
+                                        .status();
+                                    Ok(())
+                                });
+                                need_redraw = true;
+                            } else {
+                                let help_content = "BashMenu Documentation\n\nNavigation:\n  Up/Down, k/j: Navigate items\n  Enter: Select item\n  Esc/q: Back or exit\n\nFunction Keys:\n  F1: Help manual\n  F2: Theme picker\n  F3: Text editor\n  F4: Menu editor\n  F5: Reload config and menus\n  F6: Toggle shortcut numbers\n  F7: Configure status gutter\n  F8: Theme editor".to_string();
+                                active_modal = ActiveModal::Help(HelpModal::new(
+                                    "BashMenu Help",
+                                    &help_content,
+                                ));
+                            }
                         }
                         MenuAction::ThemeSelector => {
                             let theme_names: Vec<String> = themes.keys().cloned().collect();
