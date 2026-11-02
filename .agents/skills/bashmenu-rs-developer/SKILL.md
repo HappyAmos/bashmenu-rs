@@ -19,9 +19,12 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
   - Every completed task, bug fix, feature addition, or refactoring step must conclude by creating a concise, descriptive git commit (`git commit -m "..."`) and pushing directly to GitHub (`git push origin main`).
   - Never leave changes uncommitted or unpushed in the local repository.
   - After pushing to `origin/main`, inspect or verify GitHub Actions CI when appropriate using GitHub CLI (`gh run list`).
-- **Sequential TODO Execution Invariant:**
-  - Unless specifically labeled or explicitly instructed otherwise by the user, always tackle items from project TODO lists (such as `notes.yml` or `TODO.md`) strictly in sequential order, top to bottom.
-  - Complete each task fully (including verification, commit, push, and remote CI verification) before proceeding to the next.
+- **Sequential TODO Execution & Lifecycle Invariant (CRITICAL):**
+  - Unless specifically labeled (`CRITICAL`) or explicitly instructed otherwise by the user, always tackle items from project TODO lists (`~/.config/bashmenu/notebooks/notes.yml` under `'TODO (Agent: Allowed)'` or `.agents/skills/bashmenu-rs-developer/TODO.md`) strictly in sequential order, top to bottom.
+  - **Add Ad-Hoc Instructions:** If given an actionable instruction by the user that is not yet in the TODO list, you MUST first add it to the TODO list (`~/.config/bashmenu/notebooks/notes.yml` under `'TODO (Agent: Allowed)'`) before starting work.
+  - **Mark Active Tasks `PENDING`:** Before starting work on any TODO item, you MUST immediately mark it with `PENDING:` directly after the checkbox (`- [ ] PENDING: <task>`).
+  - **Complete & Log to `DONE.md`:** When a task is completed (including verification, commit, push, and remote CI verification), you MUST remove the `PENDING:` label, mark the task as complete (`- [x]`), and append a summary of the completed task to `.agents/skills/bashmenu-rs-developer/DONE.md`.
+  - **Prune Completed Tasks & Re-Check:** When there are no more tasks left to complete, remove finished (`- [x]`) tasks from the TODO list. Finally, when all tasks are completed, you MUST re-check the TODO list (`~/.config/bashmenu/notebooks/notes.yml` and `.agents/skills/bashmenu-rs-developer/TODO.md`) to ensure no new tasks were added while you were working.
 - **Configuration Header Preservation Invariant (`bashmenu.yml`):**
   - Never use raw file writes with `serde_yml::to_string()` directly to overwrite `bashmenu.yml`.
   - Always call `bashmenu_core::config::save_config(path, config)` so that `CONFIG_HEADER` comments, documentation, and placeholder references are cleanly preserved at the top of the file.
@@ -288,7 +291,8 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
 ---
 
 ## 11. Additional Directives
-- **Continuation Directive & Agent Notebook Notes:** When you are done working on a task, check both `.agents/skills/bashmenu-rs-developer/TODO.md` and `~/.config/bashmenu/notebooks/notes.yml` (fallback to repo `notebooks/notes.yml`) for notes titled `'TODO (Agent: Allowed)'`. Notes labeled as `Agent: Allowed` in their title are specifically meant for the agent. When completed, check off the item (`- [x]`), append completion summaries to `.agents/skills/bashmenu-rs-developer/DONE.md`, and inform the user.
-- **Pending Task Marker:** When actively working on an item from `TODO.md` or an allowed notebook note, immediately mark the item with `PENDING:` directly after the checkbox (e.g. `- [ ] PENDING: Fix character wrapping`). When completed, mark it as `- [x] Fix character wrapping`.
-- **Precedence:** `CRITICAL BUG` has the highest precedence, followed by `BUG`, then `RESPONSIVENESS`, `UI`, `FEATURE`, `REQUEST` and finally `RESEARCH`.
-- **Done Log Directive (`DONE.md`):** Whenever a task, bug fix, or improvement from `TODO.md` is completed, append the completed item to `.agents/skills/bashmenu-rs-developer/DONE.md` along with a concise description of what was changed/implemented and tests executed.
+- **Continuation Directive & Agent Notebook Notes:** When you are done working on a task, always re-check both `.agents/skills/bashmenu-rs-developer/TODO.md` and `~/.config/bashmenu/notebooks/notes.yml` (fallback to repo `notebooks/notes.yml`) for notes titled `'TODO (Agent: Allowed)'` to make sure no new tasks have been added. Notes labeled as `Agent: Allowed` in their title are specifically meant for the agent.
+- **Unlisted User Instructions:** If you are given an instruction by the user that is not in the TODO list, you MUST add the instruction to the TODO list (`~/.config/bashmenu/notebooks/notes.yml` under `'TODO (Agent: Allowed)'`) before executing it.
+- **Pending Task Marker (`PENDING`):** When working on a TODO item, you MUST immediately mark the item as `PENDING` directly after the checkbox (e.g. `- [ ] PENDING: Fix character wrapping`). When you have completed a task, you MUST remove the `PENDING` task label and mark it as complete (`- [x] Fix character wrapping`).
+- **Precedence:** `CRITICAL` / `CRITICAL BUG` has the highest precedence, followed by `BUG`, then `RESPONSIVENESS`, `UI`, `FEATURE`, `REQUEST` and finally `RESEARCH`.
+- **Done Log Directive (`DONE.md`) & Task Cleanup:** Whenever a task is completed, append a summary of the completed task (what was changed/implemented and tests executed) to `.agents/skills/bashmenu-rs-developer/DONE.md`. If you have no more tasks to complete, remove finished (`- [x]`) tasks from the TODO list, and re-check the TODO list one final time to confirm no new tasks were added.

@@ -38,6 +38,9 @@
   4. Shell Scripts: `shellcheck *.sh`
 - In terminal scripts, do not assume `/usr/local/bin` for non-root users; install user CLI tools to `$HOME/.local/bin`.
 
-## 5. TODO Task Execution Ordering Invariant
-- **Sequential TODO Execution:** Unless specifically labeled or explicitly instructed otherwise by the user, always tackle items from TODO lists (such as `notes.yml` or `TODO.md`) strictly in sequential order, top to bottom. Complete each item fully (including verification, commit, push, and remote CI check) before moving to the next.
+## 5. TODO Task Execution & Lifecycle Invariants (CRITICAL)
+- **Sequential TODO Execution:** Unless specifically labeled (`CRITICAL`) or explicitly instructed otherwise by the user, always tackle items from TODO lists (`~/.config/bashmenu/notebooks/notes.yml` under `'TODO (Agent: Allowed)'` or `.agents/skills/bashmenu-rs-developer/TODO.md`) strictly in sequential order, top to bottom. Complete each item fully (including verification, commit, push, and remote CI check) before moving to the next.
+- **Add Unlisted Instructions:** If given an instruction that is not in a TODO list, you MUST add the instruction to the TODO list before working on it.
+- **Pending Marker (`PENDING`):** When working on a TODO item, you MUST mark it as `PENDING` (`- [ ] PENDING: ...`). When completed, remove the `PENDING` label and mark it as complete (`- [x] ...`).
+- **Log to `DONE.md` & Prune Finished Tasks:** Append a summary of every completed task to `.agents/skills/bashmenu-rs-developer/DONE.md`. When there are no more tasks to complete, remove finished (`- [x]`) tasks from the TODO list, and re-check the TODO list to make sure no new tasks have been added.
 

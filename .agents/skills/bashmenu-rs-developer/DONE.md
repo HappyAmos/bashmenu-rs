@@ -181,3 +181,27 @@
   - Removed remaining `►` glyph indicators in `ThemePickerModal`, `FilePickerModal`, and `ColorGridModal`.
   - Added integration test `test_modal_no_triangle_indicator` in `modals_test.rs`.
 - [x] Verified zero Clippy warnings, full formatting compliance, and 100% test pass rate across 70 tests.
+
+## Phase 15: Theme Editor Collapsible Tree, Quiet Flag, Plugin Color, Flicker Elimination, `bmpager` Integration & TODO Protocol
+- [x] **Menu Editor `quiet` Flag (`menuedit`, `bashmenu-core`, `bashmenu-cli`):**
+  - Added `quiet: bool` to `MenuItem` schema and exposed `[x] Quiet Mode (No Pause)` in `ItemEditModal` for `command` and `script` items.
+  - Updated `bashmenu-cli` console execution path to suppress `"Press [ENTER] to return to menu..."` when `item.quiet` is `true`.
+- [x] **Plugin Text Color Token (`themeedit`, `bashmenu-core`, `bashmenu-tui`):**
+  - Added `plugin` style token to `Theme`, `ResolvedThemeStyles`, wallpaper auto-derivation (`derive_colors_from_wallpaper`), and `themeedit` (`Plugin Text Color`), rendering plugin output lines with `self.styles.plugin`.
+- [x] **Flicker-Free Subprocess Resume & Synchronized Redraw (`TerminalGuard`):**
+  - Eliminated `terminal.clear()` (`\x1b[2J`) on subprocess return and `<F5>` refresh in favor of `guard.request_clear()` buffer sentinel invalidation and DEC Mode 2026 (`\x1b[?2026h`...`\x1b[?2026l`) synchronized output.
+  - Added `BASHMENU_CHILD_ALT=1` coordination via `guard.suspend_keep_alt(...)` so child TUIs (`bashedit`, `menuedit`, `themeedit`, `bmpager`) remain smoothly in the parent's alternate screen buffer.
+- [x] **Built-in Text Editor `<F6>` & Main Menu `<F1>` Delegation to `bmpager --markdown`:**
+  - Updated `bashedit` `<F6>` Markdown preview to launch `bmpager --markdown --no-file <temp_file>` via `guard.suspend_keep_alt`.
+  - Updated `bashmenu` `<F1>` Help action to launch `bmpager --markdown <bashmenu.md>` via `guard.suspend_keep_alt`.
+- [x] **Theme Editor Collapsible Token Tree (`themeedit`):**
+  - Grouped tokens into collapsible `Theme`, `Colors`, and `Borders` category nodes (`TokenCategory`, `TreeRow`), collapsed by default.
+  - Added `Left`/`Right`/`Enter`/`Space` and mouse click toggling on category headers, plus automatic category expansion and token focus when clicking items in the preview pane (`select_token_by_key`).
+  - Added integration test `test_collapsible_token_tree_default_and_navigation` in `crates/themeedit-cli/tests/themeedit_test.rs`.
+- [x] **`bmpager` Fenced Code Block Frame Alignment (`bmpager`):**
+  - Fixed `MarkdownRenderer::render_code_block` in `crates/bmpager-cli/src/markdown.rs` to account for all 4 inner margin spaces (`max_code_w = box_w.saturating_sub(4)`), expand tabs, and clip long code lines so the right vertical border `│` aligns strictly with `┐` and `┘`.
+  - Added regression test `test_bmpager_code_block_frame_exact_border_alignment` in `crates/bmpager-cli/tests/bmpager_test.rs`.
+- [x] **Documentation & Manpage Synchronization (`bashmenu.md`, `bashmenu.1`, `ymlcheck`):**
+  - Synchronized `bashmenu.md` and `bashmenu.1` with all native Rust binaries (`bashmenu`, `menuedit`, `bashedit`, `themeedit`, `bmpager`, `ymlcheck`), keybindings, `{dev_dir}`, and `type: toast` / `{toast:...}`. Added `"toast"` to `VALID_OPTION_TYPES` in `ymlcheck`.
+- [x] **CRITICAL TODO Lifecycle Protocol (`SKILL.md`, `AGENTS.md`, `DONE.md`):**
+  - Documented mandatory `PENDING` task marking, adding unlisted user instructions to the TODO list, logging completed tasks to `DONE.md`, removing finished tasks when no more tasks remain, and re-checking the TODO list upon completion in `.agents/skills/bashmenu-rs-developer/SKILL.md` and `AGENTS.md`.
