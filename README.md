@@ -9,16 +9,16 @@
 
 ## Features
 
-- **Blazing Fast Startup & Execution**: Zero Python runtime overhead, zero garbage collection pauses, and sub-10ms startup.
+- **Blazing Fast Startup & Execution**: Zero garbage collection pauses, and sub-10ms startup.
 - **Pure Terminal TUI**: Built on [Ratatui](https://github.com/ratatui/ratatui) and [Crossterm](https://github.com/crossterm-rs/crossterm) with double-buffered cell rendering.
 - **Dynamic 6-Tier Macro Engine**: Evaluates `{env:...}`, runtime paths (`{bashmenu_dir}`, `{scripts_dir}`, `{cache_dir}`), time badges, and dot-notation config keys (`{user.<key>}`).
-- **Adaptive Glyph Resolver**: `{nf:[char]:[nerd]:[emoji]}` with strict 4-column visual icon alignment.
+- **Adaptive Glyph Resolver**: `{nf:[char]:[nerd]:[emoji]}`.
 - **Background Plugin Engine**: Non-blocking asynchronous worker threads executing periodic shell scripts with table and sequential layout formatting.
 - **Interactive Companion Tools**:
   - `bashmenu` (`bm`): Main interactive menu system with raw mode suspension for child processes.
   - `menuedit`: Visual menu hierarchy tree editor with add/edit/delete/move actions.
   - `themeedit`: Visual theme & palette editor with 2D 256-color picker, CP437 ASCII picker, and split-screen live preview.
-  - `bashedit`: Full-screen terminal text editor with colocated `.<filename>.swp` swap files, crash recovery prompt, and read-only collision detection.
+  - `bashedit`: Simple full-screen terminal text editor with colocated `.<filename>.swp` swap files, crash recovery prompt, and read-only collision detection.
   - `ymlcheck`: Standalone YAML schema validator and linter.
 
 ---
@@ -50,6 +50,8 @@ bm
 ```
 
 Launch companion tools:
+(All tools are accessible from within bashmenu)
+
 ```bash
 # Validate configuration and theme files
 ymlcheck --config bashmenu.yml --themes bashmenu.themes --menu bashmenu.mnu

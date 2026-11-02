@@ -19,7 +19,7 @@ use ratatui::widgets::{Block, Borders, Widget};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use themeedit_cli::{
-    get_token_preview_spans, render_preview_pane, PreviewMode, ThemeEditorState, TokenKind,
+    get_token_preview_spans, render_preview_pane, PreviewMode, ThemeEditorState, TokenKind, TreeRow,
 };
 
 #[derive(Parser, Debug)]
@@ -210,9 +210,10 @@ fn main() -> Result<()> {
                 // Tokens header
                 let visible_rows = (left_area.height.saturating_sub(3)) as usize;
                 state.adjust_scroll(visible_rows);
+                let tree_rows = state.visible_rows();
 
                 let scroll_up_ind = if state.scroll_offset > 0 { " ▲" } else { "" };
-                let scroll_dn_ind = if state.scroll_offset + visible_rows < state.tokens.len() {
+                let scroll_dn_ind = if state.scroll_offset + visible_rows < tree_rows.len() {
                     " ▼"
                 } else {
                     ""
@@ -227,32 +228,55 @@ fn main() -> Result<()> {
                         .add_modifier(Modifier::BOLD),
                 );
 
-                for (v_idx, token) in state
-                    .tokens
+                for (v_idx, tree_row) in tree_rows
                     .iter()
                     .enumerate()
                     .skip(state.scroll_offset)
                     .take(visible_rows)
                 {
                     let row_y = left_area.y + 3 + (v_idx - state.scroll_offset) as u16;
+                    let is_sel = !is_editing_name && v_idx == state.selected_row;
 
-                    let is_sel = !is_editing_name && v_idx == state.selected_idx;
-                    let val_str = state.get_token_value_display(token);
-
-                    let cursor = if is_sel { "▶ " } else { "  " };
-                    let row_style = if is_sel {
-                        Style::default().fg(Color::Black).bg(Color::Cyan)
-                    } else {
-                        Style::default().fg(Color::White)
-                    };
-
-                    let label_text = format!("{}{:<20} {}", cursor, token.label, val_str);
-                    buf.set_line(
-                        left_area.x,
-                        row_y,
-                        &Line::from(vec![Span::styled(label_text, row_style)]),
-                        left_area.width,
-                    );
+                    match *tree_row {
+                        TreeRow::Category(cat) => {
+                            let expanded = state.is_category_expanded(cat);
+                            let icon = if expanded { "▾ " } else { "▸ " };
+                            let row_style = if is_sel {
+                                Style::default()
+                                    .fg(Color::Black)
+                                    .bg(Color::Cyan)
+                                    .add_modifier(Modifier::BOLD)
+                            } else {
+                                Style::default()
+                                    .fg(Color::Yellow)
+                                    .add_modifier(Modifier::BOLD)
+                            };
+                            let label_text = format!(" {}{:<25}", icon, cat.label());
+                            buf.set_line(
+                                left_area.x,
+                                row_y,
+                                &Line::from(vec![Span::styled(label_text, row_style)]),
+                                left_area.width,
+                            );
+                        }
+                        TreeRow::Token(t_idx) => {
+                            let token = &state.tokens[t_idx];
+                            let val_str = state.get_token_value_display(token);
+                            let cursor = if is_sel { "  ▶ " } else { "    " };
+                            let row_style = if is_sel {
+                                Style::default().fg(Color::Black).bg(Color::Cyan)
+                            } else {
+                                Style::default().fg(Color::White)
+                            };
+                            let label_text = format!("{}{:<20} {}", cursor, token.label, val_str);
+                            buf.set_line(
+                                left_area.x,
+                                row_y,
+                                &Line::from(vec![Span::styled(label_text, row_style)]),
+                                left_area.width,
+                            );
+                        }
+                    }
                 }
 
                 // 2. Render Right Panel: Live Multi-View Preview Block
@@ -726,18 +750,19 @@ fn main() -> Result<()> {
                             if m.kind == MouseEventKind::ScrollUp {
                                 if m.column >= left_area.x
                                     && m.column < left_area.x + left_area.width
-                                    && state.selected_idx > 0
+                                    && state.selected_row > 0
                                 {
-                                    state.selected_idx -= 1;
+                                    state.select_visible_row(state.selected_row - 1);
                                 }
                                 continue;
                             }
                             if m.kind == MouseEventKind::ScrollDown {
+                                let total_rows = state.visible_rows().len();
                                 if m.column >= left_area.x
                                     && m.column < left_area.x + left_area.width
-                                    && state.selected_idx + 1 < state.tokens.len()
+                                    && state.selected_row + 1 < total_rows
                                 {
-                                    state.selected_idx += 1;
+                                    state.select_visible_row(state.selected_row + 1);
                                 }
                                 continue;
                             }
@@ -786,42 +811,53 @@ fn main() -> Result<()> {
                                     && m.row >= left_area.y + 3
                                     && m.row < left_area.y + 3 + visible_rows as u16
                                 {
-                                    let clicked_idx =
+                                    let clicked_row_idx =
                                         state.scroll_offset + (m.row - (left_area.y + 3)) as usize;
-                                    if clicked_idx < state.tokens.len() {
-                                        let was_selected = clicked_idx == state.selected_idx;
-                                        state.selected_idx = clicked_idx;
-                                        let token = state.tokens[clicked_idx].clone();
-                                        toast_rack.add(ToastNotification {
-                                            title: Some("Theme Editor".to_string()),
-                                            message: format!("Selected: {}", token.label),
-                                            severity: ToastSeverity::Information,
-                                            timeout_secs: 1.5,
-                                        });
-                                        if matches!(
-                                            token.kind,
-                                            TokenKind::ToastChar | TokenKind::ToastTimeout
-                                        ) || matches!(
-                                            &token.kind,
-                                            TokenKind::Color(ref k) if k.starts_with("toast_")
-                                        ) {
-                                            state.preview_mode = PreviewMode::Toast;
-                                        }
-                                        let spans = get_token_preview_spans(
-                                            &token,
-                                            right_area,
-                                            state.preview_mode,
-                                            &preview_styles,
-                                        );
-                                        click_flash = Some((std::time::Instant::now(), spans));
-                                        need_redraw = true;
+                                    let rows = state.visible_rows();
+                                    if let Some(&clicked_row) = rows.get(clicked_row_idx) {
+                                        let was_selected = clicked_row_idx == state.selected_row;
+                                        state.select_visible_row(clicked_row_idx);
 
-                                        // If clicked again on the already selected item, or clicked on the value column, open picker
-                                        if was_selected || m.column >= left_area.x + 22 {
-                                            open_selected_token_picker(
-                                                &mut state,
-                                                &mut active_modal,
-                                            );
+                                        match clicked_row {
+                                            TreeRow::Category(cat) => {
+                                                state.toggle_category(cat);
+                                                need_redraw = true;
+                                            }
+                                            TreeRow::Token(t_idx) => {
+                                                let token = state.tokens[t_idx].clone();
+                                                toast_rack.add(ToastNotification {
+                                                    title: Some("Theme Editor".to_string()),
+                                                    message: format!("Selected: {}", token.label),
+                                                    severity: ToastSeverity::Information,
+                                                    timeout_secs: 1.5,
+                                                });
+                                                if matches!(
+                                                    token.kind,
+                                                    TokenKind::ToastChar | TokenKind::ToastTimeout
+                                                ) || matches!(
+                                                    &token.kind,
+                                                    TokenKind::Color(ref k) if k.starts_with("toast_")
+                                                ) {
+                                                    state.preview_mode = PreviewMode::Toast;
+                                                }
+                                                let spans = get_token_preview_spans(
+                                                    &token,
+                                                    right_area,
+                                                    state.preview_mode,
+                                                    &preview_styles,
+                                                );
+                                                click_flash =
+                                                    Some((std::time::Instant::now(), spans));
+                                                need_redraw = true;
+
+                                                // If clicked again on the already selected item, or clicked on the value column, open picker
+                                                if was_selected || m.column >= left_area.x + 24 {
+                                                    open_selected_token_picker(
+                                                        &mut state,
+                                                        &mut active_modal,
+                                                    );
+                                                }
+                                            }
                                         }
                                     }
                                     continue;
@@ -1095,26 +1131,59 @@ fn main() -> Result<()> {
                                 KeyCode::Char('5') => {
                                     state.preview_mode = PreviewMode::Toast;
                                 }
+                                KeyCode::Left | KeyCode::Char('h') => {
+                                    if state.handle_left_key() {
+                                        need_redraw = true;
+                                    }
+                                }
+                                KeyCode::Right | KeyCode::Char('l') => {
+                                    if state.handle_right_key() {
+                                        need_redraw = true;
+                                    }
+                                }
                                 KeyCode::Up | KeyCode::Char('k') => {
-                                    if state.selected_idx == 0 {
+                                    if state.selected_row == 0 {
                                         is_editing_name = true;
                                         state.name_input.select_all();
                                     } else {
-                                        state.selected_idx -= 1;
-                                        let spans = get_token_preview_spans(
-                                            &state.tokens[state.selected_idx],
-                                            right_area,
-                                            state.preview_mode,
-                                            &preview_styles,
-                                        );
-                                        click_flash = Some((std::time::Instant::now(), spans));
+                                        state.select_visible_row(state.selected_row - 1);
+                                        if let Some(TreeRow::Token(t_idx)) =
+                                            state.visible_rows().get(state.selected_row).copied()
+                                        {
+                                            let spans = get_token_preview_spans(
+                                                &state.tokens[t_idx],
+                                                right_area,
+                                                state.preview_mode,
+                                                &preview_styles,
+                                            );
+                                            click_flash = Some((std::time::Instant::now(), spans));
+                                        }
                                     }
                                 }
                                 KeyCode::Down | KeyCode::Char('j') => {
-                                    if state.selected_idx + 1 < state.tokens.len() {
-                                        state.selected_idx += 1;
+                                    let total_rows = state.visible_rows().len();
+                                    if state.selected_row + 1 < total_rows {
+                                        state.select_visible_row(state.selected_row + 1);
+                                        if let Some(TreeRow::Token(t_idx)) =
+                                            state.visible_rows().get(state.selected_row).copied()
+                                        {
+                                            let spans = get_token_preview_spans(
+                                                &state.tokens[t_idx],
+                                                right_area,
+                                                state.preview_mode,
+                                                &preview_styles,
+                                            );
+                                            click_flash = Some((std::time::Instant::now(), spans));
+                                        }
+                                    }
+                                }
+                                KeyCode::PageUp => {
+                                    state.select_visible_row(state.selected_row.saturating_sub(5));
+                                    if let Some(TreeRow::Token(t_idx)) =
+                                        state.visible_rows().get(state.selected_row).copied()
+                                    {
                                         let spans = get_token_preview_spans(
-                                            &state.tokens[state.selected_idx],
+                                            &state.tokens[t_idx],
                                             right_area,
                                             state.preview_mode,
                                             &preview_styles,
@@ -1122,46 +1191,49 @@ fn main() -> Result<()> {
                                         click_flash = Some((std::time::Instant::now(), spans));
                                     }
                                 }
-                                KeyCode::PageUp => {
-                                    state.selected_idx = state.selected_idx.saturating_sub(5);
-                                    let spans = get_token_preview_spans(
-                                        &state.tokens[state.selected_idx],
-                                        right_area,
-                                        state.preview_mode,
-                                        &preview_styles,
-                                    );
-                                    click_flash = Some((std::time::Instant::now(), spans));
-                                }
                                 KeyCode::PageDown => {
-                                    state.selected_idx = (state.selected_idx + 5)
-                                        .min(state.tokens.len().saturating_sub(1));
-                                    let spans = get_token_preview_spans(
-                                        &state.tokens[state.selected_idx],
-                                        right_area,
-                                        state.preview_mode,
-                                        &preview_styles,
-                                    );
-                                    click_flash = Some((std::time::Instant::now(), spans));
+                                    let max_row = state.visible_rows().len().saturating_sub(1);
+                                    state.select_visible_row((state.selected_row + 5).min(max_row));
+                                    if let Some(TreeRow::Token(t_idx)) =
+                                        state.visible_rows().get(state.selected_row).copied()
+                                    {
+                                        let spans = get_token_preview_spans(
+                                            &state.tokens[t_idx],
+                                            right_area,
+                                            state.preview_mode,
+                                            &preview_styles,
+                                        );
+                                        click_flash = Some((std::time::Instant::now(), spans));
+                                    }
                                 }
                                 KeyCode::Home => {
-                                    state.selected_idx = 0;
-                                    let spans = get_token_preview_spans(
-                                        &state.tokens[state.selected_idx],
-                                        right_area,
-                                        state.preview_mode,
-                                        &preview_styles,
-                                    );
-                                    click_flash = Some((std::time::Instant::now(), spans));
+                                    state.select_visible_row(0);
+                                    if let Some(TreeRow::Token(t_idx)) =
+                                        state.visible_rows().get(state.selected_row).copied()
+                                    {
+                                        let spans = get_token_preview_spans(
+                                            &state.tokens[t_idx],
+                                            right_area,
+                                            state.preview_mode,
+                                            &preview_styles,
+                                        );
+                                        click_flash = Some((std::time::Instant::now(), spans));
+                                    }
                                 }
                                 KeyCode::End => {
-                                    state.selected_idx = state.tokens.len().saturating_sub(1);
-                                    let spans = get_token_preview_spans(
-                                        &state.tokens[state.selected_idx],
-                                        right_area,
-                                        state.preview_mode,
-                                        &preview_styles,
-                                    );
-                                    click_flash = Some((std::time::Instant::now(), spans));
+                                    let max_row = state.visible_rows().len().saturating_sub(1);
+                                    state.select_visible_row(max_row);
+                                    if let Some(TreeRow::Token(t_idx)) =
+                                        state.visible_rows().get(state.selected_row).copied()
+                                    {
+                                        let spans = get_token_preview_spans(
+                                            &state.tokens[t_idx],
+                                            right_area,
+                                            state.preview_mode,
+                                            &preview_styles,
+                                        );
+                                        click_flash = Some((std::time::Instant::now(), spans));
+                                    }
                                 }
                                 KeyCode::F(4) | KeyCode::Char('b') => {
                                     let start_dir = if let Ok(cwd) = std::env::current_dir() {
@@ -1216,8 +1288,20 @@ fn main() -> Result<()> {
                                         });
                                     }
                                 }
-                                KeyCode::Enter => {
-                                    open_selected_token_picker(&mut state, &mut active_modal);
+                                KeyCode::Enter | KeyCode::Char(' ') => {
+                                    let rows = state.visible_rows();
+                                    match rows.get(state.selected_row).copied() {
+                                        Some(TreeRow::Category(cat)) => {
+                                            state.toggle_category(cat);
+                                        }
+                                        Some(TreeRow::Token(_)) => {
+                                            open_selected_token_picker(
+                                                &mut state,
+                                                &mut active_modal,
+                                            );
+                                        }
+                                        None => {}
+                                    }
                                 }
                                 KeyCode::Esc | KeyCode::Char('q') => {
                                     if state.is_modified {

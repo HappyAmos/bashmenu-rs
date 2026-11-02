@@ -1040,3 +1040,63 @@ fn test_derive_colors_from_wallpaper() {
         );
     }
 }
+
+#[test]
+fn test_collapsible_token_tree_default_and_navigation() {
+    use themeedit_cli::{TokenCategory, TreeRow};
+
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(fixture_path, Some("dracula".to_string()));
+
+    // 1. All category nodes are collapsed by default
+    assert!(state.expanded_categories.is_empty());
+    let initial_rows = state.visible_rows();
+    assert_eq!(
+        initial_rows,
+        vec![
+            TreeRow::Category(TokenCategory::Theme),
+            TreeRow::Category(TokenCategory::Colors),
+            TreeRow::Category(TokenCategory::Borders),
+        ]
+    );
+
+    // 2. Right arrow key expands the selected category node ("Theme:")
+    state.selected_row = 0;
+    assert!(state.handle_right_key());
+    assert!(state.is_category_expanded(TokenCategory::Theme));
+    assert!(!state.is_category_expanded(TokenCategory::Colors));
+    assert!(!state.is_category_expanded(TokenCategory::Borders));
+    assert!(state.visible_rows().len() > 3);
+
+    // Pressing Right again moves into the first child token of Theme
+    assert!(state.handle_right_key());
+    assert_eq!(state.selected_row, 1);
+    assert!(matches!(state.visible_rows()[1], TreeRow::Token(_)));
+
+    // 3. Left arrow key from a child token collapses its parent category and focuses the category header
+    assert!(state.handle_left_key());
+    assert!(!state.is_category_expanded(TokenCategory::Theme));
+    assert_eq!(state.selected_row, 0);
+    assert_eq!(
+        state.visible_rows()[0],
+        TreeRow::Category(TokenCategory::Theme)
+    );
+
+    // 4. Clicking an item in the preview pane (select_token_by_key) auto-expands the category and focuses the token
+    assert!(state.select_token_by_key("border_horizontal"));
+    assert!(state.is_category_expanded(TokenCategory::Borders));
+    assert_eq!(state.tokens[state.selected_idx].label, "Horizontal Border");
+    assert_eq!(
+        state.visible_rows()[state.selected_row],
+        TreeRow::Token(state.selected_idx)
+    );
+
+    // Clicking a color item in the preview pane auto-expands Colors and focuses that color token
+    assert!(state.select_token_by_key("plugin"));
+    assert!(state.is_category_expanded(TokenCategory::Colors));
+    assert_eq!(state.tokens[state.selected_idx].label, "Plugin Text Color");
+    assert_eq!(
+        state.visible_rows()[state.selected_row],
+        TreeRow::Token(state.selected_idx)
+    );
+}

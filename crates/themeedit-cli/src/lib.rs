@@ -10,8 +10,37 @@ use bashmenu_core::{
 };
 use bashmenu_tui::{ResolvedThemeStyles, TextInput};
 use ratatui::layout::Rect;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TokenCategory {
+    Theme,
+    Colors,
+    Borders,
+}
+
+impl TokenCategory {
+    pub const ALL: [TokenCategory; 3] = [
+        TokenCategory::Theme,
+        TokenCategory::Colors,
+        TokenCategory::Borders,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            TokenCategory::Theme => "Theme:",
+            TokenCategory::Colors => "Colors:",
+            TokenCategory::Borders => "Borders:",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TreeRow {
+    Category(TokenCategory),
+    Token(usize),
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TokenKind {
@@ -31,6 +60,23 @@ pub enum TokenKind {
 pub struct TokenItem {
     pub label: String,
     pub kind: TokenKind,
+}
+
+impl TokenItem {
+    pub fn category(&self) -> TokenCategory {
+        match &self.kind {
+            TokenKind::Color(_) => TokenCategory::Colors,
+            TokenKind::Border(_) => TokenCategory::Borders,
+            TokenKind::WallpaperImage
+            | TokenKind::Indicator
+            | TokenKind::DividerChar
+            | TokenKind::DividerLength
+            | TokenKind::MarqueeChar
+            | TokenKind::MarqueeGap
+            | TokenKind::ToastChar
+            | TokenKind::ToastTimeout => TokenCategory::Theme,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -73,6 +119,8 @@ pub struct ThemeEditorState {
     pub is_modified: bool,
     pub tokens: Vec<TokenItem>,
     pub selected_idx: usize,
+    pub selected_row: usize,
+    pub expanded_categories: HashSet<TokenCategory>,
     pub scroll_offset: usize,
     pub status_message: String,
     pub preview_mode: PreviewMode,
@@ -336,6 +384,8 @@ impl ThemeEditorState {
             is_modified: false,
             tokens,
             selected_idx: 0,
+            selected_row: 0,
+            expanded_categories: HashSet::new(),
             scroll_offset: 0,
             status_message: "Ready".to_string(),
             preview_mode: PreviewMode::default(),
@@ -788,14 +838,113 @@ impl ThemeEditorState {
         }
     }
 
+    pub fn visible_rows(&self) -> Vec<TreeRow> {
+        let mut rows = Vec::new();
+        for cat in TokenCategory::ALL {
+            rows.push(TreeRow::Category(cat));
+            if self.expanded_categories.contains(&cat) {
+                for (idx, token) in self.tokens.iter().enumerate() {
+                    if token.category() == cat {
+                        rows.push(TreeRow::Token(idx));
+                    }
+                }
+            }
+        }
+        rows
+    }
+
+    pub fn is_category_expanded(&self, cat: TokenCategory) -> bool {
+        self.expanded_categories.contains(&cat)
+    }
+
+    pub fn expand_category(&mut self, cat: TokenCategory) {
+        self.expanded_categories.insert(cat);
+    }
+
+    pub fn collapse_category(&mut self, cat: TokenCategory) {
+        self.expanded_categories.remove(&cat);
+        let rows = self.visible_rows();
+        if self.selected_row >= rows.len() {
+            self.selected_row = rows.len().saturating_sub(1);
+        }
+        self.sync_selected_idx_from_row(&rows);
+    }
+
+    pub fn toggle_category(&mut self, cat: TokenCategory) {
+        if self.expanded_categories.contains(&cat) {
+            self.collapse_category(cat);
+        } else {
+            self.expand_category(cat);
+        }
+    }
+
+    fn sync_selected_idx_from_row(&mut self, rows: &[TreeRow]) {
+        if let Some(TreeRow::Token(idx)) = rows.get(self.selected_row) {
+            self.selected_idx = *idx;
+        }
+    }
+
+    pub fn select_visible_row(&mut self, row_idx: usize) {
+        let rows = self.visible_rows();
+        if rows.is_empty() {
+            return;
+        }
+        self.selected_row = row_idx.min(rows.len().saturating_sub(1));
+        self.sync_selected_idx_from_row(&rows);
+    }
+
+    pub fn handle_right_key(&mut self) -> bool {
+        let rows = self.visible_rows();
+        if let Some(&TreeRow::Category(cat)) = rows.get(self.selected_row) {
+            if !self.expanded_categories.contains(&cat) {
+                self.expand_category(cat);
+                return true;
+            } else if self.selected_row + 1 < self.visible_rows().len() {
+                self.select_visible_row(self.selected_row + 1);
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn handle_left_key(&mut self) -> bool {
+        let rows = self.visible_rows();
+        match rows.get(self.selected_row).copied() {
+            Some(TreeRow::Category(cat)) => {
+                if self.expanded_categories.contains(&cat) {
+                    self.collapse_category(cat);
+                    return true;
+                }
+            }
+            Some(TreeRow::Token(idx)) => {
+                let cat = self.tokens[idx].category();
+                self.collapse_category(cat);
+                let new_rows = self.visible_rows();
+                if let Some(cat_pos) = new_rows.iter().position(|r| *r == TreeRow::Category(cat)) {
+                    self.selected_row = cat_pos;
+                }
+                return true;
+            }
+            None => {}
+        }
+        false
+    }
+
     pub fn adjust_scroll(&mut self, viewport_h: usize) {
         if viewport_h == 0 {
             return;
         }
-        if self.selected_idx < self.scroll_offset {
-            self.scroll_offset = self.selected_idx;
-        } else if self.selected_idx >= self.scroll_offset + viewport_h {
-            self.scroll_offset = self.selected_idx.saturating_sub(viewport_h - 1);
+        let rows = self.visible_rows();
+        let active_pos = if self.expanded_categories.is_empty() && self.selected_idx > 0 {
+            // Backward compatibility when tests set selected_idx directly without expanding tree
+            self.selected_idx
+        } else {
+            self.selected_row.min(rows.len().saturating_sub(1))
+        };
+        if active_pos < self.scroll_offset {
+            self.scroll_offset = active_pos;
+        } else if active_pos >= self.scroll_offset + viewport_h {
+            self.scroll_offset = active_pos.saturating_sub(viewport_h - 1);
         }
     }
 
@@ -952,55 +1101,66 @@ impl ThemeEditorState {
         }
     }
 
-    /// Focuses/selects the token corresponding to the given style or border key
+    /// Focuses/selects the token corresponding to the given style or border key,
+    /// automatically expanding its parent category node and focusing the row in the tree.
     pub fn select_token_by_key(&mut self, key: &str) -> bool {
         // 1. Exact match first
-        if let Some(idx) = self.tokens.iter().position(|t| match &t.kind {
-            TokenKind::Color(k) => k == key,
-            TokenKind::Border(k) => k == key,
-            TokenKind::Indicator => key == "indicator",
-            TokenKind::DividerChar => key == "divider_char",
-            TokenKind::DividerLength => key == "divider_length",
-            TokenKind::MarqueeChar => key == "marquee_char",
-            TokenKind::MarqueeGap => key == "marquee_gap",
-            TokenKind::ToastChar => key == "toast_char",
-            TokenKind::ToastTimeout => key == "toast_timeout",
-            TokenKind::WallpaperImage => key == "wallpaper" || key == "wallpaper_image",
-        }) {
-            self.selected_idx = idx;
-            self.status_message.clear();
-            return true;
-        }
+        let matched_idx = self
+            .tokens
+            .iter()
+            .position(|t| match &t.kind {
+                TokenKind::Color(k) => k == key,
+                TokenKind::Border(k) => k == key,
+                TokenKind::Indicator => key == "indicator",
+                TokenKind::DividerChar => key == "divider_char",
+                TokenKind::DividerLength => key == "divider_length",
+                TokenKind::MarqueeChar => key == "marquee_char",
+                TokenKind::MarqueeGap => key == "marquee_gap",
+                TokenKind::ToastChar => key == "toast_char",
+                TokenKind::ToastTimeout => key == "toast_timeout",
+                TokenKind::WallpaperImage => key == "wallpaper" || key == "wallpaper_image",
+            })
+            .or_else(|| {
+                // 2. Fallback aliases
+                self.tokens.iter().position(|t| match &t.kind {
+                    TokenKind::Color(k) => {
+                        (k == "shortcut_key" && (key == "shortcut_gutter" || key == "shortcut"))
+                            || (k == "text" && key == "content")
+                            || (k == "plugin" && (key == "plugin_text" || key == "plugins"))
+                            || (k == "background"
+                                && (key == "bg" || key == "bg_color" || key == "background_color"))
+                    }
+                    TokenKind::Border(k) => {
+                        (k == "top_tee" && key == "gutter_top_tee")
+                            || (k == "bottom_tee" && key == "gutter_bottom_tee")
+                            || (k == "gutter_top_tee" && key == "top_tee")
+                            || (k == "gutter_bottom_tee" && key == "bottom_tee")
+                            || (k == "left_tee" && key == "gutter_left_tee")
+                            || (k == "right_tee" && key == "gutter_right_tee")
+                            || (k == "gutter_left_tee" && key == "left_tee")
+                            || (k == "gutter_right_tee" && key == "right_tee")
+                    }
+                    TokenKind::DividerChar => key == "divider",
+                    TokenKind::MarqueeChar => key == "marquee",
+                    TokenKind::ToastChar => {
+                        key == "toast_char" || key == "toast_bar" || key == "toast"
+                    }
+                    TokenKind::ToastTimeout => key == "toast_timeout" || key == "toast_duration",
+                    TokenKind::WallpaperImage => {
+                        key == "wallpaper" || key == "wallpaper_image" || key == "bg_image"
+                    }
+                    _ => false,
+                })
+            });
 
-        // 2. Fallback aliases
-        if let Some(idx) = self.tokens.iter().position(|t| match &t.kind {
-            TokenKind::Color(k) => {
-                (k == "shortcut_key" && (key == "shortcut_gutter" || key == "shortcut"))
-                    || (k == "text" && key == "content")
-                    || (k == "plugin" && (key == "plugin_text" || key == "plugins"))
-                    || (k == "background"
-                        && (key == "bg" || key == "bg_color" || key == "background_color"))
-            }
-            TokenKind::Border(k) => {
-                (k == "top_tee" && key == "gutter_top_tee")
-                    || (k == "bottom_tee" && key == "gutter_bottom_tee")
-                    || (k == "gutter_top_tee" && key == "top_tee")
-                    || (k == "gutter_bottom_tee" && key == "bottom_tee")
-                    || (k == "left_tee" && key == "gutter_left_tee")
-                    || (k == "right_tee" && key == "gutter_right_tee")
-                    || (k == "gutter_left_tee" && key == "left_tee")
-                    || (k == "gutter_right_tee" && key == "right_tee")
-            }
-            TokenKind::DividerChar => key == "divider",
-            TokenKind::MarqueeChar => key == "marquee",
-            TokenKind::ToastChar => key == "toast_char" || key == "toast_bar" || key == "toast",
-            TokenKind::ToastTimeout => key == "toast_timeout" || key == "toast_duration",
-            TokenKind::WallpaperImage => {
-                key == "wallpaper" || key == "wallpaper_image" || key == "bg_image"
-            }
-            _ => false,
-        }) {
+        if let Some(idx) = matched_idx {
+            let cat = self.tokens[idx].category();
+            self.expanded_categories.insert(cat);
             self.selected_idx = idx;
+            let rows = self.visible_rows();
+            if let Some(r_idx) = rows.iter().position(|r| *r == TreeRow::Token(idx)) {
+                self.selected_row = r_idx;
+            }
             self.status_message.clear();
             return true;
         }
