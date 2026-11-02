@@ -77,6 +77,7 @@ const VALID_OPTION_TYPES: &[&str] = &[
     "inject_block",
     "theme_selector",
     "notebook",
+    "toast",
     "{divider}",
     "back",
     "exit",

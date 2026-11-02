@@ -33,6 +33,9 @@ Interactive TUI menu tree editor for managing bashmenu.mnu.
 .I themeedit
 Interactive TUI visual theme creator and palette editor.
 .TP
+.I bmpager
+Interactive full-screen terminal text and Markdown pager (\fBbmpager --markdown\fR).
+.TP
 .I ymlcheck
 YAML configuration, menu, and theme validator tool.
 .TP
@@ -44,9 +47,6 @@ Menu layout structure definitions list in YAML format.
 .TP
 .I bashmenu.themes
 Color theme definitions (supporting 256, 16, and 8 color modes).
-.TP
-.I ymlcheck.py
-Command line utility to validate YAML syntax and schemas.
 .SH MAN PAGES (MANUALS)
 The application provides a local man page for terminal-based help:
 .TP
@@ -154,9 +154,9 @@ Configurable template for autoexec shell scripts.
 .I templates/bash_aliases.tmpl
 Dynamic aliases shell template sourced inside user profiles.
 .SH KEYBOARD SHORTCUTS
-.SS Main Menu Interface (bashmenu.py)
+.SS Main Menu Interface (bashmenu)
 .TP
-.B UP, DOWN
+.B UP, DOWN, k, j
 Navigate highlighted selection row.
 .TP
 .B 0-9, a-z
@@ -166,30 +166,36 @@ Select menu option directly by shortcut hotkey.
 Execute active selected menu option action.
 .TP
 .B F1
-Display Markdown help manual modal.
+View Markdown user manual (bashmenu.md) via bmpager --markdown.
 .TP
 .B F2
 Open Theme selector dialog.
 .TP
 .B F3
-Launch built-in text editor (bashedit.py).
+Launch built-in text editor (bashedit).
 .TP
 .B F4
-Launch menuedit.py visual menu tree editor.
+Launch menuedit visual menu tree editor.
 .TP
 .B F5
-Refresh menu, reload configuration, menu files, and plugin outputs.
+Full system refresh: clear command cache, reload configuration (bashmenu.yml), menus (bashmenu.mnu), themes (bashmenu.themes), wallpapers, status/help gutters, and background plugins.
 .TP
 .B F6
 Toggle visibility of option shortcut key badges.
 .TP
-.B ESC
+.B F7
+Configure status gutter format modal.
+.TP
+.B F8
+Launch interactive Visual Theme Editor (themeedit).
+.TP
+.B ESC, q
 Return to parent menu, or quit if at the root menu level.
 
 .PP
 .B Intelligent State Retention:
 When returning from editors, or scripts with refresh: true, the engine traces and preserves your submenu coordinate depth to return you to your exact location, skipping the root menu.
-.SS Visual Menu Editor (menuedit.py)
+.SS Visual Menu Editor (menuedit)
 .TP
 .B a
 Add new menu option node.
@@ -200,7 +206,7 @@ Edit node properties or submenu header title (opens ItemEditModal).
 .B t
 Change selected item type.
 .TP
-.B SPACE
+.B SPACE, LEFT, RIGHT
 Expand or collapse submenu tree node.
 .TP
 .B d
@@ -225,10 +231,10 @@ Display HA Bash Menu manual (bashmenu.md) modal.
 Toggle (collapse/expand) all children of top root menu.
 .TP
 .B F3, CTRL+A
-View ASCII character table (ascii.sh) modal.
+View ASCII character table modal.
 .TP
 .B F4, CTRL+N
-Search Nerd Font & Emoji glyphs (glyphs.sh) modal.
+Search Nerd Font & Emoji glyphs modal.
 .TP
 .B F5, CTRL+P
 View available placeholders and macros modal.
@@ -245,10 +251,9 @@ CTRL+S / F2 / s (Save changes), CTRL+T / t (Change item type), CTRL+A / F3 (ASCI
 
 .PP
 .B Menu Focus Synchronization & Property Inspector Previews:
-When launching menuedit.py from bashmenu.py (via F4 or menu item action), the editor tree automatically synchronizes active keyboard focus and selection directly on the item that was selected in bashmenu.py, so pressing e or ENTER immediately opens the ItemEditModal dialog for that exact item. The Property Inspector side panel features a real-time visual Preview section for all item types (commands, submenus, scripts, dividers, etc.) showing exactly how the item will appear in the main menu (including resolved Nerd Font/emoji icons, placeholders, and right-aligned shortcut brackets). Additionally, the ItemEditModal dialog dynamically updates its preview box in real-time as title or icon fields are edited. Property inspector binary switches match window background styling (Switch:focus { background: transparent; }), and the help text footer explicitly displays [ESC / C] Cancel.
-.SS Built-in Text Editor (bashedit.py)
-The application features a built-in text editor supporting tabs and desktop
-shortcuts.
+When launching menuedit from bashmenu (via F4 or menu item action), the editor tree automatically synchronizes active keyboard focus and selection directly on the item that was selected in bashmenu, so pressing e or ENTER immediately opens the ItemEditModal dialog for that exact item. The Property Inspector side panel features a real-time visual Preview section for all item types (commands, submenus, scripts, dividers, etc.) showing exactly how the item will appear in the main menu (including resolved Nerd Font/emoji icons, placeholders, and right-aligned shortcut brackets). Additionally, the ItemEditModal dialog dynamically updates its preview box in real-time as title or icon fields are edited.
+.SS Built-in Text Editor (bashedit)
+The application features a built-in text editor supporting tabs, colocated swap files, and desktop shortcuts.
 .TP
 .B F1
 View BashEdit keybindings manual modal dialog.
@@ -257,16 +262,16 @@ View BashEdit keybindings manual modal dialog.
 Toggle whitespace visibility (spaces as dots, tabs as arrows).
 .TP
 .B F3
-Stream ASCII character table (ascii.sh) in modal viewer.
+Open CP437 / ASCII character table modal viewer.
 .TP
 .B F4
-Stream terminal colors table (ncurses_colors.py) in modal viewer.
+Open 256-color palette viewer modal.
 .TP
 .B F5
 Show modal with available placeholders and macros.
 .TP
 .B F6
-View Markdown via Rich pager (scripts/rich.sh).
+View Markdown preview via bmpager --markdown --no-file.
 .TP
 .B F7
 Toggle line numbers gutter display.
@@ -315,41 +320,72 @@ Paste cutbuffer or system clipboard text at cursor.
 .TP
 .B Ctrl+Z, Ctrl+Y
 Undo or redo edit operations.
-.SS Visual Theme Editor (themeedit.py)
-Interactive split-screen theme designer with a quarter-scale live preview of the main menu and real-time color and glyph inspector.
+.SS Visual Theme Editor (themeedit)
+Interactive split-screen theme designer with a collapsible token tree (Theme:, Colors:, Borders:) and multi-view live preview pane.
 .TP
-.B c, ENTER
-Open 256-color picker modal dialog (ColorPickerModal) for focused color field.
+.B LEFT, RIGHT, h, l
+Collapse or expand collapsible token tree category nodes (Theme:, Colors:, Borders:).
 .TP
-.B a
-Open box-drawing and character glyph picker modal dialog (AsciiPickerModal) for focused border/glyph field.
+.B ENTER, SPACE
+Toggle selected category node, or open 256-color, CP437 character, or wallpaper file picker for the focused token.
 .TP
-.B t
-Clone existing theme as a base (ThemeCloneModal).
+.B [, ]
+Cycle to previous or next theme (alphabetically sorted).
 .TP
-.B d
-Auto-derive 16-color and 8-color fallback palettes from the active 256-color palette.
+.B TAB, p, 1-5
+Cycle or jump between live preview views (Main Menu, Text Editor, Popup Modals, Menu Editor, Toast Notifications).
 .TP
-.B s
-Save theme to bashmenu.themes and optionally activate it in bashmenu.yml (SaveThemeModal).
+.B F4, b
+Choose background wallpaper image via file picker modal.
 .TP
-.B F8
-Toggle expand/collapse all property inspector sections.
+.B F5, F9
+Auto-derive harmonious 256-color palette (including plugin text color) from the configured wallpaper image.
 .TP
-.B F9
-Auto-generate theme palette from an image file (ThemeFromImageModal).
+.B F6, Ctrl+N
+Create a new theme using the monochrome base palette.
 .TP
-.B Ctrl+R
-Rename theme (RenameThemeModal). Themes can also be renamed in the inspector panel under General & Identity.
+.B F7, F2, Ctrl+R
+Rename current theme inline.
 .TP
-.B Ctrl+D
-Delete theme from bashmenu.themes (prompts confirmation). Themes can also be deleted in the Theme Picker modal via [d].
+.B F8, Delete
+Delete current theme from bashmenu.themes (prompts confirmation), or clear wallpaper image when Wallpaper Image token is focused.
 .TP
-.B F1, ?
-Display theme editor keyboard shortcuts and help modal.
+.B Ctrl+S
+Save theme directly to bashmenu.themes (prompts Save As only if untitled).
+.TP
+.B Ctrl+A
+Save As under a new theme name.
 .TP
 .B ESC, q
 Exit theme editor (prompts to save if modifications exist).
+.SS Interactive Terminal Pager (bmpager)
+.TP
+.B j, DOWN, ENTER / k, UP
+Scroll down or up one line.
+.TP
+.B SPACE, f, PGDN / b, PGUP
+Scroll down or up one full page.
+.TP
+.B Ctrl-D / Ctrl-U
+Scroll down or up half a page.
+.TP
+.B g, HOME / G, END
+Jump to top or bottom of document.
+.TP
+.B / , n, N
+Search forward and repeat search forward/backward.
+.TP
+.B l, o
+Open interactive hyperlink and section anchor selector.
+.TP
+.B e, E
+Open active file in configured editor (bashedit or $EDITOR).
+.TP
+.B h, ?, F1
+Open scrollable pager help modal.
+.TP
+.B q, Q, ESC
+Close modal or exit pager.
 .SH CONFIGURATION & SCHEMA SPECIFICATIONS
 .SS Settings Store (bashmenu.yml)
 Stores nested, dot-notation accessible key-value settings. Any nested path (e.g.
@@ -457,8 +493,11 @@ Installs or uninstalls template blocks inside profiles.
 .B theme_selector
 Launches list of registered color themes.
 .TP
-.B divider
-Renders an aesthetic non-selectable horizontal line separator. Supports optional length and char attributes.
+.B toast
+Triggers a non-blocking, self-dismissing toast notification docked in the bottom-right corner above the status gutter (supports message, title, and seconds/timeout).
+.TP
+.B {divider}
+Renders an aesthetic non-selectable horizontal line separator styled by the active theme.
 .TP
 .B back
 Navigates back to the preceding submenu level.
@@ -540,7 +579,10 @@ Script version (e.g., 0.0.1).
 User's absolute home directory path.
 .TP
 .B {bashmenu_dir}
-Application script directory.
+User configuration root directory (~/.config/bashmenu).
+.TP
+.B {dev_dir}, {repo_dir}
+Local git repository and development workspace root directory.
 .TP
 .B {templates_dir}, {templates}, {scripts_dir}, {scripts}
 Templates and scripts folders paths.
@@ -612,6 +654,9 @@ Configuration key lookup from bashmenu.yml using explicit app namespace (e.g.,
 .TP
 .B {command:shell_cmd}
 Dynamic shell command execution placeholder. Runs shell_cmd via the system shell, trims trailing whitespace/newlines, and replaces the tag with the command output. Fully supports nested curly braces (e.g., {command:hostname -I | awk '{print $1}'}). Features a 30.0-second performance cache TTL and a 3.0-second safety execution timeout.
+.TP
+.B {toast:SECONDS:"Message"}, {toast:"Message"}
+Configurable non-blocking toast notification directive. Displays a floating toast notification on the bottom-right corner for the specified duration in seconds (default 2.0s) and resolves to an empty string.
 .SS Nerd Fonts & Emoji Adaptive Resolution
 The application resolves icons dynamically using three properties: a fallback
 ASCII character, a Nerd Font PUA code point, and a Unicode emoji icon:

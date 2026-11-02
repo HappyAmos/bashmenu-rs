@@ -13,10 +13,11 @@ editor for Linux systems.
   - [2.1 Provided Utility Scripts (`scripts/`)](#21-provided-utility-scripts-scripts)
   - [2.2 Provided Templates (`templates/`)](#22-provided-templates-templates)
 - [3. Keyboard Shortcuts & Navigation Reference](#3-keyboard-shortcuts--navigation-reference)
-  - [3.1 Main Menu Engine (`bashmenu.py`)](#31-main-menu-engine-bashmenupy)
-  - [3.2 Visual Menu Editor (`menuedit.py`)](#32-visual-menu-editor-menueditpy)
-  - [3.3 Built-in Text Editor (`bashedit.py`)](#33-built-in-text-editor-basheditpy)
-  - [3.4 Visual Theme Editor (`themeedit.py`)](#34-visual-theme-editor-themeeditpy)
+  - [3.1 Main Menu Engine (`bashmenu`)](#31-main-menu-engine-bashmenu)
+  - [3.2 Visual Menu Editor (`menuedit`)](#32-visual-menu-editor-menuedit)
+  - [3.3 Built-in Text Editor (`bashedit`)](#33-built-in-text-editor-bashedit)
+  - [3.4 Visual Theme Editor (`themeedit`)](#34-visual-theme-editor-themeedit)
+  - [3.5 Interactive Terminal Pager (`bmpager`)](#35-interactive-terminal-pager-bmpager)
 - [4. Configuration & Schema Specifications](#4-configuration--schema-specifications)
   - [4.1 Settings Store (`bashmenu.yml`)](#41-settings-store-bashmenuyml)
   - [4.2 Menu Structure (`bashmenu.mnu`)](#42-menu-structure-bashmenumnu)
@@ -52,6 +53,7 @@ HA Bash Menu is comprised of modular scripts and configuration files:
 | `bashedit` | Built-in text editor engine with swap file recovery. |
 | `menuedit` | Interactive TUI visual editor for `bashmenu.mnu` (run via `F4`). |
 | `themeedit` | Interactive TUI visual theme creator and palette editor (run via `F8`). |
+| `bmpager` | Interactive full-screen terminal text & Markdown pager (`bmpager --markdown`). |
 | `bashmenu.yml` | YAML user settings configuration store. |
 | `bashmenu.mnu` | YAML menu layout structure and action definitions. |
 | `bashmenu.themes` | YAML color themes for 256, 16, and 8 color modes. |
@@ -115,32 +117,32 @@ Used as dynamic templates for code generation, settings, or block injections:
 
 ## 3. Keyboard Shortcuts & Navigation Reference
 
-### 3.1 Main Menu Engine (`bashmenu.py`)
+### 3.1 Main Menu Engine (`bashmenu`)
 | Keybinding | Action |
 | :--- | :--- |
-| `UP` / `DOWN` | Navigate highlighted selection row. |
+| `UP` / `DOWN`, `k` / `j` | Navigate highlighted selection row. |
 | `0` - `9`, `a` - `z` | Direct option shortcut hotkey jump. |
 | `ENTER` | Execute selected item action. |
-| `F1` | Display Markdown help manual modal. |
+| `F1` | View Markdown user manual (`bashmenu.md`) via `bmpager --markdown`. |
 | `F2` | Open Theme selector dialog. |
-| `F3` | Launch built-in text editor (`bashedit.py`). |
-| `F4` | Launch visual menu editor (`menuedit.py`). |
-| `F5` | Refresh menu, reload configuration, menu files, and plugin outputs. |
+| `F3` | Launch built-in text editor (`bashedit`). |
+| `F4` | Launch visual menu editor (`menuedit`). |
+| `F5` | Full system refresh: clear command cache, reload config (`bashmenu.yml`), menus (`bashmenu.mnu`), themes (`bashmenu.themes`), wallpapers, status/help gutters, and plugins. |
 | `F6` | Toggle option shortcut key badges display. |
 | `F7` | Configure status gutter format modal. |
-| `F8` | Launch interactive Visual Theme Editor (`themeedit.py`). |
-| `ESC` | Return to parent submenu or exit application. |
+| `F8` | Launch interactive Visual Theme Editor (`themeedit`). |
+| `ESC` / `q` | Return to parent submenu or exit application. |
 
 *Note on Intelligent State Retention:* When returning from editors, or scripts with `refresh: true`, the engine traces and preserves your submenu coordinate depth to return you to your exact location, skipping the root menu.
 
-### 3.2 Visual Menu Editor (`menuedit.py`)
+### 3.2 Visual Menu Editor (`menuedit`)
 
 | Keybinding | Action |
 | :--- | :--- |
 | `a` | Add new menu option node. |
 | `e` / `ENTER` | Edit selected node properties (opens `ItemEditModal`). |
 | `t` | Change selected item type. |
-| `SPACE` | Expand or collapse submenu tree node. |
+| `SPACE` / `LEFT` / `RIGHT` | Expand or collapse submenu tree node. |
 | `d` | Delete selected option node (with confirm box). |
 | `m` | Move selected node down. |
 | `M` | Move selected node up. |
@@ -148,8 +150,8 @@ Used as dynamic templates for code generation, settings, or block injections:
 | `<` | Outdent item out to Parent menu list. |
 | `F1` / `?` | Display HA Bash Menu manual (`bashmenu.md`). |
 | `F2` | Toggle (collapse/expand) all children of top root menu. |
-| `F3` / `CTRL+A` | View ASCII character table (`ascii.sh`). |
-| `F4` / `CTRL+N` | Search Nerd Font & Emoji glyphs (`glyphs.sh`). |
+| `F3` / `CTRL+A` | View ASCII character table. |
+| `F4` / `CTRL+N` | Search Nerd Font & Emoji glyphs. |
 | `F5` / `CTRL+P` | View available placeholders and macros modal. |
 | `s` / `CTRL+S` | Save changes to `bashmenu.mnu`. |
 | `ESC` / `q` | Exit editor (prompts if unsaved changes exist). |
@@ -159,24 +161,24 @@ Used as dynamic templates for code generation, settings, or block injections:
 | :--- | :--- |
 | `CTRL+S` / `F2` / `s` | Save changes to item. |
 | `CTRL+T` / `t` | Change item type. |
-| `CTRL+A` / `F3` | View ASCII character table (`ascii.sh`). |
-| `CTRL+N` / `F4` | Search Nerd Font & Emoji glyphs (`glyphs.sh`). |
+| `CTRL+A` / `F3` | View ASCII character table. |
+| `CTRL+N` / `F4` | Search Nerd Font & Emoji glyphs. |
 | `CTRL+P` / `F5` | View available placeholders and macros modal. |
 | `F1` / `?` | Display item property editor help modal. |
 | `ESC` / `c` | Cancel changes and close dialog. |
 
-*Note on Menu Focus Synchronization & Property Inspector Previews:* When launching `menuedit.py` from `bashmenu.py` (via `F4` or menu item action), the editor tree automatically synchronizes active keyboard focus and selection directly on the item that was selected in `bashmenu.py`, so pressing `e` or `ENTER` immediately opens the `ItemEditModal` dialog for that exact item. The Property Inspector side panel features a real-time visual `Preview:` section for all item types (commands, submenus, scripts, dividers, etc.) showing exactly how the item will appear in the main menu (including resolved Nerd Font/emoji icons, placeholders, and right-aligned shortcut brackets). Additionally, the `ItemEditModal` dialog dynamically updates its preview box in real-time as title or icon fields are edited. Property inspector binary switches match window background styling (`Switch:focus { background: transparent; }`), and the help text footer clearly displays `[ESC / C] Cancel`.
+*Note on Menu Focus Synchronization & Property Inspector Previews:* When launching `menuedit` from `bashmenu` (via `F4` or menu item action), the editor tree automatically synchronizes active keyboard focus and selection directly on the item that was selected in `bashmenu`, so pressing `e` or `ENTER` immediately opens the `ItemEditModal` dialog for that exact item. The Property Inspector side panel features a real-time visual `Preview:` section for all item types (commands, submenus, scripts, dividers, etc.) showing exactly how the item will appear in the main menu (including resolved Nerd Font/emoji icons, placeholders, and right-aligned shortcut brackets). Additionally, the `ItemEditModal` dialog dynamically updates its preview box in real-time as title or icon fields are edited.
 
-### 3.3 Built-in Text Editor (`bashedit.py`)
+### 3.3 Built-in Text Editor (`bashedit`)
 
 | Keybinding | Action |
 | :--- | :--- |
 | `F1` | View BashEdit keybindings manual modal. |
 | `F2` | Toggle whitespace characters visibility. |
-| `F3` | Stream ASCII character table (`ascii.sh`). |
-| `F4` | Stream terminal colors (`ncurses_colors.py`). |
+| `F3` | Open CP437 / ASCII character table modal. |
+| `F4` | Open 256-color palette viewer modal. |
 | `F5` | View available placeholders & macros modal. |
-| `F6` | View Markdown via Rich pager (`scripts/rich.sh`). |
+| `F6` | View Markdown preview via `bmpager --markdown --no-file`. |
 | `F7` | Toggle line numbers gutter display. |
 | `F8` | View Markdown syntax quick reference modal. |
 | `Ctrl+Q` / `ESC` | Exit editor (prompts save if modified). |
@@ -196,28 +198,42 @@ Used as dynamic templates for code generation, settings, or block injections:
 | `Ctrl+V` | Paste cutbuffer / clipboard text. |
 | `Ctrl+Z` / `Ctrl+Y` | Undo / redo edit operations. |
 
-### 3.4 Visual Theme Editor (`themeedit.py`)
+### 3.4 Visual Theme Editor (`themeedit`)
 
-The visual theme editor provides a split-screen interface featuring a live, quarter-scale preview of the main menu (including simulated options, indicators, dividers, plugins, gutter borders, and drop shadows) alongside an inspector panel for editing theme characters and color tokens.
+The visual theme editor provides a split-screen interface featuring a collapsible token tree (`Theme:`, `Colors:`, `Borders:`) on the left and a live multi-view preview pane on the right (`Main Menu`, `Text Editor`, `Popup Windows / Modals`, `Visual Menu Editor`, and `Toast Notifications`). All category nodes start collapsed by default and open via `Left`/`Right` arrow keys, `Enter`/`Space`, mouse clicks on the category header, or clicking directly on an element in the preview pane (which auto-expands the category and focuses the matching token in the tree).
 
 | Keybinding | Action |
 | :--- | :--- |
-| `F1` / `?` | Display theme editor help modal. |
-| `F2` | Configure background wallpaper image, opacity, and scaling (`BackgroundConfigModal`). |
-| `F3` / `c` / `ENTER` | Open 256-color picker modal (`ColorPickerModal`) for the focused color field. |
-| `F4` / `a` | Open box-drawing & glyph picker modal (`AsciiPickerModal`) for the focused character field. |
-| `F5` | Reset theme to initial state or loaded base. |
-| `F6` / `t` | Clone existing theme as a base (`ThemePickerModalScreen`). |
-| `F7` / `d` | Auto-derive 16-color and 8-color fallback palettes from current 256-color palette. |
-| `F8` | Toggle expand/collapse all property inspector sections. |
-| `F9` | Auto-generate theme palette from an image file (`ThemeFromImageModal`). |
-| `Ctrl+R` | Rename current theme (`RenameThemeModal`). |
-| `Ctrl+D` | Delete current theme from `bashmenu.themes` (with confirmation modal). |
-| `Ctrl+N` | Create a new theme ('untitled'). |
-| `Ctrl+O` | Open existing theme to edit (`ThemePickerModalScreen`, prompts to save pending changes). |
-| `Ctrl+S` / `s` | Save theme to `bashmenu.themes`. |
-| `Ctrl+A` | Save As under a new theme name and optionally activate in `bashmenu.yml`. |
+| `UP` / `DOWN`, `k` / `j` | Navigate collapsible category nodes and tokens. |
+| `LEFT` / `RIGHT`, `h` / `l` | Collapse or expand category nodes (`Theme:`, `Colors:`, `Borders:`). |
+| `ENTER` / `SPACE` | Toggle selected category node, or open color/character/file picker for the selected token. |
+| `[` / `]` | Cycle to previous / next theme (alphabetically sorted). |
+| `TAB` / `p` / `1`-`5` | Cycle or jump between live preview views (`1` Menu, `2` Text Editor, `3` Modals, `4` Menu Editor, `5` Toasts). |
+| `F4` / `b` | Choose background wallpaper image via file picker modal. |
+| `F5` / `F9` | Auto-derive harmonious 256-color palette (including `plugin` text color) from the configured wallpaper image. |
+| `F6` / `Ctrl+N` | Create a new theme using the monochrome base palette. |
+| `F7` / `F2` / `Ctrl+R` | Rename current theme inline. |
+| `F8` / `Delete` | Delete current theme from `bashmenu.themes` (with confirmation modal), or clear wallpaper image when `Wallpaper Image` token is focused. |
+| `Ctrl+S` | Save theme directly to `bashmenu.themes` (prompts Save As only if `untitled`). |
+| `Ctrl+A` | Save As under a new theme name. |
 | `ESC` / `q` | Exit theme editor (prompts if unsaved changes exist). |
+
+### 3.5 Interactive Terminal Pager (`bmpager`)
+
+| Keybinding | Action |
+| :--- | :--- |
+| `DOWN` / `j` / `ENTER` | Scroll down one line. |
+| `UP` / `k` | Scroll up one line. |
+| `SPACE` / `f` / `PgDn` | Scroll down one full page. |
+| `b` / `PgUp` | Scroll up one full page. |
+| `Ctrl+D` / `Ctrl+U` | Scroll down / up half a page. |
+| `g` / `Home`, `G` / `End` | Jump to top or bottom of document. |
+| `/` | Search forward for pattern. |
+| `n` / `N` | Jump to next / previous search match. |
+| `l` / `o` | Open interactive hyperlink and section anchor selector. |
+| `e` / `E` | Open active file in configured editor (`bashedit` or `$EDITOR`). |
+| `h` / `?` / `F1` | Display scrollable pager help modal. |
+| `q` / `Q` / `ESC` | Exit pager. |
 
 *Theme Renaming & Deletion:*
 - **Renaming:** Themes can be renamed directly by editing the **Theme Name:** text input field in the inspector panel under **General & Identity**, or by clicking the adjacent **[Rename]** button (or pressing `Ctrl+R`), which opens the interactive `RenameThemeModal` with automatic slug sanitization.
@@ -762,7 +778,8 @@ These variables are dynamically resolved using active configuration and environm
 | `{user-mode}` | Current privilege mode (`"root"` if running with root/sudo privileges, otherwise `"user"`). |
 | `{version}` | Script version (e.g., `0.0.1`). |
 | `{home}` | User's absolute home directory path. |
-| `{bashmenu_dir}` | Application root directory path. |
+| `{bashmenu_dir}` | User configuration root directory path (`~/.config/bashmenu`). |
+| `{dev_dir}` / `{repo_dir}` | Local git repository / development workspace root directory path. |
 | `{templates_dir}` / `{templates}` | Templates folder path (`settings.templates_dir`). |
 | `{scripts_dir}` / `{scripts}` | Scripts folder path (`settings.scripts_dir`). |
 | `{cache_dir}` / `{cache}` | Cache folder path (`settings.cache_dir`, default `~/.cache/bashmenu`). Sets `$CACHE_DIR`. |
