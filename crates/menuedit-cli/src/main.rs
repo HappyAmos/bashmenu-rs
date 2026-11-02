@@ -80,6 +80,10 @@ struct Cli {
     /// Hierarchical title chain for deep node resolution (comma or > separated)
     #[arg(long)]
     title_chain: Option<String>,
+
+    /// Launch in Keyboard Shortcuts editor mode (`shortcuts.yml`)
+    #[arg(long)]
+    shortcuts: bool,
 }
 
 fn resolve_menu_path(target: &Path, local: bool) -> PathBuf {
@@ -139,6 +143,14 @@ fn main() -> Result<()> {
     install_panic_hook();
 
     let cli = Cli::parse();
+    if cli.shortcuts {
+        let sp = if cli.file != Path::new("bashmenu.mnu") {
+            resolve_menu_path(&cli.file, cli.local)
+        } else {
+            bashmenu_core::resolve_shortcuts_path(cli.local)
+        };
+        return menuedit_cli::run_shortcut_editor(sp);
+    }
     let menu_path = resolve_menu_path(&cli.file, cli.local);
     let mut menu = if menu_path.exists() {
         load_menu(&menu_path).unwrap_or_default()

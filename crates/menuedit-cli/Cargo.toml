@@ -10,6 +10,10 @@ repository.workspace = true
 name = "menuedit"
 path = "src/main.rs"
 
+[[bin]]
+name = "shortcutedit"
+path = "src/bin/shortcutedit.rs"
+
 [dependencies]
 bashmenu-core = { workspace = true }
 bashmenu-tui = { workspace = true }

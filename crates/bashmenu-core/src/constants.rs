@@ -34,6 +34,8 @@ pub const PLACEHOLDER_HELP_TEXT: &str = "\
 {cache}                      │ Alias for {cache_dir}
 {notebooks_dir}              │ Notebooks directory path
 {notebooks}                  │ Alias for {notebooks_dir}
+{shortcuts_file}             │ Custom keyboard shortcuts file path (shortcuts.yml)
+{shortcuts}                  │ Alias for {shortcuts_file}
 {bashrc}                     │ Path to ~/.bashrc profile file
 {bash_aliases}               │ Path to ~/.bash_aliases file
 {zshrc}                      │ Path to ~/.zshrc configuration file

@@ -30,6 +30,9 @@ Built-in terminal text editor engine with swap file management.
 .I menuedit
 Interactive TUI menu tree editor for managing bashmenu.mnu.
 .TP
+.I shortcutedit
+Interactive TUI keyboard shortcuts editor for managing shortcuts.yml (also available via \fBmenuedit --shortcuts\fR).
+.TP
 .I themeedit
 Interactive TUI visual theme creator and palette editor.
 .TP
@@ -37,13 +40,16 @@ Interactive TUI visual theme creator and palette editor.
 Interactive full-screen terminal text and Markdown pager (\fBbmpager --markdown\fR).
 .TP
 .I ymlcheck
-YAML configuration, menu, and theme validator tool.
+YAML configuration, menu, shortcuts (\fB--shortcuts\fR), and theme validator tool.
 .TP
 .I bashmenu.yml
 Settings configuration database in YAML format.
 .TP
 .I bashmenu.mnu
 Menu layout structure definitions list in YAML format.
+.TP
+.I shortcuts.yml
+Custom direct keyboard shortcuts and \fB<leader>\fR (\fBCtrl+Space\fR) chord definitions in YAML format.
 .TP
 .I bashmenu.themes
 Color theme definitions (supporting 256, 16, and 8 color modes).

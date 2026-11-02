@@ -2,7 +2,7 @@
 //!
 //! Validates YAML files for syntax or specific schema rules (themes, config, menu).
 
-use bashmenu_core::{load_config, load_menu, load_themes};
+use bashmenu_core::{load_config, load_menu, load_shortcuts, load_themes, validate_key_spec};
 use clap::{ArgGroup, Parser};
 use std::collections::HashSet;
 use std::fs;
@@ -92,7 +92,7 @@ const VALID_OPTION_TYPES: &[&str] = &[
 )]
 #[command(group(
     ArgGroup::new("mode")
-        .args(["themes", "config", "menu", "yaml"])
+        .args(["themes", "config", "menu", "shortcuts", "yaml"])
 ))]
 struct Cli {
     /// Path to one or more YAML files to validate
@@ -110,6 +110,10 @@ struct Cli {
     /// Validate as a menu structure file (bashmenu.mnu)
     #[arg(short = 'm', long = "menu")]
     menu: bool,
+
+    /// Validate as a custom keyboard shortcuts file (shortcuts.yml)
+    #[arg(short = 's', long = "shortcuts", alias = "shortcut")]
+    shortcuts: bool,
 
     /// Validate YAML syntax only with no schema enforcement (default)
     #[arg(short = 'y', long = "yaml")]
@@ -341,6 +345,70 @@ fn validate_menu_file(path: &Path) -> bool {
     true
 }
 
+fn validate_shortcuts_file(path: &Path) -> bool {
+    println!("Validating shortcuts file {}...", path.display());
+    let cfg = match load_shortcuts(path) {
+        Ok(c) => c,
+        Err(e) => {
+            println!(
+                "[ERROR] Shortcuts schema error in '{}': {}",
+                path.display(),
+                e
+            );
+            return false;
+        }
+    };
+
+    let mut errors = Vec::new();
+    if let Err(err) = validate_key_spec(&cfg.leader_key, true) {
+        errors.push(format!("Invalid leader_key '{}': {}", cfg.leader_key, err));
+    }
+
+    let mut seen_keys = HashSet::new();
+    for (idx, entry) in cfg.shortcuts.iter().enumerate() {
+        let loc = format!("shortcuts[{}] ('{}')", idx, entry.description);
+        if entry.description.trim().is_empty() {
+            errors.push(format!("{}: 'description' must not be empty.", loc));
+        }
+        match validate_key_spec(&entry.key, false) {
+            Ok(norm) => {
+                if entry.enabled && !seen_keys.insert(norm.clone()) {
+                    errors.push(format!("{}: Duplicate active key binding '{}'.", loc, norm));
+                }
+            }
+            Err(err) => {
+                errors.push(format!("{}: Invalid key '{}': {}", loc, entry.key, err));
+            }
+        }
+        if let Some(pct) = entry.window_percent {
+            if !(20..=100).contains(&pct) {
+                errors.push(format!(
+                    "{}: 'window_percent' ({}) must be between 20 and 100.",
+                    loc, pct
+                ));
+            }
+        }
+    }
+
+    if !errors.is_empty() {
+        println!(
+            "\n[ERROR] Found {} shortcuts validation issue(s):\n",
+            errors.len()
+        );
+        for e in &errors {
+            println!("  - {}", e);
+        }
+        return false;
+    }
+
+    println!(
+        "SUCCESS: Shortcuts file is valid ({} shortcut(s), leader_key: '{}')!",
+        cfg.shortcuts.len(),
+        cfg.leader_key
+    );
+    true
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -358,6 +426,8 @@ fn main() {
             validate_config_file(file)
         } else if cli.menu {
             validate_menu_file(file)
+        } else if cli.shortcuts {
+            validate_shortcuts_file(file)
         } else {
             validate_yaml_syntax(file)
         };

@@ -4,15 +4,16 @@ use anyhow::Result;
 use bashmenu_core::{
     add_or_update_note, build_notebook_submenu, clear_command_cache, delete_note, extract_toasts,
     get_note_by_title, interpolate_placeholders, load_config, load_menu, load_notebook,
-    load_themes, rename_note, resolve_notebook_path, save_config, save_notebook, BashMenuConfig,
-    ConfirmAction, ExecutionMode, MacroContext, MenuItem, MenuItemType, MenuSchema, NoteItem,
-    PluginEngine, ToastNotification,
+    load_shortcuts, load_themes, rename_note, resolve_notebook_path, resolve_shortcuts_path,
+    save_config, save_notebook, BashMenuConfig, ConfirmAction, ExecutionMode, MacroContext,
+    MenuItem, MenuItemType, MenuSchema, NoteItem, PluginEngine, ShortcutsConfig, ToastNotification,
 };
 use bashmenu_tui::{
     install_panic_hook, ConfirmChoice, ConfirmModal, FilePickerModal, HelpModal, InputModal,
     MenuAction, MenuView, MessageModal, NoteEditorAction, NoteEditorModal, NoteViewerAction,
-    NoteViewerModal, RadioModal, ResolvedThemeStyles, StreamOutputAction, StreamOutputModal,
-    TerminalGuard, ThemePickerModal, ToastRack, ToggleChoice, ToggleModal,
+    NoteViewerModal, RadioModal, ResolvedThemeStyles, ShortcutDispatchResult, ShortcutDispatcher,
+    StreamOutputAction, StreamOutputModal, TerminalGuard, ThemePickerModal, ToastRack,
+    ToggleChoice, ToggleModal,
 };
 use clap::Parser;
 use crossterm::event::{self, Event};
@@ -42,6 +43,10 @@ struct Cli {
     /// Override active theme
     #[arg(short, long)]
     theme: Option<String>,
+
+    /// Path to custom keyboard shortcuts file (shortcuts.yml)
+    #[arg(short, long)]
+    shortcuts: Option<PathBuf>,
 
     /// Load and save configuration files in current working directory
     #[arg(long)]
@@ -135,6 +140,18 @@ fn main() -> Result<()> {
         MenuSchema::default()
     };
 
+    let shortcuts_path = if let Some(ref sp) = cli.shortcuts {
+        resolve_file_path(sp, cli.local)
+    } else {
+        resolve_shortcuts_path(cli.local)
+    };
+    let shortcuts_cfg = if shortcuts_path.exists() {
+        load_shortcuts(&shortcuts_path).unwrap_or_default()
+    } else {
+        ShortcutsConfig::default()
+    };
+    let mut shortcut_dispatcher = ShortcutDispatcher::new(shortcuts_cfg);
+
     // 3. Load Themes
     let themes_path = resolve_file_path(Path::new("bashmenu.themes"), cli.local);
     let mut themes = if themes_path.exists() {
@@ -217,10 +234,18 @@ fn main() -> Result<()> {
 
         // Periodic check to advance marquee ticker (250ms)
         if last_marquee_tick.elapsed() >= Duration::from_millis(250) {
-            if matches!(active_modal, ActiveModal::None) && menu_view.tick_marquee() {
+            if matches!(active_modal, ActiveModal::None)
+                && !shortcut_dispatcher.is_leader_pending()
+                && menu_view.tick_marquee()
+            {
                 need_redraw = true;
             }
             last_marquee_tick = Instant::now();
+        }
+
+        // Periodic check to expire leader-key pending timeout
+        if shortcut_dispatcher.poll_timeout() {
+            need_redraw = true;
         }
 
         // Periodic check to advance toast rack expiration
@@ -239,7 +264,9 @@ fn main() -> Result<()> {
             guard.draw(|f| {
                 menu_view.render(f.area(), f.buffer_mut());
                 match &mut active_modal {
-                    ActiveModal::None => {}
+                    ActiveModal::None => {
+                        shortcut_dispatcher.render_leader_popup(f.area(), &styles, f.buffer_mut());
+                    }
                     ActiveModal::Help(modal) => {
                         modal.render(f.area(), &styles, f.buffer_mut());
                     }
@@ -824,8 +851,46 @@ fn main() -> Result<()> {
                         act
                     } else {
                         match ev {
-                            Event::Key(key) => menu_view.handle_key(key.code),
-                            Event::Mouse(mouse) => menu_view.handle_mouse(mouse, area),
+                            Event::Key(key) => match shortcut_dispatcher.handle_key(key) {
+                                ShortcutDispatchResult::PassThrough => {
+                                    menu_view.handle_key(key.code)
+                                }
+                                ShortcutDispatchResult::LeaderActivated
+                                | ShortcutDispatchResult::LeaderCancelled => MenuAction::None,
+                                ShortcutDispatchResult::LeaderUnbound(unbound) => {
+                                    toast_rack.add(ToastNotification::new(
+                                        format!("Unbound leader key: '<leader> {}'", unbound),
+                                        Some("Leader Shortcut".to_string()),
+                                        2.0,
+                                    ));
+                                    MenuAction::None
+                                }
+                                ShortcutDispatchResult::Matched(entry) => {
+                                    let item = entry.to_menu_item();
+                                    if item.r#type == MenuItemType::Notebook {
+                                        MenuAction::OpenNotebook(Box::new(item))
+                                    } else {
+                                        MenuAction::Execute(Box::new(item))
+                                    }
+                                }
+                            },
+                            Event::Mouse(mouse) => {
+                                if shortcut_dispatcher.is_leader_pending() {
+                                    match shortcut_dispatcher.handle_mouse(mouse, area) {
+                                        ShortcutDispatchResult::Matched(entry) => {
+                                            let item = entry.to_menu_item();
+                                            if item.r#type == MenuItemType::Notebook {
+                                                MenuAction::OpenNotebook(Box::new(item))
+                                            } else {
+                                                MenuAction::Execute(Box::new(item))
+                                            }
+                                        }
+                                        _ => MenuAction::None,
+                                    }
+                                } else {
+                                    menu_view.handle_mouse(mouse, area)
+                                }
+                            }
                             Event::Resize(_, _) => MenuAction::None,
                             _ => MenuAction::None,
                         }
@@ -920,6 +985,12 @@ fn main() -> Result<()> {
 
                             if let Ok(new_menu) = load_menu(&menu_path) {
                                 menu_view.reload_menu(new_menu);
+                            }
+
+                            if shortcuts_path.exists() {
+                                if let Ok(new_shortcuts) = load_shortcuts(&shortcuts_path) {
+                                    shortcut_dispatcher.set_config(new_shortcuts);
+                                }
                             }
 
                             if let Ok(new_themes) = load_themes(&themes_path) {
@@ -1161,7 +1232,7 @@ fn main() -> Result<()> {
                                 };
                                 let title = interpolate_placeholders(&clean_title, &ctx);
                                 let prompt =
-                                    interpolate_placeholders(item.param_modal_prompt(), &ctx);
+                                    interpolate_placeholders(&item.param_modal_prompt(), &ctx);
                                 let modal =
                                     InputModal::new(title, prompt, "").with_masked(item.masked());
                                 active_modal = ActiveModal::ParamInput(item, modal);
@@ -1252,6 +1323,33 @@ fn main() -> Result<()> {
                                             cmd.arg("--title-chain").arg(&title_chain);
                                         }
                                         let _ = cmd.status();
+                                        Ok(())
+                                    });
+                                    pending_action = Some(MenuAction::Reload);
+                                } else if action_str == "shortcutedit"
+                                    || action_str == "shortcuts_editor"
+                                    || command_str == "shortcutedit"
+                                    || command_str == "shortcuts_editor"
+                                    || matches!(
+                                        item.r#type,
+                                        MenuItemType::Other(ref s)
+                                            if s == "shortcuts_editor" || s == "shortcutedit"
+                                    )
+                                {
+                                    let shortcutedit_bin = locate_tool("shortcutedit");
+                                    let menuedit_bin = locate_tool("menuedit");
+                                    let _ = guard.suspend_keep_alt(|| {
+                                        let status = Command::new(&shortcutedit_bin)
+                                            .arg("-f")
+                                            .arg(&shortcuts_path)
+                                            .status();
+                                        if status.is_err() {
+                                            let _ = Command::new(&menuedit_bin)
+                                                .arg("--shortcuts")
+                                                .arg("-f")
+                                                .arg(&shortcuts_path)
+                                                .status();
+                                        }
                                         Ok(())
                                     });
                                     pending_action = Some(MenuAction::Reload);

@@ -517,6 +517,22 @@ items:
                       interactive: true
                       quiet: true
                       refresh: true
+                  - Keyboard Shortcuts Editor [shortcutedit]:
+                      type: script
+                      action: shortcutedit
+                      icon: '{nf::#f11c}'
+                      interactive: true
+                      quiet: true
+                      refresh: true
+                  - Edit Shortcuts File [{shortcuts_file}]:
+                      type: editor
+                      action: '{shortcuts_file}'
+                      file: '{shortcuts_file}'
+                      icon: '{nf::#f11c}'
+                      tabstop: 4
+                      interactive: true
+                      quiet: false
+                      alt_buffer: true
                   - Edit Configuration File [{bashmenu_dir}/bashmenu.yml]:
                       type: editor
                       action: '{bashmenu_dir}/bashmenu.yml'

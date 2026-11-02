@@ -1,6 +1,7 @@
 //! Library module for MenuEdit core tree navigation and menu manipulation.
 
 pub mod item_edit;
+pub mod shortcut_editor;
 pub mod tree;
 pub mod type_picker;
 
@@ -16,6 +17,10 @@ use std::path::PathBuf;
 pub use item_edit::{
     render_item_preview_line, BrowseTarget, FocusControl, ItemEditModal, ItemEditResult,
     MultiLineInput, TextInput,
+};
+pub use shortcut_editor::{
+    format_shortcut_inspector, run_shortcut_editor, KeyCaptureModal, LeaderSettingsModal,
+    ShortcutEditModal, ShortcutEditorState,
 };
 pub use tree::{
     delete_item, find_item, find_item_mut, find_node_path, flatten_tree, indent_item,

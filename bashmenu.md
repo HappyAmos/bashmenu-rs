@@ -235,6 +235,26 @@ The visual theme editor provides a split-screen interface featuring a collapsibl
 | `h` / `?` / `F1` | Display scrollable pager help modal. |
 | `q` / `Q` / `ESC` | Exit pager. |
 
+### 3.6 Custom Keyboard Shortcuts Editor (`shortcutedit` / `menuedit --shortcuts`)
+`shortcutedit` (also accessible via `menuedit --shortcuts` or `F9` / `<leader> s` from the main menu) is a split-screen visual editor for `shortcuts.yml` (`{bashmenu_dir}/shortcuts.yml`).
+
+- **Leader Key Chords (`<Ctrl+Space>`):** Pressing the configured `leader_key` (default `ctrl+space`) in the main menu opens a compact *which-key* popup overlay showing all active `<leader> <key>` shortcuts and waits up to `leader_timeout_ms` (`1500` ms default) for the follow-up key.
+- **Direct Shortcuts:** Function keys (`F9`, `F10`, `F12`) and modified combos (`ctrl+<key>`, `alt+<key>`) execute immediately with a single keystroke.
+- **Full Placeholder & Execution Mode Parity:** Every shortcut supports all 6-tier macro placeholders (`{dev_dir}`, `{bashmenu_dir}`, `{scripts_dir}`, `{param:prompt=...}`, `{file_picker}`, `{dir_picker}`, `{toast:...}`) and execution modes (`console`, `streaming`, `interactive`, `quiet`, `alt_buffer`, `window_percent`).
+
+| Keybinding | Action |
+| :--- | :--- |
+| `a` | Add a new keyboard shortcut. |
+| `e` / `ENTER` | Edit the selected shortcut's properties. |
+| `c` / `F2` | Interactively capture a direct key combo or `<leader> <key>` chord. |
+| `l` | Configure global `leader_key`, `leader_timeout_ms`, and popup hint. |
+| `SPACE` | Toggle the selected shortcut enabled/disabled. |
+| `d` / `Delete` | Delete the selected shortcut. |
+| `m` / `M` | Move the selected shortcut down / up. |
+| `CTRL+P` | View Placeholders & Macros reference modal. |
+| `s` / `CTRL+S` | Save `shortcuts.yml` (preserving `SHORTCUTS_HEADER`). |
+| `ESC` / `q` | Exit editor. |
+
 *Theme Renaming & Deletion:*
 - **Renaming:** Themes can be renamed directly by editing the **Theme Name:** text input field in the inspector panel under **General & Identity**, or by clicking the adjacent **[Rename]** button (or pressing `Ctrl+R`), which opens the interactive `RenameThemeModal` with automatic slug sanitization.
 - **Deleting:** Themes can be deleted from `bashmenu.themes` either by clicking the **[Delete]** button in the inspector panel under **General & Identity** (or pressing `Ctrl+D`), or directly from the Theme Picker modal (`F2`) using `[d]` / `Delete`. Both options present a confirmation dialog. If the theme is currently active in `bashmenu.yml`, the user is notified and the active theme is automatically switched to a fallback theme (e.g. `dracula`).

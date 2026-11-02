@@ -35,7 +35,7 @@ echo "==> Building all release binaries (workspace)..."
 (cd "$SCRIPT_DIR" && cargo build --release --workspace)
 
 echo "==> Installing binaries to $BIN_DIR..."
-for bin in bashmenu ymlcheck menuedit themeedit bashedit bmpager; do
+for bin in bashmenu ymlcheck menuedit shortcutedit themeedit bashedit bmpager; do
     src="$SCRIPT_DIR/target/release/$bin"
     if [ -f "$src" ]; then
         rm -f "$BIN_DIR/$bin"
@@ -60,7 +60,7 @@ echo "  [+] Created shortcut 'rich' -> $BIN_DIR/rich"
 # Initialize user config directory if missing
 CONFIG_DIR="$HOME/.config/bashmenu"
 mkdir -p "$CONFIG_DIR"
-for cfg in bashmenu.yml bashmenu.mnu bashmenu.themes; do
+for cfg in bashmenu.yml bashmenu.mnu bashmenu.themes shortcuts.yml; do
     fixture="$SCRIPT_DIR/tests/fixtures/$cfg"
     dest="$CONFIG_DIR/$cfg"
     if [ ! -f "$dest" ] && [ -f "$fixture" ]; then
@@ -118,10 +118,11 @@ echo "==================================================================="
 echo "            BashMenu-RS Successfully Installed!                    "
 echo "==================================================================="
 echo "  Commands installed:"
-echo "    bashmenu  - Main menu system (shortcut: bm)"
-echo "    menuedit  - Visual menu tree editor"
-echo "    themeedit - Visual theme & palette editor"
-echo "    bashedit  - Text editor with swap file recovery"
-echo "    bmpager   - Standalone native terminal pager with markdown support"
-echo "    ymlcheck  - YAML schema and syntax validator"
+echo "    bashmenu     - Main menu system (shortcut: bm)"
+echo "    menuedit     - Visual menu tree editor"
+echo "    shortcutedit - Visual keyboard shortcuts editor (shortcuts.yml)"
+echo "    themeedit    - Visual theme & palette editor"
+echo "    bashedit     - Text editor with swap file recovery"
+echo "    bmpager      - Standalone native terminal pager with markdown support"
+echo "    ymlcheck     - YAML schema and syntax validator"
 echo "==================================================================="

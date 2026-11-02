@@ -8,6 +8,7 @@ pub mod gutter;
 pub mod marquee;
 pub mod menu_view;
 pub mod modals;
+pub mod shortcuts_overlay;
 pub mod style;
 pub mod terminal;
 pub mod text_input;
@@ -34,6 +35,7 @@ pub use modals::{
     StreamOutputAction, StreamOutputModal, StreamOutputMsg, ThemePickerModal, ToggleChoice,
     ToggleModal,
 };
+pub use shortcuts_overlay::{key_event_to_token, ShortcutDispatchResult, ShortcutDispatcher};
 pub use style::{parse_color_value, ResolvedThemeStyles};
 pub use terminal::TerminalGuard;
 pub use text_input::TextInput;

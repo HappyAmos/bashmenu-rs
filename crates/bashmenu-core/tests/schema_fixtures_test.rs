@@ -278,3 +278,47 @@ fn test_menu_item_param_placeholder_and_masked() {
     assert_eq!(item.action.as_deref(), Some("which cargo"));
     assert_eq!(item.command.as_deref(), Some("which cargo"));
 }
+
+#[test]
+fn test_parse_production_shortcuts_yml_and_inline_param() {
+    use bashmenu_core::{load_shortcuts, save_shortcuts, ExecutionMode};
+
+    let fixture = fixture_path("shortcuts.yml");
+    assert!(
+        fixture.exists(),
+        "shortcuts.yml fixture must exist at {:?}",
+        fixture
+    );
+
+    let cfg = load_shortcuts(&fixture).expect("Failed to parse shortcuts.yml fixture");
+    assert_eq!(cfg.leader_key, "ctrl+space");
+    assert_eq!(cfg.leader_timeout_ms, 1500);
+    assert!(cfg.show_leader_hint);
+    assert!(!cfg.shortcuts.is_empty());
+
+    // Check inline {param:prompt=...} on the Ping shortcut
+    let ping_entry = cfg
+        .shortcuts
+        .iter()
+        .find(|s| s.key == "<leader> p")
+        .expect("<leader> p shortcut must exist");
+    let mut ping_item = ping_entry.to_menu_item();
+    assert_eq!(ping_item.execution_mode(), ExecutionMode::Streaming);
+    assert!(ping_item.has_param_placeholder());
+    assert_eq!(ping_item.param_modal_prompt(), "Enter Host or IP:");
+    ping_item.apply_param_placeholder("1.1.1.1");
+    assert!(!ping_item.has_param_placeholder());
+    assert_eq!(ping_item.action.as_deref(), Some("ping -c 4 1.1.1.1"));
+
+    // Roundtrip save preserves SHORTCUTS_HEADER
+    let tmp = std::env::temp_dir().join("test_shortcuts_roundtrip.yml");
+    save_shortcuts(&tmp, &cfg).expect("Failed to save shortcuts.yml");
+    let written = fs::read_to_string(&tmp).expect("Failed to read saved shortcuts.yml");
+    assert!(written.starts_with(
+        "# =============================================================================="
+    ));
+    assert!(written.contains("BashMenu Custom Keyboard Shortcuts (shortcuts.yml)"));
+    let reloaded = load_shortcuts(&tmp).expect("Failed to reload saved shortcuts.yml");
+    assert_eq!(reloaded.shortcuts.len(), cfg.shortcuts.len());
+    let _ = fs::remove_file(tmp);
+}

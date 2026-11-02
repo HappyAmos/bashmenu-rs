@@ -948,6 +948,11 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
         direct_map.insert("{notebooks_dir}", notebooks_dir.clone());
         direct_map.insert("{notebooks}", notebooks_dir);
     }
+    if res.contains("{shortcuts_file}") || res.contains("{shortcuts}") {
+        let shortcuts_file = format!("{}/shortcuts.yml", ctx.bashmenu_dir.display());
+        direct_map.insert("{shortcuts_file}", shortcuts_file.clone());
+        direct_map.insert("{shortcuts}", shortcuts_file);
+    }
 
     // Shell profiles and editor configs (guarded to avoid disk stats per frame)
     if res.contains("{bashrc}") {

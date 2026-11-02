@@ -238,18 +238,18 @@ impl MenuItem {
     /// Whether input prompts for this item should mask characters with `*`
     pub fn masked(&self) -> bool {
         match self.extra.get("masked") {
-            Some(serde_yml::Value::Bool(b)) => *b,
+            Some(serde_yml::Value::Bool(b)) => return *b,
             Some(serde_yml::Value::String(s)) => {
-                matches!(s.trim().to_ascii_lowercase().as_str(), "true" | "1" | "yes")
+                return matches!(s.trim().to_ascii_lowercase().as_str(), "true" | "1" | "yes");
             }
-            Some(serde_yml::Value::Number(n)) => n.as_i64().unwrap_or(0) != 0,
-            _ => false,
+            Some(serde_yml::Value::Number(n)) => return n.as_i64().unwrap_or(0) != 0,
+            _ => {}
         }
+        self.inline_param_spec().map(|s| s.masked).unwrap_or(false)
     }
 
-    /// Returns true if any executable or target payload field contains `{param}`
-    pub fn has_param_placeholder(&self) -> bool {
-        [
+    fn inline_param_spec(&self) -> Option<InlineParamSpec> {
+        for field in [
             self.command.as_deref(),
             self.action.as_deref(),
             self.script.as_deref(),
@@ -257,30 +257,32 @@ impl MenuItem {
         ]
         .into_iter()
         .flatten()
-        .any(|s| s.contains("{param}"))
+        {
+            if let Some(spec) = parse_inline_param_spec(field) {
+                return Some(spec);
+            }
+        }
+        None
     }
 
-    /// Substitutes `{param}` with `value` across all executable and target payload fields
+    /// Returns true if any executable or target payload field contains `{param...}` or `{prompt...}`
+    pub fn has_param_placeholder(&self) -> bool {
+        self.inline_param_spec().is_some()
+    }
+
+    /// Substitutes `{param...}` / `{prompt...}` with `value` across all executable and target payload fields
     pub fn apply_param_placeholder(&mut self, value: &str) {
         if let Some(ref mut s) = self.command {
-            if s.contains("{param}") {
-                *s = s.replace("{param}", value);
-            }
+            *s = replace_inline_param_tokens(s, value);
         }
         if let Some(ref mut s) = self.action {
-            if s.contains("{param}") {
-                *s = s.replace("{param}", value);
-            }
+            *s = replace_inline_param_tokens(s, value);
         }
         if let Some(ref mut s) = self.script {
-            if s.contains("{param}") {
-                *s = s.replace("{param}", value);
-            }
+            *s = replace_inline_param_tokens(s, value);
         }
         if let Some(ref mut s) = self.file {
-            if s.contains("{param}") {
-                *s = s.replace("{param}", value);
-            }
+            *s = replace_inline_param_tokens(s, value);
         }
     }
 
@@ -302,23 +304,34 @@ impl MenuItem {
     }
 
     /// Modal prompt message for a `{param}` input dialog
-    pub fn param_modal_prompt(&self) -> &str {
-        self.prompt
-            .as_deref()
+    pub fn param_modal_prompt(&self) -> String {
+        if let Some(p) = self.prompt.as_deref().filter(|s| !s.trim().is_empty()) {
+            return p.to_string();
+        }
+        if let Some(m) = self
+            .extra
+            .get("message")
+            .and_then(|v| v.as_str())
             .filter(|s| !s.trim().is_empty())
-            .or_else(|| {
-                self.extra
-                    .get("message")
-                    .and_then(|v| v.as_str())
-                    .filter(|s| !s.trim().is_empty())
-            })
-            .or_else(|| {
-                self.extra
-                    .get("text")
-                    .and_then(|v| v.as_str())
-                    .filter(|s| !s.trim().is_empty())
-            })
-            .unwrap_or("Enter parameter:")
+        {
+            return m.to_string();
+        }
+        if let Some(t) = self
+            .extra
+            .get("text")
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.trim().is_empty())
+        {
+            return t.to_string();
+        }
+        if let Some(spec) = self.inline_param_spec() {
+            if let Some(p) = spec.prompt {
+                if !p.trim().is_empty() {
+                    return p;
+                }
+            }
+        }
+        "Enter parameter:".to_string()
     }
 
     /// Returns the first `{file_picker...}` or `{dir_picker...}` specification found across
@@ -409,7 +422,12 @@ impl MenuItem {
 
     /// Execution mode for this menu item
     pub fn execution_mode(&self) -> ExecutionMode {
-        if let Some(s) = self.extra.get("exec_mode").and_then(|v| v.as_str()) {
+        if let Some(s) = self
+            .extra
+            .get("exec_mode")
+            .or_else(|| self.extra.get("execution_mode"))
+            .and_then(|v| v.as_str())
+        {
             match s.to_lowercase().as_str() {
                 "streaming" | "stream" => ExecutionMode::Streaming,
                 "interactive" => ExecutionMode::Interactive,
@@ -717,6 +735,78 @@ impl Serialize for MenuItem {
         map.serialize_entry(&self.label, &props)?;
         map.end()
     }
+}
+
+#[derive(Debug, Clone, Default)]
+struct InlineParamSpec {
+    prompt: Option<String>,
+    masked: bool,
+}
+
+fn find_inline_param_span(text: &str) -> Option<(usize, usize, &str)> {
+    for prefix in ["{param", "{prompt"] {
+        let mut search_from = 0;
+        while let Some(rel) = text[search_from..].find(prefix) {
+            let start = search_from + rel;
+            let after_prefix = &text[start + prefix.len()..];
+            if let Some(first_ch) = after_prefix.chars().next() {
+                if first_ch == '}' || first_ch == ':' {
+                    if let Some(end_rel) = after_prefix.find('}') {
+                        let end = start + prefix.len() + end_rel + 1;
+                        let inner = if first_ch == ':' {
+                            &after_prefix[1..end_rel]
+                        } else {
+                            ""
+                        };
+                        return Some((start, end, inner));
+                    }
+                }
+            }
+            search_from = start + prefix.len();
+        }
+    }
+    None
+}
+
+fn parse_inline_param_spec(text: &str) -> Option<InlineParamSpec> {
+    let (_, _, inner) = find_inline_param_span(text)?;
+    let mut spec = InlineParamSpec::default();
+    let mut rest = inner.trim();
+    // Strip trailing/leading `masked` flags (`:masked`, `masked:`, `:masked=true`)
+    for flag in [":masked=true", ":masked"] {
+        if let Some(stripped) = rest.strip_suffix(flag) {
+            spec.masked = true;
+            rest = stripped;
+        }
+    }
+    for flag in ["masked=true:", "masked:"] {
+        if let Some(stripped) = rest.strip_prefix(flag) {
+            spec.masked = true;
+            rest = stripped;
+        }
+    }
+    if rest.eq_ignore_ascii_case("masked") || rest.eq_ignore_ascii_case("masked=true") {
+        spec.masked = true;
+        rest = "";
+    }
+    // `title=...` is resolved via item title/label; ignore it here
+    if rest.starts_with("title=") {
+        rest = "";
+    }
+    // Everything after `prompt=` (colons included) is the prompt text
+    let prompt_text = rest.strip_prefix("prompt=").unwrap_or(rest);
+    if !prompt_text.is_empty() {
+        spec.prompt = Some(prompt_text.trim_matches('"').trim_matches('\'').to_string());
+    }
+    Some(spec)
+}
+
+fn replace_inline_param_tokens(text: &str, value: &str) -> String {
+    let mut out = text.to_string();
+    while let Some((start, end, _)) = find_inline_param_span(&out) {
+        out.replace_range(start..end, value);
+    }
+    out
 }
 
 /// Loads and parses `bashmenu.mnu` from the specified path.

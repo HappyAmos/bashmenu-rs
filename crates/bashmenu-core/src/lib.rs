@@ -8,6 +8,7 @@ pub mod macro_engine;
 pub mod menu;
 pub mod notebook;
 pub mod plugin;
+pub mod shortcuts;
 pub mod theme;
 
 pub use config::{
@@ -36,6 +37,10 @@ pub use notebook::{
 };
 pub use plugin::{
     PluginCacheEntry, PluginConfig, PluginDef, PluginDisplayRow, PluginEngine, PluginLayout,
+};
+pub use shortcuts::{
+    load_shortcuts, normalize_key_spec, normalize_single_key_token, resolve_shortcuts_path,
+    save_shortcuts, validate_key_spec, ShortcutEntry, ShortcutsConfig, SHORTCUTS_HEADER,
 };
 pub use theme::{
     load_themes, save_themes, DividerConfig, MarqueeConfig, Theme, ThemeCollection, ToastConfig,

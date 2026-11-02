@@ -1162,3 +1162,79 @@ fn test_menuedit_quiet_flag_toggle_and_persistence() {
     let modal_reopened = ItemEditModal::new(&updated);
     assert!(modal_reopened.quiet);
 }
+
+#[test]
+fn test_shortcut_editor_state_and_modals() {
+    use bashmenu_core::{BashMenuConfig, ExecutionMode, ShortcutEntry, ShortcutsConfig};
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    use menuedit_cli::{
+        format_shortcut_inspector, KeyCaptureModal, ShortcutEditModal, ShortcutEditorState,
+    };
+
+    let cfg = ShortcutsConfig {
+        leader_key: "ctrl+space".to_string(),
+        leader_timeout_ms: 1500,
+        show_leader_hint: true,
+        shortcuts: vec![
+            ShortcutEntry {
+                key: "F9".to_string(),
+                description: "Shortcuts Editor".to_string(),
+                action: Some("shortcutedit".to_string()),
+                ..Default::default()
+            },
+            ShortcutEntry {
+                key: "<leader> g".to_string(),
+                description: "Git Status".to_string(),
+                action: Some("git -C {dev_dir} status -sb".to_string()),
+                execution_mode: Some(ExecutionMode::Streaming),
+                window_percent: Some(60),
+                ..Default::default()
+            },
+        ],
+    };
+
+    let mut state = ShortcutEditorState::new(cfg);
+    assert_eq!(state.selected_idx, 0);
+    state.move_down();
+    assert_eq!(state.selected_idx, 1);
+
+    // Verify inspector output formats expanded macro preview
+    let app_cfg = BashMenuConfig::default();
+    let insp = format_shortcut_inspector(&state, &app_cfg, 60);
+    assert!(insp.iter().any(|l| l.contains("Git Status")));
+    assert!(insp.iter().any(|l| l.contains("<leader> g")));
+    assert!(insp.iter().any(|l| l.contains("Target (Expand)")));
+
+    // Toggle enabled/disabled
+    assert_eq!(state.toggle_selected(), Some(false));
+    assert_eq!(state.toggle_selected(), Some(true));
+
+    // Reorder items
+    assert!(state.move_item_up());
+    assert_eq!(state.selected_idx, 0);
+    assert_eq!(state.selected_entry().unwrap().key, "<leader> g");
+
+    // KeyCaptureModal: press Ctrl+Space (leader) followed by 't' -> captures "<leader> t"
+    let mut cap = KeyCaptureModal::new("F9", "ctrl+space", false);
+    assert!(cap
+        .handle_key(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::CONTROL))
+        .is_none());
+    assert!(cap.waiting_for_chord);
+    assert!(cap
+        .handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::NONE))
+        .is_none());
+    assert!(!cap.waiting_for_chord);
+    assert_eq!(cap.captured_key, "<leader> t");
+    let accepted = cap.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    assert_eq!(accepted, Some(Some("<leader> t".to_string())));
+
+    // ShortcutEditModal roundtrip build
+    let orig = state.selected_entry().unwrap().clone();
+    let mut edit_modal = ShortcutEditModal::from_entry(&orig);
+    edit_modal.set_captured_key("<leader> t");
+    edit_modal.quiet = true;
+    let built = edit_modal
+        .build_entry(&orig)
+        .expect("Must build valid entry");
+    assert_eq!(built.key, "<leader> t");
+}
