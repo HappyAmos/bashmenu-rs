@@ -253,3 +253,24 @@
   - Added comprehensive documentation comments (`///`) to every public and internal struct, enum, trait, field, function, and method across all workspace crates (`bashmenu-core`, `bashmenu-tui`, `menuedit-cli`, `themeedit-cli`, `bashedit-cli`, `bmpager-cli`, `ymlcheck-cli`).
   - Documented theme token schemas, border character mappings, style pairs, visual wrapped lines, multi-line inputs, swap file headers, modal prompt states, and selection anchors.
   - Achieved 100% clean check under `cargo clippy --workspace --all-targets -- -D warnings` with zero missing documentation warnings across production libraries.
+
+## Phase 20: Exhaustive Codebase Function & Logic Documentation
+- [x] **Universal Doc Comments Across All Internal & Private Functions:**
+  - Conducted an automated AST line scan across all `.rs` files in `crates/*/src/` to identify every private function, helper, serde default generator, and trait implementation (`Default`, `Drop`, `From`, `Serialize`, `Deserialize`) lacking doc comments.
+  - Added doc comments (`///`) and explanatory line comments to all 170+ identified functions across all crates:
+    - `bashmenu-core`: `interpolate_internal`, `default_version`, `default_title`, `default_sleep`, `default_note_type`, `default_format`, `default_marquee_char`, `default_marquee_gap`, `default_opacity`, `default_scaling`, `default_quantization`, `default_leader_key`, `default_leader_timeout_ms`, `default_true`, `is_true`, `from`, `default`, `serialize`, `deserialize`, `inline_param_spec`, `find_inline_param_span`, `title_case`, `is_hex_token`, `get_local_time_strings`, `resolve_profile_path`, `resolve_shell_profile`, `get_primary_ip`, `get_battery_info`, `lookup_value_path`, `eval_command_substitution`, `expand_tilde_path`.
+    - `bashmenu-tui`: `drain_stale_events`, `rgb_to_hsv`, `color_luminance`, `hue_distance`, `chord_keys_match`, `current_level`, `current_level_mut`, `get_help_raw`, `action_for_gutter_token`, `activate_shortcut_index`, `activate_selected`, `go_back`, `sync_yes`, `is_table_row`, `is_table_delimiter`, `parse_cells`, `render_table`, `current_line`, `insert_char`, `insert_str`, `handle_backspace`, `handle_delete`, `handle_enter`, `parse_ordered_list`, `detect_list_margin`, `wrap_chars_by_word_with_margin`, `wrap_chars_by_word`, `get_selectable_lines`, `parse_checkbox_line`, `parse_bullet_line`, `drop`.
+    - `menuedit-cli`: `resolve_menu_path`, `resolve_script_path`, `main`, `run_glyphs_search`, `flatten_items`, `collect_all_submenu_paths`, `find_by_title_recursive`, `get_container_items_mut`, `draw_connected_panel`, `has_ctrl`, `render`, `default`.
+    - `themeedit-cli`: `resolve_themes_path`, `main`, `open_selected_token_picker`, `hit_test_preview`, `sync_selected_idx_from_row`.
+    - `bashedit-cli`: `locate_tool`, `launch_markdown_preview`, `resolve_path_tilde`, `make_save_as_modal`, `main`, `render_modal`, `show_save_toast`, `handle_active_modal`.
+    - `bmpager-cli`: `print_usage`, `parse_cli_args`, `resolve_editor_mode`, `find_bashedit_exe`, `get_system_editor`, `new`, `flush_line`, `ensure_blank_line`, `emit_word`, `run`, `handle_styled_text`, `render_heading`, `render_code_block`, `render_table`, `finish`, `resolve_start`, `clamp_top`, `query_size`, `handle_key`, `build_bar`, `render`, `prompt_search`, `search_forward`, `search_next`, `choose_link`, `open_in_editor`, `reload_spool`, `default`.
+    - `ymlcheck-cli`: `validate_yaml_syntax`, `validate_theme_file`, `validate_config_file`, `validate_menu_file`, `check_items`, `validate_shortcuts_file`, `main`.
+  - Re-scanned to verify 0 undocumented non-test functions remain across the entire repository.
+- [x] **Verification & Lifecycle Conformance:**
+  - Verified `cargo fmt --all --check` passed cleanly.
+  - Verified `cargo clippy --workspace --all-targets -- -D warnings` passed with 0 warnings.
+  - Verified `cargo test --workspace` passed 100% (all 63+ tests and doc-tests passing).
+  - Verified `shellcheck *.sh scripts/*.sh` passed cleanly.
+  - Verified `./install.sh` built release binaries and installed cleanly.
+  - Pushed to `main` (`80eb328`) and verified GitHub Actions CI run `41568390777` succeeded.
+
