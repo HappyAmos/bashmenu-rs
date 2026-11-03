@@ -127,15 +127,30 @@ impl ConfirmModal {
 
     /// Renders the confirm modal with Yes, No, Cancel buttons.
     pub fn render(&self, area: Rect, styles: &ResolvedThemeStyles, buf: &mut Buffer) -> Rect {
-        let dialog_w = (self.message.len() as u16 + 8).clamp(48, 70);
-        let dialog_h = 8;
+        let max_w = 70.min(area.width.saturating_sub(4));
+        let wrapped =
+            super::input::wrap_prompt_text(&self.message, max_w.saturating_sub(4) as usize);
+        let max_line_w = wrapped
+            .iter()
+            .map(|l| l.chars().count())
+            .max()
+            .unwrap_or(20);
+        let dialog_w = (max_line_w as u16 + 8).clamp(48, max_w);
+        let dialog_h = (wrapped.len() as u16 + 5).clamp(8, area.height.saturating_sub(2));
 
         let inner = render_modal_frame(area, dialog_w, dialog_h, &self.title, styles, buf);
 
-        // 1. Render Message Text
-        let msg_y = inner.y + 1;
-        let msg_x = inner.x + 2;
-        buf.set_string(msg_x, msg_y, &self.message, styles.text);
+        // 1. Render Message Text (wrapped and clamped to visible inner area)
+        for (i, line) in wrapped.iter().enumerate() {
+            let y = inner.y + 1 + i as u16;
+            if y < inner.y + inner.height.saturating_sub(2) {
+                let clipped: String = line
+                    .chars()
+                    .take(inner.width.saturating_sub(4) as usize)
+                    .collect();
+                buf.set_string(inner.x + 2, y, &clipped, styles.text);
+            }
+        }
 
         // 2. Render Action Buttons [ Yes ] [  No ] [ Cancel ]
         let btn_y = inner.y + inner.height.saturating_sub(2);

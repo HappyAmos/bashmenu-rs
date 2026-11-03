@@ -25,6 +25,7 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
   - **Mark Active Tasks `PENDING`:** Before starting work on any TODO item, you MUST immediately mark it with `PENDING:` directly after the checkbox (`- [ ] PENDING: <task>`).
   - **Complete & Log to `DONE.md`:** When a task is completed (including verification, commit, push, and remote CI verification), you MUST remove the `PENDING:` label, mark the task as complete (`- [x]`), and append a summary of the completed task to `.agents/skills/bashmenu-rs-developer/DONE.md`.
   - **Prune Completed Tasks & Re-Check:** When there are no more tasks left to complete, remove finished (`- [x]`) tasks from the TODO list. Finally, when all tasks are completed, you MUST re-check the TODO list (`~/.config/bashmenu/notebooks/notes.yml` and `.agents/skills/bashmenu-rs-developer/TODO.md`) to ensure no new tasks were added while you were working.
+  - **Long-Running Process Periodic Status Updates:** When working on long running processes (tasks that are more than 1 minute to complete), give a short blurb of what you are working on at least every 2 minutes.
 - **Configuration Header Preservation Invariant (`bashmenu.yml`):**
   - Never use raw file writes with `serde_yml::to_string()` directly to overwrite `bashmenu.yml`.
   - Always call `bashmenu_core::config::save_config(path, config)` so that `CONFIG_HEADER` comments, documentation, and placeholder references are cleanly preserved at the top of the file.
@@ -223,6 +224,7 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
   - Terminal Geometry Bounds: All modal dialogs must fit standard 80-column terminals:
     - Width: Inner dialog width must not exceed 78 columns (80 columns with right shadow).
     - Height: Inner dialog height must not exceed 27 to 29 rows to prevent vertical clipping on standard 80×24 / 80×28 / 80×30 terminals.
+  - **Modal Text Clamping & Word Wrapping Invariant:** Text inside popup modals MUST NEVER exceed visible window width. In cases where it may exceed window width, text MUST be wrapped (e.g. using `wrap_prompt_text`) or safely clipped within available inner columns, preventing text from spilling outside borders or wrapping onto borders.
 - **Standard Action Button Sizing:** Button variants apply 2-line borders. Never use single-line `height: 1` on bottom dialog action buttons. Use standard button rows with min-width 16 and distinct focus styling.
 - **Button Semantic Alias Resolution:**
   - Theme definitions specify button colors under `button_primary`, `button_error`, `button_cancel`, and `button_success`.

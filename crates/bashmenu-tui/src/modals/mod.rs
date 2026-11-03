@@ -19,7 +19,7 @@ pub use file_picker::FilePickerModal;
 pub use frame::{compute_modal_inner, is_close_button_clicked, render_modal_frame};
 pub use grid_picker::{AsciiGridModal, ColorGridModal};
 pub use help::HelpModal;
-pub use input::InputModal;
+pub use input::{wrap_prompt_text, InputModal};
 pub use message::MessageModal;
 pub use note_editor::{NoteEditorAction, NoteEditorModal};
 pub use note_viewer::{wrap_footer_tokens, NoteViewerAction, NoteViewerModal};

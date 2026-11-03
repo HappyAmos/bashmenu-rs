@@ -268,7 +268,11 @@ impl ShortcutDispatcher {
 
         if entries.is_empty() {
             let msg = "No <leader> shortcuts configured. Press 'F9' to add.";
-            buf.set_string(inner.x + 1, inner.y, msg, badge_style);
+            let clipped_msg: String = msg
+                .chars()
+                .take(inner.width.saturating_sub(2) as usize)
+                .collect();
+            buf.set_string(inner.x + 1, inner.y, &clipped_msg, badge_style);
         } else {
             for (idx, (chord_key, entry)) in entries.iter().take(list_rows).enumerate() {
                 let y = inner.y + idx as u16;
@@ -318,9 +322,20 @@ impl ShortcutDispatcher {
             );
         }
         let footer = "Press key to launch  |  Click item  |  [ESC] Cancel";
-        let fw = UnicodeWidthStr::width(footer) as u16;
+        let avail_w = inner.width.saturating_sub(2) as usize;
+        let footer_text = if UnicodeWidthStr::width(footer) <= avail_w {
+            footer.to_string()
+        } else {
+            let compact = "Press key | Click item | [ESC]";
+            if UnicodeWidthStr::width(compact) <= avail_w {
+                compact.to_string()
+            } else {
+                compact.chars().take(avail_w).collect()
+            }
+        };
+        let fw = UnicodeWidthStr::width(footer_text.as_str()) as u16;
         let fx = inner.x + inner.width.saturating_sub(fw) / 2;
-        buf.set_string(fx, footer_y, footer, badge_style);
+        buf.set_string(fx, footer_y, &footer_text, badge_style);
     }
 }
 

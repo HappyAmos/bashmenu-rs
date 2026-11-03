@@ -439,7 +439,7 @@ impl InputModal {
 }
 
 /// Word wrapper for modal prompt strings. Respects explicit newlines and breaks long words.
-fn wrap_prompt_text(text: &str, max_w: usize) -> Vec<String> {
+pub fn wrap_prompt_text(text: &str, max_w: usize) -> Vec<String> {
     if max_w == 0 {
         return vec![text.to_string()];
     }

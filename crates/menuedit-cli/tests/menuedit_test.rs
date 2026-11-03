@@ -1312,3 +1312,123 @@ fn test_shortcut_editor_borders_and_gutter_alignment() {
         "Bottom-right window corner must be ┘"
     );
 }
+
+#[test]
+fn test_shortcut_modals_text_does_not_exceed_window_width() {
+    use bashmenu_core::{ShortcutEntry, ShortcutsConfig};
+    use bashmenu_tui::{compute_modal_inner, ResolvedThemeStyles};
+    use menuedit_cli::{KeyCaptureModal, LeaderSettingsModal, ShortcutEditModal};
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+
+    let styles = ResolvedThemeStyles::default();
+    let area = Rect::new(0, 0, 70, 26);
+
+    // 1. LeaderSettingsModal with long error
+    let mut leader_modal = LeaderSettingsModal::new(&ShortcutsConfig::default());
+    leader_modal.error_msg = Some(
+        "Invalid leader key combination! Please specify a single modifier plus key or valid chord."
+            .to_string(),
+    );
+    let mut buf = Buffer::empty(area);
+    leader_modal.render(area, &styles, &mut buf);
+
+    let box_w = area.width.saturating_sub(8).clamp(48, 68);
+    let box_h = 16;
+    let inner = compute_modal_inner(area, box_w, box_h);
+    let right_border_x = inner.x + inner.width;
+
+    for y in (inner.y - 1)..(inner.y + inner.height + 1) {
+        let sym = buf[(right_border_x, y)].symbol();
+        assert!(
+            sym == "│" || sym == "┐" || sym == "┘" || sym == "]",
+            "LeaderSettingsModal right border at row {} was overwritten with '{}'",
+            y,
+            sym
+        );
+        for x in (right_border_x + 1)..area.width {
+            let ch = buf[(x, y)].symbol();
+            assert!(
+                ch == " " || ch == "░",
+                "Spillover past modal border at ({}, {}): '{}'",
+                x,
+                y,
+                ch
+            );
+        }
+    }
+
+    // 2. ShortcutEditModal with long error & various fields
+    let entry = ShortcutEntry {
+        key: "<leader> t".to_string(),
+        description: "A very long description that might test layout boundaries".to_string(),
+        action: Some("echo 'very long command string that should be contained safely'".to_string()),
+        ..Default::default()
+    };
+    let mut edit_modal = ShortcutEditModal::from_entry(&entry);
+    edit_modal.error_msg = Some(
+        "Error: target executable cannot be located within configured system paths or workspace directory."
+            .to_string(),
+    );
+    let mut buf2 = Buffer::empty(area);
+    edit_modal.render(area, &styles, &mut buf2);
+
+    let edit_box_w = area.width.saturating_sub(6).clamp(56, 76);
+    let edit_box_h = area.height.saturating_sub(2).clamp(22, 26);
+    let edit_inner = compute_modal_inner(area, edit_box_w, edit_box_h);
+    let edit_right_border_x = edit_inner.x + edit_inner.width;
+
+    for y in (edit_inner.y - 1)..(edit_inner.y + edit_inner.height + 1) {
+        let sym = buf2[(edit_right_border_x, y)].symbol();
+        assert!(
+            sym == "│" || sym == "┐" || sym == "┘" || sym == "]",
+            "ShortcutEditModal right border at row {} was overwritten with '{}'",
+            y,
+            sym
+        );
+        for x in (edit_right_border_x + 1)..area.width {
+            let ch = buf2[(x, y)].symbol();
+            assert!(
+                ch == " " || ch == "░",
+                "Spillover past modal border at ({}, {}): '{}'",
+                x,
+                y,
+                ch
+            );
+        }
+    }
+
+    // 3. KeyCaptureModal with long prompt/error
+    let mut cap_modal = KeyCaptureModal::new("Ctrl+Space", "Ctrl+Space", false);
+    cap_modal.error_msg = Some(
+        "Single letter without Ctrl/Alt cannot be bound directly. Press leader chord or modifier."
+            .to_string(),
+    );
+    let mut buf3 = Buffer::empty(area);
+    cap_modal.render(area, &styles, &mut buf3);
+
+    let cap_box_w = area.width.saturating_sub(8).clamp(46, 68);
+    let cap_box_h = 13;
+    let cap_inner = compute_modal_inner(area, cap_box_w, cap_box_h);
+    let cap_right_border_x = cap_inner.x + cap_inner.width;
+
+    for y in (cap_inner.y - 1)..(cap_inner.y + cap_inner.height + 1) {
+        let sym = buf3[(cap_right_border_x, y)].symbol();
+        assert!(
+            sym == "│" || sym == "┐" || sym == "┘" || sym == "]",
+            "KeyCaptureModal right border at row {} was overwritten with '{}'",
+            y,
+            sym
+        );
+        for x in (cap_right_border_x + 1)..area.width {
+            let ch = buf3[(x, y)].symbol();
+            assert!(
+                ch == " " || ch == "░",
+                "Spillover past modal border at ({}, {}): '{}'",
+                x,
+                y,
+                ch
+            );
+        }
+    }
+}

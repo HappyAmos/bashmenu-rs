@@ -8,9 +8,9 @@ use bashmenu_core::{
     PLACEHOLDER_HELP_TEXT,
 };
 use bashmenu_tui::{
-    key_event_to_token, render_modal_frame, visible_text_len, wrap_spread_help_gutter_layout,
-    ConfirmChoice, ConfirmModal, FilePickerModal, HelpModal, ResolvedThemeStyles, TerminalGuard,
-    TextInput, ToastRack,
+    key_event_to_token, render_modal_frame, visible_text_len, wrap_prompt_text,
+    wrap_spread_help_gutter_layout, ConfirmChoice, ConfirmModal, FilePickerModal, HelpModal,
+    ResolvedThemeStyles, TerminalGuard, TextInput, ToastRack,
 };
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEventKind};
 use ratatui::buffer::Buffer;
@@ -312,8 +312,8 @@ impl KeyCaptureModal {
     }
 
     pub fn render(&self, area: Rect, styles: &ResolvedThemeStyles, buf: &mut Buffer) {
-        let box_w = area.width.saturating_sub(8).clamp(44, 68);
-        let box_h = 12;
+        let box_w = area.width.saturating_sub(8).clamp(46, 68);
+        let box_h = 13;
         let title = if self.is_leader_def {
             "Capture Leader Key"
         } else {
@@ -333,20 +333,25 @@ impl KeyCaptureModal {
             .bg(base_bg)
             .add_modifier(Modifier::BOLD);
 
-        if self.is_leader_def {
-            buf.set_string(
-                inner.x + 1,
-                inner.y,
-                "Press desired Leader Key combo (e.g. Ctrl+Space, Ctrl+B, Alt+Space):",
-                text_style,
-            );
+        let avail_w = inner.width.saturating_sub(2) as usize;
+
+        let prompt = if self.is_leader_def {
+            "Press desired Leader Key combo (e.g. Ctrl+Space, Ctrl+B, Alt+Space):".to_string()
         } else {
-            let prompt = format!(
+            format!(
                 "Press a direct key (F9, Alt+K, Ctrl+G) OR press Leader ({}) then a key:",
                 self.leader_key
-            );
-            buf.set_string(inner.x + 1, inner.y, &prompt, text_style);
+            )
+        };
+        let wrapped_prompt = wrap_prompt_text(&prompt, avail_w);
+        let mut cur_y = inner.y;
+        for line in wrapped_prompt.iter().take(2) {
+            let clipped: String = line.chars().take(avail_w).collect();
+            buf.set_string(inner.x + 1, cur_y, &clipped, text_style);
+            cur_y += 1;
         }
+
+        cur_y = cur_y.max(inner.y + 2);
 
         let status_line = if self.waiting_for_chord {
             format!(
@@ -356,29 +361,38 @@ impl KeyCaptureModal {
         } else {
             format!("Captured Binding :  [ {} ]", self.captured_key)
         };
-        buf.set_string(inner.x + 2, inner.y + 2, &status_line, bold_style);
+        let clipped_status: String = status_line.chars().take(avail_w).collect();
+        buf.set_string(inner.x + 1, cur_y, &clipped_status, bold_style);
+        cur_y += 2;
 
         if let Some(ref err) = self.error_msg {
-            let clipped: String = err
-                .chars()
-                .take(inner.width.saturating_sub(2) as usize)
-                .collect();
-            buf.set_string(inner.x + 1, inner.y + 4, &clipped, err_style);
+            let wrapped_err = wrap_prompt_text(err, avail_w);
+            for line in wrapped_err.iter().take(2) {
+                if cur_y < inner.y + inner.height.saturating_sub(1) {
+                    let clipped: String = line.chars().take(avail_w).collect();
+                    buf.set_string(inner.x + 1, cur_y, &clipped, err_style);
+                    cur_y += 1;
+                }
+            }
         } else {
-            buf.set_string(
-                inner.x + 1,
-                inner.y + 4,
-                "Valid binding ready. Press [ENTER] to accept.",
-                hint_style,
-            );
+            let hint = "Valid binding ready. Press [ENTER] to accept.";
+            let clipped_hint: String = hint.chars().take(avail_w).collect();
+            buf.set_string(inner.x + 1, cur_y, &clipped_hint, hint_style);
         }
 
         let footer = "[ENTER] Accept Binding    [ESC] Cancel";
-        let fx = inner.x + inner.width.saturating_sub(footer.len() as u16) / 2;
+        let fw = footer.len();
+        let footer_text: String = if fw <= avail_w {
+            footer.to_string()
+        } else {
+            let short_footer = "[ENTER] Accept  [ESC] Cancel";
+            short_footer.chars().take(avail_w).collect()
+        };
+        let fx = inner.x + inner.width.saturating_sub(footer_text.len() as u16) / 2;
         buf.set_string(
             fx,
             inner.y + inner.height.saturating_sub(1),
-            footer,
+            &footer_text,
             hint_style,
         );
     }
@@ -406,7 +420,7 @@ impl LeaderSettingsModal {
 
     pub fn render(&self, area: Rect, styles: &ResolvedThemeStyles, buf: &mut Buffer) {
         let box_w = area.width.saturating_sub(8).clamp(48, 68);
-        let box_h = 15;
+        let box_h = 16;
         let inner = render_modal_frame(area, box_w, box_h, "Leader Key Settings", styles, buf);
         if inner.width < 15 || inner.height < 10 {
             return;
@@ -421,6 +435,7 @@ impl LeaderSettingsModal {
             .bg(base_bg)
             .add_modifier(Modifier::BOLD);
 
+        let avail_w = inner.width.saturating_sub(2) as usize;
         let field_w = inner.width.saturating_sub(22).max(12);
 
         // 0: Leader Key Input
@@ -460,14 +475,19 @@ impl LeaderSettingsModal {
         } else {
             label_style
         };
-        buf.set_string(inner.x + 1, inner.y + 7, &hint_lbl, tgl_style);
+        let clipped_hint: String = hint_lbl.chars().take(avail_w).collect();
+        buf.set_string(inner.x + 1, inner.y + 7, &clipped_hint, tgl_style);
 
         if let Some(ref err) = self.error_msg {
-            buf.set_string(inner.x + 1, inner.y + 9, err, err_style);
+            let wrapped_err = wrap_prompt_text(err, avail_w);
+            for (idx, line) in wrapped_err.iter().take(2).enumerate() {
+                let clipped: String = line.chars().take(avail_w).collect();
+                buf.set_string(inner.x + 1, inner.y + 9 + idx as u16, &clipped, err_style);
+            }
         }
 
         // Buttons (4 = Save, 5 = Cancel)
-        let btn_y = inner.y + inner.height.saturating_sub(2);
+        let btn_y = inner.y + inner.height.saturating_sub(3);
         let save_lbl = "   [ Save ]   ";
         let cancel_lbl = "  [ Cancel ]  ";
         let save_style = if self.focus_idx == 4 {
@@ -484,12 +504,23 @@ impl LeaderSettingsModal {
         buf.set_string(center_x.saturating_sub(16), btn_y, save_lbl, save_style);
         buf.set_string(center_x + 2, btn_y, cancel_lbl, cancel_style);
 
-        let footer = "[Tab/Up/Down] Navigate | [Ctrl+K] Capture | [Enter] Select | [Esc] Cancel";
-        let fx = inner.x + inner.width.saturating_sub(footer.len() as u16) / 2;
+        // 2-line wrapped footer to ensure text NEVER exceeds inner width
+        let f_line1 = "[Tab/Up/Down] Navigate | [Ctrl+K] Capture Key";
+        let f_line2 = "[Enter] Select | [Esc] Cancel";
+        let f1_clipped: String = f_line1.chars().take(avail_w).collect();
+        let f2_clipped: String = f_line2.chars().take(avail_w).collect();
+        let fx1 = inner.x + inner.width.saturating_sub(f1_clipped.len() as u16) / 2;
+        let fx2 = inner.x + inner.width.saturating_sub(f2_clipped.len() as u16) / 2;
         buf.set_string(
-            fx,
+            fx1,
+            inner.y + inner.height.saturating_sub(2),
+            &f1_clipped,
+            hint_style,
+        );
+        buf.set_string(
+            fx2,
             inner.y + inner.height.saturating_sub(1),
-            footer,
+            &f2_clipped,
             hint_style,
         );
     }
@@ -684,9 +715,9 @@ impl ShortcutEditModal {
 
     pub fn render(&self, area: Rect, styles: &ResolvedThemeStyles, buf: &mut Buffer) {
         let box_w = area.width.saturating_sub(6).clamp(56, 76);
-        let box_h = area.height.saturating_sub(2).clamp(20, 25);
+        let box_h = area.height.saturating_sub(2).clamp(22, 26);
         let inner = render_modal_frame(area, box_w, box_h, "Edit Keyboard Shortcut", styles, buf);
-        if inner.width < 20 || inner.height < 12 {
+        if inner.width < 20 || inner.height < 14 {
             return;
         }
 
@@ -699,8 +730,9 @@ impl ShortcutEditModal {
             .bg(base_bg)
             .add_modifier(Modifier::BOLD);
 
-        let field_x = inner.x + 20;
-        let field_w = inner.width.saturating_sub(22).max(14);
+        let avail_w = inner.width.saturating_sub(2) as usize;
+        let field_x = inner.x + 19;
+        let field_w = inner.width.saturating_sub(21).max(14);
         let mut y = inner.y;
 
         // 0: Description
@@ -740,24 +772,32 @@ impl ShortcutEditModal {
             ldr_chk,
             self.composed_key()
         );
+        let ldr_clipped: String = ldr_str.chars().take(avail_w).collect();
         let ldr_style = if self.focus_idx == 3 {
             active_style
         } else {
             label_style
         };
-        buf.set_string(inner.x + 1, y, &ldr_str, ldr_style);
+        buf.set_string(inner.x + 1, y, &ldr_clipped, ldr_style);
         y += 2;
 
         // 4: Item Type selector
         let type_name = SHORTCUT_TYPES[self.item_type_idx].0;
-        let type_str = format!("◄  {}  ►   (Left/Right/Space to change)", type_name);
+        let type_str = if field_w >= 36 {
+            format!("◄  {}  ►   (Left/Right/Space)", type_name)
+        } else if field_w >= 22 {
+            format!("◄  {}  ►", type_name)
+        } else {
+            format!("◄{}►", type_name)
+        };
+        let type_clipped: String = type_str.chars().take(field_w as usize).collect();
         buf.set_string(inner.x + 1, y, "Shortcut Type   :", label_style);
         let type_style = if self.focus_idx == 4 {
             active_style
         } else {
             styles.shortcut_key.bg(base_bg).add_modifier(Modifier::BOLD)
         };
-        buf.set_string(field_x, y, &type_str, type_style);
+        buf.set_string(field_x, y, &type_clipped, type_style);
         y += 2;
 
         // 5: Target Action / File + 6: Browse button
@@ -768,7 +808,7 @@ impl ShortcutEditModal {
             _ => "Command / Action:",
         };
         buf.set_string(inner.x + 1, y, target_lbl, label_style);
-        let tgt_w = field_w.saturating_sub(14).max(10);
+        let tgt_w = field_w.saturating_sub(12).max(10);
         draw_input(
             buf,
             Rect::new(field_x, y, tgt_w, 1),
@@ -802,39 +842,65 @@ impl ShortcutEditModal {
         } else {
             "( )"
         };
-        let mode_line = format!(
-            "{} Console   {} Streaming   {} Interactive",
-            c_mark, s_mark, i_mark
-        );
+        let mode_line = if field_w >= 44 {
+            format!(
+                "{} Console   {} Streaming   {} Interactive",
+                c_mark, s_mark, i_mark
+            )
+        } else if field_w >= 34 {
+            format!("{} Console  {} Stream  {} Inter", c_mark, s_mark, i_mark)
+        } else {
+            format!("{} Con  {} Str  {} Int", c_mark, s_mark, i_mark)
+        };
+        let mode_clipped: String = mode_line.chars().take(field_w as usize).collect();
         let mode_style = if self.focus_idx == 7 {
             active_style
         } else {
             label_style
         };
-        buf.set_string(field_x, y, &mode_line, mode_style);
+        buf.set_string(field_x, y, &mode_clipped, mode_style);
         y += 2;
 
         // 8: Window Size % (or Quiet Mode) & 9: Alt Buffer & 10: Enabled
         buf.set_string(inner.x + 1, y, "Window Size %   :", label_style);
         draw_input(
             buf,
-            Rect::new(field_x, y, 8, 1),
+            Rect::new(field_x, y, 6, 1),
             &self.window_percent,
             styles,
             self.focus_idx == 8,
         );
-        buf.set_string(
-            field_x + 10,
-            y,
-            "(20-100%, used for Streaming/Interactive)",
-            hint_style,
-        );
+        let pct_hint_avail = field_w.saturating_sub(8) as usize;
+        let pct_hint = if pct_hint_avail >= 35 {
+            "(20-100%, Streaming/Interactive)"
+        } else if pct_hint_avail >= 12 {
+            "(20-100%)"
+        } else {
+            ""
+        };
+        let pct_clipped: String = pct_hint.chars().take(pct_hint_avail).collect();
+        buf.set_string(field_x + 8, y, &pct_clipped, hint_style);
         y += 2;
 
+        // 9: Quiet, 10: Alt Buffer, 11: Enabled checkboxes
         let q_chk = if self.quiet { "[x]" } else { "[ ]" };
-        let q_lbl = format!("{} Quiet Mode (No Pause)", q_chk);
+        let alt_chk = if self.alt_buffer { "[x]" } else { "[ ]" };
+        let en_chk = if self.enabled { "[x]" } else { "[ ]" };
+
+        let q_lbl = if avail_w >= 54 {
+            format!("{} Quiet Mode", q_chk)
+        } else {
+            format!("{} Quiet", q_chk)
+        };
+        let alt_lbl = format!("{} Alt Buffer", alt_chk);
+        let en_lbl = format!("{} Enabled", en_chk);
+
+        let q_x = inner.x + 1;
+        let alt_x = q_x + q_lbl.len() as u16 + 2;
+        let en_x = alt_x + alt_lbl.len() as u16 + 2;
+
         buf.set_string(
-            inner.x + 1,
+            q_x,
             y,
             &q_lbl,
             if self.focus_idx == 9 {
@@ -843,11 +909,8 @@ impl ShortcutEditModal {
                 label_style
             },
         );
-
-        let alt_chk = if self.alt_buffer { "[x]" } else { "[ ]" };
-        let alt_lbl = format!("{} Alt Buffer", alt_chk);
         buf.set_string(
-            inner.x + 29,
+            alt_x,
             y,
             &alt_lbl,
             if self.focus_idx == 10 {
@@ -856,11 +919,8 @@ impl ShortcutEditModal {
                 label_style
             },
         );
-
-        let en_chk = if self.enabled { "[x]" } else { "[ ]" };
-        let en_lbl = format!("{} Enabled", en_chk);
         buf.set_string(
-            inner.x + 46,
+            en_x,
             y,
             &en_lbl,
             if self.focus_idx == 11 {
@@ -872,15 +932,15 @@ impl ShortcutEditModal {
         y += 2;
 
         if let Some(ref err) = self.error_msg {
-            let clipped: String = err
-                .chars()
-                .take(inner.width.saturating_sub(2) as usize)
-                .collect();
-            buf.set_string(inner.x + 1, y, &clipped, err_style);
+            let wrapped_err = wrap_prompt_text(err, avail_w);
+            for (idx, line) in wrapped_err.iter().take(2).enumerate() {
+                let clipped: String = line.chars().take(avail_w).collect();
+                buf.set_string(inner.x + 1, y + idx as u16, &clipped, err_style);
+            }
         }
 
         // 12: Save, 13: Cancel
-        let btn_y = inner.y + inner.height.saturating_sub(2);
+        let btn_y = inner.y + inner.height.saturating_sub(3);
         let save_lbl = "   [ Save (Ctrl+S) ]   ";
         let cancel_lbl = "   [ Cancel (Esc) ]   ";
         let save_style = if self.focus_idx == 12 {
@@ -897,13 +957,27 @@ impl ShortcutEditModal {
         buf.set_string(center_x.saturating_sub(24), btn_y, save_lbl, save_style);
         buf.set_string(center_x + 2, btn_y, cancel_lbl, cancel_style);
 
-        let footer =
-            "[Tab/Up/Down] Field | [F2] Capture Key | [Ctrl+P] Placeholders | [Ctrl+S] Save";
-        let fx = inner.x + inner.width.saturating_sub(footer.len() as u16) / 2;
+        // 2-line wrapped footer to ensure text NEVER exceeds inner width
+        let f_line1 = if avail_w >= 56 {
+            "[Tab/Up/Down] Field | [F2] Capture Key | [Ctrl+P] Macros"
+        } else {
+            "[Tab/Down] Field | [F2] Capture | [Ctrl+P] Macros"
+        };
+        let f_line2 = "[Ctrl+S] Save | [Esc] Cancel";
+        let f1_clipped: String = f_line1.chars().take(avail_w).collect();
+        let f2_clipped: String = f_line2.chars().take(avail_w).collect();
+        let fx1 = inner.x + inner.width.saturating_sub(f1_clipped.len() as u16) / 2;
+        let fx2 = inner.x + inner.width.saturating_sub(f2_clipped.len() as u16) / 2;
         buf.set_string(
-            fx,
+            fx1,
+            inner.y + inner.height.saturating_sub(2),
+            &f1_clipped,
+            hint_style,
+        );
+        buf.set_string(
+            fx2,
             inner.y + inner.height.saturating_sub(1),
-            footer,
+            &f2_clipped,
             hint_style,
         );
     }

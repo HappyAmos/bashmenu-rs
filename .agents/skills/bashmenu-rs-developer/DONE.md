@@ -226,3 +226,13 @@
   - Added regression test `test_shortcut_editor_borders_and_gutter_alignment` in `crates/menuedit-cli/tests/menuedit_test.rs`.
 - [x] **Long-Running Process Periodic Status Updates Directive (`SKILL.md`, `AGENTS.md`):**
   - Documented requirement to give a short blurb of progress at least every 2 minutes during processes/tasks exceeding 1 minute in `.agents/skills/bashmenu-rs-developer/SKILL.md` and `AGENTS.md`.
+
+## Phase 18: Popup Modal Text Clamping & Word Wrapping Invariant (`shortcutedit`, `bashmenu-tui`)
+- [x] **Popup Modal Text Clamping & Wrapping Invariant (`SKILL.md`, `AGENTS.md`):**
+  - Documented invariant in `.agents/skills/bashmenu-rs-developer/SKILL.md` (Section 7) and `AGENTS.md` (Section 3): Text inside popup modals MUST NEVER exceed visible window width. In cases where it may exceed window width, text MUST be wrapped (e.g. using `wrap_prompt_text`) or safely clipped within available inner columns, preventing text from spilling outside borders or wrapping onto borders.
+- [x] **Keyboard Shortcut Program Modal Wrapping (`shortcutedit`, `crates/menuedit-cli`, `crates/bashmenu-tui`):**
+  - Made `wrap_prompt_text` public in `bashmenu_tui` and used it across `ConfirmModal`, `MessageModal`, and `WhichKeyPopup`.
+  - In `KeyCaptureModal`, wrapped prompt strings and error messages using `wrap_prompt_text`, safely clipping status lines and footer hints.
+  - In `LeaderSettingsModal`, wrapped error messages, clamped hints, and converted footer into a 2-line wrapped layout within available inner columns.
+  - In `ShortcutEditModal`, clamped `composed_key`, dynamically formatted item type options, execution mode selectors, and window percent hints to available width; compacted checkboxes; wrapped error messages; and converted footer hints into a 2-line wrapped layout.
+  - Added regression test `test_shortcut_modals_text_does_not_exceed_window_width` in `crates/menuedit-cli/tests/menuedit_test.rs`.
