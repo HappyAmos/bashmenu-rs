@@ -166,14 +166,22 @@ impl WallpaperGrid {
     }
 }
 
+/// Composite cache lookup key matching texture dimensions, background color, and scaling parameters.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct CompositorCacheKey {
+    /// Image source path or identifier
     image: String,
+    /// Terminal viewport column width
     width: usize,
+    /// Terminal viewport row height
     height: usize,
+    /// RGB color components of the container theme background
     theme_bg_rgb: (u8, u8, u8),
+    /// Fixed-point opacity factor representation
     opacity: u32,
+    /// Wallpaper scaling algorithm ("cover", "stretch", "fit", "center", "tile")
     scaling: String,
+    /// Color quantization step
     quantization: usize,
 }
 
@@ -182,9 +190,13 @@ struct CompositorCacheKey {
 pub struct WallpaperCompositor {
     /// Active wallpaper configuration settings
     pub config: WallpaperConfig,
+    /// Cached filesystem path of the loaded wallpaper image
     cached_path: Option<PathBuf>,
+    /// Decoded source RGB image texture
     raw_image: Option<RgbImage>,
+    /// Cached pre-rendered wallpaper cell grid
     cached_grid: Option<WallpaperGrid>,
+    /// Cache validation key matching current dimensions, opacity, and theme background
     cached_key: Option<CompositorCacheKey>,
 }
 
@@ -584,9 +596,13 @@ fn hue_distance(h1: f64, h2: f64) -> f64 {
 struct ExtractedColor {
     /// ANSI 256-color palette index.
     idx: u8,
+    /// Hue value in `[0.0, 1.0)`
     h: f64,
+    /// Saturation value in `[0.0, 1.0]`
     s: f64,
+    /// Relative perceptual luminance
     lum: f64,
+    /// Pixel frequency count in the source image
     count: u32,
 }
 

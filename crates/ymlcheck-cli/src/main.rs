@@ -9,6 +9,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process;
 
+/// Canonical names for 16-color ANSI terminal palette colors.
 const VALID_16_COLORS: &[&str] = &[
     "COLOR_BLACK",
     "COLOR_RED",
@@ -34,6 +35,7 @@ const VALID_16_COLORS: &[&str] = &[
     "COLOR_BROWN",
 ];
 
+/// Valid field keys permitted in a theme's `window:` border configuration map.
 const VALID_WINDOW_BORDER_KEYS: &[&str] = &[
     "border_horizontal",
     "border_vertical",
@@ -60,6 +62,7 @@ const VALID_WINDOW_BORDER_KEYS: &[&str] = &[
     "gutter_bottom_tee",
 ];
 
+/// Valid option type string descriptors permitted in menu items and shortcuts.
 const VALID_OPTION_TYPES: &[&str] = &[
     "command",
     "script",
@@ -84,6 +87,7 @@ const VALID_OPTION_TYPES: &[&str] = &[
     "action",
 ];
 
+/// Command-line argument configuration for the `ymlcheck` schema linter.
 #[derive(Parser, Debug)]
 #[command(
     name = "ymlcheck",

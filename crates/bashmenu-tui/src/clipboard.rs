@@ -8,10 +8,14 @@ use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
+/// Process-global fallback clipboard buffer used when OS clipboard tools are unavailable.
 static IN_MEMORY_CLIPBOARD: Mutex<Option<String>> = Mutex::new(None);
+
+/// Atomic flag indicating whether isolated test-mode clipboard is enabled.
 static TEST_MODE: AtomicBool = AtomicBool::new(false);
 
 thread_local! {
+    /// Thread-local clipboard buffer used to prevent race conditions during parallel test runs.
     static THREAD_CLIPBOARD: RefCell<Option<String>> = const { RefCell::new(None) };
 }
 
@@ -38,6 +42,7 @@ pub fn get_shared_cutbuffer_path() -> PathBuf {
 
 /// Minimal standard Base64 encoder for OSC 52 clipboard sequences
 pub fn base64_encode(bytes: &[u8]) -> String {
+    /// Standard Base64 character lookup table.
     const CHARSET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
     for chunk in bytes.chunks(3) {

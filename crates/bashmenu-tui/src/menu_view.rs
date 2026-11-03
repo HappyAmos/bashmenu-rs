@@ -61,27 +61,42 @@ pub enum MenuAction {
     Exit,
 }
 
+/// Internal navigation stack entry representing an active submenu or notebook level.
 #[derive(Debug, Clone)]
 struct MenuLevel {
+    /// Title string displayed in the menu window frame
     title: String,
+    /// List of menu items present at this submenu tier
     items: Vec<MenuItem>,
+    /// Index of currently selected/highlighted item
     selected_idx: usize,
+    /// Vertical scrolling offset in rows
     scroll_offset: usize,
+    /// Whether this navigation level represents a notebook submenu
     is_notebook: bool,
+    /// Notebook source file path if this level is a notebook view
     notebook_file: Option<String>,
 }
 
 /// The interactive menu widget and state machine
 pub struct MenuView {
+    /// Navigation stack holding ancestor menus and current active submenu
     stack: Vec<MenuLevel>,
+    /// Theme styling attributes for borders, text, and active highlights
     styles: ResolvedThemeStyles,
+    /// Whether Nerd Font glyphs should be rendered for menu item icons
     use_nerd_fonts: bool,
+    /// Raw un-interpolated template string for the status gutter
     status_gutter: String,
+    /// Whether to show shortcut keys on the help gutter
     show_shortcuts: bool,
+    /// Formatted plugin output rows displayed above the help gutter
     plugin_rows: Vec<PluginDisplayRow>,
     /// Active runtime configuration parameters
     pub config: BashMenuConfig,
+    /// Background wallpaper compositor for full-window backdrop rendering
     wallpaper: Option<WallpaperCompositor>,
+    /// Marquee scroll offset and pause tracker for long selected item labels
     marquee_tracker: MarqueeTracker,
 }
 

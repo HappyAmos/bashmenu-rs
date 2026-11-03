@@ -19,30 +19,52 @@ pub fn render_markdown(source: &str, terminal_width: usize) -> String {
     renderer.finish()
 }
 
+/// Stateful Markdown stream renderer converting Pulldown-Cmark events to ANSI-styled terminal text.
 struct MarkdownRenderer {
+    /// Terminal viewport column width for word wrapping
     width: usize,
+    /// Accumulated ANSI output buffer
     output: String,
+    /// Current pending visual line buffer
     current_line: String,
+    /// Active heading level being processed
     heading_level: Option<HeadingLevel>,
+    /// Accumulated heading text
     heading_text: String,
+    /// Whether parser is currently inside a fenced code block
     in_code_block: bool,
+    /// Accumulated code block text
     code_block_text: String,
+    /// Active list nesting stack (unordered vs ordered with item index)
     list_stack: Vec<ListState>,
+    /// Target URL for markdown links being rendered
     link_url: Option<String>,
+    /// Whether parser is inside a markdown table
     in_table: bool,
+    /// Whether parser is currently in the table header row
     table_head: bool,
+    /// Collected table row cells
     table_rows: Vec<Vec<String>>,
+    /// Current table row cells accumulator
     current_row: Vec<String>,
+    /// Current cell text accumulator
     current_cell: String,
+    /// Bold text modifier state
     bold: bool,
+    /// Italic text modifier state
     italic: bool,
+    /// Strikethrough text modifier state
     strikethrough: bool,
+    /// Blockquote nesting state
     in_blockquote: bool,
 }
 
+/// Active list context state in markdown rendering.
 #[derive(Clone, Copy)]
 enum ListState {
+    /// Unordered bulleted list (`*` or `-`)
     Unordered,
+    /// Ordered numbered list with current integer item number
     Ordered(u64),
 }
 

@@ -93,7 +93,9 @@ pub fn key_event_to_token(key: KeyEvent) -> Option<String> {
 /// and the compact *which-key* popup overlay.
 #[derive(Debug, Clone)]
 pub struct ShortcutDispatcher {
+    /// Active keyboard shortcuts configuration model
     config: ShortcutsConfig,
+    /// Timestamp when leader key was pressed, initiating chord wait window
     leader_pending_since: Option<Instant>,
 }
 

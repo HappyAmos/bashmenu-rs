@@ -190,15 +190,25 @@ pub fn resolve_dev_dir(home_dir: &Path, bashmenu_dir: &Path) -> PathBuf {
     bashmenu_dir.to_path_buf()
 }
 
+/// Formatted date and time representations for macro placeholder expansions.
 struct LocalTimeStrings {
+    /// Full date and 24-hour time (`YYYY-MM-DD HH:MM:SS`)
     date_time_24: String,
+    /// Short date and 24-hour time (`YY-MM-DD HH:MM`)
     date_time_24_short: String,
+    /// Full date and 12-hour time with AM/PM (`YYYY-MM-DD hh:mm:ss AM`)
     date_time_12: String,
+    /// Short date and 12-hour time with AM/PM (`YY-MM-DD hh:mm AM`)
     date_time_12_short: String,
+    /// Calendar date string (`YYYY-MM-DD`)
     date: String,
+    /// 24-hour clock time (`HH:MM:SS`)
     time_24: String,
+    /// Short 24-hour clock time (`HH:MM`)
     time_24_short: String,
+    /// 12-hour clock time with AM/PM (`hh:mm:ss AM`)
     time_12: String,
+    /// Short 12-hour clock time with AM/PM (`hh:mm AM`)
     time_12_short: String,
 }
 
@@ -432,30 +442,50 @@ fn lookup_value_path(mut curr: &serde_json::Value, parts: &[&str]) -> Option<Str
     }
 }
 
+/// Regular expression matching adaptive nerd font directives `{nf:...}`.
 static NF_RE: std::sync::LazyLock<Regex> =
     std::sync::LazyLock::new(|| Regex::new(r"\{nf:[^}]*\}").unwrap());
+
+/// Regular expression matching environment variable expansion `{env:VAR}`.
 static ENV_RE: std::sync::LazyLock<Regex> =
     std::sync::LazyLock::new(|| Regex::new(r"\{env:([a-zA-Z0-9_]+)\}").unwrap());
+
+/// Regular expression matching dotted JSON path lookups `{path.to.key}`.
 static DOT_RE: std::sync::LazyLock<Regex> =
     std::sync::LazyLock::new(|| Regex::new(r"\{([a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)+)\}").unwrap());
+
+/// Regular expression matching embedded bash command substitution `{command:...}`.
 static COMMAND_RE: std::sync::LazyLock<Regex> =
     std::sync::LazyLock::new(|| Regex::new(r"\{command:((?:[^{}]|\{[^{}]*\})+)\}").unwrap());
+
+/// Regular expression matching file picker macro directives `{file_picker:...}`.
 static FILE_PICKER_MACRO_RE: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
     Regex::new(r"\{(file_picker(?:_new)?)(?::((?:[^{}]|\{[^{}]*\})+))?\}").unwrap()
 });
+
+/// Regular expression matching directory picker macro directives `{dir_picker:...}`.
 static DIR_PICKER_MACRO_RE: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
     Regex::new(r"\{(dir_picker(?:_new)?)(?::((?:[^{}]|\{[^{}]*\})+))?\}").unwrap()
 });
+
+/// Regular expression matching combined file or directory picker macro directives.
 static PICKER_MACRO_RE: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
     Regex::new(r"\{(file_picker(?:_new)?|dir_picker(?:_new)?)(?::((?:[^{}]|\{[^{}]*\})+))?\}")
         .unwrap()
 });
+
+/// Regular expression matching quoted preceding paths terminating in a directory slash.
 static PRECEDING_QUOTED_DIR_RE: std::sync::LazyLock<Regex> =
     std::sync::LazyLock::new(|| Regex::new(r#"["'`]([^"'`]+)/$"#).unwrap());
+
+/// Regular expression matching unquoted preceding paths terminating in a directory slash.
 static PRECEDING_UNQUOTED_DIR_RE: std::sync::LazyLock<Regex> =
     std::sync::LazyLock::new(|| Regex::new(r"(?:^|[\s=])(\S+)/$").unwrap());
 
+/// Cache TTL duration in seconds for evaluated command substitutions (30s).
 const CMD_CACHE_TTL_SECS: u64 = 30;
+
+/// Global thread-safe cache mapping shell command strings to their evaluation timestamp and stdout output.
 static CMD_CACHE: std::sync::LazyLock<
     std::sync::Mutex<HashMap<String, (std::time::Instant, String)>>,
 > = std::sync::LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
@@ -796,6 +826,7 @@ pub fn apply_dir_picker_macros(
         })
         .into_owned()
 }
+/// Regular expression matching toast macro directives `{toast:[duration:]"message"}`.
 static TOAST_RE: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
     Regex::new(r#"\{toast:\s*(?:(\d+(?:\.\d+)?)\s*:\s*)?(?:"([^"]*)"|'([^']*)'|([^}]+))\s*\}"#)
         .unwrap()

@@ -135,8 +135,11 @@ pub struct PluginDisplayRow {
 /// Thread-safe plugin execution engine and background runner.
 #[derive(Clone)]
 pub struct PluginEngine {
+    /// In-memory cache of sanitized stdout output lines per plugin
     cache: Arc<RwLock<HashMap<String, PluginCacheEntry>>>,
+    /// Set of plugin names currently executing in background worker threads
     in_flight: Arc<Mutex<HashSet<String>>>,
+    /// Optional MPSC sender notifying UI when new plugin output arrives
     update_sender: Option<mpsc::Sender<String>>,
 }
 

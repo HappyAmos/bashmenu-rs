@@ -25,34 +25,57 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
+/// Action identifiers triggered via keyboard shortcuts or mouse clicks on the footer gutter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum MenuEditFooterAction {
+    /// Show contextual help dialog
     Help,
+    /// Toggle expansion of all submenu containers
     ToggleAll,
+    /// Open ASCII table symbol picker
     Ascii,
+    /// Open glyphs / Nerd Fonts search dialog
     Glyphs,
+    /// Open dynamic macro placeholders reference
     Placeholders,
+    /// Add a new menu item
     Add,
+    /// Edit the selected menu item properties
     Edit,
+    /// Change selected menu item type
     Type,
+    /// Expand or collapse current submenu node
     Toggle,
+    /// Delete selected menu item
     Delete,
+    /// Move selected item downward in sibling order
     MoveDown,
+    /// Move selected item upward in sibling order
     MoveUp,
+    /// Indent selected item (nest under previous sibling)
     Indent,
+    /// Outdent selected item (promote to parent container)
     Outdent,
+    /// Save menu configuration to disk
     Save,
+    /// Exit the menu editor
     Exit,
 }
 
+/// Hit-testing region for mouse clicks on the footer help gutter.
 #[derive(Clone, Copy)]
 struct FooterHitRegion {
+    /// Zero-based vertical row index
     row: u16,
+    /// Starting terminal column index (inclusive)
     start_x: u16,
+    /// Ending terminal column index (exclusive)
     end_x: u16,
+    /// Target action triggered by clicking inside this region
     action: MenuEditFooterAction,
 }
 
+/// Command-line argument configuration for the Menu Editor (`menuedit`).
 #[derive(Parser, Debug)]
 #[command(
     name = "menuedit",

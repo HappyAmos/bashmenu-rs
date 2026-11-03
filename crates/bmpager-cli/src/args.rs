@@ -2,18 +2,30 @@
 
 use std::path::PathBuf;
 
+/// Parsed command line options for `bmpager`.
 #[derive(Debug, Clone)]
 pub struct PagerArgs {
+    /// File paths passed as command-line arguments to view
     pub files: Vec<PathBuf>,
+    /// Whether to strip all ANSI colors and escape codes
     pub strip_colors: bool,
+    /// Whether to show the bottom help status hints
     pub show_help_hints: bool,
+    /// Whether editing and external opening of the file is allowed
     pub allow_file: bool,
+    /// Specific text editor executable or command override
     pub editor_mode: Option<String>,
+    /// Maximum line threshold before spooling to disk
     pub max_lines: usize,
+    /// Associated underlying file path for piped or spool inputs
     pub associated_file: Option<PathBuf>,
+    /// Shell command executed to reload document contents
     pub reload_cmd: Option<String>,
+    /// Initial line number to jump to on launch
     pub start_line: Option<usize>,
+    /// Initial search pattern to find and jump to on launch
     pub start_pattern: Option<String>,
+    /// Whether to render input source with Markdown formatting
     pub markdown: bool,
 }
 

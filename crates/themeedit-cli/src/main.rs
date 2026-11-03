@@ -22,6 +22,7 @@ use themeedit_cli::{
     get_token_preview_spans, render_preview_pane, PreviewMode, ThemeEditorState, TokenKind, TreeRow,
 };
 
+/// Command-line argument configuration for the Theme Editor (`themeedit`).
 #[derive(Parser, Debug)]
 #[command(
     name = "themeedit",

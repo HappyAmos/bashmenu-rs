@@ -582,6 +582,7 @@ pub struct ShortcutEditModal {
     pub error_msg: Option<String>,
 }
 
+/// Supported item types selectable for keyboard shortcut actions in the editor.
 const SHORTCUT_TYPES: &[(&str, MenuItemType)] = &[
     ("command", MenuItemType::Command),
     ("script", MenuItemType::Script),
@@ -1029,22 +1030,37 @@ impl ShortcutEditModal {
     }
 }
 
+/// Active modal screen or dialog presented in the keyboard shortcuts editor.
 enum ActiveShortcutModal {
+    /// No modal active; list navigation and main controls enabled.
     None,
+    /// Detailed shortcut entry editor modal with optional child modal overlays.
     Edit {
+        /// Active shortcut edit modal state.
         modal: Box<ShortcutEditModal>,
+        /// Whether a new shortcut is being inserted rather than editing an existing one.
         is_new: bool,
+        /// Optional interactive key capture modal for the key binding field.
         child_capture: Option<KeyCaptureModal>,
+        /// Optional file picker modal for script selection.
         child_picker: Option<FilePickerModal>,
+        /// Optional help modal dialog.
         child_help: Option<HelpModal>,
     },
+    /// Standalone interactive key capture modal.
     CaptureStandalone(KeyCaptureModal),
+    /// Leader key configuration dialog.
     LeaderSettings {
+        /// Active leader settings modal state.
         modal: LeaderSettingsModal,
+        /// Optional interactive key capture child modal for selecting the leader key.
         child_capture: Option<KeyCaptureModal>,
     },
+    /// Confirmation dialog before deleting a shortcut entry.
     ConfirmDelete(ConfirmModal),
+    /// Unsaved changes exit confirmation dialog.
     ConfirmExit(ConfirmModal),
+    /// Contextual help overlay dialog.
     Help(HelpModal),
 }
 

@@ -23,6 +23,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
+/// Command-line argument configuration for the `bashedit` text editor.
 #[derive(Parser, Debug)]
 #[command(
     name = "bashedit",
@@ -56,52 +57,92 @@ struct Cli {
     local: bool,
 }
 
+/// Action identifiers triggered by keyboard shortcuts or clicking in the footer help gutter.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum FooterAction {
+    /// Open full editor help and manual
     HelpManual,
+    /// Toggle whitespace glyph visibility
     ToggleWhitespace,
+    /// Open ASCII table character picker modal
     AsciiTable,
+    /// Open 256-color palette viewer modal
     ViewColors,
+    /// Open dynamic macro placeholders reference
     PlaceholdersHelp,
+    /// Launch markdown preview pager
     MarkdownPreview,
+    /// Toggle line number gutter display
     ToggleLineno,
+    /// Open Markdown syntax reference modal
     MarkdownReference,
+    /// Create a new untitled editor tab
     NewTab,
+    /// Open file browser modal
     OpenFile,
+    /// Save current active tab to disk
     SaveFile,
+    /// Open Save As file browser dialog
     SaveFileAs,
+    /// Open text search input prompt
     Search,
+    /// Undo last editing action
     Undo,
+    /// Switch focus to the next open tab
     NextTab,
+    /// Close buffer or exit the editor
     Exit,
 }
 
+/// Hit-testing region for mouse clicks on the footer help gutter.
 struct FooterHitRegion {
+    /// Zero-based vertical row index
     row: u16,
+    /// Starting terminal column index (inclusive)
     start_x: u16,
+    /// Ending terminal column index (exclusive)
     end_x: u16,
+    /// Target action triggered by clicking inside this region
     action: FooterAction,
 }
 
+/// Active popup modal dialog currently being presented in the text editor.
 enum ActiveModal {
+    /// No modal active; text editor buffer receives keyboard and mouse input.
     None,
+    /// Swap file recovery dialog for recovering crash files.
     SwapRecovery {
+        /// Header metadata read from the colocated `.swp` file
         header: SwapHeader,
+        /// Recovered text lines extracted from the swap payload
         recovered_lines: Vec<String>,
+        /// Index of the editor tab undergoing recovery
         tab_idx: usize,
     },
+    /// Confirmation dialog before closing a tab with unsaved modifications.
     ConfirmCloseTab {
+        /// Index of the editor tab to be closed
         tab_idx: usize,
+        /// Confirm dialog modal state
         modal: ConfirmModal,
     },
+    /// Confirmation dialog before exiting editor with unsaved modifications across any tabs.
     ConfirmExit(ConfirmModal),
+    /// File picker modal for Save As target path selection.
     SaveAs(FilePickerModal),
+    /// Search query text input prompt modal.
     Search(InputModal),
+    /// File picker modal for opening an existing file into a new tab.
     OpenFile(FilePickerModal),
+    /// Interactive help and manual viewer modal.
     HelpManual(HelpModal),
+    /// Dynamic macro placeholders reference modal.
     PlaceholdersHelp(HelpModal),
+    /// Markdown formatting cheatsheet modal.
     MarkdownReference(HelpModal),
+    /// ASCII table character picker modal.
     AsciiTable(AsciiGridModal),
+    /// 256-color palette preview and picker modal.
     ViewColors(ColorGridModal),
 }
 

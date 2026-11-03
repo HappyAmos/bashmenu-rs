@@ -928,6 +928,7 @@ fn textwrap_simple(text: &str, max_w: usize) -> Vec<String> {
 
 /// Minimal base64 encoder for OSC 52 clipboard sequences
 fn base64_encode(data: &[u8]) -> String {
+    /// Base64 encoding table
     const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::new();
     for chunk in data.chunks(3) {

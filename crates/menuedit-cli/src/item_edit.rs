@@ -2322,13 +2322,16 @@ impl ItemEditModal {
 
 /// Helper enum for form rows within the modal viewport
 enum FormRow {
+    /// Static section heading or descriptor label
     Label(&'static str),
+    /// Single-line text input field
     Input {
         ctrl: FocusControl,
         text: String,
         cursor: usize,
         selection: Option<(usize, usize)>,
     },
+    /// Visual line row inside a multi-line text input buffer
     MultiLineInputRow {
         ctrl: FocusControl,
         text: String,
@@ -2338,6 +2341,7 @@ enum FormRow {
         has_more_above: bool,
         has_more_below: bool,
     },
+    /// Text input field with an attached browse button
     InputWithBrowse {
         input_ctrl: FocusControl,
         text: String,
@@ -2345,15 +2349,15 @@ enum FormRow {
         selection: Option<(usize, usize)>,
         btn_ctrl: FocusControl,
     },
-    ExecMode {
-        mode: usize,
-        is_active: bool,
-    },
+    /// Execution mode radio button or toggle
+    ExecMode { mode: usize, is_active: bool },
+    /// Boolean checkbox toggle row
     Checkbox {
         ctrl: FocusControl,
         label: &'static str,
         checked: bool,
     },
+    /// Live rendered preview container box
     PreviewBox(String),
 }
 

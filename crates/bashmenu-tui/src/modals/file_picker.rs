@@ -10,10 +10,14 @@ use ratatui::text::{Line, Span};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// Represents an entry (file or sub-directory) displayed in the file picker.
 #[derive(Debug, Clone)]
 struct DirItem {
+    /// Display name of the entry
     name: String,
+    /// Whether this entry is a directory
     is_dir: bool,
+    /// Absolute or relative filesystem path to the entry
     path: PathBuf,
 }
 
@@ -24,6 +28,7 @@ pub struct FilePickerModal {
     pub title: String,
     /// Currently navigated directory path
     pub current_dir: PathBuf,
+    /// Discovered directory entries (sub-directories and files)
     items: Vec<DirItem>,
     /// Index of currently selected item in directory list
     pub selected_idx: usize,

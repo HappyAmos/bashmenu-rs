@@ -609,38 +609,55 @@ impl Default for MenuSchema {
 // Custom Serialization and Deserialization for Label-as-Key YAML Schema
 // ---------------------------------------------------------------------------
 
+/// Intermediate serde representation for deserializing a menu item's YAML property map.
 #[derive(Serialize, Deserialize)]
 struct RawItemProperties {
+    /// Item type discriminator
     #[serde(default)]
     pub r#type: MenuItemType,
+    /// Icon glyph or sequence
     #[serde(skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
+    /// Shell command string
     #[serde(skip_serializing_if = "Option::is_none")]
     pub command: Option<String>,
+    /// Generic action string
     #[serde(skip_serializing_if = "Option::is_none")]
     pub action: Option<String>,
+    /// Script path
     #[serde(skip_serializing_if = "Option::is_none")]
     pub script: Option<String>,
+    /// File path to edit or display
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file: Option<String>,
+    /// Parameter input prompt text
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt: Option<String>,
+    /// Working directory for file picker or command
     #[serde(skip_serializing_if = "Option::is_none")]
     pub start_dir: Option<String>,
+    /// Whether command runs interactively in raw terminal
     #[serde(skip_serializing_if = "Option::is_none")]
     pub interactive: Option<bool>,
+    /// Whether execution suppresses pause on exit
     #[serde(skip_serializing_if = "Option::is_none")]
     pub quiet: Option<bool>,
+    /// Whether command runs in alternate screen buffer
     #[serde(skip_serializing_if = "Option::is_none")]
     pub alt_buffer: Option<bool>,
+    /// Tabstop spacing
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tabstop: Option<usize>,
+    /// Action executed on confirmation dialog 'Yes'
     #[serde(skip_serializing_if = "Option::is_none")]
     pub on_yes: Option<ConfirmAction>,
+    /// Action executed on confirmation dialog 'No'
     #[serde(skip_serializing_if = "Option::is_none")]
     pub on_no: Option<ConfirmAction>,
+    /// Submenu items container
     #[serde(skip_serializing_if = "Option::is_none")]
     pub submenu: Option<Submenu>,
+    /// Additional unstructured fields preserved across roundtrips
     #[serde(flatten)]
     pub extra: HashMap<String, serde_yml::Value>,
 }
@@ -826,9 +843,12 @@ impl Serialize for MenuItem {
     }
 }
 
+/// Specification for an inline parameter or prompt macro embedded in a command string.
 #[derive(Debug, Clone, Default)]
 struct InlineParamSpec {
+    /// Custom prompt label to display in the input modal
     prompt: Option<String>,
+    /// Whether user input should be masked (password entry mode)
     masked: bool,
 }
 

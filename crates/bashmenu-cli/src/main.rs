@@ -38,6 +38,7 @@ use std::process::Command;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
+/// Command-line argument schema for the main `bashmenu` executable.
 #[derive(Parser, Debug)]
 #[command(
     name = "bashmenu",
@@ -67,23 +68,41 @@ struct Cli {
     local: bool,
 }
 
+/// Active popup modal dialog currently being presented in the main menu loop.
 enum ActiveModal {
+    /// No modal active; main menu receives keyboard and mouse input.
     None,
+    /// Contextual help overlay dialog.
     Help(HelpModal),
+    /// Interactive theme selection dialog.
     ThemePicker(ThemePickerModal),
+    /// Single-line generic text input modal.
     Input(InputModal),
+    /// Notebook note viewer modal with interactive markdown checklist support.
     NoteViewer(NoteViewerModal),
+    /// Notebook note text editor modal.
     NoteEditor(NoteEditorModal),
+    /// Input prompt modal for creating a new note title.
     NewNoteTitle(String, InputModal),
+    /// Input prompt modal for renaming an existing note title.
     RenameNoteTitle(String, String, InputModal),
+    /// Confirmation dialog for deleting an existing note.
     ConfirmDeleteNote(String, String, ConfirmModal),
+    /// Confirmation dialog before executing a menu item action.
     ConfirmItem(Box<bashmenu_core::MenuItem>, ConfirmModal),
+    /// Informational message popup dialog.
     Message(MessageModal),
+    /// Toggle setting value selection dialog.
     Toggle(String, ToggleModal),
+    /// Config value text input dialog.
     ConfigInput(String, InputModal),
+    /// Parameter input dialog for parameterized menu command execution.
     ParamInput(Box<bashmenu_core::MenuItem>, InputModal),
+    /// Radio setting choice selection dialog.
     Radio(String, RadioModal),
+    /// File or directory browser modal for items requiring path selection.
     ItemFilePicker(Box<bashmenu_core::MenuItem>, bool, FilePickerModal),
+    /// Live process streaming output modal.
     StreamOutput(StreamOutputModal),
 }
 

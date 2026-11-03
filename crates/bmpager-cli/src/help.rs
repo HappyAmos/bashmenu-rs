@@ -3,6 +3,7 @@
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use std::io::{stdout, Write};
 
+/// Static content lines displayed in the interactive pager help viewer.
 const HELP_LINES: &[&str] = &[
     "BASHMENU PAGER - HELP & MANUAL",
     "",

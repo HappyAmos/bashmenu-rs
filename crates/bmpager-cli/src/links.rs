@@ -4,18 +4,27 @@ use regex::Regex;
 use std::process::Command;
 use std::sync::LazyLock;
 
+/// Regular expression matching OSC 8 terminal hyperlink sequences.
 static OSC8_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"\x1b\]8;[^\x1b\x07]*;([^\x1b\x07]+)\x1b\\(.*?)\x1b\]8;;\x1b\\").unwrap()
 });
+
+/// Regular expression matching inline Markdown hyperlink syntax `[text](url)`.
 static MD_LINK_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\[([^\]]+)\]\(([^)]+)\)").unwrap());
+
+/// Regular expression matching bare HTTP and HTTPS web URLs.
 static BARE_URL_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"https?://[^\s)\]]+").unwrap());
 
+/// Discovered hyperlink within document lines.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DocumentLink {
+    /// Target destination URL or file path
     pub url: String,
+    /// Human-readable link label or anchor text
     pub text: String,
-    pub line_no: usize, // 1-indexed
+    /// 1-based line number where the link is located
+    pub line_no: usize,
 }
 
 /// Scans document lines for OSC 8 hyperlinks, Markdown links, and bare URLs.

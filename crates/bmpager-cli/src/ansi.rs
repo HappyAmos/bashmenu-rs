@@ -4,8 +4,11 @@ use regex::Regex;
 use std::sync::LazyLock;
 use unicode_width::UnicodeWidthChar;
 
+/// Regular expression matching ANSI CSI control sequences (`\x1b[...]`).
 static ANSI_CSI_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\x1b\[[0-9;?]*[a-zA-Z]").unwrap());
+
+/// Regular expression matching ANSI OSC operating system command sequences (`\x1b]...`).
 static ANSI_OSC_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\x1b\][^\x07\x1b]*(\x07|\x1b\\)").unwrap());
 

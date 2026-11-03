@@ -13,7 +13,9 @@ use std::time::Duration;
 
 /// RAII guard managing terminal state (raw mode, alternate screen, mouse events).
 pub struct TerminalGuard {
+    /// Underlying ratatui terminal instance wrapping buffered stdout
     terminal: Terminal<CrosstermBackend<BufWriter<Stdout>>>,
+    /// When true, drop does not leave the alternate screen buffer (used for child TUIs)
     keep_alt_on_drop: bool,
 }
 

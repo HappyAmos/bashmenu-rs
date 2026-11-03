@@ -38,7 +38,9 @@ pub struct ActiveToast {
 /// Container that manages the lifecycle, stacking, and rendering of toasts.
 #[derive(Debug, Default)]
 pub struct ToastRack {
+    /// Active toasts currently being tracked and displayed
     toasts: Vec<ActiveToast>,
+    /// Monotonically increasing identifier counter for new toasts
     next_id: usize,
 }
 

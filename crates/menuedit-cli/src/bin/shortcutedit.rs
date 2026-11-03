@@ -7,6 +7,7 @@ use clap::Parser;
 use menuedit_cli::run_shortcut_editor;
 use std::path::PathBuf;
 
+/// Command-line argument configuration for the standalone keyboard shortcuts editor (`shortcutedit`).
 #[derive(Parser, Debug)]
 #[command(
     name = "shortcutedit",

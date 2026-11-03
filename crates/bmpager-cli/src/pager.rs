@@ -15,16 +15,27 @@ use std::io::{stdout, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+/// Interactive terminal pager state machine.
 pub struct Pager {
+    /// Document lines with formatting codes intact
     pub lines: Vec<String>,
-    pub top_line: usize, // 1-indexed
+    /// 1-based index of the line currently at the top of the viewport
+    pub top_line: usize,
+    /// Total count of document lines
     pub total: usize,
+    /// Command-line configuration and runtime flags
     pub args: PagerArgs,
+    /// Target file path being paged, if backed by disk
     pub target_file: Option<PathBuf>,
+    /// Last search query string
     pub last_search: String,
+    /// Status bar notification message
     pub message: String,
+    /// Terminal column width
     pub cols: usize,
+    /// Terminal row height
     pub rows: usize,
+    /// Number of document lines visible in a single screen page
     pub page_rows: usize,
 }
 

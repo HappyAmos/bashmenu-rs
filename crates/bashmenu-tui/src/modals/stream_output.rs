@@ -51,7 +51,9 @@ pub struct StreamOutputModal {
     pub exit_code: Option<i32>,
     /// Operating system process ID of child command
     pub child_pid: Option<u32>,
+    /// Receiver channel for stdout/stderr lines and termination messages from worker thread
     rx: Option<Receiver<StreamOutputMsg>>,
+    /// Sender channel for delivering interactive keyboard input to child stdin
     stdin_tx: Option<Sender<Vec<u8>>>,
 }
 
