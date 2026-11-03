@@ -202,6 +202,7 @@ struct LocalTimeStrings {
     time_12_short: String,
 }
 
+/// Queries the system local time via libc `localtime_r` and produces formatted date/time strings.
 fn get_local_time_strings() -> LocalTimeStrings {
     let now = unsafe { libc::time(std::ptr::null_mut()) };
     let mut tm = std::mem::MaybeUninit::<libc::tm>::uninit();
@@ -269,6 +270,7 @@ fn get_local_time_strings() -> LocalTimeStrings {
     }
 }
 
+/// Discovers the user's login profile path (`~/.profile` or fallback `~/.bash_profile`).
 fn resolve_profile_path(home_dir: &std::path::Path) -> PathBuf {
     let p = home_dir.join(".profile");
     if p.exists() {
@@ -283,6 +285,7 @@ fn resolve_profile_path(home_dir: &std::path::Path) -> PathBuf {
     }
 }
 
+/// Discovers the user's bash profile path (`~/.bash_profile` or fallback `~/.profile`).
 fn resolve_bash_profile_path(home_dir: &std::path::Path) -> PathBuf {
     let bp = home_dir.join(".bash_profile");
     if bp.exists() {
@@ -297,6 +300,7 @@ fn resolve_bash_profile_path(home_dir: &std::path::Path) -> PathBuf {
     }
 }
 
+/// Discovers the active shell startup configuration file based on `$SHELL` (zsh or bash).
 fn resolve_shell_profile(home_dir: &std::path::Path) -> PathBuf {
     let shell = std::env::var("SHELL").unwrap_or_default();
     if shell.ends_with("zsh") {
@@ -326,6 +330,7 @@ fn resolve_shell_profile(home_dir: &std::path::Path) -> PathBuf {
     }
 }
 
+/// Queries the primary local IPv4 network address by creating a non-blocking UDP socket route probe.
 fn get_primary_ip() -> String {
     use std::net::UdpSocket;
     if let Ok(socket) = UdpSocket::bind("0.0.0.0:0") {
@@ -338,6 +343,7 @@ fn get_primary_ip() -> String {
     "127.0.0.1".to_string()
 }
 
+/// Reads the current battery charge percentage from `/sys/class/power_supply/`.
 fn get_battery_info() -> String {
     if let Ok(entries) = std::fs::read_dir("/sys/class/power_supply") {
         for entry in entries.flatten() {
@@ -359,6 +365,7 @@ fn get_battery_info() -> String {
     "N/A".to_string()
 }
 
+/// Reads the battery charging status (`Charging`, `Discharging`, `Full`) from `/sys/class/power_supply/`.
 fn get_battery_status() -> String {
     if let Ok(entries) = std::fs::read_dir("/sys/class/power_supply") {
         for entry in entries.flatten() {
@@ -403,6 +410,7 @@ pub fn resolve_config_dot_path(config_val: &serde_json::Value, path: &str) -> Op
     None
 }
 
+/// Recursively navigates nested JSON maps according to dot-separated property keys.
 fn lookup_value_path(mut curr: &serde_json::Value, parts: &[&str]) -> Option<String> {
     for &part in parts {
         match curr {
@@ -459,6 +467,7 @@ pub fn clear_command_cache() {
     }
 }
 
+/// Executes a `{command:...}` macro string in bash with caching up to `CMD_CACHE_TTL_SECS`.
 fn eval_command_substitution(cmd_str: &str) -> String {
     let trimmed = cmd_str.trim();
     if trimmed.is_empty() {
@@ -500,6 +509,7 @@ pub struct PickerSpec {
     pub start_dir: PathBuf,
 }
 
+/// Expands leading `~` or `~/` to the specified home directory path.
 fn expand_tilde_path(raw: &str, home_dir: &Path) -> PathBuf {
     let trimmed = raw.trim();
     if trimmed == "~" {
@@ -887,6 +897,7 @@ pub fn interpolate_placeholders(text: &str, ctx: &MacroContext) -> String {
     interpolate_internal(text, ctx, 0)
 }
 
+/// Internal recursive helper for macro interpolation with recursion depth limit protection.
 fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String {
     // Short-circuit: if string is empty or contains no curly braces, nothing to interpolate
     if text.is_empty() || !text.contains('{') {

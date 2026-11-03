@@ -60,18 +60,22 @@ pub const SHORTCUTS_HEADER: &str = r#"# ========================================
 # ==============================================================================
 "#;
 
+/// Default leader key shortcut string (`"ctrl+space"`).
 fn default_leader_key() -> String {
     "ctrl+space".to_string()
 }
 
+/// Default timeout duration in milliseconds for leader key chords (1500 ms).
 fn default_leader_timeout_ms() -> u64 {
     1500
 }
 
+/// Default boolean true for serde field defaults.
 fn default_true() -> bool {
     true
 }
 
+/// Helper predicate returning true if a boolean reference is true.
 fn is_true(b: &bool) -> bool {
     *b
 }
@@ -95,6 +99,7 @@ pub struct ShortcutsConfig {
 }
 
 impl Default for ShortcutsConfig {
+    /// Returns default shortcut configuration with `ctrl+space` leader key.
     fn default() -> Self {
         Self {
             leader_key: default_leader_key(),
@@ -166,6 +171,7 @@ pub struct ShortcutEntry {
 }
 
 impl Default for ShortcutEntry {
+    /// Returns default shortcut entry placeholder.
     fn default() -> Self {
         Self {
             key: "<leader> x".to_string(),

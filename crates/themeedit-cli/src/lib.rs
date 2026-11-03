@@ -942,6 +942,7 @@ impl ThemeEditorState {
         }
     }
 
+    /// Synchronizes `selected_idx` to the token pointed to by the currently selected tree row.
     fn sync_selected_idx_from_row(&mut self, rows: &[TreeRow]) {
         if let Some(TreeRow::Token(idx)) = rows.get(self.selected_row) {
             self.selected_idx = *idx;

@@ -27,6 +27,7 @@ pub struct NotebookData {
     pub notes: Vec<serde_yml::Value>,
 }
 
+/// Default note format string (`"markdown"`).
 fn default_format() -> String {
     "markdown".to_string()
 }
@@ -50,6 +51,7 @@ pub struct NoteItem {
     pub icon: Option<String>,
 }
 
+/// Default note type string (`"note"`).
 fn default_note_type() -> String {
     "note".to_string()
 }
@@ -120,6 +122,7 @@ pub fn resolve_notebook_path(raw_path: Option<&str>, ctx: &MacroContext) -> Path
     cand1
 }
 
+/// Converts a whitespace-separated string into Title Case by capitalizing the first character of each word.
 fn title_case(s: &str) -> String {
     s.split_whitespace()
         .map(|word| {

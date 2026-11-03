@@ -34,6 +34,7 @@ pub struct MultiLineInput {
 }
 
 impl Default for MultiLineInput {
+    /// Returns an empty multi-line text input buffer.
     fn default() -> Self {
         Self {
             lines: vec![Vec::new()],
@@ -2357,6 +2358,7 @@ enum FormRow {
 }
 
 impl FormRow {
+    /// Returns true if this form row contains or matches the specified focus control target.
     fn has_ctrl(&self, ctrl: FocusControl) -> bool {
         match self {
             FormRow::Input { ctrl: c, .. } => *c == ctrl,
@@ -2376,6 +2378,7 @@ impl FormRow {
         }
     }
 
+    /// Renders this form row at vertical coordinate `y` within the modal's inner area.
     fn render(
         &self,
         inner: Rect,

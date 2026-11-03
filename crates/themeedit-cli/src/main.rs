@@ -43,6 +43,8 @@ struct Cli {
     local: bool,
 }
 
+/// Resolves the file path for `bashmenu.themes`.
+/// If `local` is true, resolves relative to current working directory; otherwise uses user config path.
 fn resolve_themes_path(target: &Path, local: bool) -> PathBuf {
     if local {
         if target.is_absolute() {
@@ -55,19 +57,30 @@ fn resolve_themes_path(target: &Path, local: bool) -> PathBuf {
     }
 }
 
+/// Active popup modal dialog in the theme editor.
 enum ActiveModal {
+    /// No modal active; tree editor and preview pane interactions enabled.
     None,
+    /// Color picker grid dialog.
     ColorPicker(String, ColorGridModal),
+    /// ASCII symbol picker grid dialog.
     AsciiPicker(String, AsciiGridModal),
+    /// "Save As" theme name input dialog.
     SaveAs(InputModal),
+    /// "New Theme" name input dialog.
     NewTheme(InputModal),
+    /// Delete theme confirmation dialog.
     ConfirmDelete(ConfirmModal),
+    /// Unsaved changes exit confirmation dialog.
     ConfirmExit(ConfirmModal),
+    /// Wallpaper image file browser dialog.
     WallpaperPicker(FilePickerModal),
 }
 
+/// Visual flash highlight entry: (start time instant, list of `(x, y, length)` spans).
 type FlashHighlight = (std::time::Instant, Vec<(u16, u16, u16)>);
 
+/// Entry point for the theme editor TUI application (`themeedit`).
 fn main() -> Result<()> {
     install_panic_hook();
 
@@ -1331,6 +1344,8 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+/// Opens the appropriate interactive picker modal for the currently selected theme token
+/// (e.g., ColorGridModal for colors, AsciiGridModal for glyphs, or cycles toggle values).
 fn open_selected_token_picker(state: &mut ThemeEditorState, active_modal: &mut ActiveModal) {
     let token = state.tokens[state.selected_idx].clone();
     match token.kind {
@@ -1403,6 +1418,8 @@ fn open_selected_token_picker(state: &mut ThemeEditorState, active_modal: &mut A
     }
 }
 
+/// Maps mouse coordinates within the preview area to a theme token key and highlight span.
+/// Returns `Some((token_key, x, y, width))` if a clickable theme element was hit.
 fn hit_test_preview(
     col: u16,
     row: u16,

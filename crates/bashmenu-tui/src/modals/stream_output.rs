@@ -376,6 +376,7 @@ impl StreamOutputModal {
 }
 
 impl Drop for StreamOutputModal {
+    /// Terminates the child streaming process and reader thread upon dropping the modal.
     fn drop(&mut self) {
         self.terminate();
     }

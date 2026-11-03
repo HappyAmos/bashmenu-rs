@@ -276,11 +276,13 @@ fn wrap_help_text(text: &str, max_w: usize) -> Vec<String> {
     result
 }
 
+/// Checks whether a text line starts and ends with pipes, forming a candidate markdown table row.
 fn is_table_row(line: &str) -> bool {
     let trimmed = line.trim();
     trimmed.starts_with('|') && trimmed.ends_with('|') && trimmed.matches('|').count() >= 2
 }
 
+/// Checks whether a markdown table row is a delimiter separator line (e.g., `|---|---|`).
 fn is_table_delimiter(line: &str) -> bool {
     let trimmed = line.trim();
     if !trimmed.starts_with('|') || !trimmed.ends_with('|') {
@@ -296,6 +298,7 @@ fn is_table_delimiter(line: &str) -> bool {
     })
 }
 
+/// Extracts trimmed text cells from between pipe delimiters of a table row line.
 fn parse_cells(line: &str) -> Vec<String> {
     let trimmed = line.trim();
     let parts: Vec<&str> = trimmed.split('|').collect();
@@ -309,6 +312,7 @@ fn parse_cells(line: &str) -> Vec<String> {
     }
 }
 
+/// Computes table column widths and converts parsed table rows into styled Ratatui Lines.
 fn render_table(
     table_rows: &[Vec<String>],
     avail_w: usize,

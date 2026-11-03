@@ -28,6 +28,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 use unicode_width::UnicodeWidthStr;
 
+/// Default sleep interval for plugin refresh (300 seconds).
 fn default_sleep() -> u64 {
     300
 }
@@ -61,6 +62,7 @@ pub struct PluginDef {
 }
 
 impl Default for PluginDef {
+    /// Creates a default plugin definition with 300-second sleep interval.
     fn default() -> Self {
         Self {
             script: None,
@@ -89,6 +91,7 @@ pub struct PluginLayout {
 }
 
 impl Default for PluginLayout {
+    /// Creates a default plugin layout configured for 2-entry list mode.
     fn default() -> Self {
         Self {
             layout_type: "list".to_string(),
@@ -138,6 +141,7 @@ pub struct PluginEngine {
 }
 
 impl Default for PluginEngine {
+    /// Creates a new default plugin engine instance.
     fn default() -> Self {
         Self::new()
     }

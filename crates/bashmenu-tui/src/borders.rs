@@ -50,6 +50,7 @@ pub struct ResolvedWindowBorders {
 }
 
 impl Default for ResolvedWindowBorders {
+    /// Returns default window borders using standard single-line box drawing characters.
     fn default() -> Self {
         Self::from_theme_borders(None)
     }

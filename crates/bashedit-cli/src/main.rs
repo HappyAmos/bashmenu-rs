@@ -105,6 +105,7 @@ enum ActiveModal {
     ViewColors(ColorGridModal),
 }
 
+/// Locates a companion executable (`bmpager`, `bashmenu`, etc.) across search paths.
 fn locate_tool(name: &str) -> PathBuf {
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
@@ -129,6 +130,7 @@ fn locate_tool(name: &str) -> PathBuf {
     PathBuf::from(name)
 }
 
+/// Spawns `bmpager` in markdown mode via `TerminalGuard::suspend_keep_alt` to preview document.
 fn launch_markdown_preview(guard: &mut TerminalGuard, tab: &EditorBuffer) {
     let pager_bin = locate_tool("bmpager");
     let temp_dir = std::env::temp_dir();
@@ -147,6 +149,7 @@ fn launch_markdown_preview(guard: &mut TerminalGuard, tab: &EditorBuffer) {
     }
 }
 
+/// Expands a leading `~/` prefix in a filesystem path to the user's home directory.
 fn resolve_path_tilde(path: &Path) -> PathBuf {
     if let Some(stripped) = path.to_str().and_then(|s| s.strip_prefix("~/")) {
         if let Ok(home) = std::env::var("HOME") {
@@ -159,6 +162,7 @@ fn resolve_path_tilde(path: &Path) -> PathBuf {
     }
 }
 
+/// Constructs a file picker modal configured for 'Save As' destination selection.
 fn make_save_as_modal(tab: &EditorBuffer) -> FilePickerModal {
     let home_dir = std::env::var("HOME")
         .map(PathBuf::from)
@@ -176,6 +180,7 @@ fn make_save_as_modal(tab: &EditorBuffer) -> FilePickerModal {
     picker
 }
 
+/// Main application entrypoint for `bashedit`.
 fn main() -> Result<()> {
     install_panic_hook();
 
@@ -1245,6 +1250,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+/// Renders the currently active modal overlay dialog.
 fn render_modal(
     active_modal: &mut ActiveModal,
     area: Rect,
@@ -1351,6 +1357,7 @@ fn render_modal(
     }
 }
 
+/// Dispatches a transient toast notification reflecting save file success or failure.
 fn show_save_toast(toast_rack: &mut ToastRack, res: Result<()>, tab: &EditorBuffer) {
     let name = tab
         .file_path
@@ -1378,6 +1385,7 @@ fn show_save_toast(toast_rack: &mut ToastRack, res: Result<()>, tab: &EditorBuff
     }
 }
 
+/// Processes keyboard and mouse events targeted at the active modal dialog.
 #[allow(clippy::too_many_arguments)]
 fn handle_active_modal(
     active_modal: &mut ActiveModal,

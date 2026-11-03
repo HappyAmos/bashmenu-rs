@@ -62,6 +62,7 @@ pub struct ResolvedThemeStyles {
 }
 
 impl Default for ResolvedThemeStyles {
+    /// Returns default fallback TUI styles when no custom theme is loaded.
     fn default() -> Self {
         Self {
             background: Color::Reset,

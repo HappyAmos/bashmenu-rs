@@ -87,6 +87,7 @@ enum ActiveModal {
     StreamOutput(StreamOutputModal),
 }
 
+/// Resolves a configuration or asset file path, choosing between local directory or `~/.config/bashmenu/`.
 fn resolve_file_path(target: &Path, local: bool) -> PathBuf {
     if local {
         if target.is_absolute() {
@@ -99,6 +100,8 @@ fn resolve_file_path(target: &Path, local: bool) -> PathBuf {
     }
 }
 
+/// Discovers the path to companion tools (`menuedit`, `themeedit`, `bashedit`, `bmpager`)
+/// by inspecting target directories, `BASHMENU_DIR`, and `~/.local/bin`.
 fn locate_tool(name: &str) -> PathBuf {
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
@@ -129,6 +132,7 @@ fn locate_tool(name: &str) -> PathBuf {
     PathBuf::from(name)
 }
 
+/// Main application entrypoint for `bashmenu`.
 fn main() -> Result<()> {
     // 1. Terminal Panic Recovery Hook Invariant
     install_panic_hook();

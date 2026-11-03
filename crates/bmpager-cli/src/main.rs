@@ -13,6 +13,7 @@ use pager::Pager;
 use std::io::{stdin, stdout, IsTerminal, Read};
 use std::process::exit;
 
+/// CLI entrypoint for `bmpager`.
 fn main() {
     // 1. Terminal Panic Hook Invariant (AGENTS.md)
     bashmenu_tui::install_panic_hook();

@@ -545,6 +545,8 @@ pub fn rgb_to_xterm256(r: u8, g: u8, b: u8) -> u8 {
     best_idx
 }
 
+/// Converts standard sRGB component values (0-255) to HSV color space:
+/// hue in `[0.0, 1.0)`, saturation in `[0.0, 1.0]`, and value/brightness in `[0.0, 1.0]`.
 fn rgb_to_hsv(r: u8, g: u8, b: u8) -> (f64, f64, f64) {
     let rf = r as f64 / 255.0;
     let gf = g as f64 / 255.0;
@@ -566,17 +568,21 @@ fn rgb_to_hsv(r: u8, g: u8, b: u8) -> (f64, f64, f64) {
     (h, s, max)
 }
 
+/// Computes the relative perceptual luminance of an sRGB color using standard Rec. 709 coefficients.
 fn color_luminance(r: u8, g: u8, b: u8) -> f64 {
     0.2126 * (r as f64) + 0.7152 * (g as f64) + 0.0722 * (b as f64)
 }
 
+/// Computes the circular angular difference between two normalized hue values in `[0.0, 1.0)`.
 fn hue_distance(h1: f64, h2: f64) -> f64 {
     let diff = (h1 - h2).abs();
     diff.min(1.0 - diff)
 }
 
+/// Represents an extracted color candidate with ANSI index and HSV properties.
 #[derive(Debug, Clone, Copy)]
 struct ExtractedColor {
+    /// ANSI 256-color palette index.
     idx: u8,
     h: f64,
     s: f64,

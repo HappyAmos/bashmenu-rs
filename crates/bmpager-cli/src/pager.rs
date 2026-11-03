@@ -29,6 +29,7 @@ pub struct Pager {
 }
 
 impl Pager {
+    /// Initializes a new interactive pager with document lines and configuration arguments.
     pub fn new(lines: Vec<String>, args: PagerArgs) -> Self {
         let total = lines.len();
         let target_file = if !args.files.is_empty() {
@@ -55,6 +56,7 @@ impl Pager {
         pager
     }
 
+    /// Resolves starting line position from CLI arguments (`+N` or `+/PATTERN`).
     fn resolve_start(&mut self) {
         if let Some(line) = self.args.start_line {
             self.top_line = line.max(1);
@@ -78,6 +80,7 @@ impl Pager {
         }
     }
 
+    /// Clamps top visible line index within valid document bounds (1..=total).
     pub fn clamp_top(&mut self) {
         let max = self.total.max(1);
         if self.top_line < 1 {
@@ -88,6 +91,7 @@ impl Pager {
         }
     }
 
+    /// Queries terminal column and row dimensions via crossterm.
     fn query_size(&mut self) {
         let (w, h) = crossterm::terminal::size().unwrap_or((80, 24));
         self.cols = (w as usize).max(20);
@@ -95,6 +99,7 @@ impl Pager {
         self.page_rows = self.rows.saturating_sub(1).max(1);
     }
 
+    /// Runs the interactive pager event loop until the user exits.
     pub fn run(&mut self) -> anyhow::Result<()> {
         let keep_alt = std::env::var("BASHMENU_CHILD_ALT").as_deref() == Ok("1");
         enable_raw_mode()?;
@@ -128,6 +133,7 @@ impl Pager {
         Ok(())
     }
 
+    /// Processes keyboard shortcuts, cursor navigation, and search queries. Returns `true` to exit.
     fn handle_key(&mut self, key: crossterm::event::KeyEvent) -> anyhow::Result<bool> {
         let mut clear_message = true;
 
@@ -197,6 +203,7 @@ impl Pager {
         Ok(false)
     }
 
+    /// Formats the bottom command and status bar string.
     fn build_bar(&self, last_shown: usize) -> String {
         let label = if self.total == 0 {
             "EMPTY".to_string()
@@ -342,6 +349,7 @@ impl Pager {
         bar
     }
 
+    /// Redraws visible document lines, trailing tildes, and status bar into stdout.
     fn render(&self) -> anyhow::Result<()> {
         let last_shown = (self.top_line + self.page_rows - 1).min(self.total);
         let bar_line = self.build_bar(last_shown);
@@ -378,6 +386,7 @@ impl Pager {
         Ok(())
     }
 
+    /// Displays interactive forward search query input prompt on the command line.
     fn prompt_search(&mut self) -> anyhow::Result<()> {
         let mut query = String::new();
         let mut out = stdout();
@@ -409,6 +418,7 @@ impl Pager {
         Ok(())
     }
 
+    /// Searches forward from `start_line` for the given text pattern, updating top line on match.
     fn search_forward(&mut self, pat: &str, start_line: usize) {
         let pat_lower = pat.to_lowercase();
         let mut hit = None;
@@ -444,6 +454,8 @@ impl Pager {
         }
     }
 
+    /// Repeats the active search query forward (`dir >= 0`) or backward (`dir < 0`),
+    /// wrapping around the document boundaries if necessary.
     fn search_next(&mut self, dir: i32) {
         if self.last_search.is_empty() {
             self.message = "no previous search pattern".to_string();
@@ -486,6 +498,7 @@ impl Pager {
         }
     }
 
+    /// Displays an interactive link picker dialog and navigates to or opens the chosen target.
     fn choose_link(&mut self) -> anyhow::Result<()> {
         let links = extract_links(&self.lines);
         if links.is_empty() {
@@ -629,6 +642,7 @@ impl Pager {
         Ok(())
     }
 
+    /// Spawns the configured text editor on the currently displayed file, suspending raw mode.
     fn open_in_editor(&mut self) -> anyhow::Result<()> {
         if !self.args.allow_file {
             self.message = "editing disabled".to_string();
@@ -670,6 +684,7 @@ impl Pager {
         Ok(())
     }
 
+    /// Reloads the document lines from the file on disk or re-runs the reload command.
     fn reload_spool(&mut self, target_file: &Path) {
         if let Some(ref cmd) = self.args.reload_cmd {
             if let Ok(output) = Command::new("sh").arg("-c").arg(cmd).output() {

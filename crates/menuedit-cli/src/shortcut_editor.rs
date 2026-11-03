@@ -1910,6 +1910,8 @@ pub fn render_shortcut_editor_screen(
     buf.set_string(0, bot_y, &bot_rule, b_style);
 }
 
+/// Renders a bordered panel with connected title brackets (`┌─[ Title ]───`)
+/// and optional bottom-left and bottom-right status text annotations.
 fn draw_connected_panel(
     rect: Rect,
     title: &str,

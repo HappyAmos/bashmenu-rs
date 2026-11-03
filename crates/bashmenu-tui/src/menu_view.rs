@@ -355,10 +355,12 @@ impl MenuView {
         chain
     }
 
+    /// Returns an immutable reference to the active top menu level on the navigation stack.
     fn current_level(&self) -> &MenuLevel {
         self.stack.last().expect("Menu stack must not be empty")
     }
 
+    /// Returns a mutable reference to the active top menu level on the navigation stack.
     fn current_level_mut(&mut self) -> &mut MenuLevel {
         self.stack.last_mut().expect("Menu stack must not be empty")
     }
@@ -529,6 +531,7 @@ impl MenuView {
         }
     }
 
+    /// Returns the raw contextual help string for the current menu level or mode.
     fn get_help_raw(&self) -> &'static str {
         if self.is_current_notebook() {
             "[N]: New Note | [ENTER]: Read | [M]: Rename | [D]: Delete | [UP/DN]: Nav | [F1]: Help | [F2]: Themes | [F7]: Gutter | [F8]: ThemeEdit | [ESC]: Back"
@@ -539,6 +542,7 @@ impl MenuView {
         }
     }
 
+    /// Maps a clicked status gutter button token (e.g., `[F1]` or `[F2]`) to its corresponding MenuAction.
     fn action_for_gutter_token(&mut self, tok: &str) -> MenuAction {
         if tok.contains("[F1]") || tok.contains("Help") {
             MenuAction::Help
@@ -675,6 +679,7 @@ impl MenuView {
         }
     }
 
+    /// Activates a menu item by 1-based selectable shortcut sequence number.
     fn activate_shortcut_index(&mut self, target_num: usize) -> MenuAction {
         let level = self.current_level();
         let mut selectable_count = 0;
@@ -690,6 +695,7 @@ impl MenuView {
         MenuAction::None
     }
 
+    /// Triggers action execution, submenu entrance, or modal display for the currently selected item.
     fn activate_selected(&mut self) -> MenuAction {
         let level = self.current_level();
         if level.items.is_empty() {
@@ -768,6 +774,7 @@ impl MenuView {
         }
     }
 
+    /// Pops the active submenu level to return to parent menu, or emits `MenuAction::Back` if at root.
     fn go_back(&mut self) -> MenuAction {
         if self.stack.len() > 1 {
             self.stack.pop();

@@ -24,6 +24,7 @@ struct Cli {
     local: bool,
 }
 
+/// CLI entry point for the standalone keyboard shortcuts editor (`shortcutedit`).
 fn main() -> Result<()> {
     install_panic_hook();
     let cli = Cli::parse();

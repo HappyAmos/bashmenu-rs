@@ -25,6 +25,8 @@ pub fn flatten_tree(menu: &MenuSchema, expanded: &HashSet<Vec<usize>>) -> Vec<Vi
     visible
 }
 
+/// Recursively walks menu items to populate a flat list of visible rows
+/// taking expanded submenu paths into account.
 fn flatten_items(
     items: &[MenuItem],
     parent_path: &[usize],
@@ -68,6 +70,7 @@ pub fn toggle_all_nodes(menu: &MenuSchema, expanded: &mut HashSet<Vec<usize>>) {
     }
 }
 
+/// Collects index paths of every submenu container within the item hierarchy.
 fn collect_all_submenu_paths(items: &[MenuItem], parent_path: &[usize]) -> Vec<Vec<usize>> {
     let mut paths = Vec::new();
     for (idx, item) in items.iter().enumerate() {
@@ -205,6 +208,7 @@ pub fn find_node_path(
     None
 }
 
+/// Recursively locates an item by clean stripped title, matching either exact equality or substring.
 fn find_by_title_recursive(
     items: &[MenuItem],
     parent_path: &[usize],
@@ -492,6 +496,7 @@ pub fn mutate_item_type(item: &mut MenuItem, new_type_str: &str) {
     item.r#type = target_type;
 }
 
+/// Traverses the menu hierarchy down to `parent_path` and returns a mutable reference to the containing item vector.
 fn get_container_items_mut<'a>(
     menu: &'a mut MenuSchema,
     parent_path: &[usize],

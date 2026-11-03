@@ -17,15 +17,18 @@ pub struct MarqueeConfig {
     pub gap: usize,
 }
 
+/// Default separator glyph for marquee scrolling (`"•"`).
 fn default_marquee_char() -> String {
     "•".to_string()
 }
 
+/// Default spacing count between marquee repetitions (5).
 fn default_marquee_gap() -> usize {
     5
 }
 
 impl Default for MarqueeConfig {
+    /// Returns default marquee configuration with bullet separator and 5-column gap.
     fn default() -> Self {
         Self {
             char: default_marquee_char(),
@@ -133,18 +136,22 @@ pub struct ToastConfig {
     pub timeout: Option<f64>,
 }
 
+/// Default boolean true for serde field defaults.
 fn default_true() -> bool {
     true
 }
 
+/// Default wallpaper blending opacity (0.35).
 fn default_opacity() -> f32 {
     0.35
 }
 
+/// Default wallpaper scaling mode (`"cover"`).
 fn default_scaling() -> String {
     "cover".to_string()
 }
 
+/// Default wallpaper color quantization step (1).
 fn default_quantization() -> usize {
     1
 }
@@ -182,6 +189,7 @@ pub struct WallpaperConfig {
 }
 
 impl Default for WallpaperConfig {
+    /// Returns default wallpaper configuration enabled with 0.35 opacity and cover scaling.
     fn default() -> Self {
         Self {
             enabled: true,

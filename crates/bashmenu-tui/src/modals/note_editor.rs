@@ -697,6 +697,7 @@ impl NoteEditorModal {
         }
     }
 
+    /// Returns the text slice of the line currently under the cursor.
     fn current_line(&self) -> &str {
         if self.cursor_row < self.lines.len() {
             &self.lines[self.cursor_row]
@@ -705,6 +706,7 @@ impl NoteEditorModal {
         }
     }
 
+    /// Inserts a Unicode character at the current cursor column position.
     fn insert_char(&mut self, c: char) {
         if self.cursor_row >= self.lines.len() {
             self.lines.push(String::new());
@@ -717,12 +719,14 @@ impl NoteEditorModal {
         self.cursor_col = col + 1;
     }
 
+    /// Inserts a string at current cursor position by inserting individual characters sequentially.
     fn insert_str(&mut self, s: &str) {
         for c in s.chars() {
             self.insert_char(c);
         }
     }
 
+    /// Deletes the character before cursor or merges current row into preceding row.
     fn handle_backspace(&mut self) {
         if self.cursor_col > 0 {
             let mut chars: Vec<char> = self.lines[self.cursor_row].chars().collect();
@@ -740,6 +744,7 @@ impl NoteEditorModal {
         }
     }
 
+    /// Deletes the character under cursor or pulls following row into current row.
     fn handle_delete(&mut self) {
         if self.cursor_row < self.lines.len() {
             let mut chars: Vec<char> = self.lines[self.cursor_row].chars().collect();
@@ -753,6 +758,7 @@ impl NoteEditorModal {
         }
     }
 
+    /// Handles Enter key: splits line, handling markdown checkbox/list item continuation or de-escalation.
     fn handle_enter(&mut self) {
         let chars: Vec<char> = self.current_line().chars().collect();
         let col = self.cursor_col.min(chars.len());
@@ -992,6 +998,7 @@ impl NoteEditorModal {
     }
 }
 
+/// Parses an ordered list prefix (e.g. `1. `, `12. `) returning numeric string and following text.
 fn parse_ordered_list(text: &str) -> Option<(&str, &str)> {
     let dot_idx = text.find(". ")?;
     let num_part = &text[..dot_idx];
@@ -1002,6 +1009,7 @@ fn parse_ordered_list(text: &str) -> Option<(&str, &str)> {
     }
 }
 
+/// Computes continuation line indentation margin for markdown checkboxes and list bullets.
 fn detect_list_margin(line: &str) -> Option<usize> {
     let indent_len = line.chars().take_while(|c| c.is_whitespace()).count();
     let trimmed = line.trim_start();
@@ -1023,6 +1031,7 @@ fn detect_list_margin(line: &str) -> Option<usize> {
     }
 }
 
+/// Word-wraps character slice with separate widths for first line and continuation lines.
 fn wrap_chars_by_word_with_margin(
     chars: &[char],
     first_w: usize,
@@ -1056,6 +1065,7 @@ fn wrap_chars_by_word_with_margin(
     result
 }
 
+/// Word-wraps a slice of Unicode characters to fit within visual width `w`.
 fn wrap_chars_by_word(chars: &[char], w: usize) -> Vec<(usize, Vec<char>)> {
     let mut result = Vec::new();
     let mut start = 0;

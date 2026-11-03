@@ -78,6 +78,7 @@ pub struct MarqueeTracker {
 }
 
 impl Default for MarqueeTracker {
+    /// Returns default marquee tracker initialized with a 4-tick (1.0s) pause delay.
     fn default() -> Self {
         Self::new(4)
     }

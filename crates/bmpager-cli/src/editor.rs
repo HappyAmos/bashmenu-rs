@@ -42,6 +42,7 @@ pub fn open_editor(
     Ok(None)
 }
 
+/// Determines whether to use `$EDITOR` or `bashedit` based on flags, environment, and config.
 fn resolve_editor_mode(override_mode: Option<&str>) -> String {
     if let Some(m) = override_mode {
         return m.to_string();
@@ -77,6 +78,7 @@ fn resolve_editor_mode(override_mode: Option<&str>) -> String {
     "default".to_string()
 }
 
+/// Locates the `bashedit` executable across PATH, `~/.local/bin`, and target build directories.
 fn find_bashedit_exe() -> Option<PathBuf> {
     if let Ok(p) = which::which("bashedit") {
         return Some(p);
@@ -92,6 +94,7 @@ fn find_bashedit_exe() -> Option<PathBuf> {
     None
 }
 
+/// Discovers system text editor configured via `$VISUAL`, `$EDITOR`, or fallbacks (`nano`, `vim`, `vi`).
 fn get_system_editor() -> Option<String> {
     if let Ok(v) = std::env::var("VISUAL") {
         if !v.trim().is_empty() {
@@ -114,6 +117,7 @@ fn get_system_editor() -> Option<String> {
 mod which {
     use std::path::PathBuf;
 
+    /// Searches PATH for the named executable file.
     pub fn which(name: &str) -> Result<PathBuf, ()> {
         let path_var = std::env::var("PATH").map_err(|_| ())?;
         for dir in std::env::split_paths(&path_var) {
@@ -129,6 +133,7 @@ mod which {
 mod dirs {
     use std::path::PathBuf;
 
+    /// Resolves the user's home directory from `$HOME`.
     pub fn home_dir() -> Option<PathBuf> {
         std::env::var("HOME").ok().map(PathBuf::from)
     }

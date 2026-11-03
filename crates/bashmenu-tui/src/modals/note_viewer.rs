@@ -63,6 +63,7 @@ impl NoteViewerModal {
         }
     }
 
+    /// Retrieves raw line indices of lines eligible for selection and interaction in the viewer.
     fn get_selectable_lines(&self) -> Vec<usize> {
         let raw_lines: Vec<&str> = self.content.lines().collect();
         let mut selectable = Vec::new();
@@ -809,6 +810,7 @@ fn parse_markdown_spans(text: &str, base_style: Style) -> Vec<Span<'static>> {
     spans
 }
 
+/// Parses a markdown checkbox line (`- [ ]`, `- [x]`, `* [ ]`, `* [x]`), returning indent, checked status, and body.
 fn parse_checkbox_line(line: &str) -> Option<(usize, bool, &str)> {
     let indent_len = line.chars().take_while(|c| c.is_whitespace()).count();
     let trimmed = line.trim_start();
@@ -829,6 +831,7 @@ fn parse_checkbox_line(line: &str) -> Option<(usize, bool, &str)> {
     }
 }
 
+/// Parses an unordered markdown bullet list line (`- `, `* `, `+ `), returning indent and text.
 fn parse_bullet_line(line: &str) -> Option<(usize, &str)> {
     let trimmed = line.trim_start();
     let indent_len = line.len() - trimmed.len();

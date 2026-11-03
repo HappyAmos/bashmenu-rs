@@ -86,6 +86,9 @@ struct Cli {
     shortcuts: bool,
 }
 
+/// Resolves the filesystem path for the target menu file.
+/// If `local` is true, interprets non-absolute paths relative to the current working directory;
+/// otherwise delegates to [`bashmenu_core::resolve_app_path`] to locate user/system configuration.
 fn resolve_menu_path(target: &Path, local: bool) -> PathBuf {
     if local {
         if target.is_absolute() {
@@ -98,6 +101,8 @@ fn resolve_menu_path(target: &Path, local: bool) -> PathBuf {
     }
 }
 
+/// Attempts to locate a named script in `$BASHMENU_DIR/scripts`, `~/.config/bashmenu/scripts`,
+/// or the local `./scripts/` directory.
 fn resolve_script_path(script_name: &str) -> Option<PathBuf> {
     if let Ok(dir) = std::env::var("BASHMENU_DIR") {
         let p = PathBuf::from(dir).join("scripts").join(script_name);
@@ -120,25 +125,41 @@ fn resolve_script_path(script_name: &str) -> Option<PathBuf> {
     None
 }
 
+/// Represents the active child modal spawned within an item editor modal.
 enum ChildModal {
+    /// Item type selection modal.
     TypePicker(ItemTypePickerModal),
+    /// File / directory picker modal with target field indicator.
     FilePicker(FilePickerModal, BrowseTarget),
+    /// Contextual help display modal.
     Help(HelpModal),
+    /// ASCII table character picker modal.
     AsciiPicker(AsciiGridModal),
+    /// Search modal for glyphs / nerd fonts.
     GlyphSearch(InputModal),
 }
 
+/// Represents the top-level active modal dialog currently being presented in the menu editor.
 enum ActiveModal {
+    /// No modal active; tree editor interaction enabled.
     None,
+    /// Type picker modal with optional target item path.
     TypePicker(ItemTypePickerModal, Option<Vec<usize>>), // (modal, target_path)
+    /// Full item configuration and editing modal.
     ItemEdit(Box<ItemEditModal>, Vec<usize>, Option<Box<ChildModal>>),
+    /// Delete item confirmation modal.
     ConfirmDelete(ConfirmModal, Vec<usize>), // (modal, target_path)
+    /// Unsaved changes exit confirmation modal.
     ConfirmExit(ConfirmModal),
+    /// Global help dialog modal.
     Help(HelpModal),
+    /// ASCII symbol picker modal.
     AsciiPicker(AsciiGridModal),
+    /// Glyph search input modal.
     GlyphSearch(InputModal),
 }
 
+/// Entry point for the Menu Editor TUI application (`menuedit`).
 fn main() -> Result<()> {
     install_panic_hook();
 
@@ -1454,6 +1475,8 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+/// Executes the external `glyphs.sh` helper script if available, or returns a formatted
+/// fallback cheat sheet for adaptive Nerd Font directives.
 fn run_glyphs_search(term: &str) -> String {
     if let Some(script_path) = resolve_script_path("glyphs.sh") {
         if let Ok(output) = Command::new("bash").arg(script_path).arg(term).output() {

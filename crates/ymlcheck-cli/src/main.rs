@@ -120,6 +120,7 @@ struct Cli {
     yaml: bool,
 }
 
+/// Validates pure YAML parsing syntax without evaluating BashMenu-specific schemas.
 fn validate_yaml_syntax(path: &Path) -> bool {
     println!("Checking YAML syntax for {}...", path.display());
     match fs::read_to_string(path) {
@@ -144,6 +145,7 @@ fn validate_yaml_syntax(path: &Path) -> bool {
     }
 }
 
+/// Validates a `bashmenu.themes` theme file against schema rules, palette color ranges, and border keys.
 fn validate_theme_file(path: &Path) -> bool {
     println!("Validating theme file {}...", path.display());
     let themes = match load_themes(path) {
@@ -227,6 +229,7 @@ fn validate_theme_file(path: &Path) -> bool {
     true
 }
 
+/// Validates a `bashmenu.yml` configuration file against schema fields and setting bounds.
 fn validate_config_file(path: &Path) -> bool {
     println!("Validating configuration file {}...", path.display());
     let config = match load_config(path) {
@@ -266,6 +269,7 @@ fn validate_config_file(path: &Path) -> bool {
     true
 }
 
+/// Validates a `bashmenu.mnu` menu schema file, recursively checking items and submenus.
 fn validate_menu_file(path: &Path) -> bool {
     println!("Validating menu file {}...", path.display());
     let menu = match load_menu(path) {
@@ -283,6 +287,7 @@ fn validate_menu_file(path: &Path) -> bool {
         errors.push("Menu definition has no items".to_string());
     }
 
+    /// Recursively checks each menu item for type validity and submenu structure.
     fn check_items(
         items: &[bashmenu_core::MenuItem],
         path_prefix: &str,
@@ -345,6 +350,7 @@ fn validate_menu_file(path: &Path) -> bool {
     true
 }
 
+/// Validates a `shortcuts.yml` keyboard shortcut definitions file.
 fn validate_shortcuts_file(path: &Path) -> bool {
     println!("Validating shortcuts file {}...", path.display());
     let cfg = match load_shortcuts(path) {
@@ -409,6 +415,7 @@ fn validate_shortcuts_file(path: &Path) -> bool {
     true
 }
 
+/// CLI entrypoint for `ymlcheck`.
 fn main() {
     let cli = Cli::parse();
 

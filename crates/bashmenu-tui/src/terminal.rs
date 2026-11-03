@@ -68,6 +68,10 @@ impl TerminalGuard {
         res
     }
 
+    /// Discards any buffered or stale terminal input events from the event queue.
+    ///
+    /// This prevents pending keystrokes or mouse events accumulated during long-running
+    /// operations or suspensions from unexpectedly triggering actions upon resumption.
     fn drain_stale_events() {
         while event::poll(Duration::ZERO).unwrap_or(false) {
             let _ = event::read();
@@ -143,6 +147,7 @@ impl TerminalGuard {
 }
 
 impl Drop for TerminalGuard {
+    /// Restores terminal raw mode, cursor visibility, and alternate screen buffer on cleanup.
     fn drop(&mut self) {
         let _ = disable_raw_mode();
         if self.keep_alt_on_drop {

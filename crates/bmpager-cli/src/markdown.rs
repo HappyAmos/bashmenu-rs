@@ -47,6 +47,7 @@ enum ListState {
 }
 
 impl MarkdownRenderer {
+    /// Initializes a new MarkdownRenderer with the given viewport column width.
     fn new(width: usize) -> Self {
         Self {
             width,
@@ -70,6 +71,7 @@ impl MarkdownRenderer {
         }
     }
 
+    /// Appends the current accumulated line to the formatted output and clears the buffer.
     fn flush_line(&mut self) {
         if !self.current_line.is_empty() {
             self.output.push_str(&self.current_line);
@@ -78,6 +80,7 @@ impl MarkdownRenderer {
         }
     }
 
+    /// Ensures the output stream ends with an empty paragraph separator line.
     fn ensure_blank_line(&mut self) {
         self.flush_line();
         if !self.output.is_empty() && !self.output.ends_with("\n\n") {
@@ -85,6 +88,7 @@ impl MarkdownRenderer {
         }
     }
 
+    /// Emits a word to the active line, soft-wrapping to a continuation line if line width is exceeded.
     fn emit_word(&mut self, word: &str) {
         let prefix = if self.in_blockquote {
             "\x1b[38;5;244m│ \x1b[0m"
@@ -120,6 +124,7 @@ impl MarkdownRenderer {
         }
     }
 
+    /// Iterates over parser events and translates markdown elements into ANSI formatted terminal text.
     fn run<'a>(&mut self, parser: impl Iterator<Item = Event<'a>>) {
         for event in parser {
             match event {
@@ -303,6 +308,7 @@ impl MarkdownRenderer {
         }
     }
 
+    /// Applies active inline ANSI styles (bold, italic, strikethrough, OSC 8 links) to words.
     fn handle_styled_text(&mut self, text: &str) {
         let words = text.split_whitespace();
         for raw_word in words {
@@ -334,6 +340,7 @@ impl MarkdownRenderer {
         }
     }
 
+    /// Renders heading levels H1..H6 with rich box borders and colored markers.
     fn render_heading(&mut self, level: HeadingLevel) {
         let text = self.heading_text.trim();
         match level {
@@ -378,6 +385,7 @@ impl MarkdownRenderer {
         }
     }
 
+    /// Renders a syntax-highlighted code block enclosed in a box frame.
     fn render_code_block(&mut self) {
         let border_color = "\x1b[38;5;240m";
         let text_color = "\x1b[38;5;223m";
@@ -426,6 +434,7 @@ impl MarkdownRenderer {
         ));
     }
 
+    /// Computes column widths and renders a multi-column markdown table with word wrapping and borders.
     fn render_table(&mut self) {
         if self.table_rows.is_empty() {
             return;
@@ -586,6 +595,7 @@ impl MarkdownRenderer {
         self.output.push('\n');
     }
 
+    /// Finalizes rendering, flushing any trailing text line, and returns formatted ANSI text.
     fn finish(mut self) -> String {
         self.flush_line();
         self.output

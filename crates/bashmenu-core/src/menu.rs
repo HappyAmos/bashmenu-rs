@@ -145,12 +145,14 @@ impl ConfirmAction {
 }
 
 impl From<&str> for ConfirmAction {
+    /// Creates a simple action from a string slice.
     fn from(s: &str) -> Self {
         ConfirmAction::Simple(s.to_string())
     }
 }
 
 impl From<String> for ConfirmAction {
+    /// Creates a simple action from an owned string.
     fn from(s: String) -> Self {
         ConfirmAction::Simple(s)
     }
@@ -310,6 +312,7 @@ impl MenuItem {
         self.inline_param_spec().map(|s| s.masked).unwrap_or(false)
     }
 
+    /// Inspects command, action, script, and file fields for inline `{param:...}` or `{prompt:...}` macros.
     fn inline_param_spec(&self) -> Option<InlineParamSpec> {
         for field in [
             self.command.as_deref(),
@@ -580,15 +583,18 @@ pub struct MenuSchema {
     pub extra: HashMap<String, serde_yml::Value>,
 }
 
+/// Default schema version string (`"0.0.1"`).
 fn default_version() -> String {
     "0.0.1".to_string()
 }
 
+/// Default menu title string (`"Bash Menu"`).
 fn default_title() -> String {
     "Bash Menu".to_string()
 }
 
 impl Default for MenuSchema {
+    /// Returns the default menu schema with standard version and title.
     fn default() -> Self {
         Self {
             version: default_version(),
@@ -640,6 +646,7 @@ struct RawItemProperties {
 }
 
 impl<'de> Deserialize<'de> for MenuItem {
+    /// Deserializes a menu item from polymorphic YAML representation (string shorthand, object, or map).
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -781,6 +788,7 @@ impl<'de> Deserialize<'de> for MenuItem {
 }
 
 impl Serialize for MenuItem {
+    /// Serializes a menu item back into concise label-as-key YAML format.
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -824,6 +832,7 @@ struct InlineParamSpec {
     masked: bool,
 }
 
+/// Finds byte bounds and inner directive payload of `{param...}` or `{prompt...}` in text.
 fn find_inline_param_span(text: &str) -> Option<(usize, usize, &str)> {
     for prefix in ["{param", "{prompt"] {
         let mut search_from = 0;
@@ -849,6 +858,7 @@ fn find_inline_param_span(text: &str) -> Option<(usize, usize, &str)> {
     None
 }
 
+/// Parses prompt message and masked flag from an inline `{param:...}` directive.
 fn parse_inline_param_spec(text: &str) -> Option<InlineParamSpec> {
     let (_, _, inner) = find_inline_param_span(text)?;
     let mut spec = InlineParamSpec::default();
@@ -882,6 +892,7 @@ fn parse_inline_param_spec(text: &str) -> Option<InlineParamSpec> {
     Some(spec)
 }
 
+/// Replaces all occurrences of `{param...}` or `{prompt...}` in text with the user-provided value.
 fn replace_inline_param_tokens(text: &str, value: &str) -> String {
     let mut out = text.to_string();
     while let Some((start, end, _)) = find_inline_param_span(&out) {

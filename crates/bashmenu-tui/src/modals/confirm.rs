@@ -59,6 +59,7 @@ impl ConfirmModal {
         }
     }
 
+    /// Synchronizes the `selected_yes` helper boolean with `selected_index == 0`.
     fn sync_yes(&mut self) {
         self.selected_yes = self.selected_index == 0;
     }

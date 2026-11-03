@@ -123,15 +123,18 @@ pub struct BashMenuConfig {
     pub extra: HashMap<String, serde_yml::Value>,
 }
 
+/// Default configuration schema version string (`"0.0.1"`).
 fn default_version() -> String {
     "0.0.1".to_string()
 }
 
+/// Default active theme name (`"alaska-mountain"`).
 fn default_theme() -> String {
     "alaska-mountain".to_string()
 }
 
 impl Default for BashMenuConfig {
+    /// Returns default application configuration with `"alaska-mountain"` theme.
     fn default() -> Self {
         Self {
             version: default_version(),

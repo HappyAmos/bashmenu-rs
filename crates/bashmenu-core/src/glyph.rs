@@ -49,6 +49,7 @@ pub fn parse_ascii_val(text: &str) -> String {
     .to_string()
 }
 
+/// Checks if a string token represents a valid hexadecimal Unicode codepoint specifier (`#hex`, `$hex`, `0xhex`).
 fn is_hex_token(token: &str) -> bool {
     let clean = token
         .trim()

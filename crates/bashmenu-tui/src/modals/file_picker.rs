@@ -270,6 +270,7 @@ impl FilePickerModal {
         None
     }
 
+    /// Activates selected directory item (entering subfolder) or selected file (returning chosen path).
     fn activate_selected(&mut self) -> Option<Option<PathBuf>> {
         if self.items.is_empty() {
             return None;

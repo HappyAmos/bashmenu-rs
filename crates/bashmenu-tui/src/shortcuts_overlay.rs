@@ -339,6 +339,11 @@ impl ShortcutDispatcher {
     }
 }
 
+/// Evaluates whether a pressed key string matches a configured shortcut chord key.
+///
+/// Single-character chords are matched with strict case sensitivity to permit distinct
+/// uppercase vs lowercase bindings (e.g. `<leader> t` vs `<leader> T`). Multi-character
+/// key names (e.g. `Enter`, `f1`, `Space`) are matched case-insensitively.
 fn chord_keys_match(configured: &str, pressed: &str) -> bool {
     if configured.chars().count() == 1 && pressed.chars().count() == 1 {
         // Case-sensitive match for single letters so `<leader> t` and `<leader> T` are distinct

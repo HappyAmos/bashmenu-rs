@@ -18,6 +18,7 @@ pub struct PagerArgs {
 }
 
 impl Default for PagerArgs {
+    /// Returns default pager arguments with color formatting and help hints enabled.
     fn default() -> Self {
         Self {
             files: Vec::new(),
@@ -35,6 +36,7 @@ impl Default for PagerArgs {
     }
 }
 
+/// Prints the CLI usage instructions and command-line options for `bmpager`.
 pub fn print_usage() {
     println!(
         "Usage: command | bmpager [options]\n       bmpager [options] <file> [file...]\n\n\
@@ -67,6 +69,7 @@ Keys:\n  \
     );
 }
 
+/// Parses command-line arguments into structured `PagerArgs`.
 pub fn parse_cli_args() -> Result<PagerArgs, String> {
     let raw_args: Vec<String> = std::env::args().skip(1).collect();
     let mut args = PagerArgs::default();
