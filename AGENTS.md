@@ -43,4 +43,5 @@
 - **Add Unlisted Instructions:** If given an instruction that is not in a TODO list, you MUST add the instruction to the TODO list before working on it.
 - **Pending Marker (`PENDING`):** When working on a TODO item, you MUST mark it as `PENDING` (`- [ ] PENDING: ...`). When completed, remove the `PENDING` label and mark it as complete (`- [x] ...`).
 - **Log to `DONE.md` & Prune Finished Tasks:** Append a summary of every completed task to `.agents/skills/bashmenu-rs-developer/DONE.md`. When there are no more tasks to complete, remove finished (`- [x]`) tasks from the TODO list, and re-check the TODO list to make sure no new tasks have been added.
+- **Long-Running Process Periodic Status Updates:** When working on long running processes (tasks that are more than 1 minute to complete), give a short blurb of what you are working on at least every 2 minutes.
 

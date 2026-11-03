@@ -13,6 +13,14 @@ fn fixture_path(filename: &str) -> PathBuf {
 }
 
 #[test]
+fn test_libyml_string_join_overflow_bug_fixed() {
+    let input = "description: 'This is a long string that spans across multiple lines\n\nand has trailing breaks and spaces to ensure JOIN macro extends capacity without panic'\n";
+    let val: serde_yml::Value =
+        serde_yml::from_str(input).expect("Should parse multiline flow scalar");
+    assert!(val.get("description").is_some());
+}
+
+#[test]
 fn test_parse_production_bashmenu_yml() {
     let fixture = fixture_path("bashmenu.yml");
     assert!(

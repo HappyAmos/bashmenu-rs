@@ -1238,3 +1238,77 @@ fn test_shortcut_editor_state_and_modals() {
         .expect("Must build valid entry");
     assert_eq!(built.key, "<leader> t");
 }
+
+#[test]
+fn test_shortcut_editor_borders_and_gutter_alignment() {
+    use bashmenu_core::{BashMenuConfig, ShortcutsConfig};
+    use bashmenu_tui::ResolvedThemeStyles;
+    use menuedit_cli::{render_shortcut_editor_screen, ShortcutEditorState};
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+
+    let cfg = ShortcutsConfig::default();
+    let mut state = ShortcutEditorState::new(cfg);
+    let app_config = BashMenuConfig::default();
+    let styles = ResolvedThemeStyles::default();
+
+    let area = Rect::new(0, 0, 80, 24);
+    let mut buf = Buffer::empty(area);
+
+    render_shortcut_editor_screen(area, &mut state, &app_config, &styles, &mut buf);
+
+    let left_w = 40; // 80 / 2
+    let gutter_h = 2; // help spread over 2 lines
+    let panel_h = 24 - gutter_h - 1; // 21
+
+    // 1. Check panel bottom row (y = panel_h - 1 = 20)
+    let panel_bot_y = panel_h - 1;
+    assert_eq!(
+        buf[(0, panel_bot_y)].symbol(),
+        "├",
+        "Outer left border at panel bottom must be ├"
+    );
+    assert_eq!(
+        buf[(left_w - 1, panel_bot_y)].symbol(),
+        "┘",
+        "Inner left panel bottom-right must be right-angle ┘ instead of T"
+    );
+    assert_eq!(
+        buf[(left_w, panel_bot_y)].symbol(),
+        "└",
+        "Inner right panel bottom-left must be right-angle └ instead of T"
+    );
+    assert_eq!(
+        buf[(79, panel_bot_y)].symbol(),
+        "┤",
+        "Outer right border at panel bottom must be ┤"
+    );
+
+    // 2. Check gutter rows (y = 21..23) have intact outer side borders
+    for y in panel_h..23 {
+        assert_eq!(
+            buf[(0, y)].symbol(),
+            "│",
+            "Gutter row {} left border must be │",
+            y
+        );
+        assert_eq!(
+            buf[(79, y)].symbol(),
+            "│",
+            "Gutter row {} right border must be │",
+            y
+        );
+    }
+
+    // 3. Check bottom horizontal border line (y = 23)
+    assert_eq!(
+        buf[(0, 23)].symbol(),
+        "└",
+        "Bottom-left window corner must be └"
+    );
+    assert_eq!(
+        buf[(79, 23)].symbol(),
+        "┘",
+        "Bottom-right window corner must be ┘"
+    );
+}

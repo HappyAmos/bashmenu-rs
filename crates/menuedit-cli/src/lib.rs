@@ -19,8 +19,8 @@ pub use item_edit::{
     MultiLineInput, TextInput,
 };
 pub use shortcut_editor::{
-    format_shortcut_inspector, run_shortcut_editor, KeyCaptureModal, LeaderSettingsModal,
-    ShortcutEditModal, ShortcutEditorState,
+    format_shortcut_inspector, render_shortcut_editor_screen, run_shortcut_editor, KeyCaptureModal,
+    LeaderSettingsModal, ShortcutEditModal, ShortcutEditorState,
 };
 pub use tree::{
     delete_item, find_item, find_item_mut, find_node_path, flatten_tree, indent_item,

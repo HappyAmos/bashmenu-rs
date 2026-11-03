@@ -1594,7 +1594,7 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
     Ok(())
 }
 
-fn render_shortcut_editor_screen(
+pub fn render_shortcut_editor_screen(
     area: Rect,
     state: &mut ShortcutEditorState,
     app_config: &BashMenuConfig,
@@ -1626,10 +1626,19 @@ fn render_shortcut_editor_screen(
 
     let dirty_mark = if state.dirty { " *" } else { "" };
     let left_title = format!("Keyboard Shortcuts{}", dirty_mark);
-    draw_connected_panel(Rect::new(0, 0, left_w, panel_h), &left_title, styles, buf);
+    draw_connected_panel(
+        Rect::new(0, 0, left_w, panel_h),
+        &left_title,
+        "├",
+        "┘",
+        styles,
+        buf,
+    );
     draw_connected_panel(
         Rect::new(left_w, 0, right_w, panel_h),
         "Shortcut Inspector",
+        "└",
+        "┤",
         styles,
         buf,
     );
@@ -1731,25 +1740,34 @@ fn render_shortcut_editor_screen(
 
     // Bottom spread help gutter
     let gutter_start_y = panel_h;
+    let bot_y = area.height.saturating_sub(1);
+    let b_style = Style::default().fg(styles.border).bg(base_bg);
+
+    for y in gutter_start_y..bot_y {
+        buf.set_string(0, y, "│", b_style);
+        buf.set_string(area.width.saturating_sub(1), y, "│", b_style);
+    }
+
     for (i, gline) in gutter_lines.iter().enumerate() {
         let y = gutter_start_y + i as u16;
-        if y < area.height.saturating_sub(1) {
+        if y < bot_y {
             buf.set_string(2, y, &gline.0, styles.help_text.bg(base_bg));
         }
     }
 
     // Bottom horizontal border line
-    let bot_y = area.height.saturating_sub(1);
     let bot_rule = format!("└{}┘", "─".repeat(area.width.saturating_sub(2) as usize));
-    buf.set_string(
-        0,
-        bot_y,
-        &bot_rule,
-        Style::default().fg(styles.border).bg(base_bg),
-    );
+    buf.set_string(0, bot_y, &bot_rule, b_style);
 }
 
-fn draw_connected_panel(rect: Rect, title: &str, styles: &ResolvedThemeStyles, buf: &mut Buffer) {
+fn draw_connected_panel(
+    rect: Rect,
+    title: &str,
+    bot_left: &str,
+    bot_right: &str,
+    styles: &ResolvedThemeStyles,
+    buf: &mut Buffer,
+) {
     if rect.width < 4 || rect.height < 3 {
         return;
     }
@@ -1782,7 +1800,7 @@ fn draw_connected_panel(rect: Rect, title: &str, styles: &ResolvedThemeStyles, b
         buf.set_string(rect.x + rect.width - 1, y, "│", b_style);
     }
 
-    let bot = format!("├{}┤", "─".repeat(inner_w));
+    let bot = format!("{}{}{}", bot_left, "─".repeat(inner_w), bot_right);
     buf.set_string(rect.x, rect.y + rect.height - 1, &bot, b_style);
 }
 

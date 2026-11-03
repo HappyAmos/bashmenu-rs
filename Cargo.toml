@@ -43,3 +43,7 @@ anyhow = "1.0"
 libc = "0.2"
 sha2 = "0.10"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+
+[patch.crates-io]
+libyml = { path = "patches/libyml" }
+

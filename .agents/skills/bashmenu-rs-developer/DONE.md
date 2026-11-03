@@ -213,3 +213,16 @@
 - [x] **Standalone Editor (`shortcutedit` / `menuedit --shortcuts`):** Split-screen list + inspector with expanded macro preview; `ShortcutEditModal` (type, target + browse, execution mode, window %, quiet, alt buffer, enabled); `KeyCaptureModal` records direct combos or `<leader> <key>` chords; `LeaderSettingsModal`; add/edit/toggle/delete/reorder/save.
 - [x] **Integration:** Added menu entries under Bashmenu Settings, `ymlcheck --shortcuts` (duplicate/reserved key detection), `install.sh` / `uninstall.sh` support for `shortcutedit` and `shortcuts.yml`, a fixture, plus `bashmenu.md` / `bashmenu.1` docs.
 - [x] **Tests:** Added unit tests for key normalization/validation, entry conversion, Ctrl+Space normalization, and leader dispatch; a fixture roundtrip and inline `{param}` test; and a shortcut editor state/capture/modal test. fmt, clippy (`-D warnings`), all workspace tests, and shellcheck pass.
+
+## Phase 17: `libyml` Scanner Memory Bounds Fix, Shortcut Editor Gutter/Borders Alignment & Periodic Progress Update Directive
+- [x] **CRITICAL BUG: `libyml` Flow Scalar String Join Overflow Fix (`patches/libyml`):**
+  - Resolved `String join would overflow memory bounds` panic in `libyml::scanner::yaml_parser_scan_flow_scalar` when parsing multi-line quoted scalars with line breaks.
+  - Patched `JOIN!` macro in `patches/libyml/src/macros.rs` to loop `yaml_string_extend` reallocations rather than panicking when `string.pointer + b_len > string.end`.
+  - Added cargo workspace patch `[patch.crates-io]` for `libyml`.
+  - Added regression test `test_libyml_string_join_overflow_bug_fixed` in `crates/bashmenu-core/tests/schema_fixtures_test.rs`.
+- [x] **Keyboard Shortcut Editor Gutter and Border Alignment (`shortcutedit`, `crates/menuedit-cli`):**
+  - Fixed `render_shortcut_editor_screen` and `draw_connected_panel` in `crates/menuedit-cli/src/shortcut_editor.rs` so the bottom inner corners of the two split panels render right angles (`┘` for left panel, `└` for right panel) instead of tees (`┤` and `├`).
+  - Added continuous outer side borders `│` on column 0 and column `width - 1` across all help gutter rows between the panel bottom and the bottom window border `└...┘`.
+  - Added regression test `test_shortcut_editor_borders_and_gutter_alignment` in `crates/menuedit-cli/tests/menuedit_test.rs`.
+- [x] **Long-Running Process Periodic Status Updates Directive (`SKILL.md`, `AGENTS.md`):**
+  - Documented requirement to give a short blurb of progress at least every 2 minutes during processes/tasks exceeding 1 minute in `.agents/skills/bashmenu-rs-developer/SKILL.md` and `AGENTS.md`.
