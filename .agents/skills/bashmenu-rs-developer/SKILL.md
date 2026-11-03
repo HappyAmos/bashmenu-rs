@@ -8,9 +8,9 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
 # Skill Name: BashMenu Rust Core Developer
 
 ## 1. Intent, Scope & Boundaries
-- **Intent:** Activate when developing, refactoring, or writing tests for Rust crates (`crates/bashmenu-core`, `crates/bashmenu-tui`, `crates/bashmenu-cli`, `crates/menuedit-cli`, `crates/themeedit-cli`, `crates/bashedit-cli`, `crates/ymlcheck-cli`), shell scripts (`bashmenu.sh`, `install.sh`, `scripts/*.sh`), configurations (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`), or documentation.
+- **Intent:** Activate when developing, refactoring/fixing bugs, or writing tests for Rust crates (`crates/bashmenu-core`, `crates/bashmenu-tui`, `crates/bashmenu-cli`, `crates/menuedit-cli`, `crates/themeedit-cli`, `crates/bashedit-cli`, `crates/ymlcheck-cli`), shell scripts (`bashmenu.sh`, `install.sh`, `scripts/*.sh`), configurations (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`), or documentation.
 - **Can:** Update cross-platform Rust/Bash code, Yaml configs, Ratatui TUI layouts, unit and integration tests in `crates/*/tests/` or `tests/`, and man/markdown documentation.
-- **Cannot:** Introduce syntax/compile errors, uncaught `unwrap()`/`expect()` in runtime paths, or broken builds; guess paths or implementation details (ask for clarification); hardcode absolute user paths (always use expanding macros: `{home}`, `{bashmenu_dir}`, `{scripts_dir}`, `{templates_dir}`, `{cache_dir}`); bind `<F11>` (reserved by window managers for fullscreen; use `<F12>` or alternate unreserved keys).
+- **Cannot:** Introduce syntax/compile errors, uncaught `unwrap()`/`expect()` in runtime paths, or broken builds; guess paths or implementation details (ask for clarification); hardcode absolute user paths (always use expanding macros: `{home}`, `{bashmenu_dir}`, `{scripts_dir}`, `{templates_dir}`, `{cache_dir}`); bind `<F11>` (reserved by window managers for fullscreen; use `<F12>` or alternate unreserved keys), write code without comments/documentation, add functions and features without full documentation in bashmenu.md, bashmenu.1 and built-in help modals; create code that could possibly result in an endless loop the user cannot exit from.
 
 ---
 
