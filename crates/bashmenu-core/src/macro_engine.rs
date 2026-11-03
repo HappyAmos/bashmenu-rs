@@ -860,26 +860,40 @@ pub fn extract_toasts(text: &str, ctx: &MacroContext) -> (String, Vec<ToastNotif
 }
 
 /// Recursively interpolates macro placeholders within a text string.
+///
+/// # Supported Directives
+/// - Environment variables: `{env:VAR_NAME}`
+/// - Adaptive glyphs: `{nf:[char]:[nerd_hex]:[emoji]}`
+/// - ASCII byte translations: `{ascii:NNN}`
+/// - Builtin system paths: `{home}`, `{bashmenu_dir}`, `{dev_dir}`, `{scripts_dir}`, `{notebooks_dir}`, `{shortcuts_file}`, etc.
+/// - System stats & badges: `{time_24}`, `{date}`, `{user}`, `{host}`, `{localip}`, `{battery}`
+/// - Dot-notation config paths: `{user.<key>}`, `{settings.<key>}`, `{app.theme}`
+/// - Command substitutions: `{command:<cmd>}` (cached for 30 seconds)
+///
+/// # Recursion & Depth
+/// Supports nested placeholders (e.g. `{command:echo {user.name}}`) up to a maximum
+/// depth of 3 iterations to prevent infinite loops.
 pub fn interpolate_placeholders(text: &str, ctx: &MacroContext) -> String {
     interpolate_internal(text, ctx, 0)
 }
 
 fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String {
+    // Short-circuit: if string is empty or contains no curly braces, nothing to interpolate
     if text.is_empty() || !text.contains('{') {
         return text.to_string();
     }
 
-    // 0. Toast tokens: strip so they do not leak into visible labels/titles
+    // Step 0. Toast tokens: strip so they do not leak into visible labels/titles
     let mut res = if text.contains("{toast:") {
         TOAST_RE.replace_all(text, "").to_string()
     } else {
         text.to_string()
     };
 
-    // 1. CP437 ASCII: {ascii:NNN}
+    // Step 1. CP437 ASCII codes: {ascii:NNN}
     res = parse_ascii_val(&res);
 
-    // 2. Adaptive glyph: {nf:...}
+    // Step 2. Adaptive glyph: {nf:...} (prefers Nerd Font glyph if use_nerd_fonts is enabled)
     if res.contains("{nf:") {
         let use_nerd = ctx.config.settings.use_nerd_fonts.unwrap_or(false);
         res = NF_RE
@@ -887,7 +901,7 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
             .to_string();
     }
 
-    // 3. Environment variables: {env:VAR_NAME}
+    // Step 3. Environment variables: {env:VAR_NAME}
     if res.contains("{env:") {
         res = ENV_RE
             .replace_all(&res, |caps: &Captures| {
@@ -896,7 +910,7 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
             .to_string();
     }
 
-    // 4. Runtime & System Builtins (computed lazily only if referenced)
+    // Step 4. Runtime & System Builtins (computed lazily only if referenced)
     let mut direct_map: HashMap<&str, String> = HashMap::new();
 
     if res.contains("{home}") {

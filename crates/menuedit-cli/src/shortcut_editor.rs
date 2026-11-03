@@ -1355,27 +1355,38 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                         continue;
                     }
 
+                    // Field focus index map:
+                    // 0 = description, 1 = key_input, 2 = capture_btn, 3 = use_leader,
+                    // 4 = item_type, 5 = target_input, 6 = browse_btn, 7 = execution_mode,
+                    // 8 = window_percent, 9 = quiet, 10 = alt_buffer, 11 = enabled,
+                    // 12 = Save, 13 = Cancel
                     match k.code {
                         KeyCode::Esc => {
+                            // Cancel edits: if this was a freshly added item, discard it from state
                             if *is_new {
                                 state.delete_selected();
                             }
                             active_modal = ActiveShortcutModal::None;
                         }
                         KeyCode::Tab | KeyCode::Down => {
+                            // Forward field navigation (cycles 0..13)
                             modal.focus_idx = (modal.focus_idx + 1) % 14;
                         }
                         KeyCode::BackTab | KeyCode::Up => {
+                            // Backward field navigation
                             modal.focus_idx = (modal.focus_idx + 13) % 14;
                         }
                         KeyCode::Left if modal.focus_idx == 4 => {
+                            // Cycle item type backwards (command, script, editor, toast, notebook, theme_selector)
                             modal.item_type_idx = (modal.item_type_idx + SHORTCUT_TYPES.len() - 1)
                                 % SHORTCUT_TYPES.len();
                         }
                         KeyCode::Right | KeyCode::Char(' ') if modal.focus_idx == 4 => {
+                            // Cycle item type forwards
                             modal.item_type_idx = (modal.item_type_idx + 1) % SHORTCUT_TYPES.len();
                         }
                         KeyCode::Left if modal.focus_idx == 7 => {
+                            // Cycle execution mode backwards (Console, Streaming, Interactive)
                             modal.execution_mode = match modal.execution_mode {
                                 ExecutionMode::Console => ExecutionMode::Interactive,
                                 ExecutionMode::Streaming => ExecutionMode::Console,
@@ -1383,6 +1394,7 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                             };
                         }
                         KeyCode::Right | KeyCode::Char(' ') if modal.focus_idx == 7 => {
+                            // Cycle execution mode forwards
                             modal.execution_mode = match modal.execution_mode {
                                 ExecutionMode::Console => ExecutionMode::Streaming,
                                 ExecutionMode::Streaming => ExecutionMode::Interactive,
@@ -1390,19 +1402,24 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                             };
                         }
                         KeyCode::Char(' ') if modal.focus_idx == 3 => {
+                            // Toggle `<leader>` prefix on/off
                             modal.use_leader = !modal.use_leader;
                         }
                         KeyCode::Char(' ') if modal.focus_idx == 9 => {
+                            // Toggle Quiet mode (suppresses "Press [ENTER] to return...")
                             modal.quiet = !modal.quiet;
                         }
                         KeyCode::Char(' ') if modal.focus_idx == 10 => {
+                            // Toggle Alt Buffer (preserves or clears terminal alternate screen)
                             modal.alt_buffer = !modal.alt_buffer;
                         }
                         KeyCode::Char(' ') if modal.focus_idx == 11 => {
+                            // Toggle Enabled status
                             modal.enabled = !modal.enabled;
                         }
                         KeyCode::Enter => match modal.focus_idx {
                             2 => {
+                                // Activate interactive key capture modal
                                 *child_capture = Some(KeyCaptureModal::new(
                                     &modal.composed_key(),
                                     &state.config.leader_key,
@@ -1528,6 +1545,7 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                         KeyCode::Down | KeyCode::Char('j') => {
                             state.move_down();
                         }
+                        // [Home] / [End] Jump to first / last item
                         KeyCode::Home => {
                             state.selected_idx = 0;
                         }
@@ -1536,6 +1554,7 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                                 state.selected_idx = state.config.shortcuts.len() - 1;
                             }
                         }
+                        // [a] Add new shortcut entry
                         KeyCode::Char('a') | KeyCode::Char('A') => {
                             let new_entry = ShortcutEntry::default();
                             state.add_shortcut(new_entry.clone());
@@ -1547,6 +1566,7 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                                 child_help: None,
                             };
                         }
+                        // [e] / [Enter] Edit currently selected shortcut
                         KeyCode::Enter | KeyCode::Char('e') | KeyCode::Char('E') => {
                             if let Some(entry) = state.selected_entry() {
                                 active_modal = ActiveShortcutModal::Edit {
@@ -1558,6 +1578,7 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                                 };
                             }
                         }
+                        // [c] / [F2] Quick-capture shortcut key chord for current item
                         KeyCode::Char('c') | KeyCode::Char('C') | KeyCode::F(2) => {
                             if let Some(entry) = state.selected_entry() {
                                 active_modal =
@@ -1568,15 +1589,18 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                                     ));
                             }
                         }
+                        // [l] Global leader key settings modal
                         KeyCode::Char('l') | KeyCode::Char('L') => {
                             active_modal = ActiveShortcutModal::LeaderSettings {
                                 modal: LeaderSettingsModal::new(&state.config),
                                 child_capture: None,
                             };
                         }
+                        // [Space] Toggle enable / disable on selected shortcut
                         KeyCode::Char(' ') => {
                             state.toggle_selected();
                         }
+                        // [d] / [Delete] Delete selected shortcut (prompts confirmation)
                         KeyCode::Char('d') | KeyCode::Char('D') | KeyCode::Delete => {
                             if let Some(entry) = state.selected_entry() {
                                 active_modal =
@@ -1589,12 +1613,15 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                                     ));
                             }
                         }
+                        // [m] Move shortcut item down
                         KeyCode::Char('m') => {
                             state.move_item_down();
                         }
+                        // [M] Move shortcut item up
                         KeyCode::Char('M') => {
                             state.move_item_up();
                         }
+                        // [s] Save shortcuts to disk
                         KeyCode::Char('s') | KeyCode::Char('S') => {
                             match save_shortcuts(&shortcuts_path, &state.config) {
                                 Ok(()) => {
@@ -1614,12 +1641,14 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                                 }
                             }
                         }
+                        // [F1] / [?] Placeholders & Macros reference modal
                         KeyCode::F(1) | KeyCode::Char('?') => {
                             active_modal = ActiveShortcutModal::Help(HelpModal::new(
                                 "BashMenu Placeholders & Macros",
                                 PLACEHOLDER_HELP_TEXT,
                             ));
                         }
+                        // [Esc] / [q] Quit application (prompts confirmation if unsaved changes exist)
                         KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q') => {
                             if state.dirty {
                                 active_modal = ActiveShortcutModal::ConfirmExit(ConfirmModal::new(

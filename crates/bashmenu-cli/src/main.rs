@@ -1,4 +1,18 @@
 //! Main executable entrypoint for BashMenu in Rust.
+//!
+//! # Architecture & Event Loop
+//! The primary application loop in `bashmenu` coordinates between:
+//! 1. [`MenuView`]: Renders the menu item hierarchy, 4-column icon slots, status gutters,
+//!    and background wallpaper composites.
+//! 2. [`ActiveModal`]: A state machine managing modal popups (theme selectors, help dialogs,
+//!    confirm prompts, parameter inputs, markdown note viewers, and live streaming outputs).
+//! 3. [`ShortcutDispatcher`]: Evaluates global `<leader>` key chords (e.g. `<Ctrl+Space>`),
+//!    direct shortcuts, and renders the compact *which-key* overlay.
+//! 4. [`PluginEngine`]: Periodically runs background shell scripts without blocking the UI,
+//!    signaling the main thread over an MPSC channel on output arrival.
+//! 5. [`TerminalGuard`]: Safely suspends raw mode when running external shell commands
+//!    or launching companion tools (`bashedit`, `menuedit`, `themeedit`, `bmpager`).
+//! 6. [`ToastRack`]: Displays and auto-dismisses non-blocking bottom-right notifications.
 
 use anyhow::Result;
 use bashmenu_core::{

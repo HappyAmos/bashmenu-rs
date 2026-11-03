@@ -1,4 +1,21 @@
 //! Plugin execution engine, background caching, and table/list layout formatter.
+//!
+//! # Overview
+//! The BashMenu plugin subsystem allows dynamic output from external scripts and shell commands
+//! (e.g. system load, weather forecasts, memory usage, git status) to be embedded directly into
+//! the main menu interface above the bottom status gutter.
+//!
+//! # Architecture & Non-Blocking Design
+//! - Thread-Safe Asynchronous Fetching: `trigger_refresh()` runs external commands in detached
+//!   background worker threads with a 5-second execution timeout. The main TUI event loop is never blocked.
+//! - Non-Blocking Notifications: On output arrival, an `mpsc::Sender<()>` channel signals the TUI
+//!   event loop to trigger an immediate frame redraw without polling.
+//! - Caching: Outputs are cached with timestamps in an `Arc<RwLock<HashMap<String, PluginCacheEntry>>>`.
+//! - Output Sanitization: Strips ANSI escape sequences, null bytes, and normalizes tabs to 4 spaces.
+//! - Multi-Column Table Layout: Supports tabular (2-col, 4-col) or list layouts, column span rules,
+//!   and automated visual width clamping.
+//! - Menu Priority Invariant: When the terminal viewport height is constrained, plugin rows are
+//!   automatically truncated or dropped first so menu navigation options remain 100% visible.
 
 use crate::config::BashMenuConfig;
 use crate::macro_engine::{interpolate_placeholders, MacroContext};

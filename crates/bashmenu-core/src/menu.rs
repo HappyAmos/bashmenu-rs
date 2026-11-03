@@ -1,4 +1,55 @@
 //! Menu definitions, schema normalization, and serialization for `bashmenu.mnu`.
+//!
+//! # Overview
+//! This module defines the core data structures and serialization logic for the
+//! hierarchical menu system in BashMenu. Menus in `bashmenu.mnu` use a human-friendly
+//! "label-as-key" YAML structure where each item's visible display label serves as the
+//! dictionary key for its properties:
+//!
+//! ```yaml
+//! items:
+//!   - '{divider}':
+//!   - Applications:
+//!       icon: '{nf:󰖟}'
+//!       type: submenu
+//!       submenu:
+//!         title: Applications
+//!         items:
+//!           - Web Browser:
+//!               action: '{scripts_dir}/webopen.sh'
+//! ```
+//!
+//! # Architecture & Responsibilities
+//! - [`MenuItem`]: Represents an individual entry in a menu, supporting command execution,
+//!   nested submenus, script launching, text editing, notebooks, confirmation dialogs, and radio selections.
+//! - [`MenuItemType`]: Enumerates all recognized item actions, from simple shell commands
+//!   to interactive modals and submenus.
+//! - [`ConfirmAction`]: Encapsulates actions invoked when a user answers "Yes" or "No" in a confirmation dialog.
+//! - [`ExecutionMode`]: Controls subprocess presentation (`Console`, `Streaming`, or `Interactive`).
+//! - Custom Serde Deserializer: Seamlessly normalizes plain strings, `{divider}` tokens,
+//!   legacy dictionaries, and label-as-key YAML mappings into typed [`MenuItem`] vectors.
+//!
+//! # Example API Usage
+//! ```no_run
+//! use bashmenu_core::{load_menu, save_menu, MenuItem, MenuItemType, MenuSchema};
+//! use std::path::Path;
+//!
+//! # fn main() -> anyhow::Result<()> {
+//! // 1. Load menu hierarchy from disk
+//! let menu: MenuSchema = load_menu("bashmenu.mnu")?;
+//! println!("Menu Title: {}", menu.title);
+//!
+//! // 2. Iterate through top-level items
+//! for item in &menu.items {
+//!     if item.is_divider() {
+//!         println!("--- Divider ---");
+//!     } else {
+//!         println!("Item: {} (type: {:?})", item.label, item.r#type);
+//!     }
+//! }
+//! # Ok(())
+//! # }
+//! ```
 
 use crate::error::{BashMenuError, Result};
 use crate::macro_engine::{
@@ -581,7 +632,12 @@ impl<'de> Deserialize<'de> for MenuItem {
     {
         let val = serde_yml::Value::deserialize(deserializer)?;
 
-        // Case 1: Plain string (e.g. "{divider}" or a command string)
+        // -------------------------------------------------------------------
+        // Case 1: Plain string literal (e.g. "{divider}" or shorthand command)
+        // -------------------------------------------------------------------
+        // In YAML, an item can be written simply as a scalar string:
+        //   - '{divider}'
+        //   - 'echo hello world'
         if let serde_yml::Value::String(s) = &val {
             if s == "{divider}" {
                 return Ok(MenuItem::divider());
@@ -595,13 +651,15 @@ impl<'de> Deserialize<'de> for MenuItem {
             });
         }
 
-        // Case 2: Mapping
+        // -------------------------------------------------------------------
+        // Case 2: Mapping / Dictionary structure
+        // -------------------------------------------------------------------
         if let serde_yml::Value::Mapping(map) = &val {
             if map.is_empty() {
                 return Ok(MenuItem::default());
             }
 
-            // Check if divider mapping: {'{divider}': null}
+            // Step 2a: Check if explicit divider mapping: `{"{divider}": null}`
             for k in map.keys() {
                 if let serde_yml::Value::String(ks) = k {
                     if ks == "{divider}" {
@@ -610,7 +668,9 @@ impl<'de> Deserialize<'de> for MenuItem {
                 }
             }
 
-            // Check if already normalized with "label" key
+            // Step 2b: Check if pre-normalized structure containing an explicit "label" key:
+            //   - label: "My Command"
+            //     command: "echo test"
             let has_label = map.contains_key("label");
             if has_label {
                 let label = match map.get("label") {
@@ -647,7 +707,12 @@ impl<'de> Deserialize<'de> for MenuItem {
                 });
             }
 
-            // Standard label-as-key: { "Label": { props } } or { "Label": null }
+            // Step 2c: Standard label-as-key syntax:
+            //   - "Menu Item Label":
+            //       type: command
+            //       action: "ls -la"
+            // Or null-body header:
+            //   - "Section Header": null
             if map.len() == 1 {
                 let (k, v) = map.iter().next().unwrap();
                 let label = match k {
@@ -655,6 +720,7 @@ impl<'de> Deserialize<'de> for MenuItem {
                     other => format!("{:?}", other),
                 };
 
+                // Null body indicates a non-interactive label / header
                 if v.is_null() {
                     return Ok(MenuItem {
                         label,
@@ -662,6 +728,7 @@ impl<'de> Deserialize<'de> for MenuItem {
                     });
                 }
 
+                // Nested property mapping under the label key
                 if let serde_yml::Value::Mapping(_) = v {
                     let raw_props: RawItemProperties =
                         serde_yml::from_value(v.clone()).map_err(serde::de::Error::custom)?;

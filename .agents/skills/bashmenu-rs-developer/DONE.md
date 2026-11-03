@@ -236,3 +236,16 @@
   - In `LeaderSettingsModal`, wrapped error messages, clamped hints, and converted footer into a 2-line wrapped layout within available inner columns.
   - In `ShortcutEditModal`, clamped `composed_key`, dynamically formatted item type options, execution mode selectors, and window percent hints to available width; compacted checkboxes; wrapped error messages; and converted footer hints into a 2-line wrapped layout.
   - Added regression test `test_shortcut_modals_text_does_not_exceed_window_width` in `crates/menuedit-cli/tests/menuedit_test.rs`.
+
+## Phase 19: Comprehensive Application Documentation & Code Commenting Overhaul
+- [x] **Architecture & Root Documentation (`docs/ARCHITECTURE.md`, `README.md`):**
+  - Updated `docs/ARCHITECTURE.md` to reflect all binaries (`bashmenu`, `menuedit`, `shortcutedit`, `themeedit`, `bashedit`, `bmpager`, `ymlcheck`), leader chord mechanics, wallpaper compositing, and verification workflows.
+  - Updated `README.md` with complete command reference, prerequisite instructions, features, and direct execution examples.
+- [x] **`bashmenu-core` Module Headers, API Examples & Line Commentary:**
+  - Added module-level doc comments (`//!`) and executable doctests in `menu.rs` and `shortcuts.rs`.
+  - Added step-by-step explanatory line comments inside `menu.rs` custom deserialization routines (distinguishing scalar shorthand, normalized label maps, and canonical YAML label-as-key dictionaries).
+  - Added step-by-step explanatory line comments for the 6-tier macro interpolation loop in `macro_engine.rs`.
+  - Added module headers and architecture notes in `shortcuts.rs` and `plugin.rs`.
+- [x] **Interactive CLI Commentary & Event Loops:**
+  - Added step-by-step commentary for field focus indexes (0..=13), navigation cycling, key capturing, and main screen actions in `crates/menuedit-cli/src/shortcut_editor.rs`.
+  - Added subsystem architecture commentary for the main loop in `crates/bashmenu-cli/src/main.rs`.

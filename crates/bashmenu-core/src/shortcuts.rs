@@ -1,4 +1,40 @@
 //! Custom keyboard shortcuts (`shortcuts.yml`) schema, key normalization, and persistence.
+//!
+//! # Overview
+//! This module provides domain models and parsing utilities for BashMenu's custom
+//! keyboard shortcut subsystem. Shortcuts in `shortcuts.yml` allow users to bind
+//! direct function keys (e.g. `F9`, `F10`), modifier combinations (e.g. `Ctrl+G`, `Alt+T`),
+//! or two-stroke leader-key chords (e.g. `<leader> t`, `<leader> p`) to arbitrary menu actions.
+//!
+//! # Key Normalization & Validation
+//! - [`normalize_key_spec`]: Normalizes inconsistent casing and syntax (such as `C-t`, `ctrl-t`,
+//!   `<Ctrl+T>`, `leader+t`) into a canonical token string (e.g. `"<leader> t"` or `"ctrl+t"`).
+//! - [`validate_key_spec`]: Guarantees that users cannot bind reserved navigation keys
+//!   (`Up`, `Down`, `Enter`, `Esc`), critical function keys (`F1`..`F8`, `F11`), or unmodified single
+//!   characters as direct shortcuts.
+//! - Header Preservation: Serializing via [`save_shortcuts`] cleanly preserves the top-level
+//!   [`SHORTCUTS_HEADER`] comment block.
+//!
+//! # Example API Usage
+//! ```no_run
+//! use bashmenu_core::{load_shortcuts, normalize_key_spec, validate_key_spec, ShortcutsConfig};
+//! use std::path::Path;
+//!
+//! # fn main() -> anyhow::Result<()> {
+//! // 1. Validate a user-typed shortcut string
+//! let valid_key = validate_key_spec("<ctrl+space>", true).expect("Valid leader key");
+//! assert_eq!(valid_key, "ctrl+space");
+//!
+//! // 2. Normalize chords
+//! let chord = normalize_key_spec("leader+t");
+//! assert_eq!(chord, "<leader> t");
+//!
+//! // 3. Load shortcuts configuration
+//! let cfg = load_shortcuts("shortcuts.yml").unwrap_or_default();
+//! println!("Leader key: {}", cfg.leader_key);
+//! # Ok(())
+//! # }
+//! ```
 
 use crate::config::get_user_config_dir;
 use crate::error::{BashMenuError, Result};
