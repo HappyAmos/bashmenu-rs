@@ -274,3 +274,24 @@
   - Verified `./install.sh` built release binaries and installed cleanly.
   - Pushed to `main` (`80eb328`) and verified GitHub Actions CI run `41568390777` succeeded.
 
+## Phase 21: Exhaustive Struct, Enum, Field, and Variant Documentation
+- [x] **Universal Documentation of Structs, Enums, Type Aliases, and Constants:**
+  - Scanned every `.rs` file across all workspace crates for un-documented structs, enums, unions, type aliases, and constants.
+  - Added doc comments to:
+    - CLI arguments: `Cli` across `bashmenu-cli`, `menuedit-cli`, `shortcutedit`, `themeedit-cli`, `bashedit-cli`, `ymlcheck-cli`.
+    - Modal dialogs: `ActiveModal` and `ChildModal` variants across all interactive TUIs.
+    - Data schemas and constants: `SHORTCUT_TYPES`, `VALID_16_COLORS`, `VALID_WINDOW_BORDER_KEYS`, `VALID_OPTION_TYPES`, `HELP_LINES`, `OSC8_RE`, `MD_LINK_RE`, `BARE_URL_RE`, `ANSI_CSI_RE`, `ANSI_OSC_RE`, `NF_RE`, `ENV_RE`, `DOT_RE`, `COMMAND_RE`, `FILE_PICKER_MACRO_RE`, `DIR_PICKER_MACRO_RE`, `PICKER_MACRO_RE`, `CMD_CACHE_TTL_SECS`, `CMD_CACHE`, `TOAST_RE`, `IN_MEMORY_CLIPBOARD`, `TEST_MODE`, `THREAD_CLIPBOARD`, `CHARSET`, `TABLE`.
+    - Data models and internal helpers: `CompositorCacheKey`, `MenuLevel`, `DirItem`, `DocumentLink`, `RawItemProperties`, `InlineParamSpec`, `LocalTimeStrings`, `MarkdownRenderer`, `ListState`, `Pager`, `PagerArgs`, `FooterHitRegion`, `MenuEditFooterAction`, `FooterAction`.
+- [x] **100% Struct Field and Enum Variant Documentation Coverage:**
+  - Built an AST scanner specifically detecting any struct field (public or private) or enum variant lacking doc comments.
+  - Documented all 27 identified struct fields and 9 enum variants across `WallpaperCompositor`, `ExtractedColor`, `ShortcutDispatcher`, `MenuView`, `TerminalGuard`, `ToastRack`, `StreamOutputModal`, `FilePickerModal`, `PluginEngine`, `ActiveModal`, and `FormRow`.
+  - Re-scanned to confirm **0 undocumented struct fields and 0 undocumented enum variants** remain across the entire repository.
+- [x] **Verification & Lifecycle Conformance:**
+  - Verified `cargo fmt --all --check` passed cleanly.
+  - Verified `cargo clippy --workspace --all-targets -- -D warnings` passed with 0 warnings.
+  - Verified `cargo test --workspace` passed 100% across all crates.
+  - Verified `shellcheck *.sh scripts/*.sh` passed cleanly.
+  - Verified `./install.sh` built release binaries and installed cleanly to `$HOME/.local/bin`.
+  - Pushed to `main` (`5a467d6`) and verified remote CI run `41570376526` passed with status `success`.
+
+
