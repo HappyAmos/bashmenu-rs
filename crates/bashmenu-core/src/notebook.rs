@@ -10,15 +10,19 @@ use std::path::{Path, PathBuf};
 /// Root notebook document structure matching `notebooks/notes.yml`
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct NotebookSchema {
+    /// Inner notebook metadata and notes collection
     pub notebook: NotebookData,
 }
 
 /// Metadata and note collection within a notebook
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct NotebookData {
+    /// Title header of the notebook
     pub title: String,
+    /// Default text format (typically "markdown")
     #[serde(default = "default_format")]
     pub format: String,
+    /// Sequence of raw YAML note mappings
     #[serde(default)]
     pub notes: Vec<serde_yml::Value>,
 }
@@ -30,13 +34,18 @@ fn default_format() -> String {
 /// A parsed note entry
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct NoteItem {
+    /// Display title / note identifier
     pub title: String,
+    /// Note type descriptor (default "note")
     #[serde(default = "default_note_type")]
     pub r#type: String,
+    /// Document format (e.g. "markdown")
     #[serde(default = "default_format")]
     pub format: String,
+    /// Multi-line body content of the note
     #[serde(default)]
     pub content: String,
+    /// Optional leading visual icon or glyph
     #[serde(default)]
     pub icon: Option<String>,
 }

@@ -10,11 +10,14 @@ use ratatui::style::Modifier;
 /// Simple message / alert modal dialog
 #[derive(Debug, Clone)]
 pub struct MessageModal {
+    /// Dialog title header
     pub title: String,
+    /// Alert or information message body
     pub message: String,
 }
 
 impl MessageModal {
+    /// Constructs a new message modal with the given title and message.
     pub fn new(title: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             title: title.into(),

@@ -21,10 +21,15 @@ pub use bashmenu_tui::TextInput;
 /// Interactive Unicode multi-line text input state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MultiLineInput {
+    /// 2D vector of rows, where each row is a vector of Unicode characters
     pub lines: Vec<Vec<char>>,
+    /// Active cursor row index (0..lines.len())
     pub cursor_row: usize,
+    /// Active cursor character column index within current line
     pub cursor_col: usize,
+    /// Vertical scroll offset in lines for text area viewport
     pub scroll_row: usize,
+    /// Selection anchor (row, col) when selecting text
     pub selection_anchor: Option<(usize, usize)>,
 }
 
@@ -41,6 +46,7 @@ impl Default for MultiLineInput {
 }
 
 impl MultiLineInput {
+    /// Constructs a multi-line text input buffer initialized with the given string.
     pub fn new(s: &str) -> Self {
         let lines: Vec<Vec<char>> = if s.is_empty() {
             vec![Vec::new()]
@@ -61,6 +67,7 @@ impl MultiLineInput {
         }
     }
 
+    /// Converts the 2D character lines back into a newline-separated String.
     pub fn as_string(&self) -> String {
         self.lines
             .iter()
@@ -69,14 +76,17 @@ impl MultiLineInput {
             .join("\n")
     }
 
+    /// Replaces the current text content with the provided string.
     pub fn set_text(&mut self, s: &str) {
         *self = Self::new(s);
     }
 
+    /// Returns the total number of logical lines in the buffer.
     pub fn line_count(&self) -> usize {
         self.lines.len()
     }
 
+    /// Adjusts `scroll_row` so that `cursor_row` remains visible within `v_rows` vertical rows.
     pub fn ensure_cursor_visible(&mut self, v_rows: usize) {
         if self.cursor_row < self.scroll_row {
             self.scroll_row = self.cursor_row;
@@ -85,6 +95,7 @@ impl MultiLineInput {
         }
     }
 
+    /// Moves cursor up by one line, clamping column to the new line's length.
     pub fn move_up(&mut self) -> bool {
         if self.cursor_row > 0 {
             self.cursor_row -= 1;
@@ -98,6 +109,7 @@ impl MultiLineInput {
         }
     }
 
+    /// Moves cursor down by one line, clamping column to the new line's length.
     pub fn move_down(&mut self) -> bool {
         if self.cursor_row + 1 < self.lines.len() {
             self.cursor_row += 1;
@@ -111,6 +123,7 @@ impl MultiLineInput {
         }
     }
 
+    /// Returns normalized selection boundaries `((start_row, start_col), (end_row, end_col))` if active.
     pub fn selection_range(&self) -> Option<((usize, usize), (usize, usize))> {
         let (ar, ac) = self.selection_anchor?;
         let (cr, cc) = (self.cursor_row, self.cursor_col);
@@ -124,6 +137,7 @@ impl MultiLineInput {
         }
     }
 
+    /// Checks if a particular `(row, col)` position falls within the active selection range.
     pub fn is_pos_selected(&self, row: usize, col: usize) -> bool {
         if let Some((start, end)) = self.selection_range() {
             let pos = (row, col);
@@ -133,6 +147,7 @@ impl MultiLineInput {
         }
     }
 
+    /// Returns the text content encompassed by the current selection range.
     pub fn get_selected_text(&self) -> Option<String> {
         let (start, end) = self.selection_range()?;
         let (start_r, start_c) = start;
@@ -167,6 +182,7 @@ impl MultiLineInput {
         Some(result.join("\n"))
     }
 
+    /// Deletes the currently selected text range and positions cursor at range start.
     pub fn delete_selection(&mut self) -> bool {
         let (start, end) = match self.selection_range() {
             Some(range) => range,
@@ -216,6 +232,7 @@ impl MultiLineInput {
         true
     }
 
+    /// Pastes text at the current cursor position, replacing active selection if any.
     pub fn paste_text(&mut self, text: &str) {
         self.delete_selection();
         let paste_lines: Vec<&str> = text.split('\n').collect();
@@ -276,6 +293,7 @@ impl MultiLineInput {
         self.selection_anchor = None;
     }
 
+    /// Moves cursor left by one word boundary within current row.
     pub fn move_word_left(&mut self) {
         if self.cursor_row >= self.lines.len() {
             return;
@@ -291,6 +309,7 @@ impl MultiLineInput {
         self.cursor_col = col;
     }
 
+    /// Moves cursor right by one word boundary within current row.
     pub fn move_word_right(&mut self) {
         if self.cursor_row >= self.lines.len() {
             return;
@@ -306,6 +325,7 @@ impl MultiLineInput {
         self.cursor_col = col;
     }
 
+    /// Handles keyboard input with active modifiers (Shift selection, Ctrl commands).
     pub fn handle_key_with_modifiers(&mut self, code: KeyCode, modifiers: KeyModifiers) -> bool {
         let is_ctrl = modifiers.contains(KeyModifiers::CONTROL);
         let is_shift = modifiers.contains(KeyModifiers::SHIFT);
@@ -535,120 +555,189 @@ impl MultiLineInput {
         }
     }
 
+    /// Handles a single key code with no modifier keys pressed.
     pub fn handle_key(&mut self, code: KeyCode) -> bool {
         self.handle_key_with_modifiers(code, KeyModifiers::NONE)
     }
 }
 
-/// Target destination for file browser dialog.
+/// Target destination field for the file browser modal picker.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BrowseTarget {
+    /// Browse for executable action / command script
     Action,
+    /// Browse for template file
     Template,
+    /// Browse for target output file
     Target,
+    /// Browse for starting directory path
     StartDir,
+    /// Browse for confirmation Yes script
     OnYes,
+    /// Browse for confirmation No script
     OnNo,
 }
 
 /// Result returned from `ItemEditModal::handle_key` or `handle_mouse`.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ItemEditResult {
+    /// Modal continues running with no action
     Continue,
+    /// Save changes and return modified MenuItem
     Save(Box<MenuItem>),
+    /// Abort editing and discard modifications
     Cancel,
+    /// Request item type conversion modal
     ChangeType,
+    /// Request contextual help modal
     ShowHelp,
+    /// Request ASCII character picker modal
     ShowAscii,
+    /// Request Nerd Font / Emoji glyph picker modal
     ShowGlyphs,
+    /// Request placeholder / macro reference modal
     ShowPlaceholders,
+    /// Request file picker modal targeting the specified field
     Browse(BrowseTarget),
 }
 
 /// Dynamic focusable control types within the editor form.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FocusControl {
+    /// Button to change item schema type
     ChangeTypeBtn,
-    // Divider fields
+    /// Input for divider rule character
     CharInput,
+    /// Input for divider length specification
     LengthInput,
-    // Standard fields
+    /// Input for menu item label/title
     TitleInput,
+    /// Input for menu item icon glyph
     IconInput,
+    /// Input for primary action / command payload
     ActionInput,
+    /// Button to browse filesystem for primary action
     ActionBrowseBtn,
+    /// Input for confirmation Yes callback command
     OnYesInput,
+    /// Button to browse filesystem for Yes callback command
     OnYesBrowseBtn,
+    /// Input for confirmation No callback command
     OnNoInput,
+    /// Button to browse filesystem for No callback command
     OnNoBrowseBtn,
+    /// Input for prompt message string
     PromptInput,
+    /// Multi-line input for radio options list
     RadioOptionsInput,
+    /// Input for template file path
     TemplateInput,
+    /// Button to browse filesystem for template file
     TemplateBrowseBtn,
+    /// Input for target output path
     TargetInput,
+    /// Button to browse filesystem for target path
     TargetBrowseBtn,
+    /// Input for block identifier
     BlockIdInput,
+    /// Input for process starting directory
     StartDirInput,
+    /// Button to browse filesystem for starting directory
     StartDirBrowseBtn,
+    /// Input for editor tabstop width
     TabstopInput,
+    /// Selector for command execution mode (streaming/interactive/console)
     ExecModeSelector,
+    /// Input for streaming output window height percentage
     WindowPercentInput,
+    /// Checkbox for alternate screen buffer usage
     AltBufferChk,
+    /// Checkbox for quiet/silent execution
     QuietChk,
+    /// Checkbox to disable ANSI formatting interpretation
     NoFormattingChk,
+    /// Checkbox to mask input text with asterisks
     MaskedChk,
+    /// Checkbox to trigger menu refresh after execution
     RefreshChk,
+    /// Checkbox to display whitespace characters
     ShowWhitespaceChk,
+    /// Checkbox to execute in external terminal emulator
     ExternalChk,
-    // Dialog action buttons
+    /// Button to commit changes and save
     SaveBtn,
+    /// Button to discard changes and close
     CancelBtn,
 }
 
 /// Modal dialog for editing all schema properties of a menu item.
 #[derive(Debug, Clone)]
 pub struct ItemEditModal {
+    /// Working copy of the MenuItem being edited
     pub item: MenuItem,
+    /// Active schema type identifier (e.g. "command", "submenu", "divider")
     pub current_type: String,
+    /// Original item type prior to any user type conversion
     pub original_type: String,
 
-    // Divider fields
+    /// Input for divider character
     pub char_input: TextInput,
+    /// Input for divider length specification
     pub length_input: TextInput,
 
-    // Standard fields
+    /// Input for item title/label
     pub title_input: TextInput,
+    /// Input for item icon glyph
     pub icon_input: TextInput,
+    /// Input for item action/command payload
     pub action_input: TextInput,
+    /// Input for prompt message
     pub prompt_input: TextInput,
+    /// Input for on_yes action
     pub on_yes_input: TextInput,
+    /// Input for on_no action
     pub on_no_input: TextInput,
+    /// Multi-line input for radio options
     pub radio_options_input: MultiLineInput,
+    /// Input for template file path
     pub template_input: TextInput,
+    /// Input for target file path
     pub target_input: TextInput,
+    /// Input for block identifier
     pub block_id_input: TextInput,
+    /// Input for process starting directory
     pub start_dir_input: TextInput,
+    /// Input for tabstop width
     pub tabstop_input: TextInput,
 
-    // Execution mode: 0 = Streaming, 1 = Interactive, 2 = Console
+    /// Selected execution mode: 0 = Streaming, 1 = Interactive, 2 = Console
     pub exec_mode: usize,
+    /// Input for streaming window height percentage
     pub window_percent_input: TextInput,
 
-    // Boolean checkboxes
+    /// Checkbox for alternate screen buffer
     pub alt_buffer: bool,
+    /// Checkbox for quiet output suppression
     pub quiet: bool,
+    /// Checkbox to disable ANSI formatting
     pub no_formatting: bool,
+    /// Checkbox to mask input text
     pub masked: bool,
+    /// Checkbox to reload menu on return
     pub refresh: bool,
+    /// Checkbox to show whitespace glyphs
     pub show_whitespace: bool,
+    /// Checkbox to launch in external terminal
     pub external: bool,
 
-    // Focus and scroll state
+    /// Index of currently focused control within the active form controls list
     pub active_control_idx: usize,
+    /// Vertical scroll offset in lines for the editor dialog body
     pub scroll_offset: usize,
 }
 
 impl ItemEditModal {
+    /// Constructs an item edit modal initialized with schema values extracted from the given MenuItem.
     pub fn new(item: &MenuItem) -> Self {
         let current_type = Self::detect_item_type(item);
         let original_type = current_type.clone();
@@ -868,18 +957,22 @@ impl ItemEditModal {
         }
     }
 
+    /// Returns `true` if current item is a horizontal divider rule.
     pub fn is_divider(&self) -> bool {
         self.current_type == "{divider}" || self.current_type == "divider"
     }
 
+    /// Returns `true` if current item is a confirmation modal prompt.
     pub fn is_confirm(&self) -> bool {
         self.current_type == "confirm"
     }
 
+    /// Returns `true` if current item is a radio selection modal.
     pub fn is_radio(&self) -> bool {
         self.current_type == "radio" || self.current_type == "config_radio"
     }
 
+    /// Returns `true` if current item performs menu navigation rather than command execution.
     pub fn is_nav_type(&self) -> bool {
         matches!(
             self.current_type.as_str(),
@@ -887,6 +980,7 @@ impl ItemEditModal {
         )
     }
 
+    /// Returns `true` if current item executes external code or child processes.
     pub fn is_executable(&self) -> bool {
         matches!(
             self.current_type.as_str(),
@@ -894,10 +988,12 @@ impl ItemEditModal {
         )
     }
 
+    /// Returns `true` if current item exposes a process starting working directory.
     pub fn shows_start_dir(&self) -> bool {
         matches!(self.current_type.as_str(), "command" | "script" | "editor")
     }
 
+    /// Returns `true` if current item supports custom prompt text.
     pub fn shows_prompt(&self) -> bool {
         matches!(
             self.current_type.as_str(),
@@ -905,6 +1001,7 @@ impl ItemEditModal {
         )
     }
 
+    /// Returns `true` if current item possesses an action payload input field.
     pub fn shows_action(&self) -> bool {
         !self.is_divider()
             && !self.is_confirm()
@@ -915,6 +1012,7 @@ impl ItemEditModal {
             )
     }
 
+    /// Returns `true` if the current item type supports file browsing for its action.
     pub fn shows_action_browse(&self) -> bool {
         matches!(
             self.current_type.as_str(),
@@ -1003,6 +1101,7 @@ impl ItemEditModal {
         controls
     }
 
+    /// Retrieves the currently focused form control.
     pub fn current_control(&self) -> FocusControl {
         let list = self.focus_controls();
         if self.active_control_idx < list.len() {
@@ -1012,6 +1111,7 @@ impl ItemEditModal {
         }
     }
 
+    /// Mutates the active item schema type, re-initializing form inputs and valid controls.
     pub fn apply_type_change(&mut self, new_type: &str) {
         self.current_type = new_type.to_string();
         if self.is_divider() {
@@ -1047,6 +1147,7 @@ impl ItemEditModal {
         }
     }
 
+    /// Injects the file picker result path into the appropriate target form input field.
     pub fn set_browse_result(&mut self, target: BrowseTarget, path: &str) {
         match target {
             BrowseTarget::Action => self.action_input.set_text(path),
@@ -1058,6 +1159,7 @@ impl ItemEditModal {
         }
     }
 
+    /// Returns human-readable label header text for the action input field.
     pub fn get_action_label_text(&self) -> &'static str {
         match self.current_type.as_str() {
             "command" => "Shell Command (command):",
@@ -1070,6 +1172,7 @@ impl ItemEditModal {
         }
     }
 
+    /// Formats a badge string displaying the schema type (e.g. `[CMD]`, `[DIR]`).
     pub fn get_type_display_str(&self) -> String {
         let badge = match self.current_type.as_str() {
             "{divider}" | "divider" => "[DIV]",

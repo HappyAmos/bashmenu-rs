@@ -14,28 +14,42 @@ use std::thread;
 
 /// Messages emitted by the background streaming process
 pub enum StreamOutputMsg {
+    /// A line of standard output or error received from child process
     Line(String),
+    /// Child process has exited with optional status code
     Finished(Option<i32>),
 }
 
 /// Action result from handling keyboard or mouse events
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StreamOutputAction {
+    /// No modal state transition
     None,
+    /// Request to close and dismiss the streaming modal
     Close,
 }
 
 /// Modal window displaying live streaming command output
 pub struct StreamOutputModal {
+    /// Dialog title header
     pub title: String,
+    /// Command string being executed
     pub command: String,
+    /// Viewport size percentage relative to terminal dimensions
     pub window_percent: u16,
+    /// Whether stdin remains connected for interactive user inputs
     pub interactive: bool,
+    /// Buffered output lines collected from process stdout/stderr
     pub lines: Vec<String>,
+    /// Vertical scroll offset in lines
     pub scroll_offset: usize,
+    /// Whether viewport automatically follows the latest output line
     pub auto_scroll: bool,
+    /// Whether the background child process is actively executing
     pub is_running: bool,
+    /// Process exit code upon termination
     pub exit_code: Option<i32>,
+    /// Operating system process ID of child command
     pub child_pid: Option<u32>,
     rx: Option<Receiver<StreamOutputMsg>>,
     stdin_tx: Option<Sender<Vec<u8>>>,

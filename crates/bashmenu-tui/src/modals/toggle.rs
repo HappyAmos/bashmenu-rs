@@ -10,20 +10,27 @@ use ratatui::style::Modifier;
 /// User choice from a toggle dialog
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ToggleChoice {
+    /// True/Enabled option selected
     True,
+    /// False/Disabled option selected
     False,
+    /// Cancelled without change
     Cancel,
 }
 
 /// Interactive Toggle modal dialog matching Python Textual `ToggleModalScreen`
 #[derive(Debug, Clone)]
 pub struct ToggleModal {
+    /// Dialog title header
     pub title: String,
+    /// Description or prompt message
     pub message: String,
-    pub focused_idx: usize, // 0 = True, 1 = False, 2 = Cancel
+    /// Currently focused button index (0 = True, 1 = False, 2 = Cancel)
+    pub focused_idx: usize,
 }
 
 impl ToggleModal {
+    /// Constructs a toggle modal with the given title and message.
     pub fn new(title: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             title: title.into(),

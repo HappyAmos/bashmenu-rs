@@ -249,3 +249,7 @@
 - [x] **Interactive CLI Commentary & Event Loops:**
   - Added step-by-step commentary for field focus indexes (0..=13), navigation cycling, key capturing, and main screen actions in `crates/menuedit-cli/src/shortcut_editor.rs`.
   - Added subsystem architecture commentary for the main loop in `crates/bashmenu-cli/src/main.rs`.
+- [x] **Complete Workspace Documentation Coverage (`-W missing_docs`):**
+  - Added comprehensive documentation comments (`///`) to every public and internal struct, enum, trait, field, function, and method across all workspace crates (`bashmenu-core`, `bashmenu-tui`, `menuedit-cli`, `themeedit-cli`, `bashedit-cli`, `bmpager-cli`, `ymlcheck-cli`).
+  - Documented theme token schemas, border character mappings, style pairs, visual wrapped lines, multi-line inputs, swap file headers, modal prompt states, and selection anchors.
+  - Achieved 100% clean check under `cargo clippy --workspace --all-targets -- -D warnings` with zero missing documentation warnings across production libraries.

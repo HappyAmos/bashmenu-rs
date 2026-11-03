@@ -6,6 +6,7 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Modifier;
 
+/// Available menu item types presented in the type selection modal `(type_name, description)`.
 pub const ITEM_TYPES: &[(&str, &str)] = &[
     ("submenu", "Submenu Folder (nested options list)"),
     ("command", "Shell Command (executes shell command)"),
@@ -28,11 +29,14 @@ pub const ITEM_TYPES: &[(&str, &str)] = &[
 /// Modal dialog for picking an item type
 #[derive(Debug, Clone)]
 pub struct ItemTypePickerModal {
+    /// Currently highlighted item index in `ITEM_TYPES`
     pub selected_idx: usize,
+    /// Vertical scroll offset for long item type lists
     pub scroll_offset: usize,
 }
 
 impl ItemTypePickerModal {
+    /// Constructs a new type picker modal pre-selecting the current type.
     pub fn new(current_type: &str) -> Self {
         let selected_idx = ITEM_TYPES
             .iter()

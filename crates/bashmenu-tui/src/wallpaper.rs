@@ -146,8 +146,11 @@ pub struct WallpaperCell {
 /// 2D grid of pre-calculated wallpaper cell colors matching terminal dimensions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WallpaperGrid {
+    /// Visual column width of the grid
     pub width: usize,
+    /// Terminal row height of the grid
     pub height: usize,
+    /// Linear buffer of cells indexed as `y * width + x`
     pub cells: Vec<WallpaperCell>,
 }
 
@@ -177,6 +180,7 @@ struct CompositorCacheKey {
 /// Manages loading, caching, aspect-ratio scaling, and color blending of wallpapers.
 #[derive(Clone, Default)]
 pub struct WallpaperCompositor {
+    /// Active wallpaper configuration settings
     pub config: WallpaperConfig,
     cached_path: Option<PathBuf>,
     raw_image: Option<RgbImage>,

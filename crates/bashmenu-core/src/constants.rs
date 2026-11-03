@@ -1,5 +1,6 @@
 //! Shared documentation, help texts, and reference tables for BashMenu and BashEdit.
 
+/// Comprehensive help text and reference guide for macro placeholders supported by BashMenu.
 pub const PLACEHOLDER_HELP_TEXT: &str = "\
 ── Interactive Input Directives ──
 {param}                      │ Prompts for text input modal (masked=true supported)
@@ -90,6 +91,7 @@ pub const PLACEHOLDER_HELP_TEXT: &str = "\
 {<key.path>}                 │ Refers to nested key in bashmenu.yml (e.g. {user.postal_code})
 ";
 
+/// Markdown formatting reference table displayed in help modals.
 pub const MARKDOWN_REFERENCE_TEXT: &str = "\
 # Markdown Syntax Reference
 
@@ -112,6 +114,7 @@ pub const MARKDOWN_REFERENCE_TEXT: &str = "\
 | ```` ```bash ```` | Fenced code block with syntax highlight |
 ";
 
+/// BashEdit keybindings, keyboard shortcuts, and control commands reference table.
 pub const BASHEDIT_HELP_TEXT: &str = "\
 # BashEdit Keybindings & Controls
 

@@ -20,18 +20,27 @@ struct DirItem {
 /// Interactive file and directory picker dialog
 #[derive(Debug, Clone)]
 pub struct FilePickerModal {
+    /// Dialog title header
     pub title: String,
+    /// Currently navigated directory path
     pub current_dir: PathBuf,
     items: Vec<DirItem>,
+    /// Index of currently selected item in directory list
     pub selected_idx: usize,
+    /// Vertical scroll offset in lines
     pub scroll_offset: usize,
+    /// Whether only directories can be chosen
     pub only_dirs: bool,
+    /// Whether user is permitted to create new files or folders
     pub allow_new: bool,
+    /// Whether modal is currently in 'create new item' text prompt mode
     pub creating_new: bool,
+    /// Text input buffer when creating a new file or folder
     pub new_name_input: String,
 }
 
 impl FilePickerModal {
+    /// Constructs a new file picker starting at the specified path.
     pub fn new(title: impl Into<String>, start_dir: &Path, only_dirs: bool) -> Self {
         let current_dir = if start_dir.is_dir() {
             start_dir.to_path_buf()

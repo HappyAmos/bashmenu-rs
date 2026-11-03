@@ -30,17 +30,26 @@ pub enum NoteViewerAction {
 /// Formatted note viewer modal
 #[derive(Debug, Clone)]
 pub struct NoteViewerModal {
+    /// Dialog title header
     pub title: String,
+    /// Target file path of the viewed note
     pub filepath: String,
+    /// Raw markdown note content
     pub content: String,
+    /// Whether completed todo items (`- [x]`) are displayed
     pub show_completed: bool,
+    /// Vertical scroll offset in lines
     pub scroll_offset: usize,
+    /// Currently focused selectable line index (for checkboxes/links)
     pub selected_line: usize,
+    /// Whether viewport scrolling automatically tracks the focused selection
     pub follow_selection: bool,
+    /// Raw line indices of rendered visible items for hit-testing
     pub last_visible_raw_indices: Vec<usize>,
 }
 
 impl NoteViewerModal {
+    /// Constructs a new note viewer modal with the given title, path, and markdown text.
     pub fn new(title: impl Into<String>, filepath: impl Into<String>, content: &str) -> Self {
         Self {
             title: title.into(),

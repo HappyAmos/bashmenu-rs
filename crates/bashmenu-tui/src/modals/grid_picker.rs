@@ -13,11 +13,14 @@ use ratatui::text::{Line, Span};
 /// Interactive 16x16 2D color grid picker (0..=255)
 #[derive(Debug, Clone)]
 pub struct ColorGridModal {
+    /// Dialog title header
     pub title: String,
+    /// Currently selected ANSI 256-color palette code (0..=255)
     pub selected_code: u8,
 }
 
 impl ColorGridModal {
+    /// Constructs a color picker modal initialized with the specified palette index.
     pub fn new(title: impl Into<String>, initial_code: u8) -> Self {
         Self {
             title: title.into(),
@@ -167,11 +170,14 @@ impl ColorGridModal {
 /// Interactive 16x16 2D CP437 ASCII character picker (0..=255)
 #[derive(Debug, Clone)]
 pub struct AsciiGridModal {
+    /// Dialog title header
     pub title: String,
+    /// Currently selected CP437 byte index (0..=255)
     pub selected_code: u8,
 }
 
 impl AsciiGridModal {
+    /// Constructs a CP437 character picker modal initialized with the specified byte index.
     pub fn new(title: impl Into<String>, initial_code: u8) -> Self {
         Self {
             title: title.into(),

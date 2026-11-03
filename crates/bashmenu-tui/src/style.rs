@@ -7,31 +7,57 @@ use ratatui::style::{Color, Modifier, Style};
 /// Resolved active theme styles for TUI rendering
 #[derive(Debug, Clone)]
 pub struct ResolvedThemeStyles {
+    /// Window background color fill
     pub background: Color,
+    /// Window frame and border line color
     pub border: Color,
+    /// Header/title bar style
     pub title: Style,
+    /// Standard body text style
     pub text: Style,
+    /// Highlighted/selected item style
     pub highlight: Style,
+    /// Accent color style (e.g., active elements or key markers)
     pub accent: Style,
+    /// Footer bar text style
     pub footer: Style,
+    /// Status/help gutter bar style
     pub gutter: Style,
+    /// Contextual help text style
     pub help_text: Style,
+    /// Plugin status display row style
     pub plugin: Style,
+    /// Text selection highlight style
     pub selection: Style,
+    /// Shortcut key indicator style (e.g., [1] or <F1>)
     pub shortcut_key: Style,
+    /// Divider rule style
     pub divider: Style,
+    /// Divider rule character
     pub divider_char: String,
+    /// Whether divider spans the full screen width
     pub divider_is_screen_width: bool,
+    /// Character used as delimiter in horizontal marquee tickers
     pub marquee_char: String,
+    /// Space padding gap between marquee repetitions
     pub marquee_gap: usize,
+    /// Window close button indicator style (e.g. `[X]`)
     pub window_close_button: Style,
+    /// Selection indicator symbol (e.g. `> `)
     pub indicator_symbol: String,
+    /// Resolved box-drawing glyphs for window borders
     pub borders: ResolvedWindowBorders,
+    /// Toast notification vertical accent indicator bar glyph
     pub toast_bar_char: String,
+    /// Default display duration in seconds for toast popups
     pub toast_timeout: f64,
+    /// Toast informational severity color
     pub toast_info: Color,
+    /// Toast warning severity color
     pub toast_warning: Color,
+    /// Toast error severity color
     pub toast_error: Color,
+    /// Scrollbar track and thumb styling
     pub scrollbar: Style,
 }
 

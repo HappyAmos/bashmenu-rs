@@ -10,16 +10,24 @@ use ratatui::style::Modifier;
 /// Interactive text input prompt modal
 #[derive(Debug, Clone)]
 pub struct InputModal {
+    /// Dialog title header
     pub title: String,
+    /// Prompt description label shown above input box
     pub prompt: String,
+    /// Current text string content
     pub value: String,
+    /// Cursor position measured in Unicode character indices
     pub cursor_pos: usize,
+    /// Horizontal scroll offset in columns for long text strings
     pub scroll_offset: usize,
+    /// Selection anchor index when selecting text
     pub selection_anchor: Option<usize>,
+    /// Whether to mask input characters with asterisks (for passwords)
     pub masked: bool,
 }
 
 impl InputModal {
+    /// Constructs a new input modal with given title, prompt, and initial value.
     pub fn new(title: impl Into<String>, prompt: impl Into<String>, initial_val: &str) -> Self {
         let char_count = initial_val.chars().count();
         Self {
@@ -241,6 +249,7 @@ impl InputModal {
         self.handle_key_with_modifiers(code, KeyModifiers::NONE)
     }
 
+    /// Moves cursor left by one word boundary, skipping whitespace and grouping alphanumerics.
     pub fn move_word_left(&mut self) {
         if self.cursor_pos == 0 {
             return;
@@ -266,6 +275,7 @@ impl InputModal {
         self.cursor_pos = i;
     }
 
+    /// Moves cursor right by one word boundary, skipping whitespace and grouping alphanumerics.
     pub fn move_word_right(&mut self) {
         let chars: Vec<char> = self.value.chars().collect();
         let len = chars.len();

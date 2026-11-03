@@ -19,11 +19,17 @@ use unicode_width::UnicodeWidthStr;
 /// Represents an active toast notification currently held in the rack.
 #[derive(Debug, Clone)]
 pub struct ActiveToast {
+    /// Unique integer identifier for this active toast
     pub id: usize,
+    /// Optional header title displayed in bold
     pub title: Option<String>,
+    /// Main notification body text
     pub message: String,
+    /// Severity classification determining the indicator accent color
     pub severity: ToastSeverity,
+    /// Lifetime duration before auto-dismissal
     pub timeout_secs: f64,
+    /// Timestamp when notification was received and queued
     pub created_at: Instant,
     /// Computed screen bounding box for mouse click hit testing
     pub bounds: Option<Rect>,

@@ -6,20 +6,31 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
+/// Magic header signature string identifying valid BashEdit swap files.
 pub const SWAP_MAGIC: &str = "BASHEDIT-SWAP-v1";
+/// Boundary delimiter separating metadata JSON header from text payload.
 pub const SWAP_DELIMITER: &str = "\n---BASHEDIT-SWAP-PAYLOAD---\n";
 
 /// Metadata header stored at the beginning of a `.swp` file.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SwapHeader {
+    /// Format identifier matching `SWAP_MAGIC`
     pub magic: String,
+    /// Operating system process ID holding or creating the swap lock
     pub pid: u32,
+    /// Username of process owner
     pub user: String,
+    /// System hostname
     pub host: String,
+    /// Absolute or relative path to target document file
     pub file_path: String,
+    /// Timestamp (UNIX epoch seconds) when swap file was last written
     pub updated_at: f64,
+    /// Target file modification timestamp when buffer was opened
     pub base_mtime: f64,
+    /// SHA256 checksum of target file when buffer was opened
     pub base_sha256: String,
+    /// Total number of text lines saved in swap payload
     pub line_count: usize,
 }
 

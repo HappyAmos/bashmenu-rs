@@ -5,26 +5,47 @@ use bashmenu_core::{parse_ascii_val, WindowBorders};
 /// Resolved character glyphs for window borders, gutters, tees, and caps.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedWindowBorders {
+    /// Horizontal top frame border character
     pub border_horizontal_top: String,
+    /// Horizontal bottom frame border character
     pub border_horizontal_bottom: String,
+    /// Vertical left frame border character
     pub border_vertical_left: String,
+    /// Vertical right frame border character
     pub border_vertical_right: String,
+    /// Top-left frame corner character
     pub border_top_left: String,
+    /// Top-right frame corner character
     pub border_top_right: String,
+    /// Bottom-left frame corner character
     pub border_bottom_left: String,
+    /// Bottom-right frame corner character
     pub border_bottom_right: String,
+    /// Left T-junction connector character
     pub left_tee: String,
+    /// Right T-junction connector character
     pub right_tee: String,
+    /// Top T-junction connector character
     pub top_tee: String,
+    /// Bottom T-junction connector character
     pub bottom_tee: String,
+    /// Left cap bracket enclosing panel titles
     pub title_left_cap: String,
+    /// Right cap bracket enclosing panel titles
     pub title_right_cap: String,
+    /// Horizontal border character separating status/help gutter
     pub gutter_border: String,
+    /// Vertical separator character dividing gutter columns
     pub gutter_separator: String,
+    /// Left T-junction connector on the gutter border
     pub gutter_left_tee: String,
+    /// Right T-junction connector on the gutter border
     pub gutter_right_tee: String,
+    /// Top T-junction connector on the gutter border
     pub gutter_top_tee: String,
+    /// Bottom T-junction connector on the gutter border
     pub gutter_bottom_tee: String,
+    /// Character used to render window drop shadows
     pub shadow_char: String,
 }
 

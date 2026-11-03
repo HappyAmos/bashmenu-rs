@@ -29,6 +29,7 @@ pub use tree::{
 };
 pub use type_picker::{ItemTypePickerModal, ITEM_TYPES};
 
+/// Detailed help reference text displayed in the item properties editor help modal.
 pub const ITEM_EDIT_HELP_TEXT: &str = "\
 BashMenu Item Properties (Editor Help)
 
@@ -428,23 +429,35 @@ pub fn format_inspector_text(
     lines
 }
 
+/// Represents a single hierarchy level in the interactive menu editor navigation stack.
 #[derive(Debug, Clone)]
 pub struct EditorLevel {
+    /// Submenu or level header title
     pub title: String,
+    /// List of menu items defined at this hierarchy level
     pub items: Vec<MenuItem>,
+    /// Index of currently selected item at this level
     pub selected_idx: usize,
 }
 
+/// Interactive state for the main menu editor screen.
 pub struct MenuEditorState {
+    /// File system path to the edited menu YAML file
     pub menu_path: PathBuf,
+    /// Complete root menu schema
     pub root_menu: MenuSchema,
+    /// Navigation hierarchy stack of menu levels
     pub stack: Vec<EditorLevel>,
+    /// Set of expanded tree item index paths
     pub expanded_paths: HashSet<Vec<usize>>,
+    /// Flag indicating whether unsaved modifications exist
     pub is_modified: bool,
+    /// Transient status bar notification message
     pub status_message: String,
 }
 
 impl MenuEditorState {
+    /// Initializes state by loading the menu file at the given path.
     pub fn new(menu_path: PathBuf) -> Self {
         let root_menu = if menu_path.exists() {
             load_menu(&menu_path).unwrap_or_default()
@@ -468,22 +481,27 @@ impl MenuEditorState {
         }
     }
 
+    /// Returns a reference to the active top menu level in the stack.
     pub fn current_level(&self) -> &EditorLevel {
         self.stack.last().expect("Stack must never be empty")
     }
 
+    /// Returns a mutable reference to the active top menu level in the stack.
     pub fn current_level_mut(&mut self) -> &mut EditorLevel {
         self.stack.last_mut().expect("Stack must never be empty")
     }
 
+    /// Returns the slice of menu items present at the current level.
     pub fn current_items(&self) -> &[MenuItem] {
         &self.current_level().items
     }
 
+    /// Returns the selected item index at the current level.
     pub fn selected_index(&self) -> usize {
         self.current_level().selected_idx
     }
 
+    /// Moves selection up by one item.
     pub fn move_up(&mut self) {
         let level = self.current_level_mut();
         if level.selected_idx > 0 {
@@ -491,6 +509,7 @@ impl MenuEditorState {
         }
     }
 
+    /// Moves selection down by one item.
     pub fn move_down(&mut self) {
         let level = self.current_level_mut();
         if !level.items.is_empty() && level.selected_idx + 1 < level.items.len() {
@@ -498,6 +517,7 @@ impl MenuEditorState {
         }
     }
 
+    /// Moves the selected item up in sibling order by swapping with predecessor.
     pub fn swap_up(&mut self) {
         let level = self.current_level_mut();
         let idx = level.selected_idx;
@@ -509,6 +529,7 @@ impl MenuEditorState {
         }
     }
 
+    /// Moves the selected item down in sibling order by swapping with successor.
     pub fn swap_down(&mut self) {
         let level = self.current_level_mut();
         let idx = level.selected_idx;
@@ -520,6 +541,7 @@ impl MenuEditorState {
         }
     }
 
+    /// Inserts a new menu item immediately after the current selection.
     pub fn add_item(&mut self, item: MenuItem) {
         let level = self.current_level_mut();
         if level.items.is_empty() {
@@ -534,6 +556,7 @@ impl MenuEditorState {
         self.status_message = "Added new item".to_string();
     }
 
+    /// Updates label, command, and icon fields of the selected item.
     pub fn edit_selected(&mut self, label: String, command: Option<String>, icon: Option<String>) {
         let level = self.current_level_mut();
         if level.items.is_empty() {
@@ -547,6 +570,7 @@ impl MenuEditorState {
         self.status_message = "Updated item properties".to_string();
     }
 
+    /// Deletes the currently selected item from the current level.
     pub fn delete_selected(&mut self) -> Option<MenuItem> {
         let level = self.current_level_mut();
         if level.items.is_empty() {
@@ -562,6 +586,7 @@ impl MenuEditorState {
         Some(removed)
     }
 
+    /// Enters into a submenu item if one is selected, pushing a new level onto the stack.
     pub fn enter_submenu(&mut self) -> bool {
         let sub_opt = {
             let level = self.current_level();
@@ -590,6 +615,7 @@ impl MenuEditorState {
         false
     }
 
+    /// Pops the active submenu level, returning to the parent menu level.
     pub fn leave_submenu(&mut self) -> bool {
         if self.stack.len() <= 1 {
             return false;

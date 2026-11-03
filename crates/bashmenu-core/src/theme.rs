@@ -34,71 +34,101 @@ impl Default for MarqueeConfig {
     }
 }
 
-/// Window border and box drawing character definitions
+/// Window border and box drawing character definitions.
+///
+/// Each optional field allows overriding specific border characters (such as
+/// single-line, double-line, or rounded corners) for window frames, gutters, and tees.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct WindowBorders {
+    /// Horizontal border character (e.g., '─' or '═')
     #[serde(skip_serializing_if = "Option::is_none")]
     pub border_horizontal: Option<String>,
+    /// Vertical border character (e.g., '│' or '║')
     #[serde(skip_serializing_if = "Option::is_none")]
     pub border_vertical: Option<String>,
+    /// Top horizontal border override
     #[serde(skip_serializing_if = "Option::is_none")]
     pub border_horizontal_top: Option<String>,
+    /// Bottom horizontal border override
     #[serde(skip_serializing_if = "Option::is_none")]
     pub border_horizontal_bottom: Option<String>,
+    /// Left vertical border override
     #[serde(skip_serializing_if = "Option::is_none")]
     pub border_vertical_left: Option<String>,
+    /// Right vertical border override
     #[serde(skip_serializing_if = "Option::is_none")]
     pub border_vertical_right: Option<String>,
+    /// Top-left corner character (e.g., '┌')
     #[serde(skip_serializing_if = "Option::is_none")]
     pub border_top_left: Option<String>,
+    /// Top-right corner character (e.g., '┐')
     #[serde(skip_serializing_if = "Option::is_none")]
     pub border_top_right: Option<String>,
+    /// Bottom-left corner character (e.g., '└')
     #[serde(skip_serializing_if = "Option::is_none")]
     pub border_bottom_left: Option<String>,
+    /// Bottom-right corner character (e.g., '┘')
     #[serde(skip_serializing_if = "Option::is_none")]
     pub border_bottom_right: Option<String>,
+    /// Left T-junction connector ('├')
     #[serde(skip_serializing_if = "Option::is_none")]
     pub left_tee: Option<String>,
+    /// Right T-junction connector ('┤')
     #[serde(skip_serializing_if = "Option::is_none")]
     pub right_tee: Option<String>,
+    /// Top T-junction connector ('┬')
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_tee: Option<String>,
+    /// Bottom T-junction connector ('┴')
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bottom_tee: Option<String>,
+    /// Left title decoration cap bracket (e.g., '[')
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title_left_cap: Option<String>,
+    /// Right title decoration cap bracket (e.g., ']')
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title_right_cap: Option<String>,
+    /// Horizontal border character for status/help gutter
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gutter_border: Option<String>,
+    /// Vertical separator character within gutter columns
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gutter_separator: Option<String>,
+    /// Left T-junction connector connecting gutter border to window frame
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gutter_left_tee: Option<String>,
+    /// Right T-junction connector connecting gutter border to window frame
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gutter_right_tee: Option<String>,
+    /// Top T-junction connector on gutter border
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gutter_top_tee: Option<String>,
+    /// Bottom T-junction connector on gutter border
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gutter_bottom_tee: Option<String>,
+    /// Shadow character used for modal backdrop effects (e.g., '▒' or '░')
     #[serde(skip_serializing_if = "Option::is_none")]
     pub shadow_char: Option<String>,
 }
 
-/// Theme divider configuration
+/// Theme divider configuration for separating menu sections.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct DividerConfig {
+    /// Character repeated across the divider rule (e.g., '─' or '=')
     #[serde(skip_serializing_if = "Option::is_none")]
     pub char: Option<String>,
+    /// Length of divider: either a fixed number or dynamic macro like `"{window_width}"`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub length: Option<String>,
 }
 
-/// Theme toast notification configuration
+/// Theme toast notification configuration.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct ToastConfig {
+    /// Left accent indicator glyph (defaults to left half block `▌`)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub char: Option<String>,
+    /// Default display duration in seconds before auto-dismissal
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timeout: Option<f64>,
 }

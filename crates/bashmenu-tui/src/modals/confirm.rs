@@ -10,20 +10,26 @@ use ratatui::style::{Color, Modifier, Style};
 /// Tri-state confirmation result.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConfirmChoice {
+    /// User confirmed the affirmative action
     Yes,
+    /// User confirmed the negative action
     No,
+    /// User cancelled or dismissed the modal
     Cancel,
 }
 
 impl ConfirmChoice {
+    /// Returns `true` if affirmative option was selected.
     pub fn is_yes(&self) -> bool {
         matches!(self, ConfirmChoice::Yes)
     }
 
+    /// Returns `true` if negative option was selected.
     pub fn is_no(&self) -> bool {
         matches!(self, ConfirmChoice::No)
     }
 
+    /// Returns `true` if cancel/abort option was selected.
     pub fn is_cancel(&self) -> bool {
         matches!(self, ConfirmChoice::Cancel)
     }
@@ -32,13 +38,18 @@ impl ConfirmChoice {
 /// Interactive Confirm modal dialog with Yes, No, and Cancel buttons.
 #[derive(Debug, Clone)]
 pub struct ConfirmModal {
+    /// Modal header title
     pub title: String,
+    /// Modal prompt or confirmation query text
     pub message: String,
-    pub selected_index: usize, // 0: Yes, 1: No, 2: Cancel
+    /// Currently focused button index (0: Yes, 1: No, 2: Cancel)
+    pub selected_index: usize,
+    /// Convenience boolean reflecting if Yes button is selected
     pub selected_yes: bool,
 }
 
 impl ConfirmModal {
+    /// Constructs a new confirmation dialog with the given title and prompt text.
     pub fn new(title: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             title: title.into(),

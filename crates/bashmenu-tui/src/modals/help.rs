@@ -11,13 +11,18 @@ use ratatui::style::{Color, Modifier, Style};
 /// Scrollable markdown / text help modal
 #[derive(Debug, Clone)]
 pub struct HelpModal {
+    /// Dialog title header
     pub title: String,
+    /// Unmodified source markdown or text string
     pub raw_content: String,
+    /// Pre-split lines of help text for rendering
     pub lines: Vec<String>,
+    /// Vertical scroll offset in lines
     pub scroll_offset: usize,
 }
 
 impl HelpModal {
+    /// Constructs a new help modal with the given title and text content.
     pub fn new(title: impl Into<String>, content: &str) -> Self {
         let lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
         Self {

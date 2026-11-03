@@ -5,12 +5,16 @@ use crossterm::event::{KeyCode, KeyModifiers};
 /// Interactive Unicode text input state.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TextInput {
+    /// Underlying vector of Unicode code points
     pub chars: Vec<char>,
+    /// Insertion cursor position measured in Unicode character indices (0..=chars.len())
     pub cursor: usize,
+    /// Selection anchor point when selecting text via Shift+Arrows or Ctrl+A
     pub selection_anchor: Option<usize>,
 }
 
 impl TextInput {
+    /// Initializes a text input pre-filled with the provided string, positioning cursor at the end.
     pub fn new(s: &str) -> Self {
         let chars: Vec<char> = s.chars().collect();
         let cursor = chars.len();
@@ -21,33 +25,40 @@ impl TextInput {
         }
     }
 
+    /// Converts the current Unicode characters into a standard `String`.
     pub fn as_string(&self) -> String {
         self.chars.iter().collect()
     }
 
+    /// Overwrites the current text content, resetting cursor to the end and clearing selection.
     pub fn set_text(&mut self, s: &str) {
         self.chars = s.chars().collect();
         self.cursor = self.chars.len();
         self.selection_anchor = None;
     }
 
+    /// Returns `true` if the input contains zero characters.
     pub fn is_empty(&self) -> bool {
         self.chars.is_empty()
     }
 
+    /// Returns the number of Unicode characters in the buffer.
     pub fn len(&self) -> usize {
         self.chars.len()
     }
 
+    /// Selects the entire text buffer from index 0 to `len()`.
     pub fn select_all(&mut self) {
         self.selection_anchor = Some(0);
         self.cursor = self.chars.len();
     }
 
+    /// Clears any active selection range without modifying the text content.
     pub fn clear_selection(&mut self) {
         self.selection_anchor = None;
     }
 
+    /// Returns the active selection character range `(start, end)` if an anchor exists and is non-empty.
     pub fn selection_range(&self) -> Option<(usize, usize)> {
         self.selection_anchor.and_then(|anchor| {
             let c = self.cursor.min(self.chars.len());
@@ -60,6 +71,7 @@ impl TextInput {
         })
     }
 
+    /// Deletes the currently selected character slice, returning `true` if characters were removed.
     pub fn delete_selection(&mut self) -> bool {
         if let Some((start, end)) = self.selection_range() {
             self.chars.drain(start..end);
@@ -71,6 +83,7 @@ impl TextInput {
         }
     }
 
+    /// Processes keyboard events with active modifier flags (Shift, Ctrl, Alt).
     pub fn handle_key_with_modifiers(&mut self, code: KeyCode, modifiers: KeyModifiers) -> bool {
         let is_shift = modifiers.contains(KeyModifiers::SHIFT);
         let is_ctrl = modifiers.contains(KeyModifiers::CONTROL);
@@ -218,6 +231,7 @@ impl TextInput {
         }
     }
 
+    /// Processes a single key code with no modifier keys pressed.
     pub fn handle_key(&mut self, code: KeyCode) -> bool {
         self.handle_key_with_modifiers(code, KeyModifiers::NONE)
     }

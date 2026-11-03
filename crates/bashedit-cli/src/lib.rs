@@ -11,33 +11,57 @@ pub use swap::*;
 /// Snapshot of editor state for undo/redo history.
 #[derive(Clone, Debug)]
 pub struct UndoSnapshot {
+    /// Document text lines at snapshot time
     pub lines: Vec<String>,
+    /// Cursor row index at snapshot time
     pub cursor_row: usize,
+    /// Cursor column index at snapshot time
     pub cursor_col: usize,
+    /// Whether visual selection mark was active
     pub mark_active: bool,
+    /// Selection anchor row index
     pub mark_row: usize,
+    /// Selection anchor column index
     pub mark_col: usize,
 }
 
 /// Text editing document buffer with cursor tracking, dirty state, and swap persistence.
 pub struct EditorBuffer {
+    /// Destination file system path if file has been saved or opened
     pub file_path: Option<PathBuf>,
+    /// Colocated swap file path (`.<filename>.swp`)
     pub swap_path: PathBuf,
+    /// Logical text lines of document
     pub lines: Vec<String>,
+    /// Active cursor row index (0..lines.len())
     pub cursor_row: usize,
+    /// Active cursor Unicode column position
     pub cursor_col: usize,
+    /// Vertical viewport scroll offset in lines
     pub scroll_row: usize,
+    /// Horizontal viewport scroll offset in columns
     pub scroll_col: usize,
+    /// Flag indicating whether buffer has unsaved edits
     pub is_modified: bool,
+    /// Read-only status (e.g. when concurrent swap lock collision occurs)
     pub is_read_only: bool,
+    /// File modification time when loaded
     pub base_mtime: f64,
+    /// SHA256 checksum of file when loaded
     pub base_sha256: String,
+    /// Count of keystrokes since last swap file flush
     pub keystroke_counter: usize,
+    /// Status bar notification string
     pub status_message: String,
+    /// Stack of prior states for undo operations
     pub undo_stack: Vec<UndoSnapshot>,
+    /// Stack of undone states for redo operations
     pub redo_stack: Vec<UndoSnapshot>,
+    /// Whether visual mark / text selection mode is active
     pub mark_active: bool,
+    /// Selection mark anchor row index
     pub mark_row: usize,
+    /// Selection mark anchor column index
     pub mark_col: usize,
 }
 
@@ -73,6 +97,7 @@ impl EditorBuffer {
         self.flush_swap();
     }
 
+    /// Opens an existing document from disk or creates a new file at path.
     pub fn open(file_path: impl AsRef<Path>) -> Result<Self> {
         let raw = file_path.as_ref();
         let path = if let Some(stripped) = raw.to_str().and_then(|s| s.strip_prefix("~/")) {
@@ -509,6 +534,7 @@ impl EditorBuffer {
         false
     }
 
+    /// Inserts a single Unicode character at current cursor position, replacing selection if active.
     pub fn insert_char(&mut self, ch: char) {
         if self.is_read_only {
             return;
@@ -531,6 +557,7 @@ impl EditorBuffer {
         self.record_edit();
     }
 
+    /// Splits current line at cursor position, creating a new line below.
     pub fn insert_newline(&mut self) {
         if self.is_read_only {
             return;
@@ -564,6 +591,7 @@ impl EditorBuffer {
         self.record_edit();
     }
 
+    /// Deletes the character before the cursor (or active selection).
     pub fn delete_backspace(&mut self) {
         if self.is_read_only {
             return;
@@ -594,6 +622,7 @@ impl EditorBuffer {
         }
     }
 
+    /// Deletes the character under the cursor (or merges following line).
     pub fn delete_char(&mut self) {
         if self.is_read_only {
             return;
@@ -622,6 +651,7 @@ impl EditorBuffer {
         }
     }
 
+    /// Clamps cursor row and column within document bounds.
     pub fn clamp_cursor(&mut self) {
         if self.lines.is_empty() {
             self.lines.push(String::new());
@@ -635,6 +665,7 @@ impl EditorBuffer {
         }
     }
 
+    /// Moves cursor left by one character, wrapping to previous line end if at column 0.
     pub fn move_left(&mut self) {
         if self.cursor_col > 0 {
             self.cursor_col -= 1;
@@ -644,6 +675,7 @@ impl EditorBuffer {
         }
     }
 
+    /// Moves cursor left to previous word boundary.
     pub fn move_word_left(&mut self) {
         if self.cursor_col == 0 {
             if self.cursor_row > 0 {
@@ -674,6 +706,7 @@ impl EditorBuffer {
         self.cursor_col = i;
     }
 
+    /// Moves cursor right to next word boundary.
     pub fn move_word_right(&mut self) {
         if self.cursor_row >= self.lines.len() {
             return;
@@ -708,6 +741,7 @@ impl EditorBuffer {
         self.cursor_col = i;
     }
 
+    /// Moves cursor upward to start of previous paragraph block.
     pub fn move_paragraph_up(&mut self) {
         if self.cursor_row == 0 {
             self.cursor_col = 0;
@@ -724,6 +758,7 @@ impl EditorBuffer {
         self.cursor_col = 0;
     }
 
+    /// Moves cursor downward to start of next paragraph block.
     pub fn move_paragraph_down(&mut self) {
         if self.lines.is_empty() || self.cursor_row >= self.lines.len() - 1 {
             return;
@@ -739,6 +774,7 @@ impl EditorBuffer {
         self.cursor_col = 0;
     }
 
+    /// Moves cursor right by one character, wrapping to next line start if at end.
     pub fn move_right(&mut self) {
         if self.cursor_row < self.lines.len() {
             let line_len = self.lines[self.cursor_row].chars().count();
@@ -751,6 +787,7 @@ impl EditorBuffer {
         }
     }
 
+    /// Moves cursor up by one line, clamping column to target line length.
     pub fn move_up(&mut self) {
         if self.cursor_row > 0 {
             self.cursor_row -= 1;
@@ -761,6 +798,7 @@ impl EditorBuffer {
         }
     }
 
+    /// Moves cursor down by one line, clamping column to target line length.
     pub fn move_down(&mut self) {
         if self.cursor_row + 1 < self.lines.len() {
             self.cursor_row += 1;
@@ -771,16 +809,19 @@ impl EditorBuffer {
         }
     }
 
+    /// Moves cursor to column 0 of current line.
     pub fn move_home(&mut self) {
         self.cursor_col = 0;
     }
 
+    /// Moves cursor to end of current line.
     pub fn move_end(&mut self) {
         if self.cursor_row < self.lines.len() {
             self.cursor_col = self.lines[self.cursor_row].chars().count();
         }
     }
 
+    /// Scrolls cursor up by page size in lines.
     pub fn page_up(&mut self, page_size: usize) {
         self.cursor_row = self.cursor_row.saturating_sub(page_size);
         let line_len = self.lines[self.cursor_row].chars().count();
@@ -789,6 +830,7 @@ impl EditorBuffer {
         }
     }
 
+    /// Scrolls cursor down by page size in lines.
     pub fn page_down(&mut self, page_size: usize) {
         if !self.lines.is_empty() {
             self.cursor_row = (self.cursor_row + page_size).min(self.lines.len() - 1);
@@ -800,14 +842,17 @@ impl EditorBuffer {
     }
 }
 
+/// Returns the filesystem path to the shared cross-tool cutbuffer file.
 pub fn get_shared_cutbuffer_path() -> PathBuf {
     bashmenu_tui::clipboard::get_shared_cutbuffer_path()
 }
 
+/// Reads current text content from the shared system or local clipboard.
 pub fn get_clipboard_text() -> Option<String> {
     bashmenu_tui::get_clipboard_text()
 }
 
+/// Writes text to the shared system or local clipboard.
 pub fn set_clipboard_text(text: &str) {
     bashmenu_tui::set_clipboard_text(text);
 }

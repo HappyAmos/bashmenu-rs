@@ -22,29 +22,45 @@ pub enum NoteEditorAction {
 /// A single visual row produced by soft-wrapping a logical line
 #[derive(Debug, Clone)]
 pub struct VisualLine {
+    /// 0-based index of the logical line in the document
     pub logical_row: usize,
+    /// 0-based character offset within the logical line where this visual line starts
     pub start_col: usize,
+    /// Unicode characters comprising this visual wrapped line
     pub chars: Vec<char>,
+    /// Column offset within this visual line if cursor is on this slice
     pub cursor_col_in_chunk: Option<usize>,
+    /// Leading space indentation margin applied to continuation rows
     pub indent_margin: usize,
 }
 
 /// In-modal note editor
 #[derive(Debug, Clone)]
 pub struct NoteEditorModal {
+    /// Header title of the editor modal
     pub title: String,
+    /// File path of the note or document being edited
     pub filepath: String,
+    /// Logical text lines of the document
     pub lines: Vec<String>,
+    /// Active cursor row index (0..=lines.len())
     pub cursor_row: usize,
+    /// Active cursor character column index within `lines[cursor_row]`
     pub cursor_col: usize,
+    /// Vertical visual scroll offset in wrapped rows
     pub scroll_offset: usize,
+    /// Whether document has unsaved edits
     pub is_modified: bool,
+    /// Last measured inner frame width for word-wrapping cache
     pub last_inner_w: usize,
+    /// Last rendered inner frame bounding rectangle
     pub last_inner_rect: Rect,
+    /// Selection anchor (row, col) when selecting text range
     pub selection_anchor: Option<(usize, usize)>,
 }
 
 impl NoteEditorModal {
+    /// Constructs a new note editor modal initialized with document content.
     pub fn new(title: impl Into<String>, filepath: impl Into<String>, content: &str) -> Self {
         let lines: Vec<String> = if content.is_empty() {
             vec![String::new()]

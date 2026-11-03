@@ -129,6 +129,7 @@ pub enum ConfirmAction {
 }
 
 impl ConfirmAction {
+    /// Returns the raw command, action, or message string associated with this confirmation outcome.
     pub fn as_str(&self) -> &str {
         match self {
             ConfirmAction::Simple(s) => s.as_str(),
@@ -155,24 +156,34 @@ impl From<String> for ConfirmAction {
     }
 }
 
+/// Detailed configuration object for a confirmation dialog choice (`on_yes` or `on_no`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct ConfirmActionDetails {
+    /// Action type (e.g. `command`, `script`, `toast`)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub r#type: Option<String>,
+    /// Target action payload
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub action: Option<String>,
+    /// Shell command string
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub command: Option<String>,
+    /// Script path
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub script: Option<String>,
+    /// Optional dialog or toast title
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
+    /// Message or toast text
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
+    /// Prompt text if requesting interactive input
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prompt: Option<String>,
+    /// Whether output streams in a floating modal
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stream: Option<bool>,
+    /// Extra arbitrary properties
     #[serde(flatten)]
     pub extra: HashMap<String, serde_yml::Value>,
 }
@@ -534,8 +545,11 @@ impl MenuItem {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ExecutionMode {
+    /// Streams stdout/stderr non-interactively into a sized floating popup modal
     Streaming,
+    /// Launches an interactive subprocess inside an alternate screen modal terminal
     Interactive,
+    /// Suspends raw mode, leaves alternate screen, and executes directly on the system terminal
     Console,
 }
 

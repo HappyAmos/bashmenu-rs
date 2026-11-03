@@ -10,15 +10,22 @@ use ratatui::style::Modifier;
 /// Interactive Radio modal dialog matching Python Textual `RadioModalScreen`
 #[derive(Debug, Clone)]
 pub struct RadioModal {
+    /// Dialog title header
     pub title: String,
+    /// Explanatory prompt message
     pub message: String,
-    pub options: Vec<(String, String)>, // (value, label)
+    /// List of choice options as `(value, label)` pairs
+    pub options: Vec<(String, String)>,
+    /// Currently chosen option value
     pub selected_val: String,
+    /// Cursor index within options list
     pub cursor_idx: usize,
-    pub focused_btn: Option<usize>, // None = list, Some(0) = Ok, Some(1) = Cancel
+    /// Focused button index (`None` = list, `Some(0)` = Ok, `Some(1)` = Cancel)
+    pub focused_btn: Option<usize>,
 }
 
 impl RadioModal {
+    /// Constructs a radio selection modal initialized with available options and current value.
     pub fn new(
         title: impl Into<String>,
         message: impl Into<String>,

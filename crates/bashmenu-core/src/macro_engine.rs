@@ -380,6 +380,8 @@ fn get_battery_status() -> String {
     "N/A".to_string()
 }
 
+/// Resolves a dot-delimited configuration path (e.g. `"user.postal_code"` or `"settings.ping_target"`)
+/// against the provided JSON Value representation of `BashMenuConfig`.
 pub fn resolve_config_dot_path(config_val: &serde_json::Value, path: &str) -> Option<String> {
     let parts: Vec<&str> = path.split('.').collect();
     if parts.is_empty() {
@@ -789,25 +791,33 @@ static TOAST_RE: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
         .unwrap()
 });
 
-/// Toast notification severity
+/// Toast notification severity level.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub enum ToastSeverity {
+    /// Informational message badge (blue/accent block)
     #[default]
     Information,
+    /// Warning message badge (yellow block)
     Warning,
+    /// Error message badge (red block)
     Error,
 }
 
-/// A parsed toast notification from macro evaluation
+/// A parsed toast notification resulting from `{toast:...}` macro evaluation or programmatic dispatch.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ToastNotification {
+    /// Body text displayed inside the notification box
     pub message: String,
+    /// Optional bold title header
     pub title: Option<String>,
+    /// Visual severity level
     pub severity: ToastSeverity,
+    /// Lifetime of the toast in seconds before automatic dismissal
     pub timeout_secs: f64,
 }
 
 impl ToastNotification {
+    /// Constructs a new toast notification with `Information` severity.
     pub fn new(message: impl Into<String>, title: Option<String>, timeout_secs: f64) -> Self {
         Self {
             message: message.into(),

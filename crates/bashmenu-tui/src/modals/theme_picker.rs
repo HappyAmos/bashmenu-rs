@@ -10,12 +10,16 @@ use ratatui::style::Modifier;
 /// Interactive theme selector modal dialog
 #[derive(Debug, Clone)]
 pub struct ThemePickerModal {
+    /// Alphabetically sorted list of available theme names
     pub themes: Vec<String>,
+    /// Index of currently highlighted theme
     pub selected_idx: usize,
+    /// Vertical scroll offset in lines
     pub scroll_offset: usize,
 }
 
 impl ThemePickerModal {
+    /// Constructs a theme picker modal with alphabetically sorted theme names.
     pub fn new(mut themes: Vec<String>, current_theme: &str) -> Self {
         Self::sort_themes(&mut themes);
         let selected_idx = themes.iter().position(|t| t == current_theme).unwrap_or(0);

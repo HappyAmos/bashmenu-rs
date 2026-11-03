@@ -46,7 +46,9 @@ pub enum MenuAction {
     OpenNotebook(Box<MenuItem>),
     /// View/read a notebook note
     ViewNote {
+        /// Absolute or relative path to the target notebook YAML file
         filepath: String,
+        /// Title header of the selected note item
         note_title: String,
     },
     /// Create a new note inside current notebook
@@ -77,6 +79,7 @@ pub struct MenuView {
     status_gutter: String,
     show_shortcuts: bool,
     plugin_rows: Vec<PluginDisplayRow>,
+    /// Active runtime configuration parameters
     pub config: BashMenuConfig,
     wallpaper: Option<WallpaperCompositor>,
     marquee_tracker: MarqueeTracker,

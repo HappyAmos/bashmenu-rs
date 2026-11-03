@@ -103,22 +103,29 @@ impl Default for PluginLayout {
 /// Normalized plugin configuration extracted from `settings.plugins`.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct PluginConfig {
+    /// Active layout mode (table, list, multi-column)
     pub layout: PluginLayout,
+    /// Mapping of plugin names to their definition blocks
     pub plugins: HashMap<String, PluginDef>,
+    /// Order of plugin names as defined in configuration
     pub order: Vec<String>,
 }
 
 /// Cache entry for a plugin's stdout lines.
 #[derive(Debug, Clone)]
 pub struct PluginCacheEntry {
+    /// Timestamp when this plugin output was fetched
     pub fetched_at: Instant,
+    /// Sanitized stdout lines returned by the plugin script
     pub lines: Vec<String>,
 }
 
 /// A formatted display row ready for TUI rendering.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PluginDisplayRow {
+    /// Formatted row text with column spacing
     pub text: String,
+    /// Whether this row represents a visual horizontal divider line
     pub is_divider: bool,
 }
 

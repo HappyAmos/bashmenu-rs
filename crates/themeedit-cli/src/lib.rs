@@ -13,20 +13,26 @@ use ratatui::layout::Rect;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
+/// Category grouping for theme attributes in the editor sidebar tree.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TokenCategory {
+    /// Global theme metadata, wallpaper, and marquee settings
     Theme,
+    /// Color token palette mappings
     Colors,
+    /// Box drawing and window frame border glyphs
     Borders,
 }
 
 impl TokenCategory {
+    /// Array containing all three category variants.
     pub const ALL: [TokenCategory; 3] = [
         TokenCategory::Theme,
         TokenCategory::Colors,
         TokenCategory::Borders,
     ];
 
+    /// Display header label for this category.
     pub fn label(self) -> &'static str {
         match self {
             TokenCategory::Theme => "Theme:",
@@ -36,33 +42,51 @@ impl TokenCategory {
     }
 }
 
+/// Represents a row in the theme editor's sidebar hierarchy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TreeRow {
+    /// Category header row (expandable/collapsible)
     Category(TokenCategory),
+    /// Individual token item row referencing an index in `tokens`
     Token(usize),
 }
 
+/// The specific theme token or attribute being edited.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TokenKind {
+    /// Color palette token name (e.g., "background", "text", "highlight")
     Color(String),
+    /// Border glyph field name (e.g., "border_horizontal", "border_top_left")
     Border(String),
+    /// Active selection indicator symbol
     Indicator,
+    /// Section divider rule character
     DividerChar,
+    /// Section divider rule length expression
     DividerLength,
+    /// Horizontal marquee ticker scroll delimiter character
     MarqueeChar,
+    /// Marquee scroll repeat gap in spaces
     MarqueeGap,
+    /// Toast notification vertical indicator glyph
     ToastChar,
+    /// Toast notification default duration timeout
     ToastTimeout,
+    /// Background wallpaper image path
     WallpaperImage,
 }
 
+/// An individual editable theme token entry in the sidebar.
 #[derive(Debug, Clone)]
 pub struct TokenItem {
+    /// Display label in the tree list
     pub label: String,
+    /// Classification kind of the token
     pub kind: TokenKind,
 }
 
 impl TokenItem {
+    /// Returns the category under which this token is grouped.
     pub fn category(&self) -> TokenCategory {
         match &self.kind {
             TokenKind::Color(_) => TokenCategory::Colors,
@@ -79,17 +103,24 @@ impl TokenItem {
     }
 }
 
+/// Active preview mode displaying different BashMenu screens.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PreviewMode {
+    /// Main menu interactive preview
     #[default]
     Menu,
+    /// Text editor (`bashedit`) preview
     TextEditor,
+    /// Modal dialogs and alert popups preview
     Modals,
+    /// Visual menu hierarchy editor (`menuedit`) preview
     MenuEditor,
+    /// Toast notification popups preview
     Toast,
 }
 
 impl PreviewMode {
+    /// Cycles to the next preview mode screen.
     pub fn next(self) -> Self {
         match self {
             PreviewMode::Menu => PreviewMode::TextEditor,
@@ -100,6 +131,7 @@ impl PreviewMode {
         }
     }
 
+    /// Title string of the current preview screen mode.
     pub fn title(self) -> &'static str {
         match self {
             PreviewMode::Menu => "Main Menu",
@@ -111,19 +143,33 @@ impl PreviewMode {
     }
 }
 
+/// Interactive state for the `themeedit` TUI.
 pub struct ThemeEditorState {
+    /// All loaded themes mapped by theme name
     pub themes: ThemeCollection,
+    /// File path to `bashmenu.themes`
     pub themes_path: PathBuf,
+    /// Name of currently active theme
     pub current_name: String,
+    /// Active theme definition schema
     pub current_theme: Theme,
+    /// Dirty flag indicating unsaved modifications
     pub is_modified: bool,
+    /// List of all discoverable token items
     pub tokens: Vec<TokenItem>,
+    /// Currently highlighted token index
     pub selected_idx: usize,
+    /// Currently highlighted visual tree row index
     pub selected_row: usize,
+    /// Set of expanded sidebar categories
     pub expanded_categories: HashSet<TokenCategory>,
+    /// Vertical scroll offset in lines for sidebar tree
     pub scroll_offset: usize,
+    /// Transient status notification message
     pub status_message: String,
+    /// Active preview pane mode
     pub preview_mode: PreviewMode,
+    /// Text input buffer for theme name editing
     pub name_input: TextInput,
 }
 
@@ -168,6 +214,7 @@ pub fn color_to_u8(color: ratatui::style::Color) -> u8 {
 }
 
 impl ThemeEditorState {
+    /// Initializes theme editor state from `bashmenu.themes` targeting the selected or default theme.
     pub fn new(themes_path: PathBuf, target_theme: Option<String>) -> Self {
         let themes = if themes_path.exists() {
             load_themes(&themes_path).unwrap_or_default()
@@ -393,6 +440,7 @@ impl ThemeEditorState {
         }
     }
 
+    /// Creates a base fallback theme with standard borders and color mappings.
     pub fn create_default_theme() -> Theme {
         let mut t = Theme::default();
         let borders = WindowBorders {
@@ -472,6 +520,7 @@ impl ThemeEditorState {
         t
     }
 
+    /// Returns a human-readable display string representing the token's current value.
     pub fn get_token_value_display(&self, token: &TokenItem) -> String {
         match &token.kind {
             TokenKind::Color(key) => {
@@ -599,6 +648,7 @@ impl ThemeEditorState {
         }
     }
 
+    /// Updates a 256-color palette token entry with the specified color index.
     pub fn set_color_token(&mut self, key: &str, color_idx: u8) {
         if self.current_theme.colors_256.is_none() {
             self.current_theme.colors_256 = Some(HashMap::new());
@@ -623,6 +673,7 @@ impl ThemeEditorState {
         }
     }
 
+    /// Configures or removes the background wallpaper image file path.
     pub fn set_wallpaper_image(&mut self, path: Option<String>) {
         match path {
             Some(p) => {
@@ -680,6 +731,7 @@ impl ThemeEditorState {
         Ok(fname)
     }
 
+    /// Retrieves the current 8-bit color index for a palette token key.
     pub fn get_color_token_u8(&self, key: &str) -> u8 {
         if let Some(c_map) = &self.current_theme.colors_256 {
             if let Some(val) = c_map.get(key) {
@@ -725,6 +777,7 @@ impl ThemeEditorState {
         }
     }
 
+    /// Sets the border glyph character for a specific window frame element.
     pub fn set_border_token(&mut self, key: &str, ch: char) {
         if self.current_theme.window.is_none() {
             self.current_theme.window = Some(WindowBorders::default());
@@ -755,6 +808,7 @@ impl ThemeEditorState {
         }
     }
 
+    /// Updates the character glyph used for divider rules.
     pub fn set_divider_char(&mut self, ch: char) {
         if self.current_theme.divider.is_none() {
             self.current_theme.divider = Some(DividerConfig::default());
@@ -766,6 +820,7 @@ impl ThemeEditorState {
         }
     }
 
+    /// Toggles divider length setting between `{window_width}` and `{screen_width}`.
     pub fn toggle_divider_length(&mut self) {
         if self.current_theme.divider.is_none() {
             self.current_theme.divider = Some(DividerConfig::default());
@@ -783,6 +838,7 @@ impl ThemeEditorState {
         }
     }
 
+    /// Updates delimiter glyph character used in marquee tickers.
     pub fn set_marquee_char(&mut self, ch: char) {
         if self.current_theme.marquee.is_none() {
             self.current_theme.marquee = Some(MarqueeConfig::default());
@@ -794,6 +850,7 @@ impl ThemeEditorState {
         }
     }
 
+    /// Cycles the marquee repetition spacing gap (1..10 spaces).
     pub fn cycle_marquee_gap(&mut self) {
         if self.current_theme.marquee.is_none() {
             self.current_theme.marquee = Some(MarqueeConfig::default());
@@ -810,6 +867,7 @@ impl ThemeEditorState {
         }
     }
 
+    /// Updates left vertical accent bar character for toast popups.
     pub fn set_toast_char(&mut self, ch: char) {
         if self.current_theme.toast.is_none() {
             self.current_theme.toast = Some(bashmenu_core::ToastConfig::default());
@@ -821,6 +879,7 @@ impl ThemeEditorState {
         }
     }
 
+    /// Cycles through preset toast auto-dismissal durations (1.0s..5.0s).
     pub fn cycle_toast_timeout(&mut self) {
         if self.current_theme.toast.is_none() {
             self.current_theme.toast = Some(bashmenu_core::ToastConfig::default());
@@ -838,6 +897,7 @@ impl ThemeEditorState {
         }
     }
 
+    /// Computes the list of currently visible sidebar rows based on expanded categories.
     pub fn visible_rows(&self) -> Vec<TreeRow> {
         let mut rows = Vec::new();
         for cat in TokenCategory::ALL {
@@ -853,14 +913,17 @@ impl ThemeEditorState {
         rows
     }
 
+    /// Returns `true` if the specified category section is currently expanded.
     pub fn is_category_expanded(&self, cat: TokenCategory) -> bool {
         self.expanded_categories.contains(&cat)
     }
 
+    /// Expands the specified category in the sidebar tree.
     pub fn expand_category(&mut self, cat: TokenCategory) {
         self.expanded_categories.insert(cat);
     }
 
+    /// Collapses the specified category in the sidebar tree.
     pub fn collapse_category(&mut self, cat: TokenCategory) {
         self.expanded_categories.remove(&cat);
         let rows = self.visible_rows();
@@ -870,6 +933,7 @@ impl ThemeEditorState {
         self.sync_selected_idx_from_row(&rows);
     }
 
+    /// Toggles the expansion state of the specified category.
     pub fn toggle_category(&mut self, cat: TokenCategory) {
         if self.expanded_categories.contains(&cat) {
             self.collapse_category(cat);
@@ -884,6 +948,7 @@ impl ThemeEditorState {
         }
     }
 
+    /// Selects the visible row at the given index, synchronizing selected token index.
     pub fn select_visible_row(&mut self, row_idx: usize) {
         let rows = self.visible_rows();
         if rows.is_empty() {
@@ -893,6 +958,7 @@ impl ThemeEditorState {
         self.sync_selected_idx_from_row(&rows);
     }
 
+    /// Handles Right arrow key navigation (expanding categories or descending into tokens).
     pub fn handle_right_key(&mut self) -> bool {
         let rows = self.visible_rows();
         if let Some(&TreeRow::Category(cat)) = rows.get(self.selected_row) {
@@ -907,6 +973,7 @@ impl ThemeEditorState {
         false
     }
 
+    /// Handles Left arrow key navigation (collapsing categories or ascending to header).
     pub fn handle_left_key(&mut self) -> bool {
         let rows = self.visible_rows();
         match rows.get(self.selected_row).copied() {
@@ -930,6 +997,7 @@ impl ThemeEditorState {
         false
     }
 
+    /// Adjusts viewport scroll offset so selected row remains visible.
     pub fn adjust_scroll(&mut self, viewport_h: usize) {
         if viewport_h == 0 {
             return;
@@ -948,6 +1016,7 @@ impl ThemeEditorState {
         }
     }
 
+    /// Saves all loaded themes to `bashmenu.themes` on disk in alphabetical order.
     pub fn save_to_disk(&mut self) -> Result<()> {
         self.themes
             .insert(self.current_name.clone(), self.current_theme.clone());
@@ -957,10 +1026,12 @@ impl ThemeEditorState {
         Ok(())
     }
 
+    /// Constructs a clean monochrome baseline theme.
     pub fn create_monochrome_theme() -> Theme {
         Theme::monochrome()
     }
 
+    /// Creates a new theme using the given name and monochrome baseline.
     pub fn create_theme(&mut self, name: &str) -> std::result::Result<(), String> {
         let trimmed = name.trim();
         if trimmed.is_empty() {
@@ -986,6 +1057,7 @@ impl ThemeEditorState {
         Ok(())
     }
 
+    /// Deletes the named theme from the collection and updates disk storage.
     pub fn delete_theme(&mut self, name: &str) -> std::result::Result<(), String> {
         self.themes.remove(name);
         if self.themes.is_empty() {
@@ -1022,6 +1094,7 @@ impl ThemeEditorState {
         Ok(())
     }
 
+    /// Renames the active theme in memory.
     pub fn rename_theme(&mut self, new_name: &str) -> std::result::Result<(), String> {
         let trimmed = new_name.trim();
         if trimmed.is_empty() {
@@ -1044,6 +1117,7 @@ impl ThemeEditorState {
         Ok(())
     }
 
+    /// Saves the active theme under a new name and commits to disk.
     pub fn save_as_theme(&mut self, new_name: &str) -> std::result::Result<(), String> {
         let trimmed = new_name.trim();
         if trimmed.is_empty() {
@@ -1060,6 +1134,7 @@ impl ThemeEditorState {
         Ok(())
     }
 
+    /// Switches the active editing target to the specified theme.
     pub fn switch_theme(&mut self, name: &str) -> bool {
         if let Some(th) = self.themes.get(name).cloned() {
             if self.is_modified {
@@ -1077,6 +1152,7 @@ impl ThemeEditorState {
         }
     }
 
+    /// Cycles forward or backward through alphabetically sorted themes.
     pub fn cycle_theme(&mut self, forward: bool) {
         if self.themes.is_empty() {
             return;

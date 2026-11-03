@@ -22,13 +22,18 @@ use std::time::Duration;
 /// Core state for the `shortcutedit` TUI, testable headlessly.
 #[derive(Debug, Clone)]
 pub struct ShortcutEditorState {
+    /// Active keyboard shortcuts configuration being edited
     pub config: ShortcutsConfig,
+    /// Currently highlighted shortcut index in the left list
     pub selected_idx: usize,
+    /// Vertical scroll offset in lines for list viewport
     pub scroll_offset: usize,
+    /// Dirty flag indicating unsaved modifications
     pub dirty: bool,
 }
 
 impl ShortcutEditorState {
+    /// Initializes state with the provided shortcuts configuration.
     pub fn new(config: ShortcutsConfig) -> Self {
         Self {
             config,
@@ -38,18 +43,21 @@ impl ShortcutEditorState {
         }
     }
 
+    /// Moves selection up by one item in the list.
     pub fn move_up(&mut self) {
         if self.selected_idx > 0 {
             self.selected_idx -= 1;
         }
     }
 
+    /// Moves selection down by one item in the list.
     pub fn move_down(&mut self) {
         if self.selected_idx + 1 < self.config.shortcuts.len() {
             self.selected_idx += 1;
         }
     }
 
+    /// Moves the selected shortcut up in ordering by swapping with preceding entry.
     pub fn move_item_up(&mut self) -> bool {
         if self.selected_idx > 0 && self.selected_idx < self.config.shortcuts.len() {
             self.config
@@ -62,6 +70,7 @@ impl ShortcutEditorState {
         false
     }
 
+    /// Moves the selected shortcut down in ordering by swapping with following entry.
     pub fn move_item_down(&mut self) -> bool {
         if self.selected_idx + 1 < self.config.shortcuts.len() {
             self.config
@@ -74,6 +83,7 @@ impl ShortcutEditorState {
         false
     }
 
+    /// Toggles the enabled/disabled state of the selected shortcut.
     pub fn toggle_selected(&mut self) -> Option<bool> {
         if let Some(entry) = self.config.shortcuts.get_mut(self.selected_idx) {
             entry.enabled = !entry.enabled;
@@ -83,6 +93,7 @@ impl ShortcutEditorState {
         None
     }
 
+    /// Adds a new shortcut entry immediately after the currently selected item.
     pub fn add_shortcut(&mut self, entry: ShortcutEntry) {
         if self.config.shortcuts.is_empty() {
             self.config.shortcuts.push(entry);
@@ -95,6 +106,7 @@ impl ShortcutEditorState {
         self.dirty = true;
     }
 
+    /// Deletes the currently selected shortcut, returning it if removed.
     pub fn delete_selected(&mut self) -> Option<ShortcutEntry> {
         if self.selected_idx < self.config.shortcuts.len() {
             let removed = self.config.shortcuts.remove(self.selected_idx);
@@ -108,10 +120,12 @@ impl ShortcutEditorState {
         None
     }
 
+    /// Returns a reference to the currently selected shortcut entry if valid.
     pub fn selected_entry(&self) -> Option<&ShortcutEntry> {
         self.config.shortcuts.get(self.selected_idx)
     }
 
+    /// Returns a mutable reference to the currently selected shortcut entry if valid.
     pub fn selected_entry_mut(&mut self) -> Option<&mut ShortcutEntry> {
         self.config.shortcuts.get_mut(self.selected_idx)
     }
@@ -234,14 +248,20 @@ pub fn format_shortcut_inspector(
 
 /// Interactive modal for recording a direct key combo or `<leader> <key>` chord.
 pub struct KeyCaptureModal {
+    /// Configured leader prefix key (e.g. "Space" or "Ctrl+Space")
     pub leader_key: String,
+    /// Currently captured key combination string
     pub captured_key: String,
+    /// Flag indicating whether the dialog is waiting for following chord key
     pub waiting_for_chord: bool,
+    /// Error message string displayed on validation failure
     pub error_msg: Option<String>,
+    /// Whether modal is configuring the leader key itself
     pub is_leader_def: bool,
 }
 
 impl KeyCaptureModal {
+    /// Constructs a key capture modal initialized with current key and leader definition flag.
     pub fn new(current_key: &str, leader_key: &str, is_leader_def: bool) -> Self {
         Self {
             leader_key: normalize_key_spec(leader_key),
@@ -311,6 +331,7 @@ impl KeyCaptureModal {
         None
     }
 
+    /// Renders the shortcut editor modal frame and input fields into `buf`.
     pub fn render(&self, area: Rect, styles: &ResolvedThemeStyles, buf: &mut Buffer) {
         let box_w = area.width.saturating_sub(8).clamp(46, 68);
         let box_h = 13;
@@ -400,14 +421,20 @@ impl KeyCaptureModal {
 
 /// Modal for editing global leader key settings (`leader_key`, `leader_timeout_ms`, `show_leader_hint`).
 pub struct LeaderSettingsModal {
+    /// Single-line text input for the leader key sequence (e.g. `Ctrl+Space`)
     pub key_input: TextInput,
+    /// Single-line text input for the leader chord timeout in milliseconds
     pub timeout_input: TextInput,
+    /// Whether to display the compact which-key popup overlay during chord pending mode
     pub show_hint: bool,
-    pub focus_idx: usize, // 0 = key, 1 = capture btn, 2 = timeout, 3 = show_hint, 4 = Save, 5 = Cancel
+    /// Active focused field index (0 = key, 1 = capture btn, 2 = timeout, 3 = show_hint, 4 = Save, 5 = Cancel)
+    pub focus_idx: usize,
+    /// Validation error message, if any
     pub error_msg: Option<String>,
 }
 
 impl LeaderSettingsModal {
+    /// Constructs a new leader settings modal initialized with current `ShortcutsConfig`.
     pub fn new(cfg: &ShortcutsConfig) -> Self {
         Self {
             key_input: TextInput::new(&cfg.leader_key),
@@ -418,6 +445,7 @@ impl LeaderSettingsModal {
         }
     }
 
+    /// Renders the shortcut editor modal frame and input fields into `buf`.
     pub fn render(&self, area: Rect, styles: &ResolvedThemeStyles, buf: &mut Buffer) {
         let box_w = area.width.saturating_sub(8).clamp(48, 68);
         let box_h = 16;
@@ -528,17 +556,29 @@ impl LeaderSettingsModal {
 
 /// Property editor modal for a single [`ShortcutEntry`].
 pub struct ShortcutEditModal {
+    /// Human-readable description label
     pub description: TextInput,
+    /// Direct key binding or leader chord follow-up key
     pub key_input: TextInput,
+    /// Whether this shortcut requires the `<leader>` prefix
     pub use_leader: bool,
+    /// Selected index in `SHORTCUT_TYPES`
     pub item_type_idx: usize,
+    /// Target command, script path, or editor file
     pub target_input: TextInput,
+    /// Subprocess execution mode (`Console`, `Streaming`, `Interactive`)
     pub execution_mode: ExecutionMode,
+    /// Viewport window percentage for streaming output dialogs
     pub window_percent: TextInput,
+    /// Whether to run in quiet mode (no pause after command)
     pub quiet: bool,
+    /// Whether to preserve the terminal alternate screen buffer
     pub alt_buffer: bool,
+    /// Whether this shortcut binding is currently active
     pub enabled: bool,
+    /// Current input focus index (0..=13)
     pub focus_idx: usize,
+    /// Validation error message, if any
     pub error_msg: Option<String>,
 }
 
@@ -552,6 +592,7 @@ const SHORTCUT_TYPES: &[(&str, MenuItemType)] = &[
 ];
 
 impl ShortcutEditModal {
+    /// Instantiates the edit modal with fields initialized from an existing [`ShortcutEntry`].
     pub fn from_entry(entry: &ShortcutEntry) -> Self {
         let norm_key = entry.normalized_key();
         let (use_leader, key_body) = if let Some(rest) = norm_key.strip_prefix("<leader> ") {
@@ -595,6 +636,7 @@ impl ShortcutEditModal {
         }
     }
 
+    /// Returns the currently selected [`MenuItemType`] corresponding to `item_type_idx`.
     pub fn current_type(&self) -> MenuItemType {
         match self.item_type_idx {
             0 => MenuItemType::Command,
@@ -607,6 +649,7 @@ impl ShortcutEditModal {
         }
     }
 
+    /// Assembles the effective key binding string (prepending `<leader>` if toggled).
     pub fn composed_key(&self) -> String {
         let raw_owned = self.key_input.as_string();
         let raw = raw_owned.trim();
@@ -619,6 +662,7 @@ impl ShortcutEditModal {
         }
     }
 
+    /// Updates internal fields after an interactive key capture sequence completes.
     pub fn set_captured_key(&mut self, full_key: &str) {
         let norm = normalize_key_spec(full_key);
         if let Some(rest) = norm.strip_prefix("<leader> ") {
@@ -631,6 +675,7 @@ impl ShortcutEditModal {
         self.error_msg = None;
     }
 
+    /// Validates fields and constructs an updated [`ShortcutEntry`].
     pub fn build_entry(
         &mut self,
         orig: &ShortcutEntry,
@@ -713,6 +758,7 @@ impl ShortcutEditModal {
         Ok(entry)
     }
 
+    /// Renders the shortcut editor modal frame and input fields into `buf`.
     pub fn render(&self, area: Rect, styles: &ResolvedThemeStyles, buf: &mut Buffer) {
         let box_w = area.width.saturating_sub(6).clamp(56, 76);
         let box_h = area.height.saturating_sub(2).clamp(22, 26);
@@ -1697,6 +1743,7 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
     Ok(())
 }
 
+/// Renders the complete split-screen shortcut editor (left shortcuts list, right details inspector, and bottom help gutter).
 pub fn render_shortcut_editor_screen(
     area: Rect,
     state: &mut ShortcutEditorState,
