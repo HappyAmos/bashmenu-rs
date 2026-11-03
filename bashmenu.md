@@ -131,6 +131,7 @@ Used as dynamic templates for code generation, settings, or block injections:
 | `F6` | Toggle option shortcut key badges display. |
 | `F7` | Configure status gutter format modal. |
 | `F8` | Launch interactive Visual Theme Editor (`themeedit`). |
+| `F9` | Launch interactive Visual Keyboard Shortcuts Editor (`shortcutedit`). |
 | `ESC` / `q` | Return to parent submenu or exit application. |
 
 *Note on Intelligent State Retention:* When returning from editors, or scripts with `refresh: true`, the engine traces and preserves your submenu coordinate depth to return you to your exact location, skipping the root menu.

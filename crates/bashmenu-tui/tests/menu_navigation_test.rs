@@ -284,6 +284,10 @@ fn test_function_key_actions() {
         view.handle_key(KeyCode::F(8)),
         MenuAction::LaunchThemeEditor
     );
+    assert_eq!(
+        view.handle_key(KeyCode::F(9)),
+        MenuAction::LaunchShortcutEditor
+    );
 }
 
 #[test]
@@ -708,6 +712,66 @@ fn test_gutter_mouse_click_actions() {
     assert!(
         found_f1,
         "Expected clicking on [F1]: Help in gutter to return MenuAction::Help"
+    );
+
+    // Verify clicking on [F9]: ShortcutEdit in wide gutter returns MenuAction::LaunchShortcutEditor
+    let wide_area = Rect::new(0, 0, 200, 24);
+    let mut found_f9 = false;
+    for r in 20..24 {
+        for c in 3..wide_area.width {
+            let mouse = MouseEvent {
+                kind: MouseEventKind::Down(MouseButton::Left),
+                column: c,
+                row: r,
+                modifiers: KeyModifiers::empty(),
+            };
+            let action = view.handle_mouse(mouse, wide_area);
+            if action == MenuAction::LaunchShortcutEditor {
+                found_f9 = true;
+                break;
+            }
+        }
+        if found_f9 {
+            break;
+        }
+    }
+    assert!(
+        found_f9,
+        "Expected clicking on [F9]: ShortcutEdit in gutter to return MenuAction::LaunchShortcutEditor"
+    );
+}
+
+#[test]
+fn test_help_gutter_text_contains_f9_and_omits_direct() {
+    let schema = create_sample_menu();
+    let mut view = MenuView::new(
+        schema,
+        ResolvedThemeStyles::default(),
+        true,
+        "Status".to_string(),
+    );
+
+    let area = Rect::new(0, 0, 200, 24);
+    let mut buf = Buffer::empty(area);
+    view.render(area, &mut buf);
+
+    // Collect all text from gutter rows (rows 20 to 23)
+    let mut gutter_text = String::new();
+    for y in 0..24 {
+        let mut line = String::new();
+        for x in 0..200 {
+            line.push(buf[(x, y)].symbol().chars().next().unwrap_or(' '));
+        }
+        gutter_text.push_str(&line);
+    }
+
+    assert!(
+        !gutter_text.contains("[0-9/a-z]: Direct"),
+        "Help gutter must NOT contain '[0-9/a-z]: Direct'"
+    );
+    assert!(
+        gutter_text.contains("[F9]: ShortcutEdit"),
+        "Help gutter must contain '[F9]: ShortcutEdit'"
     );
 }
 

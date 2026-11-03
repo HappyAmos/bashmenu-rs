@@ -958,7 +958,7 @@ fn main() -> Result<()> {
                                 });
                                 need_redraw = true;
                             } else {
-                                let help_content = "BashMenu Documentation\n\nNavigation:\n  Up/Down, k/j: Navigate items\n  Enter: Select item\n  Esc/q: Back or exit\n\nFunction Keys:\n  F1: Help manual\n  F2: Theme picker\n  F3: Text editor\n  F4: Menu editor\n  F5: Reload config and menus\n  F6: Toggle shortcut numbers\n  F7: Configure status gutter\n  F8: Theme editor".to_string();
+                                let help_content = "BashMenu Documentation\n\nNavigation:\n  Up/Down, k/j: Navigate items\n  Enter: Select item\n  Esc/q: Back or exit\n\nFunction Keys:\n  F1: Help manual\n  F2: Theme picker\n  F3: Text editor\n  F4: Menu editor\n  F5: Reload config and menus\n  F6: Toggle shortcut numbers\n  F7: Configure status gutter\n  F8: Theme editor\n  F9: Keyboard shortcut editor".to_string();
                                 active_modal = ActiveModal::Help(HelpModal::new(
                                     "BashMenu Help",
                                     &help_content,
@@ -1093,6 +1093,25 @@ fn main() -> Result<()> {
                                     .arg("-t")
                                     .arg(&config.theme)
                                     .status();
+                                Ok(())
+                            });
+                            pending_action = Some(MenuAction::Reload);
+                        }
+                        MenuAction::LaunchShortcutEditor => {
+                            let shortcutedit_bin = locate_tool("shortcutedit");
+                            let menuedit_bin = locate_tool("menuedit");
+                            let _ = guard.suspend_keep_alt(|| {
+                                let status = Command::new(&shortcutedit_bin)
+                                    .arg("-f")
+                                    .arg(&shortcuts_path)
+                                    .status();
+                                if status.is_err() {
+                                    let _ = Command::new(&menuedit_bin)
+                                        .arg("--shortcuts")
+                                        .arg("-f")
+                                        .arg(&shortcuts_path)
+                                        .status();
+                                }
                                 Ok(())
                             });
                             pending_action = Some(MenuAction::Reload);
@@ -1373,23 +1392,7 @@ fn main() -> Result<()> {
                                             if s == "shortcuts_editor" || s == "shortcutedit"
                                     )
                                 {
-                                    let shortcutedit_bin = locate_tool("shortcutedit");
-                                    let menuedit_bin = locate_tool("menuedit");
-                                    let _ = guard.suspend_keep_alt(|| {
-                                        let status = Command::new(&shortcutedit_bin)
-                                            .arg("-f")
-                                            .arg(&shortcuts_path)
-                                            .status();
-                                        if status.is_err() {
-                                            let _ = Command::new(&menuedit_bin)
-                                                .arg("--shortcuts")
-                                                .arg("-f")
-                                                .arg(&shortcuts_path)
-                                                .status();
-                                        }
-                                        Ok(())
-                                    });
-                                    pending_action = Some(MenuAction::Reload);
+                                    pending_action = Some(MenuAction::LaunchShortcutEditor);
                                 } else if item.r#type == MenuItemType::Other("toast".to_string())
                                     || matches!(item.r#type, MenuItemType::Other(ref s) if s == "toast")
                                 {

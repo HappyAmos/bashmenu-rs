@@ -42,6 +42,8 @@ pub enum MenuAction {
     ConfigureGutter,
     /// Launch theme editor (F8)
     LaunchThemeEditor,
+    /// Launch keyboard shortcut editor (F9)
+    LaunchShortcutEditor,
     /// Open a notebook menu
     OpenNotebook(Box<MenuItem>),
     /// View/read a notebook note
@@ -542,6 +544,7 @@ impl MenuView {
             KeyCode::F(6) => MenuAction::ToggleShortcuts,
             KeyCode::F(7) => MenuAction::ConfigureGutter,
             KeyCode::F(8) => MenuAction::LaunchThemeEditor,
+            KeyCode::F(9) => MenuAction::LaunchShortcutEditor,
             _ => MenuAction::None,
         }
     }
@@ -551,9 +554,9 @@ impl MenuView {
         if self.is_current_notebook() {
             "[N]: New Note | [ENTER]: Read | [M]: Rename | [D]: Delete | [UP/DN]: Nav | [F1]: Help | [F2]: Themes | [F7]: Gutter | [F8]: ThemeEdit | [ESC]: Back"
         } else if self.show_shortcuts {
-            "[UP/DN]: Nav | [0-9/a-z]: Direct | [F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [F8]: ThemeEdit | [ESC]: Back"
+            "[UP/DN]: Nav | [F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [F8]: ThemeEdit | [F9]: ShortcutEdit | [ESC]: Back"
         } else {
-            "[UP/DN]: Nav | [ENTER]: Select | [F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [F8]: ThemeEdit | [ESC]: Back"
+            "[UP/DN]: Nav | [ENTER]: Select | [F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [F8]: ThemeEdit | [F9]: ShortcutEdit | [ESC]: Back"
         }
     }
 
@@ -565,6 +568,10 @@ impl MenuView {
             MenuAction::ThemeSelector
         } else if tok.contains("[F3]") || tok.contains("Editor") {
             MenuAction::LaunchEditor
+        } else if tok.contains("[F8]") || tok.contains("ThemeEdit") {
+            MenuAction::LaunchThemeEditor
+        } else if tok.contains("[F9]") || tok.contains("Shortcut") {
+            MenuAction::LaunchShortcutEditor
         } else if tok.contains("[F4]") || tok.contains("Edit") {
             MenuAction::EditMenu
         } else if tok.contains("[F5]") || tok.contains("Refresh") {
@@ -573,8 +580,6 @@ impl MenuView {
             MenuAction::ToggleShortcuts
         } else if tok.contains("[F7]") || tok.contains("Gutter") {
             MenuAction::ConfigureGutter
-        } else if tok.contains("[F8]") || tok.contains("ThemeEdit") {
-            MenuAction::LaunchThemeEditor
         } else if tok.contains("[ESC]") || tok.contains("Back") {
             self.go_back()
         } else if tok.contains("[ENTER]") || tok.contains("Select") || tok.contains("Read") {
@@ -766,12 +771,21 @@ impl MenuView {
                 let filepath = item.file.unwrap_or_default();
                 MenuAction::NewNote(filepath)
             }
+            MenuItemType::Other(ref s) if s == "shortcuts_editor" || s == "shortcutedit" => {
+                MenuAction::LaunchShortcutEditor
+            }
             MenuItemType::Other(ref s) if s == "theme_selector" => MenuAction::ThemeSelector,
             MenuItemType::Other(ref s) if s == "back" => self.go_back(),
             _ => {
                 if let Some(ref act) = item.action {
                     if act == "themeedit" || act == "action_theme_editor" {
                         return MenuAction::LaunchThemeEditor;
+                    }
+                    if act == "shortcutedit"
+                        || act == "shortcuts_editor"
+                        || act == "action_shortcuts"
+                    {
+                        return MenuAction::LaunchShortcutEditor;
                     }
                     if act == "menuedit" || act == "menuedit.py" {
                         return MenuAction::EditMenu;
