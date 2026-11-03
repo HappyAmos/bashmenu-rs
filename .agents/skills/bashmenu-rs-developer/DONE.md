@@ -294,4 +294,21 @@
   - Verified `./install.sh` built release binaries and installed cleanly to `$HOME/.local/bin`.
   - Pushed to `main` (`5a467d6`) and verified remote CI run `41570376526` passed with status `success`.
 
+## Phase 22: Help Gutter Keyboard Shortcut Editor (`<F9>`) Integration & Direct Help Text Pruning
+- [x] **Main Menu Help Gutter `<F9>` Integration (`crates/bashmenu-tui`, `crates/bashmenu-cli`):**
+  - Added `[F9]: ShortcutEdit` to contextual help gutters across all menu states in `MenuView::get_help_raw`.
+  - Removed redundant `[0-9/a-z]: Direct` help token from `get_help_raw` when shortcut badges are displayed, freeing up essential visual width.
+  - Introduced `MenuAction::LaunchShortcutEditor` to `MenuAction` enum and wired `KeyCode::F(9)` inside `MenuView::handle_key`.
+  - Updated gutter mouse click resolution in `MenuView::action_for_gutter_token` to prioritize `[F8]` (`ThemeEdit`) and `[F9]` (`ShortcutEdit`) before generic `Edit` (`menuedit`), ensuring reliable mouse clicks on `<F9>` launch `shortcutedit`.
+  - Wired `MenuAction::LaunchShortcutEditor` inside `bashmenu-cli`'s main event loop to invoke `locate_tool("shortcutedit")` with fallback to `menuedit --shortcuts`.
+  - Updated `bashmenu.md`, `bashmenu.1`, and the `<F1>` Help modal documentation to document `<F9>`.
+- [x] **Verification & Remote CI:**
+  - Verified `cargo fmt --all --check` passed cleanly.
+  - Verified `cargo clippy --workspace --all-targets -- -D warnings` passed with 0 warnings.
+  - Verified `cargo test --workspace` passed 100% (all 64+ tests and doc-tests passing).
+  - Verified `shellcheck *.sh scripts/*.sh` passed cleanly.
+  - Committed and pushed commit `36aa16e` to `origin/main`.
+  - Verified GitHub Actions remote CI run `41739787382` passed with status `success`.
+
+
 
