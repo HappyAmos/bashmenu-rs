@@ -294,7 +294,26 @@
   - Verified `./install.sh` built release binaries and installed cleanly to `$HOME/.local/bin`.
   - Pushed to `main` (`5a467d6`) and verified remote CI run `41570376526` passed with status `success`.
 
-## Phase 22: Help Gutter Keyboard Shortcut Editor (`<F9>`) Integration & Direct Help Text Pruning
+## Phase 23: Standalone Pager (`bmpager`) Non-Markdown Text Wrapping Support
+- [x] **CLI Argument & Flag Parsing (`crates/bmpager-cli`):**
+  - Added `wrap_text: bool` option to `PagerArgs`.
+  - Added `-w`, `--wrap`, and `--wrap-text` flags to `parse_cli_args`.
+  - Updated `print_usage` and interactive `<F1>` / `h` / `?` help modal to document `-w, --wrap`.
+- [x] **ANSI-Preserving Word Wrapping Engine (`crates/bmpager-cli/src/ansi.rs`):**
+  - Implemented `wrap_text_line` and `wrap_text_content` soft word-wrapping functions that measure visual column width, respect indentations, preserve active ANSI styling across lines, and hard-split words exceeding window width.
+  - Connected word-wrapping to `bmpager`'s main processing pipeline when non-markdown text is viewed and `--wrap` is specified.
+- [x] **Documentation & Test Parity:**
+  - Added unit tests for plain text, indented text, and long unbroken words in `ansi.rs`.
+  - Added CLI integration test `test_bmpager_wrap_flag_plain_text` in `crates/bmpager-cli/tests/bmpager_test.rs`.
+  - Updated `bashmenu.md` and `bashmenu.1` manpage documenting the `-w` / `--wrap` / `--wrap-text` options.
+- [x] **Verification & Remote CI:**
+  - Verified `cargo fmt --all --check` passed cleanly.
+  - Verified `cargo clippy --workspace --all-targets -- -D warnings` passed with 0 warnings.
+  - Verified `cargo test --workspace` passed 100%.
+  - Verified `shellcheck *.sh scripts/*.sh` passed cleanly.
+  - Committed and pushed commit `8fa5d33` to `origin/main`.
+  - Verified remote CI run `41743716695` passed with status `success`.
+
 - [x] **Main Menu Help Gutter `<F9>` Integration (`crates/bashmenu-tui`, `crates/bashmenu-cli`):**
   - Added `[F9]: ShortcutEdit` to contextual help gutters across all menu states in `MenuView::get_help_raw`.
   - Removed redundant `[0-9/a-z]: Direct` help token from `get_help_raw` when shortcut badges are displayed, freeing up essential visual width.
