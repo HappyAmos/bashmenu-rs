@@ -294,7 +294,13 @@
   - Verified `./install.sh` built release binaries and installed cleanly to `$HOME/.local/bin`.
   - Pushed to `main` (`5a467d6`) and verified remote CI run `41570376526` passed with status `success`.
 
-## Phase 23: Standalone Pager (`bmpager`) Non-Markdown Text Wrapping Support
+## Phase 24: Rules Reorganization (.agents/rules/invariants.md)
+- [x] **Relocated Root `AGENTS.md` to `.agents/rules/invariants.md`:**
+  - Moved `AGENTS.md` from the workspace root into `.agents/rules/invariants.md` conforming to industry and Antigravity standard conventions for workspace rules.
+  - Updated documentation map in `docs/ARCHITECTURE.md`.
+  - Updated `SKILL.md` 6-tier reference modal list to include `crates/bmpager-cli`.
+  - Verified remote CI run `41747999484` succeeded on GitHub Actions.
+
 - [x] **CLI Argument & Flag Parsing (`crates/bmpager-cli`):**
   - Added `wrap_text: bool` option to `PagerArgs`.
   - Added `-w`, `--wrap`, and `--wrap-text` flags to `parse_cli_args`.
