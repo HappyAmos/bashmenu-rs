@@ -13,8 +13,10 @@ BashMenu-RS is a zero-dependency, compiled terminal menu system and companion de
 
 ```
 bashmenu-rs/
+├── .agents/
+│   ├── rules/                    # Agent development guidelines, rules, and invariants (invariants.md)
+│   └── skills/                   # Antigravity developer skill and task playbooks
 ├── Cargo.toml                    # Root workspace manifest
-├── AGENTS.md                     # Agent development guidelines, rules, and invariants
 ├── rustfmt.toml                  # Workspace Rust formatting standard
 ├── bashmenu.sh                   # POSIX/Bash launcher trampoline
 ├── install.sh                    # Multi-binary release installer (~/.local/bin)
