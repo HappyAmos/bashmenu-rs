@@ -131,7 +131,7 @@ pub struct ToastConfig {
     /// Left accent indicator glyph (defaults to left half block `▌`)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub char: Option<String>,
-    /// Default display duration in seconds before auto-dismissal
+    /// Optional legacy theme display duration in seconds before auto-dismissal
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timeout: Option<f64>,
 }

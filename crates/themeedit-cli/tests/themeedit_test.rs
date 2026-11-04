@@ -451,10 +451,6 @@ fn test_themeedit_toast_tokens_and_customization() {
 
     // Verify toast tokens exist
     assert!(state.tokens.iter().any(|t| t.label == "Toast Left Bar"));
-    assert!(state
-        .tokens
-        .iter()
-        .any(|t| t.label == "Toast Default Timeout"));
     assert!(state.tokens.iter().any(|t| t.label == "Toast Info Accent"));
     assert!(state
         .tokens
@@ -471,16 +467,6 @@ fn test_themeedit_toast_tokens_and_customization() {
         .find(|t| t.label == "Toast Left Bar")
         .unwrap();
     assert_eq!(state.get_token_value_display(bar_token), "'▎'");
-
-    // Verify cycling toast timeout
-    state.cycle_toast_timeout();
-    let timeout_token = state
-        .tokens
-        .iter()
-        .find(|t| t.label == "Toast Default Timeout")
-        .unwrap();
-    let display = state.get_token_value_display(timeout_token);
-    assert!(display.ends_with('s'));
 
     // Verify toast color tokens update correctly
     state.set_color_token("toast_info", 39);
@@ -511,12 +497,6 @@ fn test_themeedit_toast_tokens_and_customization() {
     // Verify token selection by key works for toast keys
     assert!(state.select_token_by_key("toast_char"));
     assert_eq!(state.tokens[state.selected_idx].label, "Toast Left Bar");
-
-    assert!(state.select_token_by_key("toast_timeout"));
-    assert_eq!(
-        state.tokens[state.selected_idx].label,
-        "Toast Default Timeout"
-    );
 
     assert!(state.select_token_by_key("toast_info"));
     assert_eq!(state.tokens[state.selected_idx].label, "Toast Info Accent");

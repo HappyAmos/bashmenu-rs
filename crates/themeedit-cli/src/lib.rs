@@ -70,8 +70,6 @@ pub enum TokenKind {
     MarqueeGap,
     /// Toast notification vertical indicator glyph
     ToastChar,
-    /// Toast notification default duration timeout
-    ToastTimeout,
     /// Background wallpaper image path
     WallpaperImage,
 }
@@ -97,8 +95,7 @@ impl TokenItem {
             | TokenKind::DividerLength
             | TokenKind::MarqueeChar
             | TokenKind::MarqueeGap
-            | TokenKind::ToastChar
-            | TokenKind::ToastTimeout => TokenCategory::Theme,
+            | TokenKind::ToastChar => TokenCategory::Theme,
         }
     }
 }
@@ -404,10 +401,6 @@ impl ThemeEditorState {
                 kind: TokenKind::ToastChar,
             },
             TokenItem {
-                label: "Toast Default Timeout".to_string(),
-                kind: TokenKind::ToastTimeout,
-            },
-            TokenItem {
                 label: "Toast Info Accent".to_string(),
                 kind: TokenKind::Color("toast_info".to_string()),
             },
@@ -620,15 +613,6 @@ impl ThemeEditorState {
                     .unwrap_or_else(|| "▌".to_string());
                 let parsed = bashmenu_core::parse_ascii_val(&c);
                 format!("'{}'", if parsed.is_empty() { c } else { parsed })
-            }
-            TokenKind::ToastTimeout => {
-                let t = self
-                    .current_theme
-                    .toast
-                    .as_ref()
-                    .and_then(|t| t.timeout)
-                    .unwrap_or(2.0);
-                format!("{:.1}s", t)
             }
             TokenKind::WallpaperImage => {
                 if let Some(wp) = self.current_theme.wallpaper_config() {
@@ -876,24 +860,6 @@ impl ThemeEditorState {
             t.char = Some(ch.to_string());
             self.is_modified = true;
             self.status_message = format!("Updated toast left bar character to '{}'", ch);
-        }
-    }
-
-    /// Cycles through preset toast auto-dismissal durations (1.0s..5.0s).
-    pub fn cycle_toast_timeout(&mut self) {
-        if self.current_theme.toast.is_none() {
-            self.current_theme.toast = Some(bashmenu_core::ToastConfig::default());
-        }
-        if let Some(t) = &mut self.current_theme.toast {
-            let timeouts = [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0];
-            let curr = t.timeout.unwrap_or(2.0);
-            let next_t = match timeouts.iter().position(|&v| (v - curr).abs() < 0.05) {
-                Some(idx) => timeouts[(idx + 1) % timeouts.len()],
-                None => 2.0,
-            };
-            t.timeout = Some(next_t);
-            self.is_modified = true;
-            self.status_message = format!("Updated toast timeout to {:.1}s", next_t);
         }
     }
 
@@ -1194,7 +1160,6 @@ impl ThemeEditorState {
                 TokenKind::MarqueeChar => key == "marquee_char",
                 TokenKind::MarqueeGap => key == "marquee_gap",
                 TokenKind::ToastChar => key == "toast_char",
-                TokenKind::ToastTimeout => key == "toast_timeout",
                 TokenKind::WallpaperImage => key == "wallpaper" || key == "wallpaper_image",
             })
             .or_else(|| {
@@ -1222,7 +1187,6 @@ impl ThemeEditorState {
                     TokenKind::ToastChar => {
                         key == "toast_char" || key == "toast_bar" || key == "toast"
                     }
-                    TokenKind::ToastTimeout => key == "toast_timeout" || key == "toast_duration",
                     TokenKind::WallpaperImage => {
                         key == "wallpaper" || key == "wallpaper_image" || key == "bg_image"
                     }
@@ -1460,7 +1424,7 @@ pub fn get_token_preview_spans(
                 ));
             }
         }
-        TokenKind::ToastChar | TokenKind::ToastTimeout => {
+        TokenKind::ToastChar => {
             let toast_w = 40_u16.min(right_area.width.saturating_sub(4));
             let toast_h = 4_u16.min(right_area.height.saturating_sub(2));
             let toast_x = right_area.x + right_area.width.saturating_sub(toast_w + 2);

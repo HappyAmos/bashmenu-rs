@@ -644,6 +644,15 @@ items:
                       interactive: true
                       quiet: false
                       alt_buffer: true
+                  - Toast Message Timeout [[{app.settings.toast_timeout}] seconds]:
+                      type: config
+                      icon: '{nf::#f0f3}'
+                      key: app.settings.toast_timeout
+                      title: Configure Toast Message Timeout
+                      prompt: 'Seconds to display popup toast notifications:'
+                      interactive: true
+                      quiet: false
+                      alt_buffer: true
                   - Visual Menu Editor [menuedit]:
                       type: script
                       action: menuedit

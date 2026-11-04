@@ -324,4 +324,14 @@ impl ResolvedThemeStyles {
 
         resolved
     }
+
+    /// Sets the runtime toast notification timeout (from global settings).
+    pub fn with_toast_timeout(mut self, timeout: Option<f64>) -> Self {
+        if let Some(t) = timeout {
+            if t > 0.0 {
+                self.toast_timeout = t;
+            }
+        }
+        self
+    }
 }

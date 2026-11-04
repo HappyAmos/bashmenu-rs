@@ -54,4 +54,5 @@ settings:
     milliseconds: 300000
     command: cmatrix -s
   refresh_interval: 10
+  toast_timeout: 2.0
   pager_editor: vim

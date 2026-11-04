@@ -845,13 +845,12 @@ fn main() -> Result<()> {
                                                     severity: ToastSeverity::Information,
                                                     timeout_secs: 1.5,
                                                 });
-                                                if matches!(
-                                                    token.kind,
-                                                    TokenKind::ToastChar | TokenKind::ToastTimeout
-                                                ) || matches!(
-                                                    &token.kind,
-                                                    TokenKind::Color(ref k) if k.starts_with("toast_")
-                                                ) {
+                                                if matches!(token.kind, TokenKind::ToastChar)
+                                                    || matches!(
+                                                        &token.kind,
+                                                        TokenKind::Color(ref k) if k.starts_with("toast_")
+                                                    )
+                                                {
                                                     state.preview_mode = PreviewMode::Toast;
                                                 }
                                                 let spans = get_token_preview_spans(
@@ -1413,9 +1412,6 @@ fn open_selected_token_picker(state: &mut ThemeEditorState, active_modal: &mut A
                 AsciiGridModal::new("Pick Toast Left Bar Glyph", 221),
             );
         }
-        TokenKind::ToastTimeout => {
-            state.cycle_toast_timeout();
-        }
     }
 }
 
@@ -1841,7 +1837,7 @@ fn hit_test_preview(
             let summary_y = right_area.y + right_area.height - 2;
 
             if row == summary_y {
-                return Some(("toast_timeout", row, p_inner_x, p_inner_x + p_avail_w));
+                return Some(("toast_char", row, p_inner_x, p_inner_x + p_avail_w));
             }
 
             // Check Toast 1 (Info)

@@ -768,8 +768,8 @@ pub fn render_preview_pane(
             // Bottom configuration summary footer
             let summary_y = right_area.y + right_area.height - 2;
             let summary_txt = format!(
-                "Bar: '{}'  Timeout: {:.1}s  [Enter: Cycle / Pick]",
-                preview_styles.toast_bar_char, preview_styles.toast_timeout
+                "Bar: '{}'  Accent Bar  [Enter: Pick Glyph]",
+                preview_styles.toast_bar_char
             );
             let summary_style = preview_styles.gutter.bg(title_bg);
             buf.set_string(p_inner_x, summary_y, summary_txt, summary_style);

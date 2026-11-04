@@ -201,8 +201,9 @@ fn main() -> Result<()> {
     let active_theme = themes.get(&config.theme);
     let mut styles = if let Some(t) = active_theme {
         ResolvedThemeStyles::from_theme(t, use_nerd)
+            .with_toast_timeout(config.settings.toast_timeout)
     } else {
-        ResolvedThemeStyles::default()
+        ResolvedThemeStyles::default().with_toast_timeout(config.settings.toast_timeout)
     };
 
     // 4. Macro Context & Status Gutter
@@ -407,7 +408,8 @@ fn main() -> Result<()> {
                             let _ = save_config(&config_path, &config);
                             menu_view.set_config(config.clone());
                             if let Some(t) = themes.get(&config.theme) {
-                                styles = ResolvedThemeStyles::from_theme(t, use_nerd);
+                                styles = ResolvedThemeStyles::from_theme(t, use_nerd)
+                                    .with_toast_timeout(config.settings.toast_timeout);
                                 menu_view.set_styles(styles.clone());
                                 let wp_config = config.resolve_wallpaper(Some(t));
                                 menu_view.set_wallpaper(wp_config);
@@ -768,7 +770,8 @@ fn main() -> Result<()> {
                                 use_nerd = unf;
                                 menu_view.set_use_nerd_fonts(unf);
                                 if let Some(t) = themes.get(&config.theme) {
-                                    styles = ResolvedThemeStyles::from_theme(t, use_nerd);
+                                    styles = ResolvedThemeStyles::from_theme(t, use_nerd)
+                                        .with_toast_timeout(config.settings.toast_timeout);
                                     menu_view.set_styles(styles.clone());
                                 }
                             }
@@ -806,6 +809,17 @@ fn main() -> Result<()> {
                             config.set_value(key_path.as_str(), parsed);
                             let _ = save_config(&config_path, &config);
                             menu_view.set_config(config.clone());
+                            if key_path == "settings.toast_timeout"
+                                || key_path == "settings.toast.timeout"
+                                || key_path == "app.settings.toast_timeout"
+                                || key_path == "app.settings.toast.timeout"
+                            {
+                                if let Some(t) = themes.get(&config.theme) {
+                                    styles = ResolvedThemeStyles::from_theme(t, use_nerd)
+                                        .with_toast_timeout(config.settings.toast_timeout);
+                                    menu_view.set_styles(styles.clone());
+                                }
+                            }
                             if key_path == "settings.status_gutter" {
                                 let new_gutter =
                                     config.settings.status_gutter.clone().unwrap_or_default();
@@ -1036,8 +1050,10 @@ fn main() -> Result<()> {
                             let active_theme = themes.get(&config.theme);
                             styles = if let Some(t) = active_theme {
                                 ResolvedThemeStyles::from_theme(t, use_nerd)
+                                    .with_toast_timeout(config.settings.toast_timeout)
                             } else {
                                 ResolvedThemeStyles::default()
+                                    .with_toast_timeout(config.settings.toast_timeout)
                             };
                             menu_view.set_styles(styles.clone());
 
@@ -1404,7 +1420,7 @@ fn main() -> Result<()> {
                                         .and_then(|v| {
                                             v.as_f64().or_else(|| v.as_i64().map(|i| i as f64))
                                         })
-                                        .unwrap_or(2.0);
+                                        .unwrap_or(styles.toast_timeout);
                                     let raw_msg = item
                                         .message()
                                         .or(item.action.as_deref())

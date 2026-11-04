@@ -50,6 +50,10 @@ pub struct Settings {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ping_target: Option<String>,
 
+    /// Default toast notification timeout in seconds
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub toast_timeout: Option<f64>,
+
     /// Convert tabs to spaces in text editor
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tab_to_spaces: Option<bool>,
@@ -269,6 +273,15 @@ impl BashMenuConfig {
             "settings.ping_target" => {
                 self.settings.ping_target = match &value {
                     serde_yml::Value::String(s) => Some(s.clone()),
+                    _ => None,
+                };
+            }
+            "settings.toast_timeout" | "settings.toast.timeout" => {
+                self.settings.toast_timeout = match &value {
+                    serde_yml::Value::Number(n) => {
+                        n.as_f64().or_else(|| n.as_u64().map(|v| v as f64))
+                    }
+                    serde_yml::Value::String(s) => s.parse::<f64>().ok(),
                     _ => None,
                 };
             }

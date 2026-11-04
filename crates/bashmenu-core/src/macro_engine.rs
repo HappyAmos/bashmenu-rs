@@ -881,7 +881,7 @@ pub fn extract_toasts(text: &str, ctx: &MacroContext) -> (String, Vec<ToastNotif
         let timeout = caps
             .get(1)
             .and_then(|m| m.as_str().parse::<f64>().ok())
-            .unwrap_or(2.0);
+            .unwrap_or_else(|| ctx.config.settings.toast_timeout.unwrap_or(2.0));
 
         let raw_msg = caps
             .get(2)
