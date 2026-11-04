@@ -36,8 +36,21 @@
   1. Formatting: `cargo fmt --all --check`
   2. Compiler & Clippy Lints: `cargo clippy --workspace --all-targets -- -D warnings` (treat all Clippy warnings as errors)
   3. Tests: `cargo test --workspace`
-  4. Shell Scripts: `shellcheck *.sh`
+  4. Shell Scripts: `shellcheck *.sh scripts/*.sh`
 - In terminal scripts, do not assume `/usr/local/bin` for non-root users; install user CLI tools to `$HOME/.local/bin`.
+- **Shellcheck Scope Invariant:** Verify shell scripts using `shellcheck *.sh scripts/*.sh` so extension scripts in `scripts/` are checked alongside root scripts.
+- **Forbidden Keybindings (<kbd>F11</kbd>):** Never bind `<F11>` anywhere in interactive navigation or child TUIs; `<F11>` is reserved by Linux desktop window managers for fullscreen toggle. Use `<F12>` or alternate unreserved keys.
+- **Code Safety & Error Handling (No Naked Panics):** Avoid naked `.unwrap()` and `.expect()` in interactive runtime loops, macro interpolation, or file parsing. Return strongly-typed errors using `thiserror` (e.g. `BashMenuError`) or propagate via `anyhow::Result` / `color_eyre::Result` at the binary boundary.
+- **No Endless Loops Without Escape Paths:** Never construct interactive event loops or modal states that lack a dedicated escape/exit key sequence (`ESC`, `q`, `Ctrl+C`).
+- **No Hardcoded Absolute Paths:** Never hardcode absolute user paths; always use dynamic resolving macros (`{home}`, `{bashmenu_dir}`, `{scripts_dir}`, `{templates_dir}`, `{cache_dir}`, `{dev_dir}`).
+- **CP437 ASCII Macro Interpolation Invariant (`{ascii:NNN}`):** Any code reading theme glyphs or configuration strings must translate `{ascii:NNN}` macros to CP437 bytes. Raw `{ascii:NNN}` strings must NEVER appear unexpanded in visible menu options, indicators, or status lines.
+- **Universal Documentation & 6-Tier Parity Invariant:** Every crate, module, struct, enum, and public function must have `///` doc comments (wrapped under 80 characters). When introducing or extending placeholders, macros, directives, options, or flags, update all six documentation tiers:
+  1. Built-in help/reference modal in `bashmenu-tui`
+  2. Inspector guide help modal in `menuedit-cli`
+  3. Editor manual modal in `bashedit-cli`
+  4. Pager manual modal in `bmpager-cli`
+  5. Markdown guide (`bashmenu.md`)
+  6. Linux man page (`bashmenu.1`)
 
 ## 5. TODO Task Execution & Lifecycle Invariants (CRITICAL)
 - **Sequential TODO Execution:** Unless specifically labeled (`CRITICAL`) or explicitly instructed otherwise by the user, always tackle items from TODO lists (`~/.config/bashmenu/notebooks/notes.yml` under `'TODO (Agent: Allowed)'` or `.agents/skills/bashmenu-rs-developer/TODO.md`) strictly in sequential order, top to bottom. Complete each item fully (including verification, commit, push, and remote CI check) before moving to the next.

@@ -286,7 +286,7 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
   1. `crates/bashmenu-tui`: Placeholders and Macros reference modal.
   2. `crates/menuedit-cli`: Inspector guide help modal.
   3. `crates/bashedit-cli`: Editor manual modal.
-  4. `crates/bashmenu-cli`: Main menu help modal (renders `bashmenu.md`).
+  4. `crates/bmpager-cli`: Standalone pager help modal.
   5. `bashmenu.md`: Reference documentation.
   6. `bashmenu.1`: Linux system man page.
 
