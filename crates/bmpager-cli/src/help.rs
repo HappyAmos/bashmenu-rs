@@ -52,6 +52,7 @@ const HELP_LINES: &[&str] = &[
     "  -h, --help         Print CLI help screen and exit",
     "  -V, --version      Display pager version",
     "  -m, --markdown     Render input formatted as Markdown",
+    "  -w, --wrap         Soft-wrap non-markdown text lines to window width",
     "  +N                 Start viewing at line number N",
     "  +/PATTERN          Start viewing at first line matching PATTERN",
     "  -c, --no-color     Strip all ANSI escape codes from display",

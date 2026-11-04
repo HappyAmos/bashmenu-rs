@@ -221,6 +221,18 @@ The visual theme editor provides a split-screen interface featuring a collapsibl
 
 ### 3.5 Interactive Terminal Pager (`bmpager`)
 
+The `bmpager` standalone pager provides full-screen interactive viewing of files and piped streams with ANSI color handling, vim navigation, CommonMark markdown formatting (`--markdown`), and optional soft word wrapping (`--wrap` / `--wrap-text`).
+
+| Option | Description |
+| :--- | :--- |
+| `-m`, `--markdown` | Render input formatted as CommonMark Markdown (wrapped to window width). |
+| `-w`, `--wrap`, `--wrap-text` | Soft-wrap non-markdown plain and ANSI text lines to terminal width. |
+| `-c`, `--no-color` | Discard ANSI escape sequences instead of rendering colors. |
+| `--no-file` | Omit filename badge and disable external/built-in editor launcher. |
+| `--editor=MODE` | Configure editor mode (`default` or `builtin`). |
+| `+N` | Start viewing with line `N` at the top of the window. |
+| `+/PATTERN` | Jump to the first line matching search pattern. |
+
 | Keybinding | Action |
 | :--- | :--- |
 | `DOWN` / `j` / `ENTER` | Scroll down one line. |

@@ -70,14 +70,17 @@ fn main() {
             && args.markdown);
 
     let (cols, _) = crossterm::terminal::size().unwrap_or((80, 24));
-    let final_content = if is_markdown {
-        markdown::render_markdown(&raw_content, cols as usize)
-    } else {
-        raw_content
-    };
+    let term_width = (cols as usize).clamp(20, 500);
 
-    // 5. Split into lines and cap at max_lines
-    let mut lines: Vec<String> = final_content.lines().map(|s| s.to_string()).collect();
+    // 5. Format and split content into lines
+    let mut lines: Vec<String> = if is_markdown {
+        let rendered = markdown::render_markdown(&raw_content, term_width);
+        rendered.lines().map(|s| s.to_string()).collect()
+    } else if args.wrap_text {
+        ansi::wrap_text_content(&raw_content, term_width)
+    } else {
+        raw_content.lines().map(|s| s.to_string()).collect()
+    };
     if lines.len() > args.max_lines {
         lines.truncate(args.max_lines);
         truncated = true;

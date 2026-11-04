@@ -196,10 +196,142 @@ pub fn split_ansi_line(line: &str, max_cols: usize) -> (String, String) {
     }
 
     let remainder = line[i..].to_string();
-    if had_ansi || used >= max_cols {
+    if had_ansi {
         out.push_str("\x1b[0m");
     }
     (out, remainder)
+}
+
+/// Soft word-wraps a single ANSI or plain text line to fit within `max_width` visual columns.
+///
+/// Leading whitespace / indentation is preserved on the first line. Continuation lines
+/// inherit any active ANSI formatting state if formatted, or simply wrap cleanly.
+/// If a single word exceeds `max_width`, it is split cleanly into chunks using `split_ansi_line`.
+pub fn wrap_text_line(line: &str, max_width: usize) -> Vec<String> {
+    if max_width == 0 {
+        return vec![String::new()];
+    }
+
+    if visual_width(line) <= max_width {
+        return vec![line.to_string()];
+    }
+
+    let mut result = Vec::new();
+    let mut current_line = String::new();
+    let mut current_vis = 0;
+
+    // Preserve leading whitespace if any
+    let num_leading_spaces = line
+        .chars()
+        .take_while(|c| c.is_whitespace() && *c != '\n' && *c != '\r')
+        .count();
+    let (indent, content) = if num_leading_spaces > 0 && num_leading_spaces < max_width {
+        let prefix: String = line.chars().take(num_leading_spaces).collect();
+        let rest = &line[prefix.len()..];
+        (prefix, rest)
+    } else {
+        (String::new(), line)
+    };
+
+    if !indent.is_empty() {
+        current_vis = visual_width(&indent);
+        current_line.push_str(&indent);
+    }
+
+    // Split words on whitespace while keeping token boundaries intact
+    for word in content.split_whitespace() {
+        let word_vis = visual_width(word);
+
+        if current_line.is_empty() || current_line == indent {
+            if current_vis + word_vis <= max_width {
+                current_line.push_str(word);
+                current_vis += word_vis;
+            } else {
+                // Word alone exceeds available line width; split into hard-wrapped chunks
+                let mut rem = word.to_string();
+                while !rem.is_empty() {
+                    let avail = max_width.saturating_sub(current_vis).max(1);
+                    let (chunk, tail) = split_ansi_line(&rem, avail);
+                    if chunk.is_empty() {
+                        let mut chars = rem.chars();
+                        if let Some(ch) = chars.next() {
+                            current_line.push(ch);
+                            rem = chars.as_str().to_string();
+                        } else {
+                            break;
+                        }
+                    } else {
+                        current_line.push_str(&chunk);
+                        rem = tail;
+                    }
+                    if !rem.is_empty() {
+                        result.push(current_line);
+                        current_line = String::new();
+                        current_vis = 0;
+                    }
+                }
+                current_vis = visual_width(&current_line);
+            }
+        } else if current_vis + 1 + word_vis <= max_width {
+            current_line.push(' ');
+            current_line.push_str(word);
+            current_vis += 1 + word_vis;
+        } else {
+            result.push(current_line);
+            current_line = String::new();
+
+            if word_vis <= max_width {
+                current_line.push_str(word);
+                current_vis = word_vis;
+            } else {
+                let mut rem = word.to_string();
+                while !rem.is_empty() {
+                    let (chunk, tail) = split_ansi_line(&rem, max_width);
+                    if chunk.is_empty() {
+                        let mut chars = rem.chars();
+                        if let Some(ch) = chars.next() {
+                            current_line.push(ch);
+                            rem = chars.as_str().to_string();
+                        } else {
+                            break;
+                        }
+                    } else {
+                        current_line.push_str(&chunk);
+                        rem = tail;
+                    }
+                    if !rem.is_empty() {
+                        result.push(current_line);
+                        current_line = String::new();
+                    }
+                }
+                current_vis = visual_width(&current_line);
+            }
+        }
+    }
+
+    if !current_line.is_empty() {
+        result.push(current_line);
+    }
+
+    if result.is_empty() {
+        result.push(String::new());
+    }
+
+    result
+}
+
+/// Wraps all text lines in `raw_content` to `max_width` columns if wrap is enabled.
+pub fn wrap_text_content(raw_content: &str, max_width: usize) -> Vec<String> {
+    let mut out = Vec::new();
+    for line in raw_content.lines() {
+        let wrapped = wrap_text_line(line, max_width);
+        out.extend(wrapped);
+    }
+    // If original content ends with a newline and raw_content is not empty, lines() handles all lines
+    if raw_content.is_empty() {
+        out.push(String::new());
+    }
+    out
 }
 
 #[cfg(test)]
@@ -232,5 +364,41 @@ mod tests {
         let (head, tail) = split_ansi_line(input, 5);
         assert_eq!(strip_ansi(&head), "12345");
         assert_eq!(strip_ansi(&tail), "67890");
+    }
+
+    #[test]
+    fn test_wrap_text_line_plain() {
+        let line = "The quick brown fox jumps over the lazy dog";
+        let wrapped = wrap_text_line(line, 15);
+        assert_eq!(
+            wrapped,
+            vec![
+                "The quick brown".to_string(),
+                "fox jumps over".to_string(),
+                "the lazy dog".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_wrap_text_line_with_indent() {
+        let line = "    indented line that needs wrapping";
+        let wrapped = wrap_text_line(line, 20);
+        assert_eq!(wrapped[0], "    indented line");
+        assert_eq!(wrapped[1], "that needs wrapping");
+    }
+
+    #[test]
+    fn test_wrap_text_line_long_word() {
+        let line = "abcdefghijklmnopqrstuvwxyz";
+        let wrapped = wrap_text_line(line, 10);
+        assert_eq!(
+            wrapped,
+            vec![
+                "abcdefghij".to_string(),
+                "klmnopqrst".to_string(),
+                "uvwxyz".to_string(),
+            ]
+        );
     }
 }

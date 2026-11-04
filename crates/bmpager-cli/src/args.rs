@@ -27,6 +27,8 @@ pub struct PagerArgs {
     pub start_pattern: Option<String>,
     /// Whether to render input source with Markdown formatting
     pub markdown: bool,
+    /// Whether to soft-wrap non-markdown plain/ANSI text to terminal width
+    pub wrap_text: bool,
 }
 
 impl Default for PagerArgs {
@@ -44,6 +46,7 @@ impl Default for PagerArgs {
             start_line: None,
             start_pattern: None,
             markdown: false,
+            wrap_text: false,
         }
     }
 }
@@ -59,6 +62,7 @@ Options:\n  \
   -h, --help        Show this help and exit.\n  \
   -V, --version     Print the version and exit.\n  \
   -m, --markdown    Render input formatted as Markdown.\n  \
+  -w, --wrap        Soft-wrap non-markdown text lines to window width.\n  \
   +N                Start with line N at the top of the window.\n  \
   +/PATTERN         Start at the first line containing PATTERN.\n  \
   -c, --no-color    Discard ANSI escape sequences instead of rendering them.\n  \
@@ -98,6 +102,8 @@ pub fn parse_cli_args() -> Result<PagerArgs, String> {
             std::process::exit(0);
         } else if arg == "-m" || arg == "--markdown" {
             args.markdown = true;
+        } else if arg == "-w" || arg == "--wrap" || arg == "--wrap-text" {
+            args.wrap_text = true;
         } else if arg == "-c" || arg == "--no-color" || arg == "--no-colour" {
             args.strip_colors = true;
         } else if arg == "--no-help" {

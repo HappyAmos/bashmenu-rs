@@ -20,6 +20,7 @@ fn test_bmpager_help_and_version() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("Usage: command | bmpager [options]"));
     assert!(stdout.contains("-m, --markdown"));
+    assert!(stdout.contains("-w, --wrap"));
     assert!(stdout.contains("+N"));
     assert!(stdout.contains("+/PATTERN"));
 
@@ -236,4 +237,36 @@ settings:
             line
         );
     }
+}
+
+#[test]
+fn test_bmpager_wrap_flag_plain_text() {
+    let mut child = Command::new("cargo")
+        .args([
+            "run",
+            "-p",
+            "bmpager-cli",
+            "--bin",
+            "bmpager",
+            "--",
+            "--wrap",
+        ])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("failed to spawn bmpager");
+
+    let long_text = "This is a single line with many words that would normally be quite long and overflow across small screens when soft word-wrapping is enabled in bmpager.\n";
+    {
+        let stdin = child.stdin.as_mut().expect("failed to open stdin");
+        stdin.write_all(long_text.as_bytes()).unwrap();
+    }
+
+    let output = child.wait_with_output().expect("failed to read stdout");
+    assert!(output.status.success());
+    let out_str = String::from_utf8_lossy(&output.stdout);
+    let lines: Vec<&str> = out_str.lines().collect();
+    // Default fallback terminal columns in headless non-tty is 80 cols
+    assert!(!lines.is_empty());
+    assert!(out_str.contains("soft word-wrapping"));
 }
