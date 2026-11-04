@@ -335,5 +335,17 @@
   - Committed and pushed commit `36aa16e` to `origin/main`.
   - Verified GitHub Actions remote CI run `41739787382` passed with status `success`.
 
+- [x] **Global Toast Message Timeout Migration (`crates/bashmenu-core`, `crates/bashmenu-tui`, `crates/bashmenu-cli`, `crates/themeedit-cli`):**
+  - Moved `toast_timeout` setting from themes (`bashmenu.themes`) into global settings (`bashmenu.yml` under `settings: toast_timeout: 2.0`).
+  - Added `toast_timeout: Option<f64>` to `Settings` struct in `crates/bashmenu-core/src/config.rs`.
+  - Added dot-notation config mutation support for `settings.toast_timeout` and `settings.toast.timeout` (with automatic `app.` prefix resolution) in `BashMenuConfig::set_value`.
+  - Updated `macro_engine.rs` toast extraction to fall back to `ctx.config.settings.toast_timeout.unwrap_or(2.0)`.
+  - Updated `ResolvedThemeStyles` with `.with_toast_timeout(...)` and integrated it across `bashmenu-cli`'s startup, theme change modal, config input modal, and `<F5>` reload handler.
+  - Added interactive configuration menu item in `bashmenu.mnu` (`Toast Message Timeout [[{app.settings.toast_timeout}] seconds]`) to configure toast timeout dynamically.
+  - Removed toast timeout cycling and tokens from `themeedit` (`crates/themeedit-cli`) so theme editing focuses purely on visual styles.
+  - Verified `cargo fmt`, `cargo clippy`, `cargo test`, `shellcheck`, and `ymlcheck` validation passed.
+  - Committed and pushed changes to `origin/main` (commit `47db436`).
+
+
 
 
