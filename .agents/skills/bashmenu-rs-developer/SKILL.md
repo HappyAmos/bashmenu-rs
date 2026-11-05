@@ -95,6 +95,8 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
 | `crates/menuedit-cli` | Visual tree editor binary for `bashmenu.mnu` (invoked via `F4` or standalone). |
 | `crates/themeedit-cli` | Visual split-screen theme editor binary with 2D color and CP437 ASCII pickers (invoked via `F8` or standalone). |
 | `crates/bashedit-cli` | Standalone terminal text editor binary using `ropey` text buffer and swap-file management. |
+| `crates/bmpager-cli` | Standalone native terminal pager with CommonMark markdown and OSC 8 hyperlink rendering (`bmpager`). |
+| `crates/cheat-cli` | Cheatsheet search and terminal viewer binary (`cheat`). |
 | `crates/ymlcheck-cli` | Schema validation and linting tool for `bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`. |
 | `bashmenu.sh` | POSIX trampoline wrapper that executes the compiled binary, checking terminal capabilities and paths. |
 | `bashmenu.yml` | Main Yaml configuration file (active theme, plugin layout, timeouts). |

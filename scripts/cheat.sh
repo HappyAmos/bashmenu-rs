@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # SCRIPT: cheat.sh
-# DESCRIPTION: Terminal cheatsheet CLI wrapper. Resolves paths, activates the
-#              virtual environment, and executes cheat.py.
+# DESCRIPTION: Terminal cheatsheet CLI wrapper trampoline. Resolves paths and
+#              executes the compiled cheat binary (with fallback to cheat.py).
 # USAGE:       cheat.sh [topic] [options]
-# OPTIONS:     Passes all options and arguments through to cheat.py.
 # ==============================================================================
-# Version: 0.0.8
+# Version: 0.1.0
 # Author:  HA Bash Menu
 
 export LANG=en_US.UTF-8
@@ -29,19 +28,38 @@ while [ -L "$SOURCE" ]; do
   [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
 done
 SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+REPO_ROOT="$(cd -P "${SCRIPT_DIR}/.." && pwd)"
+CANONICAL_SELF="${SCRIPT_DIR}/cheat.sh"
 
-# Save your current terminal location, then move to the script directory
+# Prioritize native compiled cheat binary, avoiding self-referential loop
+for candidate in \
+    "${REPO_ROOT}/target/release/cheat" \
+    "${REPO_ROOT}/target/debug/cheat" \
+    "$(command -v cheat 2>/dev/null)" \
+    "${HOME}/.local/bin/cheat" \
+    "/usr/local/bin/cheat"; do
+    if [ -n "$candidate" ] && [ -x "$candidate" ]; then
+        cand_real="$(readlink -f "$candidate" 2>/dev/null || realpath "$candidate" 2>/dev/null || echo "$candidate")"
+        if [ "$cand_real" != "$CANONICAL_SELF" ] && [ -f "$candidate" ]; then
+            exec "$candidate" "$@"
+        fi
+    fi
+done
+
+# Fallback to Python if native binary has not yet been compiled
 pushd "$SCRIPT_DIR" > /dev/null || safe_exit 1
 
 if [ -f "${SCRIPT_DIR}/.venv/bin/activate" ]; then
     # shellcheck source=/dev/null
     source "${SCRIPT_DIR}/.venv/bin/activate"
     python "${SCRIPT_DIR}/cheat.py" "$@"
+    RET=$?
     deactivate
+    popd > /dev/null || safe_exit 1
+    safe_exit "$RET"
 else
     python3 "${SCRIPT_DIR}/cheat.py" "$@"
+    RET=$?
+    popd > /dev/null || safe_exit 1
+    safe_exit "$RET"
 fi
-
-# Restore your original terminal location
-popd > /dev/null || safe_exit 1
-

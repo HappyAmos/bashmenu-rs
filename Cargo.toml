@@ -8,6 +8,7 @@ members = [
     "crates/menuedit-cli",
     "crates/bashedit-cli",
     "crates/bmpager-cli",
+    "crates/cheat-cli",
 ]
 resolver = "2"
 

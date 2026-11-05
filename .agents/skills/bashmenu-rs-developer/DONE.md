@@ -346,6 +346,20 @@
   - Verified `cargo fmt`, `cargo clippy`, `cargo test`, `shellcheck`, and `ymlcheck` validation passed.
   - Committed and pushed changes to `origin/main` (commit `47db436`).
 
+- [x] **Native Rust Cheatsheet Manager Binary (`crates/cheat-cli`, `cheat`):**
+  - Created standalone Rust tool `cheat` (`crates/cheat-cli`) replacing `scripts/cheat.py` and `scripts/cheat.sh` with 1:1 parity of function.
+  - Implemented command-line argument parsing (`args.rs`) with `clap` supporting optional queries, `-l`/`--list` (with optional query filter), `-s`/`--search`, and `-d`/`--directory`.
+  - Implemented `.cheat.yml` configuration lookup and auto-creation (`config.rs`), supporting environment overrides (`CHEAT_CONFIG`), executable parent directory, user config directory, and home directory.
+  - Implemented YAML frontmatter parser (`frontmatter.rs`) extracting lowercased tags from YAML sequences, multi-line lists, and comma-delimited strings.
+  - Implemented cheatsheet discovery and search (`cheatsheet.rs`) with recursive `.md` file collection, case-insensitive relative path sorting, 3-priority search (stem/path match, tag match, full-text content match), and two-column terminal list formatting.
+  - Implemented rendering pipeline (`render.rs`) prioritizing `rich.sh`, native `bmpager --markdown`, and raw terminal stdout printing.
+  - Updated `scripts/cheat.sh` trampoline wrapper to prioritize executing the native `cheat` binary with self-referential loop protection and Python fallback.
+  - Updated `install.sh` to compile and install `cheat` alongside existing workspace binaries.
+  - Synchronized documentation in `bashmenu.md`, `bashmenu.1`, `assets/cheat.md`, and `SKILL.md`.
+  - Added unit test suite and integration test suite (`tests/cli_tests.rs`). Verified all tests pass cleanly.
+
+
+
 
 
 

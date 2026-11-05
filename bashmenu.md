@@ -18,6 +18,7 @@ editor for Linux systems.
   - [3.3 Built-in Text Editor (`bashedit`)](#33-built-in-text-editor-bashedit)
   - [3.4 Visual Theme Editor (`themeedit`)](#34-visual-theme-editor-themeedit)
   - [3.5 Interactive Terminal Pager (`bmpager`)](#35-interactive-terminal-pager-bmpager)
+  - [3.6 Cheatsheet Manager (`cheat`)](#36-cheatsheet-manager-cheat)
 - [4. Configuration & Schema Specifications](#4-configuration--schema-specifications)
   - [4.1 Settings Store (`bashmenu.yml`)](#41-settings-store-bashmenuyml)
   - [4.2 Menu Structure (`bashmenu.mnu`)](#42-menu-structure-bashmenumnu)
@@ -54,6 +55,7 @@ HA Bash Menu is comprised of modular scripts and configuration files:
 | `menuedit` | Interactive TUI visual editor for `bashmenu.mnu` (run via `F4`). |
 | `themeedit` | Interactive TUI visual theme creator and palette editor (run via `F8`). |
 | `bmpager` | Interactive full-screen terminal text & Markdown pager (`bmpager --markdown`). |
+| `cheat` | Fast CLI Markdown cheatsheet search engine and viewer. |
 | `bashmenu.yml` | YAML user settings configuration store. |
 | `bashmenu.mnu` | YAML menu layout structure and action definitions. |
 | `bashmenu.themes` | YAML color themes for 256, 16, and 8 color modes. |
@@ -247,6 +249,20 @@ The `bmpager` standalone pager provides full-screen interactive viewing of files
 | `e` / `E` | Open active file in configured editor (`bashedit` or `$EDITOR`). |
 | `h` / `?` / `F1` | Display scrollable pager help modal. |
 | `q` / `Q` / `ESC` | Exit pager. |
+
+### 3.6 Cheatsheet Manager (`cheat`)
+
+The `cheat` standalone CLI tool searches, lists, and displays Markdown cheatsheets based on exact path matches, frontmatter tags, or full-text content search.
+
+| Option | Description |
+| :--- | :--- |
+| `[query]` | Search query to display matching markdown cheatsheet file. |
+| `-l`, `--list [query]` | List all cheatsheet files with tags, or list matching files for an optional query. |
+| `-s`, `--search [query]` | Search cheatsheets and list matching files with tags. |
+| `-d`, `--directory` | Print the configured cheatsheets directory path. |
+| `-h`, `--help` | Print help information. |
+
+Configuration is stored in `.cheat.yml` (pointing to `dir: ~/cheat`). Cheatsheets are rendered via `rich.sh` or `bmpager --markdown` with raw text terminal fallback.
 
 ### 3.6 Custom Keyboard Shortcuts Editor (`shortcutedit` / `menuedit --shortcuts`)
 `shortcutedit` (also accessible via `menuedit --shortcuts` or `F9` / `<leader> s` from the main menu) is a split-screen visual editor for `shortcuts.yml` (`{bashmenu_dir}/shortcuts.yml`).

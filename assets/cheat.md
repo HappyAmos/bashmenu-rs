@@ -9,27 +9,14 @@ A lightweight CLI tool to search, list, and render Markdown cheatsheets.
 - **Priority Search**: Matches filenames/paths first, then tags, then content.
 - **Flexible Listing**: List all cheatsheets with tags or filter matches.
 
-## Requirements
+## Requirements & Installation
 
-- Python 3.9+
-- `PyYAML`
-- `rich`
-
-## Setup
-
-1. Create a virtual environment and install dependencies:
+`cheat` is built directly as part of the BashMenu-RS workspace:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-2. Update paths in `cheat.sh` to match your local installation directory.
-3. Make `cheat.sh` executable and add it to your `PATH` or alias it:
-
-```bash
-chmod +x cheat.sh
+cargo build --release --bin cheat
+# Or install all binaries into ~/.local/bin:
+./install.sh
 ```
 
 ## Configuration
