@@ -42,6 +42,8 @@ pub struct FilePickerModal {
     pub creating_new: bool,
     /// Text input buffer when creating a new file or folder
     pub new_name_input: String,
+    /// Whether hidden files and directories (dotfiles) are displayed
+    pub show_hidden: bool,
 }
 
 impl FilePickerModal {
@@ -69,6 +71,7 @@ impl FilePickerModal {
             allow_new: false,
             creating_new: false,
             new_name_input: String::new(),
+            show_hidden: false,
         };
         picker.refresh_entries();
         picker
@@ -78,6 +81,25 @@ impl FilePickerModal {
     pub fn with_allow_new(mut self, allow_new: bool) -> Self {
         self.allow_new = allow_new;
         self
+    }
+
+    /// Builder method to configure initial hidden files visibility
+    pub fn with_show_hidden(mut self, show_hidden: bool) -> Self {
+        self.show_hidden = show_hidden;
+        self.refresh_entries();
+        self
+    }
+
+    /// Toggles visibility of hidden dotfile entries and refreshes directory listing.
+    pub fn toggle_hidden(&mut self) {
+        self.show_hidden = !self.show_hidden;
+        let prev_path = self.items.get(self.selected_idx).map(|i| i.path.clone());
+        self.refresh_entries();
+        if let Some(p) = prev_path {
+            if let Some(idx) = self.items.iter().position(|i| i.path == p) {
+                self.selected_idx = idx;
+            }
+        }
     }
 
     /// Builder method to pre-select an initial path/file if present in directory
@@ -123,8 +145,8 @@ impl FilePickerModal {
                 let is_dir = path.is_dir();
                 let name = entry.file_name().to_string_lossy().to_string();
 
-                if name.starts_with('.') {
-                    continue; // Skip hidden by default
+                if !self.show_hidden && name.starts_with('.') {
+                    continue; // Skip hidden unless show_hidden is enabled
                 }
 
                 if is_dir {
@@ -203,7 +225,20 @@ impl FilePickerModal {
                 _ => None,
             }
         } else {
+            if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
+                match code {
+                    KeyCode::Char('h') | KeyCode::Char('H') => {
+                        self.toggle_hidden();
+                        return None;
+                    }
+                    _ => {}
+                }
+            }
             match code {
+                KeyCode::Char('h') | KeyCode::Char('H') | KeyCode::Char('.') => {
+                    self.toggle_hidden();
+                    None
+                }
                 KeyCode::Char('n') | KeyCode::Char('N') if self.allow_new => {
                     self.creating_new = true;
                     self.new_name_input.clear();
@@ -258,11 +293,30 @@ impl FilePickerModal {
                     self.selected_idx = clicked_idx;
                     return self.activate_selected();
                 }
-            } else if self.allow_new && !self.creating_new {
+            } else if !self.creating_new {
                 let btn_y = inner_area.y + inner_area.height.saturating_sub(1);
                 if row == btn_y {
-                    self.creating_new = true;
-                    self.new_name_input.clear();
+                    let rel_x = col.saturating_sub(inner_area.x + 2);
+                    let hidden_tag = if self.show_hidden {
+                        "[h] Hide Hidden"
+                    } else {
+                        "[h] Show Hidden"
+                    };
+                    let hidden_start = 17;
+                    let hidden_end = hidden_start + hidden_tag.len() as u16;
+                    let new_start = hidden_end + 3;
+                    let new_end = new_start + 12;
+
+                    if rel_x >= hidden_start && rel_x < hidden_end {
+                        self.toggle_hidden();
+                    } else if self.allow_new && rel_x >= new_start && rel_x < new_end {
+                        self.creating_new = true;
+                        self.new_name_input.clear();
+                    } else if rel_x >= new_end {
+                        return Some(None);
+                    } else if rel_x < hidden_start {
+                        return self.activate_selected();
+                    }
                 }
             }
         } else if mouse.kind == MouseEventKind::ScrollDown {
@@ -356,20 +410,21 @@ impl FilePickerModal {
         if self.creating_new {
             let prompt = format!(" New file name: [{}]_ ", self.new_name_input);
             buf.set_string(inner.x + 2, btn_y, &prompt, styles.highlight);
-        } else if self.allow_new {
-            buf.set_string(
-                inner.x + 2,
-                btn_y,
-                "[Enter] Select / Enter   [n] New File   [Esc] Cancel",
-                styles.gutter,
-            );
         } else {
-            buf.set_string(
-                inner.x + 2,
-                btn_y,
-                "[Enter] Select / Enter   [Esc] Cancel",
-                styles.gutter,
-            );
+            let hidden_tag = if self.show_hidden {
+                "[h] Hide Hidden"
+            } else {
+                "[h] Show Hidden"
+            };
+            let bottom_str = if self.allow_new {
+                format!(
+                    "[Enter] Select   {}   [n] New File   [Esc] Cancel",
+                    hidden_tag
+                )
+            } else {
+                format!("[Enter] Select   {}   [Esc] Cancel", hidden_tag)
+            };
+            buf.set_string(inner.x + 2, btn_y, &bottom_str, styles.gutter);
         }
 
         inner

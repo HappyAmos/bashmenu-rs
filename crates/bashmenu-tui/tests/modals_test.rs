@@ -236,6 +236,45 @@ fn test_file_picker_navigation() {
 
     assert!(content.contains("Pick Configuration"));
     assert!(content.contains("bashmenu.yml"));
+
+    // Test toggle hidden files with dotfiles in temporary directory
+    let temp_dir = std::env::temp_dir().join("bm_test_file_picker_hidden");
+    let _ = std::fs::remove_dir_all(&temp_dir);
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    std::fs::write(temp_dir.join("visible.txt"), "hello").unwrap();
+    std::fs::write(temp_dir.join(".hidden.txt"), "secret").unwrap();
+
+    let mut tmp_picker = FilePickerModal::new("Test Hidden", &temp_dir, false);
+    assert!(!tmp_picker.show_hidden);
+
+    let mut tmp_buf = Buffer::empty(area);
+    tmp_picker.render(area, &styles, &mut tmp_buf);
+    let tmp_content = format!("{:?}", tmp_buf);
+    assert!(tmp_content.contains("visible.txt"));
+    assert!(!tmp_content.contains(".hidden.txt"));
+    assert!(tmp_content.contains("[h] Show Hidden"));
+
+    // Toggle via 'h' key
+    tmp_picker.handle_key(KeyCode::Char('h'));
+    assert!(tmp_picker.show_hidden);
+    let mut tmp_buf2 = Buffer::empty(area);
+    tmp_picker.render(area, &styles, &mut tmp_buf2);
+    let tmp_content2 = format!("{:?}", tmp_buf2);
+    assert!(tmp_content2.contains("visible.txt"));
+    assert!(tmp_content2.contains(".hidden.txt"));
+    assert!(tmp_content2.contains("[h] Hide Hidden"));
+
+    // Toggle back via '.' key
+    tmp_picker.handle_key(KeyCode::Char('.'));
+    assert!(!tmp_picker.show_hidden);
+
+    // Toggle via Ctrl+H
+    tmp_picker
+        .handle_key_with_modifiers(KeyCode::Char('h'), crossterm::event::KeyModifiers::CONTROL);
+    assert!(tmp_picker.show_hidden);
+
+    // Clean up
+    let _ = std::fs::remove_dir_all(&temp_dir);
 }
 
 #[test]
