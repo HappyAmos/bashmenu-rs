@@ -372,6 +372,18 @@
   - Removed references to `scripts/cheat.py` from `bashmenu.md`, `bashmenu.1`, and internal code comments.
   - Verified tests, Clippy, formatting, and Shellcheck pass cleanly.
 
+- [x] **Theme Editor: Display Clicked Color Code in Preview Pane Toast:**
+  - Added preview buffer tracking in `crates/themeedit-cli/src/main.rs` to snapshot the rendered cells of `right_area` directly from `render_preview_pane`.
+  - Implemented `format_color_code(color: Color) -> String` in `crates/themeedit-cli/src/preview.rs` supporting RGB TrueColor hex (`#rrggbb`), ANSI 256 indexed colors (`N`), named colors (`cyan`, `black`, etc.), and `default` for `Color::Reset`.
+  - Implemented `extract_preview_color_at(buf, col, row, fallback_styles) -> String` in `preview.rs` resolving cell background for whitespace, half-block foreground for composited wallpaper (`▀`), character foreground for glyphs/borders/text, and falling back gracefully to theme background or text colors.
+  - Updated mouse click handling for preview pane in `main.rs` to display a 2-line toast notification:
+    `Selected: <item label>`
+    `Color Clicked: <color code>`
+  - Added unit test suite `test_format_color_code_and_extract_preview_color` in `crates/themeedit-cli/tests/themeedit_test.rs`.
+  - Verified `cargo fmt`, `cargo clippy`, and `cargo test` pass with 0 warnings.
+  - Committed and pushed changes to `origin/main` (commit `51e7f99`), verified GitHub Actions CI run `42137829166` passed.
+
+
 
 
 
