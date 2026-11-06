@@ -12,6 +12,7 @@ use bashmenu_tui::{
 };
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers, MouseButton, MouseEventKind};
+use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
@@ -19,7 +20,8 @@ use ratatui::widgets::{Block, Borders, Widget};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use themeedit_cli::{
-    get_token_preview_spans, render_preview_pane, PreviewMode, ThemeEditorState, TokenKind, TreeRow,
+    extract_preview_color_at, get_token_preview_spans, render_preview_pane, PreviewMode,
+    ThemeEditorState, TokenKind, TreeRow,
 };
 
 /// Command-line argument configuration for the Theme Editor (`themeedit`).
@@ -100,6 +102,7 @@ fn main() -> Result<()> {
     let mut click_flash: Option<FlashHighlight> = None;
     let mut toast_rack = ToastRack::new();
     let mut is_editing_name = false;
+    let mut preview_buffer = Buffer::empty(Rect::default());
 
     loop {
         let size = guard.terminal_mut().size()?;
@@ -301,6 +304,15 @@ fn main() -> Result<()> {
                     &preview_styles,
                     &mut wp_compositor,
                 );
+
+                preview_buffer = Buffer::empty(right_area);
+                for y in right_area.y..right_area.y + right_area.height {
+                    for x in right_area.x..right_area.x + right_area.width {
+                        if let Some(cell) = buf.cell((x, y)) {
+                            preview_buffer[(x, y)] = cell.clone();
+                        }
+                    }
+                }
 
                 // 3. Render Bottom Help Gutter with dedicated divider
                 let b = &preview_styles.borders;
@@ -904,16 +916,26 @@ fn main() -> Result<()> {
                                         state.preview_mode,
                                         preview_styles.divider_is_screen_width,
                                     ) {
-                                        if state.select_token_by_key(key) {
-                                            let label =
-                                                state.tokens[state.selected_idx].label.clone();
-                                            toast_rack.add(ToastNotification {
-                                                title: Some("Theme Editor".to_string()),
-                                                message: format!("Selected: {}", label),
-                                                severity: ToastSeverity::Information,
-                                                timeout_secs: 1.5,
-                                            });
-                                        }
+                                        let color_str = extract_preview_color_at(
+                                            &preview_buffer,
+                                            m.column,
+                                            m.row,
+                                            &preview_styles,
+                                        );
+                                        let label = if state.select_token_by_key(key) {
+                                            state.tokens[state.selected_idx].label.clone()
+                                        } else {
+                                            key.to_string()
+                                        };
+                                        toast_rack.add(ToastNotification {
+                                            title: Some("Theme Editor".to_string()),
+                                            message: format!(
+                                                "Selected: {}\nColor Clicked: {}",
+                                                label, color_str
+                                            ),
+                                            severity: ToastSeverity::Information,
+                                            timeout_secs: 1.5,
+                                        });
                                         click_flash = Some((
                                             std::time::Instant::now(),
                                             vec![(fy, fx_start, fx_end)],
@@ -1741,7 +1763,7 @@ fn hit_test_preview(
             }
             if row == bot_y {
                 return Some((
-                    "border_bottom",
+                    "border_horizontal",
                     row,
                     right_area.x,
                     right_area.x + right_area.width,

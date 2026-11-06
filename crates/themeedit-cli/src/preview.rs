@@ -776,3 +776,67 @@ pub fn render_preview_pane(
         }
     }
 }
+
+/// Formats a Ratatui Color into a string color code (hex, index, or name).
+pub fn format_color_code(color: Color) -> String {
+    match color {
+        Color::Rgb(r, g, b) => format!("#{r:02x}{g:02x}{b:02x}"),
+        Color::Indexed(code) => format!("{code}"),
+        Color::Reset => "default".to_string(),
+        Color::Black => "black".to_string(),
+        Color::Red => "red".to_string(),
+        Color::Green => "green".to_string(),
+        Color::Yellow => "yellow".to_string(),
+        Color::Blue => "blue".to_string(),
+        Color::Magenta => "magenta".to_string(),
+        Color::Cyan => "cyan".to_string(),
+        Color::Gray => "gray".to_string(),
+        Color::DarkGray => "darkgray".to_string(),
+        Color::LightRed => "lightred".to_string(),
+        Color::LightGreen => "lightgreen".to_string(),
+        Color::LightYellow => "lightyellow".to_string(),
+        Color::LightBlue => "lightblue".to_string(),
+        Color::LightMagenta => "lightmagenta".to_string(),
+        Color::LightCyan => "lightcyan".to_string(),
+        Color::White => "white".to_string(),
+    }
+}
+
+/// Extracts the color code string of the rendered cell at (col, row).
+pub fn extract_preview_color_at(
+    buf: &Buffer,
+    col: u16,
+    row: u16,
+    fallback_styles: &ResolvedThemeStyles,
+) -> String {
+    if let Some(cell) = buf.cell((col, row)) {
+        let sym = cell.symbol();
+        let color = if sym == " " || sym.is_empty() {
+            // Padding space: visible pixel color is the background
+            if cell.bg != Color::Reset {
+                cell.bg
+            } else {
+                fallback_styles.background
+            }
+        } else if sym == "▀" {
+            // Wallpaper half-block: upper half is fg, lower half is bg
+            if cell.fg != Color::Reset {
+                cell.fg
+            } else if cell.bg != Color::Reset {
+                cell.bg
+            } else {
+                fallback_styles.background
+            }
+        } else {
+            // Character glyph: visible pixel color is the foreground
+            if cell.fg != Color::Reset {
+                cell.fg
+            } else {
+                fallback_styles.text.fg.unwrap_or(Color::White)
+            }
+        };
+        format_color_code(color)
+    } else {
+        format_color_code(fallback_styles.background)
+    }
+}

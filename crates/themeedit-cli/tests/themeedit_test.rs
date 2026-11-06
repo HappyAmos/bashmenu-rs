@@ -1080,3 +1080,62 @@ fn test_collapsible_token_tree_default_and_navigation() {
         TreeRow::Token(state.selected_idx)
     );
 }
+
+#[test]
+fn test_format_color_code_and_extract_preview_color() {
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::style::{Color, Style};
+    use themeedit_cli::{extract_preview_color_at, format_color_code};
+
+    // 1. format_color_code tests
+    assert_eq!(format_color_code(Color::Rgb(255, 121, 198)), "#ff79c6");
+    assert_eq!(format_color_code(Color::Rgb(0, 0, 0)), "#000000");
+    assert_eq!(format_color_code(Color::Indexed(61)), "61");
+    assert_eq!(format_color_code(Color::Indexed(236)), "236");
+    assert_eq!(format_color_code(Color::Reset), "default");
+    assert_eq!(format_color_code(Color::Cyan), "cyan");
+    assert_eq!(format_color_code(Color::Black), "black");
+
+    // 2. extract_preview_color_at tests
+    let styles = bashmenu_tui::ResolvedThemeStyles::default();
+    let area = Rect::new(0, 0, 20, 10);
+    let mut buf = Buffer::empty(area);
+
+    // Cell (2, 2): space character with background color 236
+    buf[(2, 2)]
+        .set_char(' ')
+        .set_style(Style::default().bg(Color::Indexed(236)));
+    assert_eq!(extract_preview_color_at(&buf, 2, 2, &styles), "236");
+
+    // Cell (3, 2): border glyph '─' with foreground color 61
+    buf[(3, 2)].set_char('─').set_style(
+        Style::default()
+            .fg(Color::Indexed(61))
+            .bg(Color::Indexed(236)),
+    );
+    assert_eq!(extract_preview_color_at(&buf, 3, 2, &styles), "61");
+
+    // Cell (4, 2): text glyph 'A' with TrueColor RGB foreground
+    buf[(4, 2)]
+        .set_char('A')
+        .set_style(Style::default().fg(Color::Rgb(255, 100, 50)));
+    assert_eq!(extract_preview_color_at(&buf, 4, 2, &styles), "#ff6432");
+
+    // Cell (5, 2): half-block wallpaper glyph '▀' with RGB upper and lower
+    buf[(5, 2)].set_char('▀').set_style(
+        Style::default()
+            .fg(Color::Rgb(40, 50, 60))
+            .bg(Color::Rgb(20, 25, 30)),
+    );
+    assert_eq!(extract_preview_color_at(&buf, 5, 2, &styles), "#28323c");
+
+    // Verify toast message construction with 2 lines
+    let label = "Horizontal Border";
+    let color_str = extract_preview_color_at(&buf, 3, 2, &styles);
+    let toast_msg = format!("Selected: {}\nColor Clicked: {}", label, color_str);
+    let lines: Vec<&str> = toast_msg.lines().collect();
+    assert_eq!(lines.len(), 2);
+    assert_eq!(lines[0], "Selected: Horizontal Border");
+    assert_eq!(lines[1], "Color Clicked: 61");
+}

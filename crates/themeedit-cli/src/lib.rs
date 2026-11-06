@@ -1,7 +1,7 @@
 //! Library module for ThemeEdit core state, actions, and theme manipulation.
 
 pub mod preview;
-pub use preview::render_preview_pane;
+pub use preview::{extract_preview_color_at, format_color_code, render_preview_pane};
 
 use anyhow::Result;
 use bashmenu_core::{
@@ -1181,6 +1181,8 @@ impl ThemeEditorState {
                             || (k == "right_tee" && key == "gutter_right_tee")
                             || (k == "gutter_left_tee" && key == "left_tee")
                             || (k == "gutter_right_tee" && key == "right_tee")
+                            || (k == "border_horizontal"
+                                && (key == "border_bottom" || key == "border_top"))
                     }
                     TokenKind::DividerChar => key == "divider",
                     TokenKind::MarqueeChar => key == "marquee",
