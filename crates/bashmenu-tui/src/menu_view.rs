@@ -552,11 +552,11 @@ impl MenuView {
     /// Returns the raw contextual help string for the current menu level or mode.
     fn get_help_raw(&self) -> &'static str {
         if self.is_current_notebook() {
-            "[N]: New Note | [ENTER]: Read | [M]: Rename | [D]: Delete | [UP/DN]: Nav | [F1]: Help | [F2]: Themes | [F7]: Gutter | [F8]: ThemeEdit | [F9]: ShortcutEdit | [ESC]: Back"
+            "[N]: New Note | [ENTER]: Read | [M]: Rename | [D]: Delete | [F1]: Help | [F2]: Themes | [F8]: ThemeEdit | [F9]: ShortcutEdit | [F7]: Gutter | [ESC]: Back"
         } else if self.show_shortcuts {
-            "[UP/DN]: Nav | [F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [F8]: ThemeEdit | [F9]: ShortcutEdit | [ESC]: Back"
+            "[F1]: Help | [F2]: Themes | [F8]: ThemeEdit | [F9]: ShortcutEdit | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [ESC]: Back"
         } else {
-            "[UP/DN]: Nav | [ENTER]: Select | [F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [F8]: ThemeEdit | [F9]: ShortcutEdit | [ESC]: Back"
+            "[ENTER]: Select | [F1]: Help | [F2]: Themes | [F8]: ThemeEdit | [F9]: ShortcutEdit | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [ESC]: Back"
         }
     }
 
@@ -625,10 +625,17 @@ impl MenuView {
                     && row < area.y + area.height - 1
                 {
                     let w = area.width as usize;
-                    let avail_both = (w.saturating_sub(11)).max(4);
-                    let left_gutter_w = avail_both / 2;
-                    let right_gutter_w = avail_both - left_gutter_w;
-                    let sep_x = (left_gutter_w + 5).min(w.saturating_sub(2));
+                    let status_tokens: Vec<&str> = if self.status_gutter.is_empty() {
+                        Vec::new()
+                    } else {
+                        self.status_gutter
+                            .split('|')
+                            .map(|s| s.trim())
+                            .filter(|s| !s.is_empty())
+                            .collect()
+                    };
+                    let (left_gutter_w, right_gutter_w, sep_x) =
+                        calculate_gutter_dimensions(w, &status_tokens);
 
                     let help_raw = self.get_help_raw();
                     let help_tokens: Vec<&str> = help_raw
@@ -639,15 +646,6 @@ impl MenuView {
                     let help_layout =
                         wrap_spread_help_gutter_layout(&help_tokens, left_gutter_w, 2);
 
-                    let status_tokens: Vec<&str> = if self.status_gutter.is_empty() {
-                        Vec::new()
-                    } else {
-                        self.status_gutter
-                            .split('|')
-                            .map(|s| s.trim())
-                            .filter(|s| !s.is_empty())
-                            .collect()
-                    };
                     let status_lines = wrap_gutter_tokens(&status_tokens, right_gutter_w, 2);
                     let gutter_rows = (help_layout.len().max(status_lines.len())).clamp(1, 2);
                     let gutter_border_y =
@@ -832,10 +830,16 @@ impl MenuView {
         }
 
         // 1. Calculate gutter dimensions and layout
-        let avail_both = (w.saturating_sub(11)).max(4);
-        let left_gutter_w = avail_both / 2;
-        let right_gutter_w = avail_both - left_gutter_w;
-        let sep_x = (left_gutter_w + 5).min(w.saturating_sub(2));
+        let status_tokens: Vec<&str> = if self.status_gutter.is_empty() {
+            Vec::new()
+        } else {
+            self.status_gutter
+                .split('|')
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .collect()
+        };
+        let (left_gutter_w, right_gutter_w, sep_x) = calculate_gutter_dimensions(w, &status_tokens);
         let left_seg_len = sep_x.saturating_sub(1);
         let right_seg_len = w.saturating_sub(2 + sep_x);
 
@@ -847,15 +851,6 @@ impl MenuView {
             .collect();
         let help_lines = wrap_spread_help_gutter(&help_tokens, left_gutter_w, 2);
 
-        let status_tokens: Vec<&str> = if self.status_gutter.is_empty() {
-            Vec::new()
-        } else {
-            self.status_gutter
-                .split('|')
-                .map(|s| s.trim())
-                .filter(|s| !s.is_empty())
-                .collect()
-        };
         let status_lines = wrap_gutter_tokens(&status_tokens, right_gutter_w, 2);
 
         let gutter_rows = (help_lines.len().max(status_lines.len())).clamp(1, 2);
@@ -1286,6 +1281,30 @@ impl MenuView {
                 composite_buffer(area, buf, grid, self.styles.background);
             }
         }
+    }
+}
+
+/// Calculates balanced gutter dimensions `(left_w, right_w, sep_x)`
+/// given the full window width `w` and active status tokens.
+fn calculate_gutter_dimensions(w: usize, status_tokens: &[&str]) -> (usize, usize, usize) {
+    let avail_both = (w.saturating_sub(11)).max(4);
+    if status_tokens.is_empty() {
+        let left_gutter_w = avail_both;
+        let right_gutter_w = 0;
+        let sep_x = (left_gutter_w + 5).min(w.saturating_sub(2));
+        (left_gutter_w, right_gutter_w, sep_x)
+    } else {
+        let max_tok_w = status_tokens
+            .iter()
+            .map(|s| visible_text_len(s))
+            .max()
+            .unwrap_or(0);
+        let total_tok_w: usize = status_tokens.iter().map(|s| visible_text_len(s)).sum();
+        let min_status_req = (total_tok_w / 2).max(max_tok_w) + status_tokens.len() * 2;
+        let right_gutter_w = (avail_both / 2).min(min_status_req.max(20));
+        let left_gutter_w = avail_both.saturating_sub(right_gutter_w);
+        let sep_x = (left_gutter_w + 5).min(w.saturating_sub(2));
+        (left_gutter_w, right_gutter_w, sep_x)
     }
 }
 

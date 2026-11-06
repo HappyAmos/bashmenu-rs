@@ -109,7 +109,13 @@ pub fn render_preview_pane(
                 border_style,
             );
 
-            let help_items = ["[UP/DN]: Nav", "[ENTER]: Run", "[F1]: Help", "[F2]: Themes"];
+            let help_items = [
+                "[ENTER]: Select",
+                "[F1]: Help",
+                "[F2]: Themes",
+                "[F8]: ThemeEdit",
+                "[F9]: ShortcutEdit",
+            ];
             let help_avail_w = sep_x.saturating_sub(3);
             let help_spread = format_spread_gutter_line(&help_items, help_avail_w);
             let help_spans = parse_bbcode_spans(&help_spread, preview_styles.help_text);

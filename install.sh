@@ -95,6 +95,19 @@ if [ -d "$SCRIPT_DIR/notebooks" ]; then
     done
 fi
 
+# Install manual page into man1 directory
+MAN_DIR="$HOME/.local/share/man/man1"
+if [ -n "${PREFIX:-}" ] && [ -d "$PREFIX/share/man/man1" ]; then
+    MAN_DIR="$PREFIX/share/man/man1"
+elif [ "$(id -u)" = "0" ]; then
+    MAN_DIR="/usr/local/share/man/man1"
+fi
+mkdir -p "$MAN_DIR"
+if [ -f "$SCRIPT_DIR/bashmenu.1" ]; then
+    cp -f "$SCRIPT_DIR/bashmenu.1" "$MAN_DIR/bashmenu.1"
+    echo "  [+] Installed manual page -> $MAN_DIR/bashmenu.1"
+fi
+
 # Verify PATH
 case ":$PATH:" in
     *":$BIN_DIR:"*) ;;
@@ -117,6 +130,7 @@ echo "            BashMenu-RS Successfully Installed!                    "
 echo "==================================================================="
 echo "  Commands installed:"
 echo "    bashmenu     - Main menu system (shortcut: bm)"
+echo "    cheat        - Interactive cheatsheet lookup tool"
 echo "    menuedit     - Visual menu tree editor"
 echo "    shortcutedit - Visual keyboard shortcuts editor (shortcuts.yml)"
 echo "    themeedit    - Visual theme & palette editor"

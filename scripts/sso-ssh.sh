@@ -31,6 +31,7 @@ HOST_ONLY="${TARGET#*@}"
 USER_PART="${TARGET%@*}"
 KEY_NAME="id_ed25519_${HOST_ONLY//[^a-zA-Z0-9._-]/_}"
 LOCAL_KEY_PATH="$HOME/.ssh/$KEY_NAME"
+# shellcheck disable=SC2088
 REMOTE_TMP_KEY="~/.ssh/tmp_key_$$"
 
 # 1. Prepare local ~/.ssh directory

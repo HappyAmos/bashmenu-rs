@@ -714,6 +714,31 @@ fn test_gutter_mouse_click_actions() {
         "Expected clicking on [F1]: Help in gutter to return MenuAction::Help"
     );
 
+    // Verify clicking on [F9]: ShortcutEdit in standard width gutter (100 cols) returns MenuAction::LaunchShortcutEditor
+    let mut found_f9_std = false;
+    for r in 20..24 {
+        for c in 3..area.width {
+            let mouse = MouseEvent {
+                kind: MouseEventKind::Down(MouseButton::Left),
+                column: c,
+                row: r,
+                modifiers: KeyModifiers::empty(),
+            };
+            let action = view.handle_mouse(mouse, area);
+            if action == MenuAction::LaunchShortcutEditor {
+                found_f9_std = true;
+                break;
+            }
+        }
+        if found_f9_std {
+            break;
+        }
+    }
+    assert!(
+        found_f9_std,
+        "Expected clicking on [F9]: ShortcutEdit in standard gutter (100 cols) to return MenuAction::LaunchShortcutEditor"
+    );
+
     // Verify clicking on [F9]: ShortcutEdit in wide gutter returns MenuAction::LaunchShortcutEditor
     let wide_area = Rect::new(0, 0, 200, 24);
     let mut found_f9 = false;
@@ -770,8 +795,33 @@ fn test_help_gutter_text_contains_f9_and_omits_direct() {
         "Help gutter must NOT contain '[0-9/a-z]: Direct'"
     );
     assert!(
+        !gutter_text.contains("[UP/DN]: Nav"),
+        "Help gutter must NOT contain '[UP/DN]: Nav'"
+    );
+    assert!(
         gutter_text.contains("[F9]: ShortcutEdit"),
         "Help gutter must contain '[F9]: ShortcutEdit'"
+    );
+
+    // Also verify at standard terminal width 100
+    let std_area = Rect::new(0, 0, 100, 24);
+    let mut std_buf = Buffer::empty(std_area);
+    view.render(std_area, &mut std_buf);
+    let mut std_text = String::new();
+    for y in 0..24 {
+        let mut line = String::new();
+        for x in 0..100 {
+            line.push(std_buf[(x, y)].symbol().chars().next().unwrap_or(' '));
+        }
+        std_text.push_str(&line);
+    }
+    assert!(
+        !std_text.contains("[UP/DN]: Nav"),
+        "Standard width help gutter must NOT contain '[UP/DN]: Nav'"
+    );
+    assert!(
+        std_text.contains("[F9]: ShortcutEdit"),
+        "Standard width (100 cols) help gutter must contain '[F9]: ShortcutEdit'"
     );
 }
 

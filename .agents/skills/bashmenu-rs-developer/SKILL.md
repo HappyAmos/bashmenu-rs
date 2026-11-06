@@ -271,6 +271,22 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
     3. `/usr/local/bin` (when running as `root`, `id -u == 0`).
     4. `$HOME/.local/bin` (standard user binary directory).
     5. `/usr/local/bin` (fallback if no `$HOME` is defined and directory is writable).
+- **Installer Lifecycle & Invariants (`install.sh`):**
+  - Compiles release binaries across workspace via `cargo build --release --workspace`.
+  - Installs all workspace binaries (`bashmenu`, `ymlcheck`, `menuedit`, `shortcutedit`, `themeedit`, `bashedit`, `bmpager`, `cheat`) into `$BIN_DIR`.
+  - Configures convenience symlinks (`bm` -> `bashmenu`, `rich` -> `rich.sh`).
+  - Installs `bashmenu.1` manual page into `$MAN_DIR` (`$HOME/.local/share/man/man1`).
+  - Initializes user config (`~/.config/bashmenu`) without overwriting existing files.
+  - Verification banner must list all installed commands, including `cheat`.
+- **Uninstaller Lifecycle & Invariants (`uninstall.sh`):**
+  - Removes all binaries and symlinks from `$BIN_DIR` (`bashmenu`, `bm`, `ymlcheck`, `menuedit`, `shortcutedit`, `themeedit`, `bashedit`, `bmpager`, `cheat`, `rich`).
+  - Removes installed manual page `bashmenu.1` from `$MAN_DIR` (`~/.local/share/man/man1`).
+  - Preserves user settings and notebooks by default, prompting user (`[Y/n]`).
+  - Supports `--keep-settings` / `--keep-config` (`-k`), `--remove-settings`, and `-y`/`--yes`.
+- **Help Gutter Invariants & Function Key Prioritization:**
+  - Omit `[UP/DN]: Nav` from help gutters across all modes.
+  - Priority keys `[F8]: ThemeEdit` and `[F9]: ShortcutEdit` are positioned immediately after `[F2]: Themes` to ensure visibility and clickability at standard widths.
+  - Dynamic gutter dimension balancing prevents help gutter width starvation.
 - **BBCode Rich Formatting Parser:**
   - Bracketed tags: `[b]`, `[u]`, `[dim]`, `[reverse]`, `[color=...]`.
   - Parsed into `ratatui::text::Span` and `ratatui::style::Style` without intermediate HTML or heavyweight DOM structures.
