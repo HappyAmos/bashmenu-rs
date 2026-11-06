@@ -175,7 +175,7 @@ fn test_grid_pickers_navigation() {
     );
 
     let mut ascii_buf = Buffer::empty(area);
-    ascii_modal.render(area, &styles, &mut ascii_buf);
+    let (inner, origin) = ascii_modal.render(area, &styles, &mut ascii_buf);
     let ascii_text: String = (0..area.height)
         .map(|y| {
             (0..area.width)
@@ -188,6 +188,37 @@ fn test_grid_pickers_navigation() {
         ascii_text.contains("ASCII: 196"),
         "Expected ASCII modal to display 3-digit decimal badge 'ASCII: 196', got: {}",
         ascii_text
+    );
+
+    // Verify clicking [X] on AsciiGridModal dismisses the modal
+    let close_col = inner.x + inner.width - 2;
+    let close_row = inner.y.saturating_sub(1);
+    let mouse_close = crossterm::event::MouseEvent {
+        kind: crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left),
+        column: close_col,
+        row: close_row,
+        modifiers: crossterm::event::KeyModifiers::empty(),
+    };
+    assert_eq!(
+        ascii_modal.handle_mouse(mouse_close, origin),
+        Some(None),
+        "Clicking [X] on AsciiGridModal must dismiss modal"
+    );
+
+    // Verify clicking [X] on ColorGridModal dismisses the modal
+    let (color_inner, color_origin) = color_modal.render(area, &styles, &mut color_buf);
+    let color_close_col = color_inner.x + color_inner.width - 2;
+    let color_close_row = color_inner.y.saturating_sub(1);
+    let color_mouse_close = crossterm::event::MouseEvent {
+        kind: crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left),
+        column: color_close_col,
+        row: color_close_row,
+        modifiers: crossterm::event::KeyModifiers::empty(),
+    };
+    assert_eq!(
+        color_modal.handle_mouse(color_mouse_close, color_origin),
+        Some(None),
+        "Clicking [X] on ColorGridModal must dismiss modal"
     );
 }
 

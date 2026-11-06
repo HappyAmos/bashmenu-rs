@@ -1,6 +1,6 @@
 //! 16x16 2D grid pickers for 256 colors and CP437 ASCII characters.
 
-use super::frame::render_modal_frame;
+use super::frame::{is_close_button_clicked, render_modal_frame};
 use crate::style::ResolvedThemeStyles;
 use crate::wallpaper::color_to_rgb;
 use bashmenu_core::cp437_to_char;
@@ -81,6 +81,11 @@ impl ColorGridModal {
     ) -> Option<Option<u8>> {
         if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
             let (gx, gy) = grid_start;
+            let inner = Rect::new(gx.saturating_sub(2), gy.saturating_sub(1), 54, 20);
+            if is_close_button_clicked(inner, mouse.row, mouse.column) {
+                return Some(None);
+            }
+
             let col = mouse.column;
             let row = mouse.row;
 
@@ -238,6 +243,11 @@ impl AsciiGridModal {
     ) -> Option<Option<char>> {
         if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
             let (gx, gy) = grid_start;
+            let inner = Rect::new(gx.saturating_sub(2), gy.saturating_sub(1), 54, 20);
+            if is_close_button_clicked(inner, mouse.row, mouse.column) {
+                return Some(None);
+            }
+
             let col = mouse.column;
             let row = mouse.row;
 

@@ -812,6 +812,7 @@ pub fn derive_palette_from_image(
         "scrollbar".to_string(),
         make_pair(primary_accent as i64, 236),
     );
+    colors.insert("shadow".to_string(), make_pair(236, bg_color as i64));
     colors.insert("whitespace".to_string(), make_pair(gutter_color as i64, -1));
     colors.insert(
         "toast_info".to_string(),
@@ -827,4 +828,305 @@ pub fn derive_palette_from_image(
     );
 
     Ok(colors)
+}
+
+/// Canonical ANSI 16-color palette names.
+pub const ANSI16_NAMES: [&str; 16] = [
+    "COLOR_BLACK",
+    "COLOR_RED",
+    "COLOR_GREEN",
+    "COLOR_YELLOW",
+    "COLOR_BLUE",
+    "COLOR_MAGENTA",
+    "COLOR_CYAN",
+    "COLOR_WHITE",
+    "COLOR_GREY",
+    "COLOR_BRIGHT_RED",
+    "COLOR_BRIGHT_GREEN",
+    "COLOR_BRIGHT_YELLOW",
+    "COLOR_BRIGHT_BLUE",
+    "COLOR_BRIGHT_MAGENTA",
+    "COLOR_BRIGHT_CYAN",
+    "COLOR_BRIGHT_WHITE",
+];
+
+/// Canonical ANSI 8-color palette names.
+pub const ANSI8_NAMES: [&str; 8] = [
+    "COLOR_BLACK",
+    "COLOR_RED",
+    "COLOR_GREEN",
+    "COLOR_YELLOW",
+    "COLOR_BLUE",
+    "COLOR_MAGENTA",
+    "COLOR_CYAN",
+    "COLOR_WHITE",
+];
+
+/// Maps an RGB triplet to the closest canonical ANSI 16-color name.
+pub fn rgb_to_ansi16_name(r: u8, g: u8, b: u8) -> &'static str {
+    let (h, s, v) = rgb_to_hsv(r, g, b);
+    let lum = color_luminance(r, g, b);
+
+    if lum < 28.0 {
+        return "COLOR_BLACK";
+    }
+    if s < 0.18 {
+        if lum < 70.0 {
+            "COLOR_BLACK"
+        } else if lum < 150.0 {
+            "COLOR_GREY"
+        } else if lum < 225.0 {
+            "COLOR_WHITE"
+        } else {
+            "COLOR_BRIGHT_WHITE"
+        }
+    } else {
+        let is_bright = lum >= 115.0 || v >= 0.75;
+        if !(0.05..0.95).contains(&h) {
+            if is_bright {
+                "COLOR_BRIGHT_RED"
+            } else {
+                "COLOR_RED"
+            }
+        } else if h < 0.18 {
+            if is_bright {
+                "COLOR_BRIGHT_YELLOW"
+            } else {
+                "COLOR_YELLOW"
+            }
+        } else if h < 0.42 {
+            if is_bright {
+                "COLOR_BRIGHT_GREEN"
+            } else {
+                "COLOR_GREEN"
+            }
+        } else if h < 0.58 {
+            if is_bright {
+                "COLOR_BRIGHT_CYAN"
+            } else {
+                "COLOR_CYAN"
+            }
+        } else if h < 0.75 {
+            if is_bright {
+                "COLOR_BRIGHT_BLUE"
+            } else {
+                "COLOR_BLUE"
+            }
+        } else if is_bright {
+            "COLOR_BRIGHT_MAGENTA"
+        } else {
+            "COLOR_MAGENTA"
+        }
+    }
+}
+
+/// Maps an RGB triplet to the closest canonical ANSI 8-color name.
+pub fn rgb_to_ansi8_name(r: u8, g: u8, b: u8) -> &'static str {
+    let (h, s, _v) = rgb_to_hsv(r, g, b);
+    let lum = color_luminance(r, g, b);
+
+    if lum < 32.0 {
+        return "COLOR_BLACK";
+    }
+    if s < 0.18 {
+        if lum >= 110.0 {
+            "COLOR_WHITE"
+        } else {
+            "COLOR_BLACK"
+        }
+    } else if !(0.05..0.95).contains(&h) {
+        "COLOR_RED"
+    } else if h < 0.18 {
+        "COLOR_YELLOW"
+    } else if h < 0.42 {
+        "COLOR_GREEN"
+    } else if h < 0.58 {
+        "COLOR_CYAN"
+    } else if h < 0.75 {
+        "COLOR_BLUE"
+    } else {
+        "COLOR_MAGENTA"
+    }
+}
+
+/// Downsamples an arbitrary color value (sequence, number, hex string,
+/// or named token) into a valid ANSI 16-color representation.
+pub fn downsample_color_value_to_16(val: &serde_yml::Value) -> serde_yml::Value {
+    match val {
+        serde_yml::Value::Sequence(seq) => {
+            serde_yml::Value::Sequence(seq.iter().map(downsample_color_value_to_16).collect())
+        }
+        serde_yml::Value::Mapping(map) => {
+            let mut out = serde_yml::Mapping::new();
+            for (k, v) in map {
+                out.insert(k.clone(), downsample_color_value_to_16(v));
+            }
+            serde_yml::Value::Mapping(out)
+        }
+        serde_yml::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                if i < 0 {
+                    serde_yml::Value::Number((-1).into())
+                } else if i < 16 {
+                    serde_yml::Value::String(ANSI16_NAMES[i as usize].to_string())
+                } else if i <= 255 {
+                    let (r, g, b) = indexed_to_rgb(i as u8);
+                    serde_yml::Value::String(rgb_to_ansi16_name(r, g, b).to_string())
+                } else {
+                    val.clone()
+                }
+            } else {
+                val.clone()
+            }
+        }
+        serde_yml::Value::String(s) => {
+            let s_trim = s.trim();
+            if s_trim == "-1" {
+                return serde_yml::Value::Number((-1).into());
+            }
+            if let Ok(i) = s_trim.parse::<i64>() {
+                return downsample_color_value_to_16(&serde_yml::Value::Number(i.into()));
+            }
+            if s_trim.starts_with('#') {
+                let hex = s_trim.trim_start_matches('#');
+                if hex.len() == 6 {
+                    if let Ok(rgb) = u32::from_str_radix(hex, 16) {
+                        let r = ((rgb >> 16) & 0xFF) as u8;
+                        let g = ((rgb >> 8) & 0xFF) as u8;
+                        let b = (rgb & 0xFF) as u8;
+                        return serde_yml::Value::String(rgb_to_ansi16_name(r, g, b).to_string());
+                    }
+                }
+            }
+            let upper = s_trim.to_uppercase();
+            if ANSI16_NAMES.contains(&upper.as_str()) {
+                return serde_yml::Value::String(upper);
+            }
+            if let Some(c) = crate::style::parse_color_value(val) {
+                if c == ratatui::style::Color::Reset {
+                    serde_yml::Value::Number((-1).into())
+                } else {
+                    let (r, g, b) = color_to_rgb(c);
+                    serde_yml::Value::String(rgb_to_ansi16_name(r, g, b).to_string())
+                }
+            } else {
+                val.clone()
+            }
+        }
+        _ => val.clone(),
+    }
+}
+
+/// Downsamples an arbitrary color value (sequence, number, hex string,
+/// or named token) into a valid ANSI 8-color representation.
+pub fn downsample_color_value_to_8(val: &serde_yml::Value) -> serde_yml::Value {
+    match val {
+        serde_yml::Value::Sequence(seq) => {
+            serde_yml::Value::Sequence(seq.iter().map(downsample_color_value_to_8).collect())
+        }
+        serde_yml::Value::Mapping(map) => {
+            let mut out = serde_yml::Mapping::new();
+            for (k, v) in map {
+                out.insert(k.clone(), downsample_color_value_to_8(v));
+            }
+            serde_yml::Value::Mapping(out)
+        }
+        serde_yml::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                if i < 0 {
+                    serde_yml::Value::Number((-1).into())
+                } else if i < 8 {
+                    serde_yml::Value::String(ANSI8_NAMES[i as usize].to_string())
+                } else if i < 16 {
+                    let name = if i == 8 {
+                        "COLOR_BLACK"
+                    } else {
+                        ANSI8_NAMES[(i % 8) as usize]
+                    };
+                    serde_yml::Value::String(name.to_string())
+                } else if i <= 255 {
+                    let (r, g, b) = indexed_to_rgb(i as u8);
+                    serde_yml::Value::String(rgb_to_ansi8_name(r, g, b).to_string())
+                } else {
+                    val.clone()
+                }
+            } else {
+                val.clone()
+            }
+        }
+        serde_yml::Value::String(s) => {
+            let s_trim = s.trim();
+            if s_trim == "-1" {
+                return serde_yml::Value::Number((-1).into());
+            }
+            if let Ok(i) = s_trim.parse::<i64>() {
+                return downsample_color_value_to_8(&serde_yml::Value::Number(i.into()));
+            }
+            if s_trim.starts_with('#') {
+                let hex = s_trim.trim_start_matches('#');
+                if hex.len() == 6 {
+                    if let Ok(rgb) = u32::from_str_radix(hex, 16) {
+                        let r = ((rgb >> 16) & 0xFF) as u8;
+                        let g = ((rgb >> 8) & 0xFF) as u8;
+                        let b = (rgb & 0xFF) as u8;
+                        return serde_yml::Value::String(rgb_to_ansi8_name(r, g, b).to_string());
+                    }
+                }
+            }
+            let upper = s_trim.to_uppercase();
+            if ANSI8_NAMES.contains(&upper.as_str()) {
+                return serde_yml::Value::String(upper);
+            }
+            match upper.as_str() {
+                "COLOR_BRIGHT_RED" => return serde_yml::Value::String("COLOR_RED".to_string()),
+                "COLOR_BRIGHT_GREEN" => return serde_yml::Value::String("COLOR_GREEN".to_string()),
+                "COLOR_BRIGHT_YELLOW" => {
+                    return serde_yml::Value::String("COLOR_YELLOW".to_string())
+                }
+                "COLOR_BRIGHT_BLUE" => return serde_yml::Value::String("COLOR_BLUE".to_string()),
+                "COLOR_BRIGHT_MAGENTA" => {
+                    return serde_yml::Value::String("COLOR_MAGENTA".to_string())
+                }
+                "COLOR_BRIGHT_CYAN" => return serde_yml::Value::String("COLOR_CYAN".to_string()),
+                "COLOR_BRIGHT_WHITE" => return serde_yml::Value::String("COLOR_WHITE".to_string()),
+                "COLOR_BRIGHT_BLACK" | "COLOR_GREY" | "COLOR_GRAY" => {
+                    return serde_yml::Value::String("COLOR_BLACK".to_string())
+                }
+                _ => {}
+            }
+            if let Some(c) = crate::style::parse_color_value(val) {
+                if c == ratatui::style::Color::Reset {
+                    serde_yml::Value::Number((-1).into())
+                } else {
+                    let (r, g, b) = color_to_rgb(c);
+                    serde_yml::Value::String(rgb_to_ansi8_name(r, g, b).to_string())
+                }
+            } else {
+                val.clone()
+            }
+        }
+        _ => val.clone(),
+    }
+}
+
+/// Downsamples a 256-color palette map into an ANSI 16-color fallback palette map.
+pub fn downsample_palette_to_16(
+    palette_256: &std::collections::HashMap<String, serde_yml::Value>,
+) -> std::collections::HashMap<String, serde_yml::Value> {
+    let mut out = std::collections::HashMap::new();
+    for (k, v) in palette_256 {
+        out.insert(k.clone(), downsample_color_value_to_16(v));
+    }
+    out
+}
+
+/// Downsamples a 256-color palette map into an ANSI 8-color fallback palette map.
+pub fn downsample_palette_to_8(
+    palette_256: &std::collections::HashMap<String, serde_yml::Value>,
+) -> std::collections::HashMap<String, serde_yml::Value> {
+    let mut out = std::collections::HashMap::new();
+    for (k, v) in palette_256 {
+        out.insert(k.clone(), downsample_color_value_to_8(v));
+    }
+    out
 }

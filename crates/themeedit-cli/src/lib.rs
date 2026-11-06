@@ -510,6 +510,8 @@ impl ThemeEditorState {
                 serde_yml::Value::Number((-1).into()),
             ]),
         );
+        t.colors_16 = Some(bashmenu_tui::downsample_palette_to_16(&colors));
+        t.colors_8 = Some(bashmenu_tui::downsample_palette_to_8(&colors));
         t.colors_256 = Some(colors);
         t
     }
@@ -655,12 +657,47 @@ impl ThemeEditorState {
                 }
             };
             if key == "background" {
-                c_map.insert(key.to_string(), val);
+                c_map.insert(key.to_string(), val.clone());
             } else {
                 c_map.insert(
                     key.to_string(),
-                    serde_yml::Value::Sequence(vec![val, serde_yml::Value::Number((-1).into())]),
+                    serde_yml::Value::Sequence(vec![
+                        val.clone(),
+                        serde_yml::Value::Number((-1).into()),
+                    ]),
                 );
+            }
+
+            // Keep 16-color fallback palette tier in sync if present
+            if let Some(c16) = &mut self.current_theme.colors_16 {
+                let val_16 = bashmenu_tui::downsample_color_value_to_16(&val);
+                if key == "background" {
+                    c16.insert(key.to_string(), val_16);
+                } else {
+                    c16.insert(
+                        key.to_string(),
+                        serde_yml::Value::Sequence(vec![
+                            val_16,
+                            serde_yml::Value::Number((-1).into()),
+                        ]),
+                    );
+                }
+            }
+
+            // Keep 8-color fallback palette tier in sync if present
+            if let Some(c8) = &mut self.current_theme.colors_8 {
+                let val_8 = bashmenu_tui::downsample_color_value_to_8(&val);
+                if key == "background" {
+                    c8.insert(key.to_string(), val_8);
+                } else {
+                    c8.insert(
+                        key.to_string(),
+                        serde_yml::Value::Sequence(vec![
+                            val_8,
+                            serde_yml::Value::Number((-1).into()),
+                        ]),
+                    );
+                }
             }
             self.is_modified = true;
             let display_str = match color {
@@ -749,6 +786,12 @@ impl ThemeEditorState {
         c_map.remove("menu_editor");
         c_map.remove("editor");
         c_map.remove("modals");
+
+        // Also derive harmonious 16-color and 8-color fallback palette tiers
+        let c_map_16 = bashmenu_tui::downsample_palette_to_16(c_map);
+        let c_map_8 = bashmenu_tui::downsample_palette_to_8(c_map);
+        self.current_theme.colors_16 = Some(c_map_16);
+        self.current_theme.colors_8 = Some(c_map_8);
 
         self.is_modified = true;
         let fname = resolved_path

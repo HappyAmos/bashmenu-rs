@@ -289,3 +289,59 @@ fn test_resolve_wallpaper_user_overrides() {
     );
     assert!((overridden.opacity - 0.9).abs() < f32::EPSILON);
 }
+
+#[test]
+fn test_downsample_palette_to_16_and_8() {
+    use bashmenu_tui::{
+        downsample_palette_to_16, downsample_palette_to_8, rgb_to_ansi16_name, rgb_to_ansi8_name,
+    };
+    use std::collections::HashMap;
+
+    // Test ANSI mapping functions
+    assert_eq!(rgb_to_ansi16_name(0, 0, 0), "COLOR_BLACK");
+    assert_eq!(rgb_to_ansi8_name(0, 0, 0), "COLOR_BLACK");
+    assert_eq!(rgb_to_ansi16_name(255, 0, 0), "COLOR_BRIGHT_RED");
+    assert_eq!(rgb_to_ansi8_name(255, 0, 0), "COLOR_RED");
+    assert_eq!(rgb_to_ansi16_name(255, 255, 255), "COLOR_BRIGHT_WHITE");
+    assert_eq!(rgb_to_ansi8_name(255, 255, 255), "COLOR_WHITE");
+
+    let mut pal256 = HashMap::new();
+    pal256.insert(
+        "background".to_string(),
+        serde_yml::Value::Number(16.into()),
+    );
+    pal256.insert(
+        "title".to_string(),
+        serde_yml::Value::Sequence(vec![
+            serde_yml::Value::Number(201.into()),
+            serde_yml::Value::Number((-1).into()),
+        ]),
+    );
+    pal256.insert(
+        "text".to_string(),
+        serde_yml::Value::Sequence(vec![
+            serde_yml::Value::Number(255.into()),
+            serde_yml::Value::Number((-1).into()),
+        ]),
+    );
+
+    let pal16 = downsample_palette_to_16(&pal256);
+    let pal8 = downsample_palette_to_8(&pal256);
+
+    assert_eq!(
+        pal16.get("background"),
+        Some(&serde_yml::Value::String("COLOR_BLACK".to_string()))
+    );
+    assert_eq!(
+        pal8.get("background"),
+        Some(&serde_yml::Value::String("COLOR_BLACK".to_string()))
+    );
+
+    let title16 = pal16.get("title").and_then(|v| v.as_sequence()).unwrap();
+    assert_eq!(title16[0].as_str(), Some("COLOR_BRIGHT_MAGENTA"));
+    assert_eq!(title16[1].as_i64(), Some(-1));
+
+    let title8 = pal8.get("title").and_then(|v| v.as_sequence()).unwrap();
+    assert_eq!(title8[0].as_str(), Some("COLOR_MAGENTA"));
+    assert_eq!(title8[1].as_i64(), Some(-1));
+}

@@ -1019,6 +1019,49 @@ fn test_derive_colors_from_wallpaper() {
             key
         );
     }
+
+    // 3. Verify that 16-color and 8-color fallback palette tiers are also derived
+    let c16 = state_wp
+        .current_theme
+        .colors_16
+        .as_ref()
+        .expect("colors_16 must exist");
+    let c8 = state_wp
+        .current_theme
+        .colors_8
+        .as_ref()
+        .expect("colors_8 must exist");
+
+    for key in [
+        "background",
+        "text",
+        "highlight",
+        "border",
+        "divider",
+        "accent",
+        "shortcut_key",
+        "help_text",
+        "gutter",
+        "scrollbar",
+        "toast_info",
+        "toast_warning",
+        "toast_error",
+    ] {
+        assert!(
+            c16.contains_key(key),
+            "16-color palette must contain token '{}'",
+            key
+        );
+        assert!(
+            c8.contains_key(key),
+            "8-color palette must contain token '{}'",
+            key
+        );
+    }
+
+    // Check that background is a string constant in 16 and 8
+    assert!(c16["background"].is_string());
+    assert!(c8["background"].is_string());
 }
 
 #[test]
