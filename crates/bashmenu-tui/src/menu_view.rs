@@ -552,11 +552,11 @@ impl MenuView {
     /// Returns the raw contextual help string for the current menu level or mode.
     fn get_help_raw(&self) -> &'static str {
         if self.is_current_notebook() {
-            "[N]: New Note | [ENTER]: Read | [M]: Rename | [D]: Delete | [F1]: Help | [F2]: Themes | [F8]: ThemeEdit | [F9]: ShortcutEdit | [F7]: Gutter | [ESC]: Back"
+            "[N]: New Note | [ENTER]: Read | [M]: Rename | [D]: Delete | [F1]: Help | [F2]: Themes | [F7]: Gutter | [F8]: ThemeEdit | [F9]: ShortcutEdit | [ESC]: Back"
         } else if self.show_shortcuts {
-            "[F1]: Help | [F2]: Themes | [F8]: ThemeEdit | [F9]: ShortcutEdit | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [ESC]: Back"
+            "[F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [F8]: ThemeEdit | [F9]: ShortcutEdit | [ESC]: Back"
         } else {
-            "[ENTER]: Select | [F1]: Help | [F2]: Themes | [F8]: ThemeEdit | [F9]: ShortcutEdit | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [ESC]: Back"
+            "[ENTER]: Select | [F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [F8]: ThemeEdit | [F9]: ShortcutEdit | [ESC]: Back"
         }
     }
 

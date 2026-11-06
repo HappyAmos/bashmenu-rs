@@ -286,9 +286,9 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
   - Removes installed manual page `bashmenu.1` from `$MAN_DIR` (`~/.local/share/man/man1`).
   - Preserves user settings and notebooks by default, prompting user (`[Y/n]`).
   - Supports `--keep-settings` / `--keep-config` (`-k`), `--remove-settings`, and `-y`/`--yes`.
-- **Help Gutter Invariants & Function Key Prioritization:**
+- **Help Gutter Invariants & Function Key Sequential Order:**
   - Omit `[UP/DN]: Nav` from help gutters across all modes.
-  - Priority keys `[F8]: ThemeEdit` and `[F9]: ShortcutEdit` are positioned immediately after `[F2]: Themes` to ensure visibility and clickability at standard widths.
+  - Function keys `<F1>`, `<F2>`, `<F3>`, etc. listed in the help gutter must ALWAYS be listed in strictly ascending numerical order (from 1 to 12).
   - Dynamic gutter dimension balancing prevents help gutter width starvation.
 - **BBCode Rich Formatting Parser:**
   - Bracketed tags: `[b]`, `[u]`, `[dim]`, `[reverse]`, `[color=...]`.

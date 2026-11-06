@@ -113,6 +113,11 @@ pub fn render_preview_pane(
                 "[ENTER]: Select",
                 "[F1]: Help",
                 "[F2]: Themes",
+                "[F3]: Editor",
+                "[F4]: Edit",
+                "[F5]: Refresh",
+                "[F6]: Keys",
+                "[F7]: Gutter",
                 "[F8]: ThemeEdit",
                 "[F9]: ShortcutEdit",
             ];

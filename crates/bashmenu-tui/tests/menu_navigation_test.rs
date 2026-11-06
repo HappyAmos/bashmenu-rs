@@ -714,17 +714,18 @@ fn test_gutter_mouse_click_actions() {
         "Expected clicking on [F1]: Help in gutter to return MenuAction::Help"
     );
 
-    // Verify clicking on [F9]: ShortcutEdit in standard width gutter (100 cols) returns MenuAction::LaunchShortcutEditor
+    // Verify clicking on [F9]: ShortcutEdit in standard gutter (120 cols) returns MenuAction::LaunchShortcutEditor
+    let std_click_area = Rect::new(0, 0, 120, 24);
     let mut found_f9_std = false;
     for r in 20..24 {
-        for c in 3..area.width {
+        for c in 3..std_click_area.width {
             let mouse = MouseEvent {
                 kind: MouseEventKind::Down(MouseButton::Left),
                 column: c,
                 row: r,
                 modifiers: KeyModifiers::empty(),
             };
-            let action = view.handle_mouse(mouse, area);
+            let action = view.handle_mouse(mouse, std_click_area);
             if action == MenuAction::LaunchShortcutEditor {
                 found_f9_std = true;
                 break;
@@ -736,7 +737,7 @@ fn test_gutter_mouse_click_actions() {
     }
     assert!(
         found_f9_std,
-        "Expected clicking on [F9]: ShortcutEdit in standard gutter (100 cols) to return MenuAction::LaunchShortcutEditor"
+        "Expected clicking on [F9]: ShortcutEdit in standard gutter (120 cols) to return MenuAction::LaunchShortcutEditor"
     );
 
     // Verify clicking on [F9]: ShortcutEdit in wide gutter returns MenuAction::LaunchShortcutEditor
@@ -803,14 +804,14 @@ fn test_help_gutter_text_contains_f9_and_omits_direct() {
         "Help gutter must contain '[F9]: ShortcutEdit'"
     );
 
-    // Also verify at standard terminal width 100
-    let std_area = Rect::new(0, 0, 100, 24);
+    // Also verify at standard terminal width 120 and check strictly ascending F-key order
+    let std_area = Rect::new(0, 0, 120, 24);
     let mut std_buf = Buffer::empty(std_area);
     view.render(std_area, &mut std_buf);
     let mut std_text = String::new();
     for y in 0..24 {
         let mut line = String::new();
-        for x in 0..100 {
+        for x in 0..120 {
             line.push(std_buf[(x, y)].symbol().chars().next().unwrap_or(' '));
         }
         std_text.push_str(&line);
@@ -821,7 +822,29 @@ fn test_help_gutter_text_contains_f9_and_omits_direct() {
     );
     assert!(
         std_text.contains("[F9]: ShortcutEdit"),
-        "Standard width (100 cols) help gutter must contain '[F9]: ShortcutEdit'"
+        "Terminal width (120 cols) help gutter must contain '[F9]: ShortcutEdit'"
+    );
+
+    // Verify F-keys appear in strictly ascending numerical order (F1 to F12)
+    let pos_f1 = std_text.find("[F1]: Help").expect("F1 must exist");
+    let pos_f2 = std_text.find("[F2]: Themes").expect("F2 must exist");
+    let pos_f3 = std_text.find("[F3]: Editor").expect("F3 must exist");
+    let pos_f4 = std_text.find("[F4]: Edit").expect("F4 must exist");
+    let pos_f5 = std_text.find("[F5]: Refresh").expect("F5 must exist");
+    let pos_f6 = std_text.find("[F6]: Keys").expect("F6 must exist");
+    let pos_f7 = std_text.find("[F7]: Gutter").expect("F7 must exist");
+    let pos_f8 = std_text.find("[F8]: ThemeEdit").expect("F8 must exist");
+    let pos_f9 = std_text.find("[F9]: ShortcutEdit").expect("F9 must exist");
+    assert!(
+        pos_f1 < pos_f2
+            && pos_f2 < pos_f3
+            && pos_f3 < pos_f4
+            && pos_f4 < pos_f5
+            && pos_f5 < pos_f6
+            && pos_f6 < pos_f7
+            && pos_f7 < pos_f8
+            && pos_f8 < pos_f9,
+        "Function keys in help gutter must be in strictly ascending numerical order (F1 to F12)"
     );
 }
 
