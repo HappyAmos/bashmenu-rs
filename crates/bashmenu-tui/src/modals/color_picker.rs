@@ -328,13 +328,19 @@ impl ColorPickerModal {
         }
     }
 
-    /// Handles mouse clicks across tabs, grids, canvases, and sliders.
-    pub fn handle_mouse(&mut self, mouse: MouseEvent, origin: (u16, u16)) -> Option<Option<Color>> {
+    /// Handles mouse clicks across tabs, grids, canvases, sliders, and close button.
+    pub fn handle_mouse(&mut self, mouse: MouseEvent, area: Rect) -> Option<Option<Color>> {
         if mouse.kind != MouseEventKind::Down(MouseButton::Left) {
             return None;
         }
 
-        let (ox, oy) = origin;
+        let inner_area = super::frame::compute_modal_inner(area, 64, 23);
+        if super::frame::is_close_button_clicked(inner_area, mouse.row, mouse.column) {
+            return Some(None);
+        }
+
+        let ox = inner_area.x;
+        let oy = inner_area.y;
         let col = mouse.column;
         let row = mouse.row;
 

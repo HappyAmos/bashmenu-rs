@@ -2,8 +2,8 @@
 
 use crate::PreviewMode;
 use bashmenu_tui::{
-    composite_buffer, format_spread_gutter_line, parse_bbcode_spans, visible_text_len,
-    ResolvedThemeStyles, WallpaperCompositor,
+    composite_buffer, format_spread_gutter_line, parse_bbcode_spans, rgb_to_xterm256,
+    visible_text_len, ResolvedThemeStyles, WallpaperCompositor,
 };
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -777,28 +777,31 @@ pub fn render_preview_pane(
     }
 }
 
-/// Formats a Ratatui Color into a string color code (hex, index, or name).
+/// Formats a Ratatui Color into a string color code (hex, index, or name) with 256 decimal code.
 pub fn format_color_code(color: Color) -> String {
     match color {
-        Color::Rgb(r, g, b) => format!("#{r:02x}{g:02x}{b:02x}"),
-        Color::Indexed(code) => format!("{code}"),
+        Color::Rgb(r, g, b) => {
+            let idx = rgb_to_xterm256(r, g, b);
+            format!("#{r:02x}{g:02x}{b:02x} (256: {idx})")
+        }
+        Color::Indexed(code) => format!("{code} (256: {code})"),
         Color::Reset => "default".to_string(),
-        Color::Black => "black".to_string(),
-        Color::Red => "red".to_string(),
-        Color::Green => "green".to_string(),
-        Color::Yellow => "yellow".to_string(),
-        Color::Blue => "blue".to_string(),
-        Color::Magenta => "magenta".to_string(),
-        Color::Cyan => "cyan".to_string(),
-        Color::Gray => "gray".to_string(),
-        Color::DarkGray => "darkgray".to_string(),
-        Color::LightRed => "lightred".to_string(),
-        Color::LightGreen => "lightgreen".to_string(),
-        Color::LightYellow => "lightyellow".to_string(),
-        Color::LightBlue => "lightblue".to_string(),
-        Color::LightMagenta => "lightmagenta".to_string(),
-        Color::LightCyan => "lightcyan".to_string(),
-        Color::White => "white".to_string(),
+        Color::Black => "black (256: 0)".to_string(),
+        Color::Red => "red (256: 1)".to_string(),
+        Color::Green => "green (256: 2)".to_string(),
+        Color::Yellow => "yellow (256: 3)".to_string(),
+        Color::Blue => "blue (256: 4)".to_string(),
+        Color::Magenta => "magenta (256: 5)".to_string(),
+        Color::Cyan => "cyan (256: 6)".to_string(),
+        Color::Gray => "gray (256: 7)".to_string(),
+        Color::DarkGray => "darkgray (256: 8)".to_string(),
+        Color::LightRed => "lightred (256: 9)".to_string(),
+        Color::LightGreen => "lightgreen (256: 10)".to_string(),
+        Color::LightYellow => "lightyellow (256: 11)".to_string(),
+        Color::LightBlue => "lightblue (256: 12)".to_string(),
+        Color::LightMagenta => "lightmagenta (256: 13)".to_string(),
+        Color::LightCyan => "lightcyan (256: 14)".to_string(),
+        Color::White => "white (256: 15)".to_string(),
     }
 }
 

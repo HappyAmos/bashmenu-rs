@@ -1088,14 +1088,17 @@ fn test_format_color_code_and_extract_preview_color() {
     use ratatui::style::{Color, Style};
     use themeedit_cli::{extract_preview_color_at, format_color_code};
 
-    // 1. format_color_code tests
-    assert_eq!(format_color_code(Color::Rgb(255, 121, 198)), "#ff79c6");
-    assert_eq!(format_color_code(Color::Rgb(0, 0, 0)), "#000000");
-    assert_eq!(format_color_code(Color::Indexed(61)), "61");
-    assert_eq!(format_color_code(Color::Indexed(236)), "236");
+    // 1. format_color_code tests (includes 256 decimal code)
+    assert_eq!(
+        format_color_code(Color::Rgb(255, 121, 198)),
+        "#ff79c6 (256: 169)"
+    );
+    assert_eq!(format_color_code(Color::Rgb(0, 0, 0)), "#000000 (256: 16)");
+    assert_eq!(format_color_code(Color::Indexed(61)), "61 (256: 61)");
+    assert_eq!(format_color_code(Color::Indexed(236)), "236 (256: 236)");
     assert_eq!(format_color_code(Color::Reset), "default");
-    assert_eq!(format_color_code(Color::Cyan), "cyan");
-    assert_eq!(format_color_code(Color::Black), "black");
+    assert_eq!(format_color_code(Color::Cyan), "cyan (256: 6)");
+    assert_eq!(format_color_code(Color::Black), "black (256: 0)");
 
     // 2. extract_preview_color_at tests
     let styles = bashmenu_tui::ResolvedThemeStyles::default();
@@ -1106,7 +1109,10 @@ fn test_format_color_code_and_extract_preview_color() {
     buf[(2, 2)]
         .set_char(' ')
         .set_style(Style::default().bg(Color::Indexed(236)));
-    assert_eq!(extract_preview_color_at(&buf, 2, 2, &styles), "236");
+    assert_eq!(
+        extract_preview_color_at(&buf, 2, 2, &styles),
+        "236 (256: 236)"
+    );
 
     // Cell (3, 2): border glyph '─' with foreground color 61
     buf[(3, 2)].set_char('─').set_style(
@@ -1114,13 +1120,19 @@ fn test_format_color_code_and_extract_preview_color() {
             .fg(Color::Indexed(61))
             .bg(Color::Indexed(236)),
     );
-    assert_eq!(extract_preview_color_at(&buf, 3, 2, &styles), "61");
+    assert_eq!(
+        extract_preview_color_at(&buf, 3, 2, &styles),
+        "61 (256: 61)"
+    );
 
     // Cell (4, 2): text glyph 'A' with TrueColor RGB foreground
     buf[(4, 2)]
         .set_char('A')
         .set_style(Style::default().fg(Color::Rgb(255, 100, 50)));
-    assert_eq!(extract_preview_color_at(&buf, 4, 2, &styles), "#ff6432");
+    assert_eq!(
+        extract_preview_color_at(&buf, 4, 2, &styles),
+        "#ff6432 (256: 167)"
+    );
 
     // Cell (5, 2): half-block wallpaper glyph '▀' with RGB upper and lower
     buf[(5, 2)].set_char('▀').set_style(
@@ -1128,7 +1140,10 @@ fn test_format_color_code_and_extract_preview_color() {
             .fg(Color::Rgb(40, 50, 60))
             .bg(Color::Rgb(20, 25, 30)),
     );
-    assert_eq!(extract_preview_color_at(&buf, 5, 2, &styles), "#28323c");
+    assert_eq!(
+        extract_preview_color_at(&buf, 5, 2, &styles),
+        "#28323c (256: 236)"
+    );
 
     // Verify toast message construction with 2 lines
     let label = "Horizontal Border";
@@ -1137,7 +1152,7 @@ fn test_format_color_code_and_extract_preview_color() {
     let lines: Vec<&str> = toast_msg.lines().collect();
     assert_eq!(lines.len(), 2);
     assert_eq!(lines[0], "Selected: Horizontal Border");
-    assert_eq!(lines[1], "Color Clicked: 61");
+    assert_eq!(lines[1], "Color Clicked: 61 (256: 61)");
 }
 
 #[test]

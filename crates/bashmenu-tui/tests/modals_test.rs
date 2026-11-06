@@ -1432,25 +1432,30 @@ fn test_color_picker_modal_truecolor_and_tabs() {
     assert_eq!(modal_rgb.hex_input, "#00FFAA");
     assert_eq!(modal_rgb.current_color, Color::Rgb(0, 255, 170));
 
-    // 5. Mouse tab switching
+    // 5. Mouse tab switching and close button [X]
+    let area = Rect::new(0, 0, 80, 30);
+    let inner_area = bashmenu_tui::compute_modal_inner(area, 64, 23);
+
     let mouse_down = MouseEvent {
         kind: MouseEventKind::Down(MouseButton::Left),
-        column: 5,
-        row: 5,
+        column: inner_area.x + 25,
+        row: inner_area.y,
         modifiers: crossterm::event::KeyModifiers::empty(),
     };
-    // Click on Tab 2 header
-    let mouse_tab2 = MouseEvent {
-        column: 25,
-        row: 5,
+    // Click on Tab 2 header switches tab
+    modal_rgb.handle_mouse(mouse_down, area);
+    assert_eq!(modal_rgb.tab, ColorPickerTab::TrueColorHsv);
+
+    // Click on [X] close button returns Some(None) to dismiss/close
+    let mouse_close = MouseEvent {
+        column: inner_area.x + inner_area.width - 2,
+        row: inner_area.y.saturating_sub(1),
         ..mouse_down
     };
-    modal_rgb.handle_mouse(mouse_tab2, (0, 5));
-    assert_eq!(modal_rgb.tab, ColorPickerTab::TrueColorHsv);
+    assert_eq!(modal_rgb.handle_mouse(mouse_close, area), Some(None));
 
     // 6. Buffer rendering without panic across all tabs
     let styles = ResolvedThemeStyles::default();
-    let area = Rect::new(0, 0, 80, 30);
     let mut buf = Buffer::empty(area);
 
     modal_rgb.tab = ColorPickerTab::Palette256;

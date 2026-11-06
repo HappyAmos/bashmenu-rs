@@ -442,7 +442,7 @@ fn main() -> Result<()> {
                         }
                     }
                     Event::Mouse(m) => {
-                        if let Some(res) = modal.handle_mouse(m, last_grid_origin) {
+                        if let Some(res) = modal.handle_mouse(m, area) {
                             if let Some(color) = res {
                                 state.set_color_token_value(key, color);
                             }
