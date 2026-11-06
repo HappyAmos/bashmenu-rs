@@ -578,7 +578,7 @@ fn test_themeedit_background_color_and_wallpaper_tokens() {
     assert!(state.select_token_by_key("bg"));
     assert_eq!(state.tokens[state.selected_idx].label, "Background Color");
 
-    // 2. Wallpaper Image token exists and displays None initially
+    // 2. Wallpaper tokens exist and display defaults initially
     let wp_token = state
         .tokens
         .iter()
@@ -587,16 +587,86 @@ fn test_themeedit_background_color_and_wallpaper_tokens() {
         .expect("Wallpaper Image token must exist");
     assert_eq!(state.get_token_value_display(&wp_token), "None");
 
-    // 3. Set wallpaper image
-    state.set_wallpaper_image(Some("assets/wallpapers/twilight.png".to_string()));
+    let op_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Wallpaper Opacity")
+        .cloned()
+        .expect("Wallpaper Opacity token must exist");
+    assert_eq!(state.get_token_value_display(&op_token), "0.85");
+
+    let sc_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Wallpaper Scaling")
+        .cloned()
+        .expect("Wallpaper Scaling token must exist");
+    assert_eq!(state.get_token_value_display(&sc_token), "cover");
+
+    let md_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Wallpaper Mode")
+        .cloned()
+        .expect("Wallpaper Mode token must exist");
+    assert_eq!(state.get_token_value_display(&md_token), "halfblock");
+
+    let cl_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Wallpaper Clustering")
+        .cloned()
+        .expect("Wallpaper Clustering token must exist");
+    assert_eq!(state.get_token_value_display(&cl_token), "0");
+
+    let qu_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Wallpaper Quantization")
+        .cloned()
+        .expect("Wallpaper Quantization token must exist");
+    assert_eq!(state.get_token_value_display(&qu_token), "1");
+
+    // 3. Set full wallpaper configuration
+    use bashmenu_core::WallpaperConfig;
+    state.set_wallpaper_config(Some(WallpaperConfig {
+        enabled: true,
+        image: Some("assets/wallpapers/twilight.png".to_string()),
+        opacity: 0.60,
+        scaling: "stretch".to_string(),
+        clustering: 32,
+        quantization: 16,
+        mode: Some("quarterblock".to_string()),
+    }));
+
     assert_eq!(state.get_token_value_display(&wp_token), "twilight.png");
+    assert_eq!(state.get_token_value_display(&op_token), "0.60");
+    assert_eq!(state.get_token_value_display(&sc_token), "stretch");
+    assert_eq!(state.get_token_value_display(&md_token), "quarterblock");
+    assert_eq!(state.get_token_value_display(&cl_token), "32");
+    assert_eq!(state.get_token_value_display(&qu_token), "16");
+
     assert!(state.select_token_by_key("wallpaper"));
     assert_eq!(state.tokens[state.selected_idx].label, "Wallpaper Image");
-    assert!(state.select_token_by_key("wallpaper_image"));
-    assert_eq!(state.tokens[state.selected_idx].label, "Wallpaper Image");
+    assert!(state.select_token_by_key("wallpaper_scaling"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Wallpaper Scaling");
+    assert!(state.select_token_by_key("wallpaper_mode"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Wallpaper Mode");
+    assert!(state.select_token_by_key("wallpaper_opacity"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Wallpaper Opacity");
+    assert!(state.select_token_by_key("wallpaper_clustering"));
+    assert_eq!(
+        state.tokens[state.selected_idx].label,
+        "Wallpaper Clustering"
+    );
+    assert!(state.select_token_by_key("wallpaper_quantization"));
+    assert_eq!(
+        state.tokens[state.selected_idx].label,
+        "Wallpaper Quantization"
+    );
 
     // 4. Remove/clear wallpaper image
-    state.set_wallpaper_image(None);
+    state.set_wallpaper_config(None);
     assert_eq!(state.get_token_value_display(&wp_token), "None");
 }
 

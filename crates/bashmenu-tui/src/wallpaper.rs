@@ -135,12 +135,28 @@ pub fn resolve_wallpaper_path(path_str: &str) -> Option<PathBuf> {
 /// Pre-calculated TrueColor values for a single terminal cell.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct WallpaperCell {
-    /// Upper half-pixel foreground color
+    /// Rendered glyph symbol (e.g. "▀" for halfblock, or quadrant characters
+    /// like "▖", "▗", "▞")
+    pub symbol: &'static str,
+    /// Upper half-pixel or primary foreground color
     pub upper: Color,
-    /// Lower half-pixel background color
+    /// Lower half-pixel or secondary background color
     pub lower: Color,
     /// Blended average background color for overlaid characters
     pub avg_bg: Color,
+}
+
+impl WallpaperCell {
+    /// Constructs a halfblock (`▀`) wallpaper cell with upper foreground
+    /// and lower background.
+    pub const fn new(upper: Color, lower: Color, avg_bg: Color) -> Self {
+        Self {
+            symbol: "▀",
+            upper,
+            lower,
+            avg_bg,
+        }
+    }
 }
 
 /// 2D grid of pre-calculated wallpaper cell colors matching terminal dimensions.
@@ -166,7 +182,8 @@ impl WallpaperGrid {
     }
 }
 
-/// Composite cache lookup key matching texture dimensions, background color, and scaling parameters.
+/// Composite cache lookup key matching texture dimensions, background color,
+/// and scaling parameters.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct CompositorCacheKey {
     /// Image source path or identifier
@@ -183,6 +200,10 @@ struct CompositorCacheKey {
     scaling: String,
     /// Color quantization step
     quantization: usize,
+    /// Color clustering distance threshold
+    clustering: usize,
+    /// Rendering mode ("halfblock" or "quarterblock")
+    mode: String,
 }
 
 /// Manages loading, caching, aspect-ratio scaling, and color blending of wallpapers.
@@ -283,6 +304,13 @@ impl WallpaperCompositor {
         let op_int = (op * 1000.0) as u32;
         let scaling = self.config.scaling.to_lowercase();
         let quant = self.config.quantization.max(1);
+        let clustering = self.config.clustering;
+        let mode = self
+            .config
+            .mode
+            .as_deref()
+            .unwrap_or("halfblock")
+            .to_lowercase();
 
         let key = CompositorCacheKey {
             image: self.config.image.clone().unwrap_or_default(),
@@ -292,13 +320,20 @@ impl WallpaperCompositor {
             opacity: op_int,
             scaling: scaling.clone(),
             quantization: quant,
+            clustering,
+            mode: mode.clone(),
         };
 
         if self.cached_key.as_ref() == Some(&key) && self.cached_grid.is_some() {
             return self.cached_grid.as_ref();
         }
 
-        let pixel_w = width as u32;
+        let is_quarterblock = mode == "quarterblock";
+        let pixel_w = if is_quarterblock {
+            (width * 2) as u32
+        } else {
+            width as u32
+        };
         let pixel_h = (height * 2) as u32;
 
         let scaled = scale_image(raw, pixel_w, pixel_h, &scaling, theme_bg_rgb);
@@ -310,60 +345,148 @@ impl WallpaperCompositor {
             theme_bg_rgb.2 as f32,
         );
 
+        let blend_pixel = |p: &Rgb<u8>| -> (u8, u8, u8) {
+            let r = ((p[0] as f32) * op + t_r * inv_op)
+                .round()
+                .clamp(0.0, 255.0) as u8;
+            let g = ((p[1] as f32) * op + t_g * inv_op)
+                .round()
+                .clamp(0.0, 255.0) as u8;
+            let b = ((p[2] as f32) * op + t_b * inv_op)
+                .round()
+                .clamp(0.0, 255.0) as u8;
+            if quant > 1 {
+                let q = quant as u8;
+                ((r / q) * q, (g / q) * q, (b / q) * q)
+            } else {
+                (r, g, b)
+            }
+        };
+
         let mut cells = Vec::with_capacity(width * height);
+
+        const QUADRANT_GLYPHS: [&str; 16] = [
+            " ", "▘", "▝", "▀", "▖", "▌", "▞", "▛", "▗", "▚", "▐", "▜", "▄", "▙", "▟", "█",
+        ];
 
         for row in 0..height {
             let y1 = (row * 2) as u32;
             let y2 = y1 + 1;
 
+            let mut anchor_cell: Option<WallpaperCell> = None;
+            let mut anchor_k: Option<(u8, u8, u8, u8, u8, u8)> = None;
+            let mut cluster_run = 0;
+
             for col in 0..width {
-                let x = col as u32;
-                let p1 = scaled.get_pixel(x, y1);
-                let p2 = scaled.get_pixel(x, y2);
+                let (cell, k) = if is_quarterblock {
+                    let x1 = (col * 2) as u32;
+                    let x2 = x1 + 1;
+                    let (r_tl, g_tl, b_tl) = blend_pixel(scaled.get_pixel(x1, y1));
+                    let (r_tr, g_tr, b_tr) = blend_pixel(scaled.get_pixel(x2, y1));
+                    let (r_bl, g_bl, b_bl) = blend_pixel(scaled.get_pixel(x1, y2));
+                    let (r_br, g_br, b_br) = blend_pixel(scaled.get_pixel(x2, y2));
 
-                let r1_b = ((p1[0] as f32) * op + t_r * inv_op)
-                    .round()
-                    .clamp(0.0, 255.0) as u8;
-                let g1_b = ((p1[1] as f32) * op + t_g * inv_op)
-                    .round()
-                    .clamp(0.0, 255.0) as u8;
-                let b1_b = ((p1[2] as f32) * op + t_b * inv_op)
-                    .round()
-                    .clamp(0.0, 255.0) as u8;
+                    let avg_r = ((r_tl as u16 + r_tr as u16 + r_bl as u16 + r_br as u16) / 4) as u8;
+                    let avg_g = ((g_tl as u16 + g_tr as u16 + g_bl as u16 + g_br as u16) / 4) as u8;
+                    let avg_b = ((b_tl as u16 + b_tr as u16 + b_bl as u16 + b_br as u16) / 4) as u8;
 
-                let r2_b = ((p2[0] as f32) * op + t_r * inv_op)
-                    .round()
-                    .clamp(0.0, 255.0) as u8;
-                let g2_b = ((p2[1] as f32) * op + t_g * inv_op)
-                    .round()
-                    .clamp(0.0, 255.0) as u8;
-                let b2_b = ((p2[2] as f32) * op + t_b * inv_op)
-                    .round()
-                    .clamp(0.0, 255.0) as u8;
+                    let lum_tl = 0.299 * r_tl as f32 + 0.587 * g_tl as f32 + 0.114 * b_tl as f32;
+                    let lum_tr = 0.299 * r_tr as f32 + 0.587 * g_tr as f32 + 0.114 * b_tr as f32;
+                    let lum_bl = 0.299 * r_bl as f32 + 0.587 * g_bl as f32 + 0.114 * b_bl as f32;
+                    let lum_br = 0.299 * r_br as f32 + 0.587 * g_br as f32 + 0.114 * b_br as f32;
+                    let mean_lum = (lum_tl + lum_tr + lum_bl + lum_br) / 4.0;
 
-                let (r1, g1, b1, r2, g2, b2) = if quant > 1 {
-                    let q = quant as u8;
-                    (
-                        (r1_b / q) * q,
-                        (g1_b / q) * q,
-                        (b1_b / q) * q,
-                        (r2_b / q) * q,
-                        (g2_b / q) * q,
-                        (b2_b / q) * q,
-                    )
+                    let mut mask = 0usize;
+                    let mut fg_count = 0u16;
+                    let mut fg_sum = (0u16, 0u16, 0u16);
+                    let mut bg_count = 0u16;
+                    let mut bg_sum = (0u16, 0u16, 0u16);
+
+                    let mut add_subpixel = |lum: f32, r: u8, g: u8, b: u8, bit: usize| {
+                        if lum >= mean_lum {
+                            mask |= bit;
+                            fg_count += 1;
+                            fg_sum.0 += r as u16;
+                            fg_sum.1 += g as u16;
+                            fg_sum.2 += b as u16;
+                        } else {
+                            bg_count += 1;
+                            bg_sum.0 += r as u16;
+                            bg_sum.1 += g as u16;
+                            bg_sum.2 += b as u16;
+                        }
+                    };
+
+                    add_subpixel(lum_tl, r_tl, g_tl, b_tl, 1);
+                    add_subpixel(lum_tr, r_tr, g_tr, b_tr, 2);
+                    add_subpixel(lum_bl, r_bl, g_bl, b_bl, 4);
+                    add_subpixel(lum_br, r_br, g_br, b_br, 8);
+
+                    let fg = match std::num::NonZeroU16::new(fg_count) {
+                        Some(div) => Color::Rgb(
+                            (fg_sum.0 / div.get()) as u8,
+                            (fg_sum.1 / div.get()) as u8,
+                            (fg_sum.2 / div.get()) as u8,
+                        ),
+                        None => Color::Rgb(avg_r, avg_g, avg_b),
+                    };
+
+                    let bg = match std::num::NonZeroU16::new(bg_count) {
+                        Some(div) => Color::Rgb(
+                            (bg_sum.0 / div.get()) as u8,
+                            (bg_sum.1 / div.get()) as u8,
+                            (bg_sum.2 / div.get()) as u8,
+                        ),
+                        None => Color::Rgb(avg_r, avg_g, avg_b),
+                    };
+
+                    let c = WallpaperCell {
+                        symbol: QUADRANT_GLYPHS[mask],
+                        upper: fg,
+                        lower: bg,
+                        avg_bg: Color::Rgb(avg_r, avg_g, avg_b),
+                    };
+                    let (fg_r, fg_g, fg_b) = color_to_rgb(fg);
+                    let (bg_r, bg_g, bg_b) = color_to_rgb(bg);
+                    (c, (fg_r, fg_g, fg_b, bg_r, bg_g, bg_b))
                 } else {
-                    (r1_b, g1_b, b1_b, r2_b, g2_b, b2_b)
+                    let x = col as u32;
+                    let (r1, g1, b1) = blend_pixel(scaled.get_pixel(x, y1));
+                    let (r2, g2, b2) = blend_pixel(scaled.get_pixel(x, y2));
+
+                    let avg_r = ((r1 as u16 + r2 as u16) / 2) as u8;
+                    let avg_g = ((g1 as u16 + g2 as u16) / 2) as u8;
+                    let avg_b = ((b1 as u16 + b2 as u16) / 2) as u8;
+
+                    let c = WallpaperCell {
+                        symbol: "▀",
+                        upper: Color::Rgb(r1, g1, b1),
+                        lower: Color::Rgb(r2, g2, b2),
+                        avg_bg: Color::Rgb(avg_r, avg_g, avg_b),
+                    };
+                    (c, (r1, g1, b1, r2, g2, b2))
                 };
 
-                let avg_r = ((r1 as u16 + r2 as u16) / 2) as u8;
-                let avg_g = ((g1 as u16 + g2 as u16) / 2) as u8;
-                let avg_b = ((b1 as u16 + b2 as u16) / 2) as u8;
+                if clustering > 0 && cluster_run < 4 {
+                    if let (Some(anch), Some(ak)) = (anchor_cell, anchor_k) {
+                        let delta = (k.0 as i32 - ak.0 as i32).abs()
+                            + (k.1 as i32 - ak.1 as i32).abs()
+                            + (k.2 as i32 - ak.2 as i32).abs()
+                            + (k.3 as i32 - ak.3 as i32).abs()
+                            + (k.4 as i32 - ak.4 as i32).abs()
+                            + (k.5 as i32 - ak.5 as i32).abs();
+                        if delta as usize <= clustering {
+                            cluster_run += 1;
+                            cells.push(anch);
+                            continue;
+                        }
+                    }
+                }
 
-                cells.push(WallpaperCell {
-                    upper: Color::Rgb(r1, g1, b1),
-                    lower: Color::Rgb(r2, g2, b2),
-                    avg_bg: Color::Rgb(avg_r, avg_g, avg_b),
-                });
+                cluster_run = 0;
+                anchor_cell = Some(cell);
+                anchor_k = Some(k);
+                cells.push(cell);
             }
         }
 
@@ -524,8 +647,8 @@ pub fn composite_buffer(area: Rect, buf: &mut Buffer, grid: &WallpaperGrid, them
             }
 
             if padding {
-                // Padding space: render half-block with wallpaper top and bottom pixels
-                cell.set_symbol("▀");
+                // Padding space: render wallpaper glyph with upper/fg and lower/bg colors
+                cell.set_symbol(wp.symbol);
                 cell.fg = wp.upper;
                 cell.bg = wp.lower;
             } else {

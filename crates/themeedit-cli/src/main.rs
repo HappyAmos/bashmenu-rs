@@ -7,8 +7,9 @@
 use anyhow::Result;
 use bashmenu_core::{ToastNotification, ToastSeverity};
 use bashmenu_tui::{
-    install_panic_hook, AsciiGridModal, ColorPickerModal, ConfirmModal, FilePickerModal,
-    InputModal, ResolvedThemeStyles, TerminalGuard, ToastRack, WallpaperCompositor,
+    install_panic_hook, AsciiGridModal, BackgroundConfigAction, BackgroundConfigModal,
+    ColorPickerModal, ConfirmModal, FilePickerModal, InputModal, ResolvedThemeStyles,
+    TerminalGuard, ToastRack, WallpaperCompositor,
 };
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers, MouseButton, MouseEventKind};
@@ -76,11 +77,14 @@ enum ActiveModal {
     ConfirmDelete(ConfirmModal),
     /// Unsaved changes exit confirmation dialog.
     ConfirmExit(ConfirmModal),
-    /// Wallpaper image file browser dialog.
-    WallpaperPicker(FilePickerModal),
+    /// Background wallpaper configuration modal dialog.
+    BackgroundConfig(BackgroundConfigModal),
+    /// Wallpaper file browser launched from background configuration modal.
+    BackgroundBrowse(Box<BackgroundConfigModal>, FilePickerModal),
 }
 
-/// Visual flash highlight entry: (start time instant, list of `(x, y, length)` spans).
+/// Visual flash highlight entry: (start time instant, list of
+/// `(x, y, length)` spans).
 type FlashHighlight = (std::time::Instant, Vec<(u16, u16, u16)>);
 
 /// Entry point for the theme editor TUI application (`themeedit`).
@@ -383,7 +387,10 @@ fn main() -> Result<()> {
                     ActiveModal::ConfirmExit(modal) => {
                         modal.render(area, &preview_styles, buf);
                     }
-                    ActiveModal::WallpaperPicker(modal) => {
+                    ActiveModal::BackgroundConfig(modal) => {
+                        modal.render(area, &preview_styles, buf);
+                    }
+                    ActiveModal::BackgroundBrowse(_, modal) => {
                         modal.render(area, &preview_styles, buf);
                     }
                     ActiveModal::None => {}
@@ -692,10 +699,42 @@ fn main() -> Result<()> {
                     }
                     _ => {}
                 },
-                ActiveModal::WallpaperPicker(ref mut modal) => match ev {
-                    Event::Key(k) => {
-                        if k.code == KeyCode::Delete || k.code == KeyCode::Char('d') {
-                            state.set_wallpaper_image(None);
+                ActiveModal::BackgroundConfig(ref mut modal) => {
+                    let action = match ev {
+                        Event::Key(k) => modal.handle_key_with_modifiers(k.code, k.modifiers),
+                        Event::Mouse(m) => modal.handle_mouse(m, area),
+                        _ => BackgroundConfigAction::None,
+                    };
+                    match action {
+                        BackgroundConfigAction::None => {}
+                        BackgroundConfigAction::Browse => {
+                            let start_dir = if let Ok(cwd) = std::env::current_dir() {
+                                let wp_dir = cwd.join("assets/wallpapers");
+                                if wp_dir.is_dir() {
+                                    wp_dir
+                                } else {
+                                    cwd
+                                }
+                            } else {
+                                PathBuf::from(".")
+                            };
+                            let file_picker =
+                                FilePickerModal::new("Choose Wallpaper Image", &start_dir, false);
+                            active_modal =
+                                ActiveModal::BackgroundBrowse(Box::new(modal.clone()), file_picker);
+                        }
+                        BackgroundConfigAction::Apply(cfg) => {
+                            state.set_wallpaper_config(Some(cfg));
+                            toast_rack.add(ToastNotification {
+                                title: Some("Theme Editor".to_string()),
+                                message: "Wallpaper configured".to_string(),
+                                severity: ToastSeverity::Information,
+                                timeout_secs: 2.0,
+                            });
+                            active_modal = ActiveModal::None;
+                        }
+                        BackgroundConfigAction::Remove => {
+                            state.set_wallpaper_config(None);
                             toast_rack.add(ToastNotification {
                                 title: Some("Theme Editor".to_string()),
                                 message: "Wallpaper removed".to_string(),
@@ -703,57 +742,36 @@ fn main() -> Result<()> {
                                 timeout_secs: 2.0,
                             });
                             active_modal = ActiveModal::None;
-                        } else if let Some(res) = modal.handle_key(k.code) {
-                            if let Some(path) = res {
-                                if path.is_file() {
-                                    let rel_path = if let Ok(cwd) = std::env::current_dir() {
-                                        if let Ok(rel) = path.strip_prefix(&cwd) {
-                                            rel.to_string_lossy().to_string()
-                                        } else {
-                                            path.to_string_lossy().to_string()
-                                        }
-                                    } else {
-                                        path.to_string_lossy().to_string()
-                                    };
-                                    state.set_wallpaper_image(Some(rel_path.clone()));
-                                    toast_rack.add(ToastNotification {
-                                        title: Some("Theme Editor".to_string()),
-                                        message: format!("Wallpaper: {}", rel_path),
-                                        severity: ToastSeverity::Information,
-                                        timeout_secs: 2.0,
-                                    });
-                                }
-                            }
+                        }
+                        BackgroundConfigAction::Cancel => {
                             active_modal = ActiveModal::None;
                         }
                     }
-                    Event::Mouse(m) => {
-                        if let Some(res) = modal.handle_mouse(m, area) {
-                            if let Some(path) = res {
-                                if path.is_file() {
-                                    let rel_path = if let Ok(cwd) = std::env::current_dir() {
-                                        if let Ok(rel) = path.strip_prefix(&cwd) {
-                                            rel.to_string_lossy().to_string()
-                                        } else {
-                                            path.to_string_lossy().to_string()
-                                        }
+                }
+                ActiveModal::BackgroundBrowse(ref mut bg_modal, ref mut file_picker) => {
+                    let picked = match ev {
+                        Event::Key(k) => file_picker.handle_key_with_modifiers(k.code, k.modifiers),
+                        Event::Mouse(m) => file_picker.handle_mouse(m, area),
+                        _ => None,
+                    };
+                    if let Some(res) = picked {
+                        if let Some(path) = res {
+                            if path.is_file() {
+                                let rel_path = if let Ok(cwd) = std::env::current_dir() {
+                                    if let Ok(rel) = path.strip_prefix(&cwd) {
+                                        rel.to_string_lossy().to_string()
                                     } else {
                                         path.to_string_lossy().to_string()
-                                    };
-                                    state.set_wallpaper_image(Some(rel_path.clone()));
-                                    toast_rack.add(ToastNotification {
-                                        title: Some("Theme Editor".to_string()),
-                                        message: format!("Wallpaper: {}", rel_path),
-                                        severity: ToastSeverity::Information,
-                                        timeout_secs: 2.0,
-                                    });
-                                }
+                                    }
+                                } else {
+                                    path.to_string_lossy().to_string()
+                                };
+                                bg_modal.set_image_path(&rel_path);
                             }
-                            active_modal = ActiveModal::None;
                         }
+                        active_modal = ActiveModal::BackgroundConfig(*bg_modal.clone());
                     }
-                    _ => {}
-                },
+                }
                 ActiveModal::None => {
                     let bot_y = area.y + area.height - 1;
                     let footer_y = bot_y.saturating_sub(1);
@@ -1271,28 +1289,22 @@ fn main() -> Result<()> {
                                     }
                                 }
                                 KeyCode::F(4) | KeyCode::Char('b') => {
-                                    let start_dir = if let Ok(cwd) = std::env::current_dir() {
-                                        let wp_dir = cwd.join("assets/wallpapers");
-                                        if wp_dir.is_dir() {
-                                            wp_dir
-                                        } else {
-                                            cwd
-                                        }
-                                    } else {
-                                        PathBuf::from(".")
-                                    };
-                                    active_modal =
-                                        ActiveModal::WallpaperPicker(FilePickerModal::new(
-                                            "Choose Wallpaper Image",
-                                            &start_dir,
-                                            false,
-                                        ));
+                                    let wp_cfg = state.current_theme.wallpaper_config();
+                                    active_modal = ActiveModal::BackgroundConfig(
+                                        BackgroundConfigModal::new(wp_cfg.as_ref()),
+                                    );
                                 }
                                 KeyCode::Delete => {
-                                    if state.tokens[state.selected_idx].kind
-                                        == TokenKind::WallpaperImage
-                                    {
-                                        state.set_wallpaper_image(None);
+                                    if matches!(
+                                        state.tokens[state.selected_idx].kind,
+                                        TokenKind::WallpaperImage
+                                            | TokenKind::WallpaperOpacity
+                                            | TokenKind::WallpaperScaling
+                                            | TokenKind::WallpaperMode
+                                            | TokenKind::WallpaperClustering
+                                            | TokenKind::WallpaperQuantization
+                                    ) {
+                                        state.set_wallpaper_config(None);
                                         toast_rack.add(ToastNotification {
                                             title: Some("Theme Editor".to_string()),
                                             message: "Wallpaper removed".to_string(),
@@ -1311,10 +1323,16 @@ fn main() -> Result<()> {
                                     }
                                 }
                                 KeyCode::Backspace => {
-                                    if state.tokens[state.selected_idx].kind
-                                        == TokenKind::WallpaperImage
-                                    {
-                                        state.set_wallpaper_image(None);
+                                    if matches!(
+                                        state.tokens[state.selected_idx].kind,
+                                        TokenKind::WallpaperImage
+                                            | TokenKind::WallpaperOpacity
+                                            | TokenKind::WallpaperScaling
+                                            | TokenKind::WallpaperMode
+                                            | TokenKind::WallpaperClustering
+                                            | TokenKind::WallpaperQuantization
+                                    ) {
+                                        state.set_wallpaper_config(None);
                                         toast_rack.add(ToastNotification {
                                             title: Some("Theme Editor".to_string()),
                                             message: "Wallpaper removed".to_string(),
@@ -1381,22 +1399,15 @@ fn open_selected_token_picker(state: &mut ThemeEditorState, active_modal: &mut A
             *active_modal =
                 ActiveModal::ColorPicker(key, ColorPickerModal::new(title, initial_color));
         }
-        TokenKind::WallpaperImage => {
-            let start_dir = if let Ok(cwd) = std::env::current_dir() {
-                let wp_dir = cwd.join("assets/wallpapers");
-                if wp_dir.is_dir() {
-                    wp_dir
-                } else {
-                    cwd
-                }
-            } else {
-                PathBuf::from(".")
-            };
-            *active_modal = ActiveModal::WallpaperPicker(FilePickerModal::new(
-                "Choose Wallpaper Image",
-                &start_dir,
-                false,
-            ));
+        TokenKind::WallpaperImage
+        | TokenKind::WallpaperOpacity
+        | TokenKind::WallpaperScaling
+        | TokenKind::WallpaperMode
+        | TokenKind::WallpaperClustering
+        | TokenKind::WallpaperQuantization => {
+            let wp_cfg = state.current_theme.wallpaper_config();
+            *active_modal =
+                ActiveModal::BackgroundConfig(BackgroundConfigModal::new(wp_cfg.as_ref()));
         }
         TokenKind::Border(key) => {
             *active_modal =

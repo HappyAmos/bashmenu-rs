@@ -73,6 +73,16 @@ pub enum TokenKind {
     ToastChar,
     /// Background wallpaper image path
     WallpaperImage,
+    /// Background wallpaper opacity factor
+    WallpaperOpacity,
+    /// Background wallpaper scaling algorithm
+    WallpaperScaling,
+    /// Background wallpaper rendering mode
+    WallpaperMode,
+    /// Background wallpaper color clustering distance
+    WallpaperClustering,
+    /// Background wallpaper palette color quantization step
+    WallpaperQuantization,
 }
 
 /// An individual editable theme token entry in the sidebar.
@@ -91,6 +101,11 @@ impl TokenItem {
             TokenKind::Color(_) => TokenCategory::Colors,
             TokenKind::Border(_) => TokenCategory::Borders,
             TokenKind::WallpaperImage
+            | TokenKind::WallpaperOpacity
+            | TokenKind::WallpaperScaling
+            | TokenKind::WallpaperMode
+            | TokenKind::WallpaperClustering
+            | TokenKind::WallpaperQuantization
             | TokenKind::Indicator
             | TokenKind::DividerChar
             | TokenKind::DividerLength
@@ -266,6 +281,26 @@ impl ThemeEditorState {
             TokenItem {
                 label: "Wallpaper Image".to_string(),
                 kind: TokenKind::WallpaperImage,
+            },
+            TokenItem {
+                label: "Wallpaper Opacity".to_string(),
+                kind: TokenKind::WallpaperOpacity,
+            },
+            TokenItem {
+                label: "Wallpaper Scaling".to_string(),
+                kind: TokenKind::WallpaperScaling,
+            },
+            TokenItem {
+                label: "Wallpaper Mode".to_string(),
+                kind: TokenKind::WallpaperMode,
+            },
+            TokenItem {
+                label: "Wallpaper Clustering".to_string(),
+                kind: TokenKind::WallpaperClustering,
+            },
+            TokenItem {
+                label: "Wallpaper Quantization".to_string(),
+                kind: TokenKind::WallpaperQuantization,
             },
             // Colors
             TokenItem {
@@ -634,6 +669,41 @@ impl ThemeEditorState {
                 }
                 "None".to_string()
             }
+            TokenKind::WallpaperOpacity => {
+                if let Some(wp) = self.current_theme.wallpaper_config() {
+                    format!("{:.2}", wp.opacity)
+                } else {
+                    "0.85".to_string()
+                }
+            }
+            TokenKind::WallpaperScaling => {
+                if let Some(wp) = self.current_theme.wallpaper_config() {
+                    wp.scaling.clone()
+                } else {
+                    "cover".to_string()
+                }
+            }
+            TokenKind::WallpaperMode => {
+                if let Some(wp) = self.current_theme.wallpaper_config() {
+                    wp.mode.clone().unwrap_or_else(|| "halfblock".to_string())
+                } else {
+                    "halfblock".to_string()
+                }
+            }
+            TokenKind::WallpaperClustering => {
+                if let Some(wp) = self.current_theme.wallpaper_config() {
+                    format!("{}", wp.clustering)
+                } else {
+                    "0".to_string()
+                }
+            }
+            TokenKind::WallpaperQuantization => {
+                if let Some(wp) = self.current_theme.wallpaper_config() {
+                    format!("{}", wp.quantization)
+                } else {
+                    "1".to_string()
+                }
+            }
         }
     }
 
@@ -739,16 +809,34 @@ impl ThemeEditorState {
         }
     }
 
-    /// Configures or removes the background wallpaper image file path.
-    pub fn set_wallpaper_image(&mut self, path: Option<String>) {
-        match path {
-            Some(p) => {
-                let mut cfg = self.current_theme.wallpaper_config().unwrap_or_default();
-                cfg.image = Some(p.clone());
-                cfg.enabled = true;
-                self.current_theme.background = Some(WallpaperSetting::Config(cfg));
-                self.is_modified = true;
-                self.status_message = format!("Set wallpaper image to {}", p);
+    /// Applies or clears full background wallpaper configuration.
+    pub fn set_wallpaper_config(&mut self, config: Option<bashmenu_core::WallpaperConfig>) {
+        match config {
+            Some(mut cfg) => {
+                let has_img = cfg
+                    .image
+                    .as_deref()
+                    .map(|s| !s.trim().is_empty())
+                    .unwrap_or(false);
+                if has_img {
+                    cfg.enabled = true;
+                    let display_name = cfg
+                        .image
+                        .as_deref()
+                        .and_then(|p| std::path::Path::new(p).file_name())
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("image")
+                        .to_string();
+                    self.current_theme.background = Some(WallpaperSetting::Config(cfg));
+                    self.is_modified = true;
+                    self.status_message = format!("Configured wallpaper: {}", display_name);
+                } else {
+                    self.current_theme.background = None;
+                    self.current_theme.extra.remove("wallpaper");
+                    self.current_theme.extra.remove("theme_background");
+                    self.is_modified = true;
+                    self.status_message = "Removed wallpaper image".to_string();
+                }
             }
             None => {
                 self.current_theme.background = None;
@@ -756,6 +844,20 @@ impl ThemeEditorState {
                 self.current_theme.extra.remove("theme_background");
                 self.is_modified = true;
                 self.status_message = "Removed wallpaper image".to_string();
+            }
+        }
+    }
+
+    /// Configures or removes the background wallpaper image file path.
+    pub fn set_wallpaper_image(&mut self, path: Option<String>) {
+        match path {
+            Some(p) => {
+                let mut cfg = self.current_theme.wallpaper_config().unwrap_or_default();
+                cfg.image = Some(p);
+                self.set_wallpaper_config(Some(cfg));
+            }
+            None => {
+                self.set_wallpaper_config(None);
             }
         }
     }
@@ -1249,6 +1351,15 @@ impl ThemeEditorState {
                 TokenKind::MarqueeGap => key == "marquee_gap",
                 TokenKind::ToastChar => key == "toast_char",
                 TokenKind::WallpaperImage => key == "wallpaper" || key == "wallpaper_image",
+                TokenKind::WallpaperOpacity => key == "wallpaper_opacity" || key == "opacity",
+                TokenKind::WallpaperScaling => key == "wallpaper_scaling" || key == "scaling",
+                TokenKind::WallpaperMode => key == "wallpaper_mode" || key == "mode",
+                TokenKind::WallpaperClustering => {
+                    key == "wallpaper_clustering" || key == "clustering"
+                }
+                TokenKind::WallpaperQuantization => {
+                    key == "wallpaper_quantization" || key == "quantization"
+                }
             })
             .or_else(|| {
                 // 2. Fallback aliases
@@ -1334,7 +1445,12 @@ pub fn get_token_preview_spans(
                 ));
             }
         }
-        TokenKind::WallpaperImage => {
+        TokenKind::WallpaperImage
+        | TokenKind::WallpaperOpacity
+        | TokenKind::WallpaperScaling
+        | TokenKind::WallpaperMode
+        | TokenKind::WallpaperClustering
+        | TokenKind::WallpaperQuantization => {
             for y in (right_area.y + 1)..bot_y {
                 spans.push((
                     y,

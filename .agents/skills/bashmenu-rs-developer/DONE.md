@@ -463,6 +463,21 @@
   - Verified `cargo fmt`, `cargo clippy`, and `cargo test` pass with 0 warnings.
   - Committed and pushed to `origin/main` (commit `1a773d5`), verified remote GitHub Actions CI run `42222195860` passed with `'success'`.
 
+- [x] **Theme Editor Background Wallpaper Configuration Parity with Python:**
+  - Implemented interactive `BackgroundConfigModal` in `crates/bashmenu-tui/src/modals/background_config.rs` matching Python's `BackgroundConfigModal` with full 1:1 option parity:
+    - Wallpaper Image file path input + `[ Browse... ]` button launching `FilePickerModal`.
+    - Opacity factor input (`0.0` to `1.0`).
+    - Scaling algorithm selector: `cover` (fill window), `stretch` (exact fit), `fit` (proportional), `center` (original size), `tile` (repeat pattern).
+    - Rendering mode selector: `halfblock` (`▀▄` dual-pixel) and `quarterblock` (`▖▗` quad-pixel).
+    - Color clustering distance input (`0`=none, `16` to `128`).
+    - Palette quantization step input (`1`=off, `16` to `256`).
+    - Action buttons: `[ Apply ]`, `[ Remove Wallpaper ]`, `[ Cancel ]`, plus top-right `[X]` frame close button.
+  - Implemented authentic quadrant block compositing (`mode == "quarterblock"`) and color clustering (`clustering > 0`) in `WallpaperCompositor::get_grid` in `crates/bashmenu-tui/src/wallpaper.rs`.
+  - Added individual wallpaper sub-tokens in `crates/themeedit-cli/src/lib.rs` under `TokenCategory::Theme` (`Wallpaper Image`, `Wallpaper Opacity`, `Wallpaper Scaling`, `Wallpaper Mode`, `Wallpaper Clustering`, `Wallpaper Quantization`), with live display, key matching, and live span highlights.
+  - Wired `BackgroundConfigModal` and `BackgroundBrowse` into `crates/themeedit-cli/src/main.rs`, bound to shortcut <kbd>b</kbd>, <kbd>F4</kbd>, and Enter on any wallpaper token.
+  - Added comprehensive unit and integration tests in `crates/bashmenu-tui/tests/background_config_modal_test.rs`, `crates/bashmenu-tui/tests/wallpaper_test.rs`, and `crates/themeedit-cli/tests/themeedit_test.rs`.
+  - Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass with zero warnings or errors.
+
 
 
 

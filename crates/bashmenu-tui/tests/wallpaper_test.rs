@@ -96,6 +96,7 @@ fn test_composite_buffer_padding_and_glyphs() {
     }
 
     let default_cell = WallpaperCell {
+        symbol: "▀",
         upper: Color::Rgb(100, 150, 200),
         lower: Color::Rgb(50, 75, 100),
         avg_bg: Color::Rgb(75, 112, 150),
@@ -344,4 +345,98 @@ fn test_downsample_palette_to_16_and_8() {
     let title8 = pal8.get("title").and_then(|v| v.as_sequence()).unwrap();
     assert_eq!(title8[0].as_str(), Some("COLOR_MAGENTA"));
     assert_eq!(title8[1].as_i64(), Some(-1));
+}
+
+#[test]
+fn test_wallpaper_compositor_quarterblock_mode() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
+    std::env::set_var("BASHMENU_DIR", &repo_root);
+
+    let config = WallpaperConfig {
+        enabled: true,
+        image: Some("assets/wallpapers/alaska-mountain.png".to_string()),
+        opacity: 0.85,
+        scaling: "stretch".to_string(),
+        clustering: 0,
+        quantization: 1,
+        mode: Some("quarterblock".to_string()),
+    };
+
+    let mut compositor = WallpaperCompositor::new(config);
+    let theme_bg = Color::Indexed(235);
+
+    let grid = compositor.get_grid(30, 15, theme_bg);
+    assert!(grid.is_some(), "Grid should compute in quarterblock mode");
+    let grid_ref = grid.unwrap();
+    assert_eq!(grid_ref.width, 30);
+    assert_eq!(grid_ref.height, 15);
+    assert_eq!(grid_ref.cells.len(), 30 * 15);
+
+    // Verify quadrant glyphs are used
+    let valid_quadrants = [
+        " ", "▘", "▝", "▀", "▖", "▌", "▞", "▛", "▗", "▚", "▐", "▜", "▄", "▙", "▟", "█",
+    ];
+    let mut non_halfblock_quadrant_found = false;
+    for cell in &grid_ref.cells {
+        assert!(
+            valid_quadrants.contains(&cell.symbol),
+            "Cell symbol '{}' must be a valid quadrant glyph",
+            cell.symbol
+        );
+        if cell.symbol != "▀" && cell.symbol != " " && cell.symbol != "█" {
+            non_halfblock_quadrant_found = true;
+        }
+    }
+    assert!(
+        non_halfblock_quadrant_found,
+        "Quarterblock mode should generate authentic quadrant characters across a photographic texture"
+    );
+}
+
+#[test]
+fn test_wallpaper_compositor_clustering() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
+    std::env::set_var("BASHMENU_DIR", &repo_root);
+
+    let unclustered_cfg = WallpaperConfig {
+        enabled: true,
+        image: Some("assets/wallpapers/alaska-mountain.png".to_string()),
+        opacity: 0.85,
+        scaling: "stretch".to_string(),
+        clustering: 0,
+        quantization: 1,
+        mode: Some("halfblock".to_string()),
+    };
+    let mut comp_unclustered = WallpaperCompositor::new(unclustered_cfg);
+
+    let clustered_cfg = WallpaperConfig {
+        enabled: true,
+        image: Some("assets/wallpapers/alaska-mountain.png".to_string()),
+        opacity: 0.85,
+        scaling: "stretch".to_string(),
+        clustering: 60,
+        quantization: 1,
+        mode: Some("halfblock".to_string()),
+    };
+    let mut comp_clustered = WallpaperCompositor::new(clustered_cfg);
+
+    let theme_bg = Color::Indexed(235);
+    let g_unclustered = comp_unclustered.get_grid(40, 20, theme_bg).unwrap();
+    let g_clustered = comp_clustered.get_grid(40, 20, theme_bg).unwrap();
+
+    // In the clustered grid, there should be consecutive identical adjacent cells in runs <= 4
+    let mut cluster_runs_found = 0;
+    for y in 0..20 {
+        for x in 1..40 {
+            if g_clustered.get(x, y) == g_clustered.get(x - 1, y)
+                && g_unclustered.get(x, y) != g_unclustered.get(x - 1, y)
+            {
+                cluster_runs_found += 1;
+            }
+        }
+    }
+    assert!(
+        cluster_runs_found > 0,
+        "Clustering threshold should merge near-identical adjacent cells"
+    );
 }
