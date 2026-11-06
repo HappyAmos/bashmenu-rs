@@ -15,6 +15,9 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
 ---
 
 ## 2. Core Development Workflow & Invariants
+- **Permanent Rules & Invariants Default Location:**
+  - All permanent operational invariants and developer rules are centralized in `.agents/rules/invariants.md`.
+  - All agentic resources (rules, skills, task tracking) must remain strictly organized within the `.agents/` directory; do not create root `AGENTS.md` files.
 - **Mandatory Git Commit & Push on All Changes:**
   - Every completed task, bug fix, feature addition, or refactoring step must conclude by creating a concise, descriptive git commit (`git commit -m "..."`) and pushing directly to GitHub (`git push origin main`).
   - Never leave changes uncommitted or unpushed in the local repository.

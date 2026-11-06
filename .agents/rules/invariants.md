@@ -26,7 +26,7 @@
 - **Menu Priority Over Plugins:** When terminal viewport height is constrained, plugin rows must automatically truncate or drop first so menu items and the status gutter remain completely visible.
 - **Modal View Selection & Background Invariant:** Text inside modal frames must inherit the modal frame's `styles.background`. Active/highlighted items or selectable links in note viewers must use inverted text (`Modifier::REVERSED`) rather than glyph markers (`►`) or clashing highlight background fills.
 - **Unicode-Safe Text Editing & Universal Clipboard:** All single-line (`TextInput`) and multi-line text editors (`bashedit`, `NoteEditorModal`, `menuedit` multi-line fields) must operate on Unicode `char` counts (never byte slices), soft-wrap at word boundaries (`wrap_chars_by_word`), and support `Shift+Directional` selection plus `Ctrl+C` / `Ctrl+V` / `Ctrl+X` clipboard operations (`bashmenu_tui::clipboard`).
-- **Spread Help Gutters, Connected Titles & Scrollbars:** Help gutters may use up to 2 lines above the bottom border, treating `|` as a word delimiter (`wrap_spread_help_gutter`) and spreading items across the full width. Panel titles must connect directly to borders (`┌─[ Title ]───`). Scrollable views (`menuedit` tree, `NoteViewerModal`, `NoteEditorModal`) must reserve 1 row above the bottom border and render a scrollbar 1 column inside the right border when content overflows.
+- **Spread Help Gutters, Key Priorities & Dynamic Sizing:** Help gutters may use up to 2 lines above the bottom border, treating `|` as a word delimiter (`wrap_spread_help_gutter`) and spreading items across the full width. Navigation hint omission: do NOT include `[UP/DN]: Nav` in the help gutter across any view (standard menu, shortcuts mode, notebook view) to conserve critical line width. Priority placement: hardcoded keys `[F8]: ThemeEdit` and `[F9]: ShortcutEdit` must be positioned immediately following `[F2]: Themes` so both remain visible on the second gutter line and clickable on standard 80- and 100-column terminals. Dynamic gutter sizing: gutter dimensions (`left_gutter_w`, `right_gutter_w`, `sep_x`) must dynamically balance width between the help gutter and status gutter based on active status tokens, avoiding a rigid 50/50 split that starves the help gutter. Panel titles must connect directly to borders (`┌─[ Title ]───`). Scrollable views (`menuedit` tree, `NoteViewerModal`, `NoteEditorModal`) must reserve 1 row above the bottom border and render a scrollbar 1 column inside the right border when content overflows.
 - **Toast Notification Dispatch Invariant:** Non-blocking toast notifications (`{toast:SECONDS:"MESSAGE"}` or `type: toast`) must dock in the bottom-right corner above the status gutter. They must display the colored left accent block `▌` (`\u{258c}`), theme panel background, bold title, and wrapped body. They dismiss automatically on timeout or immediately on mouse click. When `{toast:...}` appears in a menu command/script and leaves an empty command string, never execute an external shell.
 - **Marquee Ticker & Overflow Invariant:** Selected menu items overflowing available column width must scroll horizontally via `get_marquee_slice` using the active theme's `marquee.char` and `marquee.gap`. Navigation or selection changes must reset the marquee with a 4-tick (1.0s) pause delay. Non-selected items must truncate with an ellipsis (`…`). When any modal screen is active, the marquee ticker must pause.
 - **TUI Border Multi-Byte Visual Width Invariant:** When constructing borders and calculating dialog padding, always measure text and icon width using visual terminal columns (`UnicodeWidthStr::width()`), never byte length (`.len()`). Multi-byte UTF-8 glyphs (`▲`, `▼`, `•`, `▌`) will otherwise offset corners and indent borders.
@@ -61,4 +61,33 @@
 - **Pending Marker (`PENDING`):** When working on a TODO item, you MUST mark it as `PENDING` (`- [ ] PENDING: ...`). When completed, remove the `PENDING` label and mark it as complete (`- [x] ...`).
 - **Log to `DONE.md` & Prune Finished Tasks:** Append a summary of every completed task to `.agents/skills/bashmenu-rs-developer/DONE.md`. When there are no more tasks to complete, remove finished (`- [x]`) tasks from the TODO list, and re-check the TODO list to make sure no new tasks have been added.
 - **Long-Running Process Periodic Status Updates:** When working on long running processes (tasks that are more than 1 minute to complete), give a short blurb of what you are working on at least every 2 minutes.
+
+## 6. Installation & Uninstallation Invariants
+
+### Installer (`install.sh`)
+- **Workspace Compilation:** Must compile all binaries in release mode (`cargo build --release --workspace`).
+- **Binary Installation:** Must install all 8 workspace binaries into `$BIN_DIR` (`$HOME/.local/bin` or `$PREFIX/bin` or `/usr/local/bin`):
+  - `bashmenu` (Main menu TUI)
+  - `ymlcheck` (YAML validation CLI)
+  - `menuedit` (Visual menu editor)
+  - `shortcutedit` (Visual shortcut editor)
+  - `themeedit` (Visual theme and palette editor)
+  - `bashedit` (Swap-safe text editor)
+  - `bmpager` (Native terminal pager with markdown support)
+  - `cheat` (Interactive cheatsheet browser)
+- **Convenience Symlinks:** Must link `bm` -> `bashmenu` and `rich` -> `rich.sh`.
+- **Manual Page Installation:** Must install `bashmenu.1` to `$MAN_DIR` (`$HOME/.local/share/man/man1` or system equivalent).
+- **Configuration Seeding:** Must copy initial configuration fixtures (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `cheat.yml`) into `~/.config/bashmenu/` without overwriting existing user files.
+- **Output Banner:** The summary of installed commands displayed to the user must explicitly list `cheat` along with all other tools.
+
+### Uninstaller (`uninstall.sh`)
+- **Complete Binary Cleanup:** Must remove all installed binaries and symlinks (`bashmenu`, `bm`, `ymlcheck`, `menuedit`, `shortcutedit`, `themeedit`, `bashedit`, `bmpager`, `cheat`, `rich`) from `$BIN_DIR`.
+- **Manual Page Cleanup:** Must remove installed manual page `bashmenu.1` from `$MAN_DIR`.
+- **Settings Preservation:**
+  - Interactive mode must prompt the user whether to keep their settings and notebooks in `~/.config/bashmenu` with a default of **Yes (Keep)** (`[Y/n]`).
+  - Supports non-interactive flags:
+    - `-k`, `--keep-settings`, `--keep-config`: Explicitly preserves user settings.
+    - `--remove-settings`, `--remove-config`: Explicitly removes user settings.
+    - `-y`, `--yes`: Non-interactive uninstall.
+
 
