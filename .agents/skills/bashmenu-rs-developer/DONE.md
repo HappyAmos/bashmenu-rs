@@ -417,6 +417,14 @@
   - Verified `cargo fmt`, `cargo clippy`, and `cargo test` pass with 0 warnings.
   - Committed and pushed to `origin/main` (commit `6747cdf`), verified remote GitHub Actions CI run `42149666239` passed.
 
+- [x] **File and Directory Pickers: Hidden Files Toggle:**
+  - Added `show_hidden: bool` field, `with_show_hidden(bool)` builder method, and `toggle_hidden()` to `FilePickerModal` (`crates/bashmenu-tui/src/modals/file_picker.rs`).
+  - Added keybindings `h`, `H`, `.`, and `Ctrl+H` to toggle visibility of hidden dotfile entries during navigation.
+  - Added interactive mouse button on bottom controls bar (`[h] Show Hidden` / `[h] Hide Hidden`) to toggle hidden files.
+  - Added unit and integration test in `crates/bashmenu-tui/tests/modals_test.rs` verifying hidden file skipping, toggling via keys and mouse, and badge state changes.
+  - Verified `cargo fmt`, `cargo clippy`, and `cargo test` pass with 0 warnings.
+  - Committed and pushed to `origin/main` (commit `56a3239`), verified remote GitHub Actions CI run `42150154497` passed.
+
 
 
 
