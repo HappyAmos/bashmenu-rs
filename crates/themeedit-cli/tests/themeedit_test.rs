@@ -1139,3 +1139,42 @@ fn test_format_color_code_and_extract_preview_color() {
     assert_eq!(lines[0], "Selected: Horizontal Border");
     assert_eq!(lines[1], "Color Clicked: 61");
 }
+
+#[test]
+fn test_themeedit_truecolor_token_support() {
+    use ratatui::style::Color;
+    use themeedit_cli::TokenKind;
+
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(fixture_path, Some("dracula".to_string()));
+
+    // 1. Set TrueColor RGB accent token
+    let dracula_purple = Color::Rgb(189, 147, 249);
+    state.set_color_token_value("accent", dracula_purple);
+    assert!(state.is_modified);
+    assert_eq!(state.get_color_token_color("accent"), dracula_purple);
+
+    let accent_token = state
+        .tokens
+        .iter()
+        .find(|t| matches!(&t.kind, TokenKind::Color(k) if k == "accent"))
+        .expect("accent token found");
+    assert_eq!(state.get_token_value_display(accent_token), "#bd93f9");
+
+    // 2. Set TrueColor RGB background token
+    let catppuccin_base = Color::Rgb(30, 30, 46);
+    state.set_color_token_value("background", catppuccin_base);
+    assert_eq!(state.get_color_token_color("background"), catppuccin_base);
+
+    let bg_token = state
+        .tokens
+        .iter()
+        .find(|t| matches!(&t.kind, TokenKind::Color(k) if k == "background"))
+        .expect("background token found");
+    assert_eq!(state.get_token_value_display(bg_token), "#1e1e2e");
+
+    // 3. Verify ResolvedThemeStyles propagates 24-bit TrueColor
+    let styles = bashmenu_tui::ResolvedThemeStyles::from_theme(&state.current_theme, true);
+    assert_eq!(styles.accent.fg, Some(dracula_purple));
+    assert_eq!(styles.background, catppuccin_base);
+}

@@ -10,6 +10,7 @@ use bashmenu_core::{
 };
 use bashmenu_tui::{ResolvedThemeStyles, TextInput};
 use ratatui::layout::Rect;
+use ratatui::style::Color;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
@@ -522,6 +523,8 @@ impl ThemeEditorState {
                         if let Some(seq) = val.as_sequence() {
                             if let Some(fg) = seq.first().and_then(|v| v.as_i64()) {
                                 return format!("Color {}", fg);
+                            } else if let Some(s) = seq.first().and_then(|v| v.as_str()) {
+                                return s.to_string();
                             }
                         } else if let Some(n) = val.as_i64() {
                             return format!("Color {}", n);
@@ -634,26 +637,68 @@ impl ThemeEditorState {
 
     /// Updates a 256-color palette token entry with the specified color index.
     pub fn set_color_token(&mut self, key: &str, color_idx: u8) {
+        self.set_color_token_value(key, Color::Indexed(color_idx));
+    }
+
+    /// Updates a color token entry with a specified Ratatui Color (Indexed, RGB, or named).
+    pub fn set_color_token_value(&mut self, key: &str, color: Color) {
         if self.current_theme.colors_256.is_none() {
             self.current_theme.colors_256 = Some(HashMap::new());
         }
         if let Some(c_map) = &mut self.current_theme.colors_256 {
+            let val = match color {
+                Color::Indexed(code) => serde_yml::Value::Number((code as i64).into()),
+                Color::Rgb(r, g, b) => serde_yml::Value::String(format!("#{r:02x}{g:02x}{b:02x}")),
+                _ => {
+                    let (r, g, b) = bashmenu_tui::color_to_rgb(color);
+                    serde_yml::Value::String(format!("#{r:02x}{g:02x}{b:02x}"))
+                }
+            };
             if key == "background" {
-                c_map.insert(
-                    key.to_string(),
-                    serde_yml::Value::Number((color_idx as i64).into()),
-                );
+                c_map.insert(key.to_string(), val);
             } else {
                 c_map.insert(
                     key.to_string(),
-                    serde_yml::Value::Sequence(vec![
-                        serde_yml::Value::Number((color_idx as i64).into()),
-                        serde_yml::Value::Number((-1).into()),
-                    ]),
+                    serde_yml::Value::Sequence(vec![val, serde_yml::Value::Number((-1).into())]),
                 );
             }
             self.is_modified = true;
-            self.status_message = format!("Updated {} to color {}", key, color_idx);
+            let display_str = match color {
+                Color::Indexed(code) => format!("color {}", code),
+                Color::Rgb(r, g, b) => format!("#{r:02x}{g:02x}{b:02x}"),
+                _ => format_color_code(color),
+            };
+            self.status_message = format!("Updated {} to {}", key, display_str);
+        }
+    }
+
+    /// Retrieves the current Ratatui Color for a palette token key.
+    pub fn get_color_token_color(&self, key: &str) -> Color {
+        if let Some(c_map) = &self.current_theme.colors_256 {
+            if let Some(val) = c_map.get(key) {
+                if let Some(c) = bashmenu_tui::parse_color_value(val) {
+                    return c;
+                }
+            }
+        }
+        let styles = ResolvedThemeStyles::from_theme(&self.current_theme, true);
+        match key {
+            "background" => styles.background,
+            "text" => styles.text.fg.unwrap_or(Color::White),
+            "highlight" => styles.highlight.bg.unwrap_or(Color::Cyan),
+            "border" => styles.border,
+            "divider" => styles.divider.fg.unwrap_or(Color::Cyan),
+            "accent" => styles.accent.fg.unwrap_or(Color::LightCyan),
+            "shortcut_key" => styles.shortcut_key.fg.unwrap_or(Color::Yellow),
+            "help_text" => styles.help_text.fg.unwrap_or(Color::Cyan),
+            "plugin" => styles.plugin.fg.unwrap_or(Color::Cyan),
+            "gutter" => styles.gutter.fg.unwrap_or(Color::DarkGray),
+            "window_close_button" => styles.window_close_button.fg.unwrap_or(Color::Red),
+            "scrollbar" => styles.scrollbar.fg.unwrap_or(Color::Cyan),
+            "toast_info" => styles.toast_info,
+            "toast_warning" => styles.toast_warning,
+            "toast_error" => styles.toast_error,
+            _ => Color::White,
         }
     }
 

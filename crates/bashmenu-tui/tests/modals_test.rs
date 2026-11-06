@@ -1,7 +1,7 @@
 use bashmenu_tui::{
-    AsciiGridModal, ColorGridModal, ConfirmChoice, ConfirmModal, FilePickerModal, InputModal,
-    MessageModal, NoteEditorAction, NoteEditorModal, NoteViewerAction, NoteViewerModal, RadioModal,
-    ResolvedThemeStyles, ToggleChoice, ToggleModal,
+    AsciiGridModal, ColorGridModal, ColorPickerModal, ColorPickerTab, ConfirmChoice, ConfirmModal,
+    FilePickerModal, InputModal, MessageModal, NoteEditorAction, NoteEditorModal, NoteViewerAction,
+    NoteViewerModal, RadioModal, ResolvedThemeStyles, ToggleChoice, ToggleModal,
 };
 use crossterm::event::KeyCode;
 use ratatui::buffer::Buffer;
@@ -1384,4 +1384,81 @@ fn test_theme_picker_alphabetical_order() {
         ]
     );
     assert_eq!(picker.selected_idx, 2);
+}
+
+#[test]
+fn test_color_picker_modal_truecolor_and_tabs() {
+    use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
+    use ratatui::style::Color;
+
+    // 1. Initializing with ANSI indexed color starts on Palette256 tab
+    let mut modal256 = ColorPickerModal::new("Theme Color", Color::Indexed(145));
+    assert_eq!(modal256.tab, ColorPickerTab::Palette256);
+    assert_eq!(modal256.selected_256, 145);
+
+    // Tab key cycles through Palette256 -> TrueColorHsv -> HexInput -> Palette256
+    modal256.handle_key(KeyCode::Tab);
+    assert_eq!(modal256.tab, ColorPickerTab::TrueColorHsv);
+    modal256.handle_key(KeyCode::Tab);
+    assert_eq!(modal256.tab, ColorPickerTab::HexInput);
+    modal256.handle_key(KeyCode::Tab);
+    assert_eq!(modal256.tab, ColorPickerTab::Palette256);
+
+    // 2. Initializing with TrueColor RGB starts on TrueColorHsv tab
+    let dracula_pink = Color::Rgb(255, 121, 198);
+    let mut modal_rgb = ColorPickerModal::new("Dracula Pink", dracula_pink);
+    assert_eq!(modal_rgb.tab, ColorPickerTab::TrueColorHsv);
+    assert_eq!(modal_rgb.current_color, dracula_pink);
+    assert_eq!(modal_rgb.hex_input, "#ff79c6");
+
+    // Pressing Enter confirms the TrueColor
+    assert_eq!(
+        modal_rgb.handle_key(KeyCode::Enter),
+        Some(Some(dracula_pink))
+    );
+
+    // 3. TrueColor navigation adjustments
+    modal_rgb.handle_key(KeyCode::Right);
+    modal_rgb.handle_key(KeyCode::Up);
+    modal_rgb.handle_key(KeyCode::Char(']'));
+    assert!(matches!(modal_rgb.current_color, Color::Rgb(_, _, _)));
+
+    // 4. Hex input tab interaction
+    modal_rgb.tab = ColorPickerTab::HexInput;
+    modal_rgb.hex_input = "#".to_string();
+    for c in "00FFAA".chars() {
+        modal_rgb.handle_key(KeyCode::Char(c));
+    }
+    assert_eq!(modal_rgb.hex_input, "#00FFAA");
+    assert_eq!(modal_rgb.current_color, Color::Rgb(0, 255, 170));
+
+    // 5. Mouse tab switching
+    let mouse_down = MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: 5,
+        row: 5,
+        modifiers: crossterm::event::KeyModifiers::empty(),
+    };
+    // Click on Tab 2 header
+    let mouse_tab2 = MouseEvent {
+        column: 25,
+        row: 5,
+        ..mouse_down
+    };
+    modal_rgb.handle_mouse(mouse_tab2, (0, 5));
+    assert_eq!(modal_rgb.tab, ColorPickerTab::TrueColorHsv);
+
+    // 6. Buffer rendering without panic across all tabs
+    let styles = ResolvedThemeStyles::default();
+    let area = Rect::new(0, 0, 80, 30);
+    let mut buf = Buffer::empty(area);
+
+    modal_rgb.tab = ColorPickerTab::Palette256;
+    modal_rgb.render(area, &styles, &mut buf);
+
+    modal_rgb.tab = ColorPickerTab::TrueColorHsv;
+    modal_rgb.render(area, &styles, &mut buf);
+
+    modal_rgb.tab = ColorPickerTab::HexInput;
+    modal_rgb.render(area, &styles, &mut buf);
 }

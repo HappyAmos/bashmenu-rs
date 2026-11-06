@@ -1,5 +1,6 @@
 //! Modal dialog framework and visual pickers.
 
+pub mod color_picker;
 pub mod confirm;
 pub mod file_picker;
 pub mod frame;
@@ -14,6 +15,7 @@ pub mod stream_output;
 pub mod theme_picker;
 pub mod toggle;
 
+pub use color_picker::{ColorPickerModal, ColorPickerTab};
 pub use confirm::{ConfirmChoice, ConfirmModal};
 pub use file_picker::FilePickerModal;
 pub use frame::{compute_modal_inner, is_close_button_clicked, render_modal_frame};

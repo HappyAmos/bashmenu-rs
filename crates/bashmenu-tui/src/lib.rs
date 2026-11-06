@@ -30,10 +30,10 @@ pub use marquee::{format_marquee_spacer, get_marquee_slice, MarqueeTracker};
 pub use menu_view::{MenuAction, MenuView};
 pub use modals::{
     compute_modal_inner, is_close_button_clicked, render_modal_frame, wrap_prompt_text,
-    AsciiGridModal, ColorGridModal, ConfirmChoice, ConfirmModal, FilePickerModal, HelpModal,
-    InputModal, MessageModal, NoteEditorAction, NoteEditorModal, NoteViewerAction, NoteViewerModal,
-    RadioModal, StreamOutputAction, StreamOutputModal, StreamOutputMsg, ThemePickerModal,
-    ToggleChoice, ToggleModal,
+    AsciiGridModal, ColorGridModal, ColorPickerModal, ColorPickerTab, ConfirmChoice, ConfirmModal,
+    FilePickerModal, HelpModal, InputModal, MessageModal, NoteEditorAction, NoteEditorModal,
+    NoteViewerAction, NoteViewerModal, RadioModal, StreamOutputAction, StreamOutputModal,
+    StreamOutputMsg, ThemePickerModal, ToggleChoice, ToggleModal,
 };
 pub use shortcuts_overlay::{key_event_to_token, ShortcutDispatchResult, ShortcutDispatcher};
 pub use style::{parse_color_value, ResolvedThemeStyles};

@@ -7,8 +7,8 @@
 use anyhow::Result;
 use bashmenu_core::{ToastNotification, ToastSeverity};
 use bashmenu_tui::{
-    install_panic_hook, AsciiGridModal, ColorGridModal, ConfirmModal, FilePickerModal, InputModal,
-    ResolvedThemeStyles, TerminalGuard, ToastRack, WallpaperCompositor,
+    install_panic_hook, AsciiGridModal, ColorPickerModal, ConfirmModal, FilePickerModal,
+    InputModal, ResolvedThemeStyles, TerminalGuard, ToastRack, WallpaperCompositor,
 };
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers, MouseButton, MouseEventKind};
@@ -64,8 +64,8 @@ fn resolve_themes_path(target: &Path, local: bool) -> PathBuf {
 enum ActiveModal {
     /// No modal active; tree editor and preview pane interactions enabled.
     None,
-    /// Color picker grid dialog.
-    ColorPicker(String, ColorGridModal),
+    /// Color picker dialog (ANSI 256 + TrueColor HSV + Hex).
+    ColorPicker(String, ColorPickerModal),
     /// ASCII symbol picker grid dialog.
     AsciiPicker(String, AsciiGridModal),
     /// "Save As" theme name input dialog.
@@ -435,16 +435,16 @@ fn main() -> Result<()> {
                 ActiveModal::ColorPicker(key, modal) => match ev {
                     Event::Key(k) => {
                         if let Some(res) = modal.handle_key(k.code) {
-                            if let Some(code) = res {
-                                state.set_color_token(key, code);
+                            if let Some(color) = res {
+                                state.set_color_token_value(key, color);
                             }
                             active_modal = ActiveModal::None;
                         }
                     }
                     Event::Mouse(m) => {
                         if let Some(res) = modal.handle_mouse(m, last_grid_origin) {
-                            if let Some(code) = res {
-                                state.set_color_token(key, code);
+                            if let Some(color) = res {
+                                state.set_color_token_value(key, color);
                             }
                             active_modal = ActiveModal::None;
                         }
@@ -1372,13 +1372,14 @@ fn open_selected_token_picker(state: &mut ThemeEditorState, active_modal: &mut A
     let token = state.tokens[state.selected_idx].clone();
     match token.kind {
         TokenKind::Color(key) => {
-            let initial_code = state.get_color_token_u8(&key);
+            let initial_color = state.get_color_token_color(&key);
             let title = if key == "background" {
                 "Pick Background Color"
             } else {
-                "Pick 256 Color"
+                "Pick Theme Color"
             };
-            *active_modal = ActiveModal::ColorPicker(key, ColorGridModal::new(title, initial_code));
+            *active_modal =
+                ActiveModal::ColorPicker(key, ColorPickerModal::new(title, initial_color));
         }
         TokenKind::WallpaperImage => {
             let start_dir = if let Ok(cwd) = std::env::current_dir() {
