@@ -405,6 +405,18 @@
   - Verified `cargo fmt`, `cargo clippy`, and `cargo test` pass with 0 warnings.
   - Committed and pushed to `origin/main` (commit `43fda5c`), verified remote GitHub Actions CI run `42146591746` passed.
 
+- [x] **Theme Editor: 16-Color and 8-Color Theme Variant Auto-Derivation:**
+  - Extended theme color auto-derivation in `crates/themeedit-cli/src/lib.rs` (`derive_colors_from_wallpaper`) and `set_color_token_value` to automatically generate and downsample palettes to valid ANSI 16-color (`colors_16`) and 8-color (`colors_8`) theme tiers.
+  - Implemented `rgb_to_ansi16_name`, `rgb_to_ansi8_name`, `downsample_palette_to_16`, and `downsample_palette_to_8` in `crates/bashmenu-tui/src/wallpaper.rs` mapping colors via HSV hue classification and relative perceptual luminance.
+  - Added unit and integration tests in `crates/bashmenu-tui/tests/wallpaper_test.rs` and `crates/themeedit-cli/tests/themeedit_test.rs`.
+  - Verified `ymlcheck -t bashmenu.themes` validates cleanly against schema standards.
+
+- [x] **Theme Editor: Glyph & Color Grid Pickers Mouse Clickable Close Button Fix:**
+  - Updated `AsciiGridModal::handle_mouse` and `ColorGridModal::handle_mouse` in `crates/bashmenu-tui/src/modals/grid_picker.rs` to detect mouse clicks on the `[X]` close button via `is_close_button_clicked`, returning `Some(None)` to dismiss the dialog.
+  - Added unit test in `crates/bashmenu-tui/tests/modals_test.rs` verifying that clicking `[X]` on both `AsciiGridModal` and `ColorGridModal` dismisses them immediately.
+  - Verified `cargo fmt`, `cargo clippy`, and `cargo test` pass with 0 warnings.
+  - Committed and pushed to `origin/main` (commit `6747cdf`), verified remote GitHub Actions CI run `42149666239` passed.
+
 
 
 
