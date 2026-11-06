@@ -425,6 +425,18 @@
   - Verified `cargo fmt`, `cargo clippy`, and `cargo test` pass with 0 warnings.
   - Committed and pushed to `origin/main` (commit `56a3239`), verified remote GitHub Actions CI run `42150154497` passed.
 
+- [x] **Shortcuts: Hardcode F9 to Shortcut Editor & Reserve from shortcuts.yml:**
+  - Removed `<F9>` entry from `shortcuts.yml`, `tests/fixtures/shortcuts.yml`, and `~/.config/bashmenu/shortcuts.yml`.
+  - Added `"F9"` to `RESERVED_DIRECT_KEYS` in `crates/bashmenu-core/src/shortcuts.rs`, ensuring it cannot be intercepted or overwritten by user-defined shortcuts.
+  - Ensured `<F9>` is hardcoded across all menu modes in `MenuView` (`crates/bashmenu-tui/src/menu_view.rs`) returning `MenuAction::LaunchShortcutEditor`.
+  - Added `[F9]: ShortcutEdit` to the help gutter across all modes (standard, notebook, shortcuts view) with mouse clickable support.
+  - Updated key capture prompt in `crates/menuedit-cli/src/shortcut_editor.rs` from `F9` to `F10`.
+  - Updated documentation in `bashmenu.md` and `bashmenu.1`.
+  - Added/updated unit tests in `crates/bashmenu-core`, `crates/bashmenu-tui`, and `crates/menuedit-cli`.
+  - Verified `cargo fmt`, `cargo clippy`, and `cargo test` pass with 0 warnings.
+  - Committed and pushed to `origin/main` (commit `acbecf5`), verified remote GitHub Actions CI run `42153477926` passed.
+
+
 
 
 
