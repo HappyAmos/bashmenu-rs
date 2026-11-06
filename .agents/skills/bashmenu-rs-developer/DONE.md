@@ -455,6 +455,15 @@
   - Verified `cargo fmt`, `cargo clippy`, and `shellcheck` pass with 0 warnings.
   - Committed and pushed to `origin/main` (commit `3ac3c58`), verified remote GitHub Actions CI run `42221099793` passed with `'success'`.
 
+- [x] **Help Gutter Function Key Strictly Ascending Order (F1 to F12):**
+  - Updated `MenuView::get_help_raw()` across all modes (standard, shortcuts, notebook) in `crates/bashmenu-tui/src/menu_view.rs` to ensure all function keys are strictly listed in ascending numerical order (`F1, F2, F3, F4, F5, F6, F7, F8, F9`).
+  - Synchronized theme preview help gutter tokens in `crates/themeedit-cli/src/preview.rs` to maintain strict numerical order.
+  - Added unit test assertion in `crates/bashmenu-tui/tests/menu_navigation_test.rs` asserting strict ascending numerical order (`pos_f1 < pos_f2 < ... < pos_f9`).
+  - Updated permanent rules in `.agents/rules/invariants.md` and `.agents/skills/bashmenu-rs-developer/SKILL.md`.
+  - Verified `cargo fmt`, `cargo clippy`, and `cargo test` pass with 0 warnings.
+  - Committed and pushed to `origin/main` (commit `1a773d5`), verified remote GitHub Actions CI run `42222195860` passed with `'success'`.
+
+
 
 
 
