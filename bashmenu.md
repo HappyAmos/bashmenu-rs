@@ -19,6 +19,7 @@ editor for Linux systems.
   - [3.4 Visual Theme Editor (`themeedit`)](#34-visual-theme-editor-themeedit)
   - [3.5 Interactive Terminal Pager (`bmpager`)](#35-interactive-terminal-pager-bmpager)
   - [3.6 Cheatsheet Manager (`cheat`)](#36-cheatsheet-manager-cheat)
+  - [3.7 Custom Keyboard Shortcuts Editor (`shortcutedit`)](#37-custom-keyboard-shortcuts-editor-shortcutedit--menuedit---shortcuts)
 - [4. Configuration & Schema Specifications](#4-configuration--schema-specifications)
   - [4.1 Settings Store (`bashmenu.yml`)](#41-settings-store-bashmenuyml)
   - [4.2 Menu Structure (`bashmenu.mnu`)](#42-menu-structure-bashmenumnu)
@@ -262,9 +263,9 @@ The `cheat` standalone CLI tool searches, lists, and displays Markdown cheatshee
 | `-d`, `--directory` | Print the configured cheatsheets directory path. |
 | `-h`, `--help` | Print help information. |
 
-Configuration is stored in `.cheat.yml` (pointing to `dir: ~/cheat`). Cheatsheets are rendered via `rich.sh` or `bmpager --markdown` with raw text terminal fallback.
+Configuration is stored in `~/.config/bashmenu/cheat.yml` (pointing to `dir: ~/cheat`). Cheatsheets are rendered via `rich.sh` or `bmpager --markdown` with raw text terminal fallback.
 
-### 3.6 Custom Keyboard Shortcuts Editor (`shortcutedit` / `menuedit --shortcuts`)
+### 3.7 Custom Keyboard Shortcuts Editor (`shortcutedit` / `menuedit --shortcuts`)
 `shortcutedit` (also accessible via `menuedit --shortcuts` or `F9` / `<leader> s` from the main menu) is a split-screen visual editor for `shortcuts.yml` (`{bashmenu_dir}/shortcuts.yml`).
 
 - **Leader Key Chords (`<Ctrl+Space>`):** Pressing the configured `leader_key` (default `ctrl+space`) in the main menu opens a compact *which-key* popup overlay showing all active `<leader> <key>` shortcuts and waits up to `leader_timeout_ms` (`1500` ms default) for the follow-up key.

@@ -52,25 +52,28 @@ with contextlib.suppress(ImportError):
 
 def get_config_path() -> Path:
     """
-    Locate or create the `.cheat.yml` configuration file.
+    Locate or create the `cheat.yml` configuration file.
 
     Returns:
-        Path: Resolved path to `.cheat.yml` in the script directory.
+        Path: Resolved path to `cheat.yml` in ~/.config/bashmenu.
     """
-    # Resolve directory containing this script
-    script_dir = Path(__file__).resolve().parent
-    config_file = script_dir / ".cheat.yml"
+    if "CHEAT_CONFIG" in os.environ:
+        custom = Path(os.environ["CHEAT_CONFIG"])
+        if custom.is_file():
+            return custom
 
+    config_file = Path.home() / ".config" / "bashmenu" / "cheat.yml"
     if config_file.is_file():
         return config_file
 
     # Create default configuration file if missing
     try:
+        config_file.parent.mkdir(parents=True, exist_ok=True)
         config_file.write_text("dir: ~/cheat\n", encoding="utf-8")
         print(f"Created default configuration file at: {config_file}")
         return config_file
     except Exception as e:  # noqa: BLE001
-        sys.exit(f"Error: No .cheat.yml found, and failed to create one at {config_file}: {e}")
+        sys.exit(f"Error: No cheat.yml found, and failed to create one at {config_file}: {e}")
 
 
 def get_root_directory(config_path: Path) -> Path:

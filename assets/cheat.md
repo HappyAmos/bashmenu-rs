@@ -21,7 +21,7 @@ cargo build --release --bin cheat
 
 ## Configuration
 
-The tool reads `.cheat.yml` located in the same directory as `cheat.py`.
+The tool reads `cheat.yml` located in `~/.config/bashmenu/cheat.yml`.
 It automatically creates a default config if one does not exist.
 
 ```yaml

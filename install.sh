@@ -58,7 +58,7 @@ echo "  [+] Created shortcut 'rich' -> $BIN_DIR/rich"
 # Initialize user config directory if missing
 CONFIG_DIR="$HOME/.config/bashmenu"
 mkdir -p "$CONFIG_DIR"
-for cfg in bashmenu.yml bashmenu.mnu bashmenu.themes shortcuts.yml; do
+for cfg in bashmenu.yml bashmenu.mnu bashmenu.themes shortcuts.yml cheat.yml; do
     fixture="$SCRIPT_DIR/tests/fixtures/$cfg"
     dest="$CONFIG_DIR/$cfg"
     if [ ! -f "$dest" ] && [ -f "$fixture" ]; then

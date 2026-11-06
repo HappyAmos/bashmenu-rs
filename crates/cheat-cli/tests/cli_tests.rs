@@ -10,7 +10,7 @@ fn test_cheat_cli_directory_and_listing() {
     let cheats_dir = dir.path().join("cheats");
     fs::create_dir_all(&cheats_dir).expect("create cheats dir");
 
-    let config_file = dir.path().join(".cheat.yml");
+    let config_file = dir.path().join("cheat.yml");
     fs::write(&config_file, format!("dir: {}\n", cheats_dir.display())).expect("write config");
 
     let cheat_md = cheats_dir.join("test-tool.md");

@@ -5,7 +5,7 @@ use serde::Deserialize;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Minimal configuration schema corresponding to `.cheat.yml`.
+/// Minimal configuration schema corresponding to `cheat.yml`.
 #[derive(Debug, Clone, Deserialize)]
 pub struct CheatConfig {
     /// Path to root cheatsheets directory.
@@ -23,15 +23,12 @@ pub fn expand_tilde<P: AsRef<Path>>(path: P) -> PathBuf {
     p.to_path_buf()
 }
 
-/// Locates or creates the `.cheat.yml` configuration file.
+/// Locates or creates the `cheat.yml` configuration file in `~/.config/bashmenu`.
 ///
 /// Checks candidate locations in order:
 /// 1. `CHEAT_CONFIG` environment variable
-/// 2. Next to the running executable (`exe_dir/.cheat.yml`)
-/// 3. Standard user script config (`~/.config/bashmenu/scripts/.cheat.yml`)
-/// 4. Standard user config (`~/.config/bashmenu/.cheat.yml`)
-/// 5. Repository or working directory relative paths (`scripts/.cheat.yml`, `.cheat.yml`)
-/// 6. User home directory (`~/.cheat.yml`)
+/// 2. User config directory (`~/.config/bashmenu/cheat.yml`)
+/// 3. Test fixtures fallback (`tests/fixtures/cheat.yml`)
 ///
 /// If no configuration file exists, creates a default one pointing to `~/cheat`.
 pub fn get_config_path() -> Result<PathBuf> {
@@ -42,60 +39,23 @@ pub fn get_config_path() -> Result<PathBuf> {
         }
     }
 
-    if let Ok(exe_path) = std::env::current_exe() {
-        if let Some(parent) = exe_path.parent() {
-            let candidate = parent.join(".cheat.yml");
-            if candidate.is_file() {
-                return Ok(candidate);
-            }
-        }
+    let user_cfg = bashmenu_core::get_user_config_dir().join("cheat.yml");
+    if user_cfg.is_file() {
+        return Ok(user_cfg);
     }
 
-    if let Ok(home) = std::env::var("HOME") {
-        let candidate = PathBuf::from(&home).join(".config/bashmenu/scripts/.cheat.yml");
-        if candidate.is_file() {
-            return Ok(candidate);
-        }
-        let candidate = PathBuf::from(&home).join(".config/bashmenu/.cheat.yml");
-        if candidate.is_file() {
-            return Ok(candidate);
-        }
-    }
-
-    let rel_candidates = [
-        PathBuf::from("scripts/.cheat.yml"),
-        PathBuf::from(".cheat.yml"),
+    let fixture_paths = [
+        PathBuf::from("tests/fixtures/cheat.yml"),
+        PathBuf::from("../../tests/fixtures/cheat.yml"),
     ];
-    for cand in &rel_candidates {
-        if cand.is_file() {
-            return Ok(cand.clone());
+    for fix in &fixture_paths {
+        if fix.is_file() {
+            return Ok(fix.clone());
         }
     }
 
-    if let Ok(home) = std::env::var("HOME") {
-        let candidate = PathBuf::from(&home).join(".cheat.yml");
-        if candidate.is_file() {
-            return Ok(candidate);
-        }
-    }
-
-    // Determine target location to create default configuration file
-    let target = if let Ok(home) = std::env::var("HOME") {
-        let scripts_dir = PathBuf::from(&home).join(".config/bashmenu/scripts");
-        if scripts_dir.is_dir() {
-            scripts_dir.join(".cheat.yml")
-        } else {
-            let cfg_dir = PathBuf::from(&home).join(".config/bashmenu");
-            if cfg_dir.is_dir() {
-                cfg_dir.join(".cheat.yml")
-            } else {
-                PathBuf::from(&home).join(".cheat.yml")
-            }
-        }
-    } else {
-        PathBuf::from(".cheat.yml")
-    };
-
+    // Target location to create default configuration file: ~/.config/bashmenu/cheat.yml
+    let target = user_cfg;
     if let Some(parent) = target.parent() {
         let _ = fs::create_dir_all(parent);
     }
@@ -110,7 +70,7 @@ pub fn get_config_path() -> Result<PathBuf> {
         }
         Err(err) => {
             bail!(
-                "Error: No .cheat.yml found, and failed to create one at {}: {}",
+                "Error: No cheat.yml found, and failed to create one at {}: {}",
                 target.display(),
                 err
             );
@@ -168,7 +128,7 @@ mod tests {
         let cheats_dir = dir.path().join("cheats");
         fs::create_dir(&cheats_dir).expect("create dir");
 
-        let config_file = dir.path().join(".cheat.yml");
+        let config_file = dir.path().join("cheat.yml");
         fs::write(&config_file, format!("dir: {}\n", cheats_dir.display())).expect("write config");
 
         let root = get_root_directory(&config_file).expect("get root");
@@ -179,7 +139,7 @@ mod tests {
     #[test]
     fn test_get_root_directory_missing_dir_key() {
         let dir = tempdir().expect("tempdir");
-        let config_file = dir.path().join(".cheat.yml");
+        let config_file = dir.path().join("cheat.yml");
         fs::write(&config_file, "other_key: 123\n").expect("write config");
 
         let res = get_root_directory(&config_file);
@@ -190,7 +150,7 @@ mod tests {
     #[test]
     fn test_get_root_directory_invalid_dir() {
         let dir = tempdir().expect("tempdir");
-        let config_file = dir.path().join(".cheat.yml");
+        let config_file = dir.path().join("cheat.yml");
         fs::write(&config_file, "dir: /nonexistent/path/for/cheat\n").expect("write config");
 
         let res = get_root_directory(&config_file);

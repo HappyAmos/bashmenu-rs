@@ -358,6 +358,15 @@
   - Synchronized documentation in `bashmenu.md`, `bashmenu.1`, `assets/cheat.md`, and `SKILL.md`.
   - Added unit test suite and integration test suite (`tests/cli_tests.rs`). Verified all tests pass cleanly.
 
+- [x] **Relocated Cheatsheet Configuration to `~/.config/bashmenu/cheat.yml`:**
+  - Removed legacy `scripts/.cheat.yml`.
+  - Added fixture template `tests/fixtures/cheat.yml` and updated `install.sh` to install `cheat.yml` into `~/.config/bashmenu/cheat.yml`.
+  - Updated `cheat-cli` (`crates/cheat-cli/src/config.rs`) to load `cheat.yml` strictly from `~/.config/bashmenu/cheat.yml` (with `CHEAT_CONFIG` override and fixtures fallback), ensuring `scripts/` is never queried.
+  - Updated `scripts/cheat.py` to target `~/.config/bashmenu/cheat.yml`.
+  - Updated documentation across `bashmenu.md`, `bashmenu.1`, and `assets/cheat.md`.
+  - Verified tests, Clippy, and formatting pass cleanly.
+
+
 
 
 
