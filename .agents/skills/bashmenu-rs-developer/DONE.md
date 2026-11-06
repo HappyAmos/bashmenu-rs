@@ -436,6 +436,19 @@
   - Verified `cargo fmt`, `cargo clippy`, and `cargo test` pass with 0 warnings.
   - Committed and pushed to `origin/main` (commit `acbecf5`), verified remote GitHub Actions CI run `42153477926` passed.
 
+- [x] **Help Gutter & Install/Uninstall Lifecycle Invariants:**
+  - Omitted `[UP/DN]: Nav` help gutter token across all menu modes in `MenuView` (`crates/bashmenu-tui/src/menu_view.rs`), saving screen width.
+  - Repositioned priority keys `[F8]: ThemeEdit` and `[F9]: ShortcutEdit` immediately after `[F2]: Themes` in the help gutter, guaranteeing visibility on 2nd gutter row on standard 80- and 100-column terminals.
+  - Implemented dynamic gutter width balancing (`calculate_gutter_dimensions`) so the help gutter is not starved by a static 50/50 split when status tokens are short or absent.
+  - Updated theme preview help gutter in `crates/themeedit-cli/src/preview.rs` to match bashmenu gutter tokens.
+  - Enhanced `crates/bashmenu-tui/tests/menu_navigation_test.rs` asserting `[UP/DN]: Nav` is omitted and `[F9]: ShortcutEdit` is visible and clickable at 100-column width.
+  - Updated `install.sh` to install `bashmenu.1` manual page to `$MAN_DIR` (`~/.local/share/man/man1`) and explicitly list `cheat` under "Commands installed".
+  - Updated `uninstall.sh` to clean up `$MAN_DIR/bashmenu.1`, default to keeping user settings/notebooks in `~/.config/bashmenu` (`[Y/n]` prompt), and support `--keep-settings` / `--keep-config` (`-k`), `--remove-settings`, and `-y`/`--yes`.
+  - Created root [`AGENTS.md`](AGENTS.md) and updated [`.agents/skills/bashmenu-rs-developer/SKILL.md`](.agents/skills/bashmenu-rs-developer/SKILL.md) documenting install/uninstall lifecycle and help gutter layout invariants.
+  - Passed `cargo fmt`, `cargo clippy -D warnings`, `cargo test --workspace`, and `shellcheck *.sh scripts/*.sh`.
+  - Committed and pushed changes (commit `2c8503e`), remote GitHub Actions CI run `42220198911` passed with `'success'`.
+
+
 
 
 
