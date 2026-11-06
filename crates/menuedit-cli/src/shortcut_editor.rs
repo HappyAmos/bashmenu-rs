@@ -360,7 +360,7 @@ impl KeyCaptureModal {
             "Press desired Leader Key combo (e.g. Ctrl+Space, Ctrl+B, Alt+Space):".to_string()
         } else {
             format!(
-                "Press a direct key (F9, Alt+K, Ctrl+G) OR press Leader ({}) then a key:",
+                "Press a direct key (F10, Alt+K, Ctrl+G) OR press Leader ({}) then a key:",
                 self.leader_key
             )
         };

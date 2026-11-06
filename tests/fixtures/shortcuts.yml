@@ -1,7 +1,7 @@
 # ==============================================================================
 # BashMenu Custom Keyboard Shortcuts (shortcuts.yml)
 # ==============================================================================
-# Configure custom direct key combos (e.g. "F9", "alt+t", "ctrl+g") and
+# Configure custom direct key combos (e.g. "F10", "alt+t", "ctrl+g") and
 # leader-key chords (e.g. "<leader> t", "<leader> g") to launch commands,
 # scripts, editors, toast notifications, or interactive prompts.
 #
@@ -14,13 +14,6 @@ leader_key: ctrl+space
 leader_timeout_ms: 1500
 show_leader_hint: true
 shortcuts:
-- key: F9
-  description: Keyboard Shortcuts Editor
-  type: command
-  action: shortcutedit
-  execution_mode: console
-  quiet: true
-  alt_buffer: true
 - key: <leader> s
   description: Keyboard Shortcuts Editor
   type: command

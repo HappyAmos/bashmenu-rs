@@ -380,10 +380,10 @@ mod tests {
             show_leader_hint: true,
             shortcuts: vec![
                 ShortcutEntry {
-                    key: "F9".to_string(),
-                    description: "Open Shortcuts".to_string(),
+                    key: "F10".to_string(),
+                    description: "Open Tool".to_string(),
                     r#type: MenuItemType::Command,
-                    action: Some("shortcutedit".to_string()),
+                    action: Some("mc".to_string()),
                     ..Default::default()
                 },
                 ShortcutEntry {
@@ -399,9 +399,9 @@ mod tests {
         let mut disp = ShortcutDispatcher::new(cfg);
         assert!(!disp.is_leader_pending());
 
-        // 1. Direct F9 match
-        let res_f9 = disp.handle_key(KeyEvent::new(KeyCode::F(9), KeyModifiers::NONE));
-        assert!(matches!(res_f9, ShortcutDispatchResult::Matched(ref e) if e.key == "F9"));
+        // 1. Direct F10 match
+        let res_f10 = disp.handle_key(KeyEvent::new(KeyCode::F(10), KeyModifiers::NONE));
+        assert!(matches!(res_f10, ShortcutDispatchResult::Matched(ref e) if e.key == "F10"));
 
         // 2. Leader key activates Leader Pending mode
         let res_leader = disp.handle_key(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::CONTROL));

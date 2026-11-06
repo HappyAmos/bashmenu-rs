@@ -213,7 +213,7 @@ The visual theme editor provides a split-screen interface featuring a collapsibl
 | `[` / `]` | Cycle to previous / next theme (alphabetically sorted). |
 | `TAB` / `p` / `1`-`5` | Cycle or jump between live preview views (`1` Menu, `2` Text Editor, `3` Modals, `4` Menu Editor, `5` Toasts). |
 | `F4` / `b` | Choose background wallpaper image via file picker modal. |
-| `F5` / `F9` | Auto-derive harmonious 256-color palette (including `plugin` text color) from the configured wallpaper image. |
+| `F5` | Auto-derive harmonious 256-color palette (including `plugin` text color) from the configured wallpaper image. |
 | `F6` / `Ctrl+N` | Create a new theme using the monochrome base palette. |
 | `F7` / `F2` / `Ctrl+R` | Rename current theme inline. |
 | `F8` / `Delete` | Delete current theme from `bashmenu.themes` (with confirmation modal), or clear wallpaper image when `Wallpaper Image` token is focused. |
@@ -268,7 +268,7 @@ Configuration is stored in `~/.config/bashmenu/cheat.yml` (pointing to `dir: ~/c
 `shortcutedit` (also accessible via `menuedit --shortcuts` or `F9` / `<leader> s` from the main menu) is a split-screen visual editor for `shortcuts.yml` (`{bashmenu_dir}/shortcuts.yml`).
 
 - **Leader Key Chords (`<Ctrl+Space>`):** Pressing the configured `leader_key` (default `ctrl+space`) in the main menu opens a compact *which-key* popup overlay showing all active `<leader> <key>` shortcuts and waits up to `leader_timeout_ms` (`1500` ms default) for the follow-up key.
-- **Direct Shortcuts:** Function keys (`F9`, `F10`, `F12`) and modified combos (`ctrl+<key>`, `alt+<key>`) execute immediately with a single keystroke.
+- **Direct Shortcuts:** Function keys (`F10`, `F12`) and modified combos (`ctrl+<key>`, `alt+<key>`) execute immediately with a single keystroke.
 - **Full Placeholder & Execution Mode Parity:** Every shortcut supports all 6-tier macro placeholders (`{dev_dir}`, `{bashmenu_dir}`, `{scripts_dir}`, `{param:prompt=...}`, `{file_picker}`, `{dir_picker}`, `{toast:...}`) and execution modes (`console`, `streaming`, `interactive`, `quiet`, `alt_buffer`, `window_percent`).
 
 | Keybinding | Action |

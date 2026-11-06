@@ -1074,8 +1074,8 @@ fn main() -> Result<()> {
                             }
 
                             match k.code {
-                                KeyCode::F(5) | KeyCode::F(9) => {
-                                    // F5 / F9 auto-derives theme colors from configured wallpaper image
+                                KeyCode::F(5) => {
+                                    // F5 auto-derives theme colors from configured wallpaper image
                                     match state.derive_colors_from_wallpaper() {
                                         Ok(fname) => {
                                             toast_rack.add(ToastNotification {

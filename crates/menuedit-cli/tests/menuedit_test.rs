@@ -1177,9 +1177,9 @@ fn test_shortcut_editor_state_and_modals() {
         show_leader_hint: true,
         shortcuts: vec![
             ShortcutEntry {
-                key: "F9".to_string(),
-                description: "Shortcuts Editor".to_string(),
-                action: Some("shortcutedit".to_string()),
+                key: "F10".to_string(),
+                description: "Terminal Tool".to_string(),
+                action: Some("mc".to_string()),
                 ..Default::default()
             },
             ShortcutEntry {
@@ -1215,7 +1215,7 @@ fn test_shortcut_editor_state_and_modals() {
     assert_eq!(state.selected_entry().unwrap().key, "<leader> g");
 
     // KeyCaptureModal: press Ctrl+Space (leader) followed by 't' -> captures "<leader> t"
-    let mut cap = KeyCaptureModal::new("F9", "ctrl+space", false);
+    let mut cap = KeyCaptureModal::new("F10", "ctrl+space", false);
     assert!(cap
         .handle_key(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::CONTROL))
         .is_none());

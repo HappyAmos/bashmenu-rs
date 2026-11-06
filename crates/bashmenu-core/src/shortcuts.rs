@@ -3,7 +3,7 @@
 //! # Overview
 //! This module provides domain models and parsing utilities for BashMenu's custom
 //! keyboard shortcut subsystem. Shortcuts in `shortcuts.yml` allow users to bind
-//! direct function keys (e.g. `F9`, `F10`), modifier combinations (e.g. `Ctrl+G`, `Alt+T`),
+//! direct function keys (e.g. `F10`, `F12`), modifier combinations (e.g. `Ctrl+G`, `Alt+T`),
 //! or two-stroke leader-key chords (e.g. `<leader> t`, `<leader> p`) to arbitrary menu actions.
 //!
 //! # Key Normalization & Validation
@@ -49,7 +49,7 @@ use std::path::{Path, PathBuf};
 pub const SHORTCUTS_HEADER: &str = r#"# ==============================================================================
 # BashMenu Custom Keyboard Shortcuts (shortcuts.yml)
 # ==============================================================================
-# Configure custom direct key combos (e.g. "F9", "alt+t", "ctrl+g") and
+# Configure custom direct key combos (e.g. "F10", "alt+t", "ctrl+g") and
 # leader-key chords (e.g. "<leader> t", "<leader> g") to launch commands,
 # scripts, editors, toast notifications, or interactive prompts.
 #
@@ -113,7 +113,7 @@ impl Default for ShortcutsConfig {
 /// A single keyboard shortcut definition in `shortcuts.yml`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ShortcutEntry {
-    /// Key combo (`"F9"`, `"ctrl+g"`, `"alt+t"`) or leader chord (`"<leader> t"`).
+    /// Key combo (`"F10"`, `"ctrl+g"`, `"alt+t"`) or leader chord (`"<leader> t"`).
     pub key: String,
     /// Human-readable description displayed in the Shortcut Manager and leader popup.
     pub description: String,
@@ -273,7 +273,7 @@ impl ShortcutEntry {
         norm.strip_prefix("<leader> ").map(|s| s.trim().to_string())
     }
 
-    /// Returns the canonical normalized key string (e.g. `"<leader> t"`, `"F9"`, `"ctrl+g"`).
+    /// Returns the canonical normalized key string (e.g. `"<leader> t"`, `"F10"`, `"ctrl+g"`).
     pub fn normalized_key(&self) -> String {
         normalize_key_spec(&self.key)
     }
@@ -481,6 +481,7 @@ const RESERVED_DIRECT_KEYS: &[&str] = &[
     "F6",
     "F7",
     "F8",
+    "F9",
     "F11",
 ];
 
@@ -540,17 +541,17 @@ pub fn validate_key_spec(raw: &str, is_leader_def: bool) -> std::result::Result<
         .any(|k| k.eq_ignore_ascii_case(&norm))
     {
         return Err(format!(
-            "'{}' is reserved for core BashMenu navigation or built-in functions (use F9, F10, F12, ctrl+<key>, alt+<key>, or '<leader> <key>').",
+            "'{}' is reserved for core BashMenu navigation or built-in functions (use F10, F12, ctrl+<key>, alt+<key>, or '<leader> <key>').",
             norm
         ));
     }
 
-    // Must be a function key (F9, F10, F12) or modified key (ctrl+..., alt+...)
+    // Must be a function key (F10, F12) or modified key (ctrl+..., alt+...)
     let is_fn = norm.starts_with('F') && norm[1..].parse::<u8>().is_ok();
     let is_mod = norm.starts_with("ctrl+") || norm.starts_with("alt+");
     if !is_fn && !is_mod {
         return Err(format!(
-            "Direct shortcut '{}' must use 'ctrl+<key>', 'alt+<key>', 'F9'/'F10'/'F12', or '<leader> <key>'.",
+            "Direct shortcut '{}' must use 'ctrl+<key>', 'alt+<key>', 'F10'/'F12', or '<leader> <key>'.",
             norm
         ));
     }
@@ -634,7 +635,7 @@ mod tests {
         assert_eq!(normalize_key_spec("<Ctrl+Space>"), "ctrl+space");
         assert_eq!(normalize_key_spec("<leader> t"), "<leader> t");
         assert_eq!(normalize_key_spec("leader+T"), "<leader> T");
-        assert_eq!(normalize_key_spec("f9"), "F9");
+        assert_eq!(normalize_key_spec("f10"), "F10");
         assert_eq!(normalize_key_spec("Alt+G"), "alt+g");
 
         assert!(validate_key_spec("ctrl+space", true).is_ok());
@@ -643,14 +644,15 @@ mod tests {
         assert!(validate_key_spec("<leader> t", false).is_ok());
         assert!(validate_key_spec("<leader> T", false).is_ok());
         assert!(validate_key_spec("<leader> 1", false).is_ok());
-        assert!(validate_key_spec("F9", false).is_ok());
+        assert!(validate_key_spec("F10", false).is_ok());
         assert!(validate_key_spec("ctrl+g", false).is_ok());
         assert!(validate_key_spec("alt+1", false).is_ok());
 
-        // Single unmodified char or F1..F8 / F11 must be rejected as direct shortcuts
+        // Single unmodified char or F1..F9 / F11 must be rejected as direct shortcuts
         assert!(validate_key_spec("t", false).is_err());
         assert!(validate_key_spec("1", false).is_err());
         assert!(validate_key_spec("F1", false).is_err());
+        assert!(validate_key_spec("F9", false).is_err());
         assert!(validate_key_spec("F11", false).is_err());
     }
 

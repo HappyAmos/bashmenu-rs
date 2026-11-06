@@ -552,7 +552,7 @@ impl MenuView {
     /// Returns the raw contextual help string for the current menu level or mode.
     fn get_help_raw(&self) -> &'static str {
         if self.is_current_notebook() {
-            "[N]: New Note | [ENTER]: Read | [M]: Rename | [D]: Delete | [UP/DN]: Nav | [F1]: Help | [F2]: Themes | [F7]: Gutter | [F8]: ThemeEdit | [ESC]: Back"
+            "[N]: New Note | [ENTER]: Read | [M]: Rename | [D]: Delete | [UP/DN]: Nav | [F1]: Help | [F2]: Themes | [F7]: Gutter | [F8]: ThemeEdit | [F9]: ShortcutEdit | [ESC]: Back"
         } else if self.show_shortcuts {
             "[UP/DN]: Nav | [F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [F8]: ThemeEdit | [F9]: ShortcutEdit | [ESC]: Back"
         } else {
