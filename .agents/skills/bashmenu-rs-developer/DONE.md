@@ -444,9 +444,17 @@
   - Enhanced `crates/bashmenu-tui/tests/menu_navigation_test.rs` asserting `[UP/DN]: Nav` is omitted and `[F9]: ShortcutEdit` is visible and clickable at 100-column width.
   - Updated `install.sh` to install `bashmenu.1` manual page to `$MAN_DIR` (`~/.local/share/man/man1`) and explicitly list `cheat` under "Commands installed".
   - Updated `uninstall.sh` to clean up `$MAN_DIR/bashmenu.1`, default to keeping user settings/notebooks in `~/.config/bashmenu` (`[Y/n]` prompt), and support `--keep-settings` / `--keep-config` (`-k`), `--remove-settings`, and `-y`/`--yes`.
-  - Created root [`AGENTS.md`](AGENTS.md) and updated [`.agents/skills/bashmenu-rs-developer/SKILL.md`](.agents/skills/bashmenu-rs-developer/SKILL.md) documenting install/uninstall lifecycle and help gutter layout invariants.
+  - Updated [`.agents/skills/bashmenu-rs-developer/SKILL.md`](.agents/skills/bashmenu-rs-developer/SKILL.md) documenting install/uninstall lifecycle and help gutter layout invariants.
   - Passed `cargo fmt`, `cargo clippy -D warnings`, `cargo test --workspace`, and `shellcheck *.sh scripts/*.sh`.
   - Committed and pushed changes (commit `2c8503e`), remote GitHub Actions CI run `42220198911` passed with `'success'`.
+
+- [x] **Consolidate Rules into .agents/rules/invariants.md & Remove Root AGENTS.md:**
+  - Merged installation/uninstallation invariants and help gutter priority/omission invariants into permanent rules file [`.agents/rules/invariants.md`](.agents/rules/invariants.md).
+  - Deleted redundant `AGENTS.md` from the root directory to keep all agentic files tidy inside `.agents/`.
+  - Updated [`.agents/skills/bashmenu-rs-developer/SKILL.md`](.agents/skills/bashmenu-rs-developer/SKILL.md) to explicitly designate `.agents/rules/invariants.md` as the default location for permanent rules and invariants.
+  - Verified `cargo fmt`, `cargo clippy`, and `shellcheck` pass with 0 warnings.
+  - Committed and pushed to `origin/main` (commit `3ac3c58`), verified remote GitHub Actions CI run `42221099793` passed with `'success'`.
+
 
 
 
