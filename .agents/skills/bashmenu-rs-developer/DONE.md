@@ -397,6 +397,14 @@
   - Verified `cargo fmt`, `cargo clippy`, and `cargo test` pass with 0 warnings.
   - Committed and pushed to `origin/main` (commit `6895fff`), verified remote GitHub Actions CI run `42144431341` passed.
 
+- [x] **Theme Editor: Preview Toast 256 Decimal Code & Color Picker Close Button Fix:**
+  - Updated `format_color_code` in `crates/themeedit-cli/src/preview.rs` to always include the 256 color code in decimal representation, e.g. `#rrggbb (256: N)` for TrueColor and `N (256: N)` for ANSI colors.
+  - Fixed `[X]` close button handling in `ColorPickerModal` (`crates/bashmenu-tui/src/modals/color_picker.rs`) by integrating `is_close_button_clicked` check against the modal frame.
+  - Updated `crates/themeedit-cli/src/main.rs` mouse event routing for `ColorPicker` to pass full viewport `area` for proper close button geometry detection.
+  - Updated unit and integration tests in `crates/bashmenu-tui/tests/modals_test.rs` and `crates/themeedit-cli/tests/themeedit_test.rs`.
+  - Verified `cargo fmt`, `cargo clippy`, and `cargo test` pass with 0 warnings.
+  - Committed and pushed to `origin/main` (commit `43fda5c`), verified remote GitHub Actions CI run `42146591746` passed.
+
 
 
 
