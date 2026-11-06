@@ -80,8 +80,7 @@ These scripts are stored in the `/scripts` directory and can be used directly or
 | `scripts/ascii.sh` | Standard and Extended ASCII viewing utility. |
 | `scripts/asteroids.sh` | Asteroids game runner that downloads, compiles, and launches the terminal game. |
 | `scripts/bsdgames.sh` | Interactive runner menu for classic BSD games (adventure, atc, battlestar, robots, snake, tetris, etc.). |
-| `scripts/cheat.py` | Python CLI cheatsheet search engine supporting exact matches, tags, and full-text search. |
-| `scripts/cheat.sh` | Cheatsheet lookup utility wrapper for rich.sh and pager.sh. |
+| `scripts/cheat.sh` | Cheatsheet lookup utility launcher trampoline for the native cheat binary. |
 | `scripts/dnsconfig.sh` | Interactive shell script that configures IPv4 and IPv6 DNS server addresses for active network connections using nmcli and systemd-resolved. |
 | `scripts/games.sh` | Interactive runner menu for terminal games (ninvaders, pacman4console, nsnake, greed, moon-buggy, nethack, asteroids). |
 | `scripts/get_api_key.sh` | Script to securely retrieve and format API keys or credentials. |

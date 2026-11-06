@@ -2,7 +2,7 @@
 # ==============================================================================
 # SCRIPT: cheat.sh
 # DESCRIPTION: Terminal cheatsheet CLI wrapper trampoline. Resolves paths and
-#              executes the compiled cheat binary (with fallback to cheat.py).
+#              executes the compiled native Rust cheat binary.
 # USAGE:       cheat.sh [topic] [options]
 # ==============================================================================
 # Version: 0.1.0
@@ -46,20 +46,7 @@ for candidate in \
     fi
 done
 
-# Fallback to Python if native binary has not yet been compiled
-pushd "$SCRIPT_DIR" > /dev/null || safe_exit 1
-
-if [ -f "${SCRIPT_DIR}/.venv/bin/activate" ]; then
-    # shellcheck source=/dev/null
-    source "${SCRIPT_DIR}/.venv/bin/activate"
-    python "${SCRIPT_DIR}/cheat.py" "$@"
-    RET=$?
-    deactivate
-    popd > /dev/null || safe_exit 1
-    safe_exit "$RET"
-else
-    python3 "${SCRIPT_DIR}/cheat.py" "$@"
-    RET=$?
-    popd > /dev/null || safe_exit 1
-    safe_exit "$RET"
-fi
+echo "Error: Native 'cheat' binary was not found." >&2
+echo "Please compile it with: cargo build --release --bin cheat" >&2
+echo "Or run the installer: ./install.sh" >&2
+safe_exit 1

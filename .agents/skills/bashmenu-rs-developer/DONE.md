@@ -366,6 +366,13 @@
   - Updated documentation across `bashmenu.md`, `bashmenu.1`, and `assets/cheat.md`.
   - Verified tests, Clippy, and formatting pass cleanly.
 
+- [x] **Removed `cheat.py` & All Python Fallbacks:**
+  - Removed `scripts/cheat.py` from repository.
+  - Updated `scripts/cheat.sh` trampoline to strictly invoke the native `cheat` binary, outputting a compilation error if the binary is not found.
+  - Removed references to `scripts/cheat.py` from `bashmenu.md`, `bashmenu.1`, and internal code comments.
+  - Verified tests, Clippy, formatting, and Shellcheck pass cleanly.
+
+
 
 
 

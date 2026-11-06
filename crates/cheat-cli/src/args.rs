@@ -43,7 +43,7 @@ impl CliArgs {
 
     /// Resolves the optional search/filter query for list mode.
     ///
-    /// Priority follows Python cheat.py:
+    /// Priority:
     /// 1. Value passed directly to `-s` / `--search`
     /// 2. Value passed directly to `-l` / `--list`
     /// 3. Positional query argument

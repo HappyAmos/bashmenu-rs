@@ -89,7 +89,7 @@ fn find_in_path(binary_name: &str) -> Option<PathBuf> {
 
 /// Displays a Markdown file using `rich.sh`, `bmpager`, or direct stdout fallback.
 pub fn display_markdown(file_path: &Path) {
-    // 1. Try to render via rich.sh (1:1 parity with cheat.py)
+    // 1. Try to render via rich.sh
     if let Some(rich) = find_rich_script() {
         let mut cmd = if is_executable(&rich) {
             let mut c = Command::new(&rich);
