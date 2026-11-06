@@ -383,6 +383,20 @@
   - Verified `cargo fmt`, `cargo clippy`, and `cargo test` pass with 0 warnings.
   - Committed and pushed changes to `origin/main` (commit `51e7f99`), verified GitHub Actions CI run `42137829166` passed.
 
+- [x] **Theme Editor: TrueColor (24-bit RGB) Selection Support & Modal (`crates/bashmenu-tui`, `crates/themeedit-cli`):**
+  - Implemented `ColorPickerModal` (`crates/bashmenu-tui/src/modals/color_picker.rs`) featuring a 3-tab interface:
+    - Tab 1: `[1: 256 Palette]` (classic 16x16 ANSI 256 color grid with keyboard & mouse navigation).
+    - Tab 2: `[2: TrueColor (HSV)]` (continuous 32-column x 14-row half-block Saturation/Value canvas with 28 vertical resolution steps, vertical Hue bar slider $0^\circ$–$360^\circ$, live swatch preview, high-contrast crosshair cursor, and RGB/HSV/ANSI breakdown).
+    - Tab 3: `[3: Hex Code]` (direct 24-bit `#RRGGBB` hex code editor with live validation, swatch display, and channel stats).
+  - Added math helpers `rgb_to_hsv`, `hsv_to_rgb`, and `parse_hex_rgb`.
+  - Added support for keyboard cycling (`Tab` / `Shift+Tab`, number keys `1`/`2`/`3`, arrow keys, vim keys, `[` / `]`) and immediate mouse clicks across tabs, grids, canvases, and sliders.
+  - Extended `ThemeEditorState` (`crates/themeedit-cli/src/lib.rs`) with `set_color_token_value(&mut self, key, color)` and `get_color_token_color(&self, key) -> Color`, storing 24-bit TrueColor hex strings (`#rrggbb`) or ANSI numbers in theme YAML.
+  - Updated `get_token_value_display` to display TrueColor hex strings cleanly in the token sidebar.
+  - Updated `crates/themeedit-cli/src/main.rs` to open `ColorPickerModal` with the current token's exact color and apply chosen TrueColor or ANSI colors.
+  - Added unit and integration test suites in `crates/bashmenu-tui/tests/modals_test.rs` and `crates/themeedit-cli/tests/themeedit_test.rs`.
+  - Verified `cargo fmt`, `cargo clippy`, and `cargo test` pass with 0 warnings.
+  - Committed and pushed to `origin/main` (commit `6895fff`), verified remote GitHub Actions CI run `42144431341` passed.
+
 
 
 
