@@ -454,6 +454,9 @@ Modal animation playback speed is configured via
 Direct Linux framebuffer hardware graphics on /dev/fb0 are configured via
 .I settings.framebuffer
 (auto, true, false).
+Stationary mouse hover expansion delay for the help gutter is configured via
+.I settings.help_gutter_delay
+in seconds (default: 4.0; setting to 0 disables delay for instant expansion). When expanded, the help gutter dynamically increases row count to display all hidden shortcuts without affecting the fixed status gutter top border or visible menu items.
 .SS Menu Structure (bashmenu.mnu)
 The menu is defined as a hierarchical YAML options list. Options can utilize the
 following configuration keys:

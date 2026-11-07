@@ -563,6 +563,15 @@ items:
                 alt_buffer: true
                 key: app.settings.toast_timeout
                 title: Configure Toast Message Timeout
+            - Help Gutter Hover Delay [[{app.settings.help_gutter_delay}] seconds]:
+                type: config
+                icon: '{nf::#f05a}'
+                prompt: 'Seconds of stationary mouse hover to expand help gutter (0 to disable delay):'
+                interactive: true
+                quiet: false
+                alt_buffer: true
+                key: app.settings.help_gutter_delay
+                title: Configure Help Gutter Hover Delay
             - '{divider}': null
             - Back to Options & Settings:
                 type: back

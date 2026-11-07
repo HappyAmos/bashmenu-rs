@@ -255,7 +255,13 @@ fn main() -> Result<()> {
     let mut inspector_scroll = 0;
     let mut is_modified = false;
     let mut active_modal = ActiveModal::None;
-    let mut footer_hover = bashmenu_tui::HelpGutterHover::new();
+    let hover_duration = std::time::Duration::from_secs_f64(
+        cfg.as_ref()
+            .map(|c| c.help_gutter_delay())
+            .unwrap_or(4.0)
+            .max(0.0),
+    );
+    let mut footer_hover = bashmenu_tui::HelpGutterHover::with_duration(hover_duration);
 
     loop {
         let size = guard.terminal_mut().size()?;

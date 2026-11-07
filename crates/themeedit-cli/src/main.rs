@@ -118,7 +118,14 @@ fn main() -> Result<()> {
     let mut toast_rack = ToastRack::new();
     let mut is_editing_name = false;
     let mut preview_buffer = Buffer::empty(Rect::default());
-    let mut footer_hover = bashmenu_tui::HelpGutterHover::new();
+    let cfg_path = bashmenu_core::get_user_config_dir().join("bashmenu.yml");
+    let delay_secs = bashmenu_core::load_config(&cfg_path)
+        .ok()
+        .map(|c| c.help_gutter_delay())
+        .unwrap_or(4.0);
+    let mut footer_hover = bashmenu_tui::HelpGutterHover::with_duration(
+        std::time::Duration::from_secs_f64(delay_secs.max(0.0)),
+    );
 
     loop {
         let size = guard.terminal_mut().size()?;

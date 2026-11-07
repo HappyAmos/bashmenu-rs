@@ -38,12 +38,19 @@ pub struct ShortcutEditorState {
 impl ShortcutEditorState {
     /// Initializes state with the provided shortcuts configuration.
     pub fn new(config: ShortcutsConfig) -> Self {
+        let cfg_path = bashmenu_core::get_user_config_dir().join("bashmenu.yml");
+        let delay_secs = bashmenu_core::load_config(&cfg_path)
+            .ok()
+            .map(|c| c.help_gutter_delay())
+            .unwrap_or(4.0);
+        let gutter_hover =
+            HelpGutterHover::with_duration(std::time::Duration::from_secs_f64(delay_secs.max(0.0)));
         Self {
             config,
             selected_idx: 0,
             scroll_offset: 0,
             dirty: false,
-            gutter_hover: HelpGutterHover::new(),
+            gutter_hover,
         }
     }
 

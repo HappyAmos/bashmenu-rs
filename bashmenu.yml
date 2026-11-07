@@ -55,6 +55,7 @@ settings:
     command: cmatrix -s
   refresh_interval: 10
   toast_timeout: 2.0
+  help_gutter_delay: 4.0
   pager_editor: vim
   transition: fade
   transition_speed: normal

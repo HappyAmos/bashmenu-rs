@@ -1295,6 +1295,10 @@ fn main() -> Result<()> {
                                 serde_yml::Value::Bool(false)
                             } else if let Ok(num) = trimmed.parse::<i64>() {
                                 serde_yml::Value::Number(serde_yml::Number::from(num))
+                            } else if let Ok(f) = trimmed.parse::<f64>() {
+                                serde_yml::to_value(f).unwrap_or_else(|_| {
+                                    serde_yml::Value::String(trimmed.to_string())
+                                })
                             } else {
                                 serde_yml::Value::String(trimmed.to_string())
                             };

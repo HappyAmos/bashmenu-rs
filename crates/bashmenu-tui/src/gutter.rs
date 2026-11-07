@@ -382,24 +382,39 @@ impl HelpGutterHover {
         }
     }
 
+    /// Sets the hover duration required before expanding the help gutter.
+    pub fn set_duration(&mut self, hover_duration: Duration) {
+        self.hover_duration = hover_duration;
+    }
+
+    /// Returns the current hover duration.
+    pub fn duration(&self) -> Duration {
+        self.hover_duration
+    }
+
     /// Handles a mouse movement event.
     ///
     /// - If the mouse moves inside `gutter_bounds`, updates hover position.
-    /// - If the mouse was stationary and moved to a new cell, any expansion is collapsed.
+    /// - If the mouse was stationary and moved to a new cell, any expansion is collapsed (unless duration is 0).
     /// - If the mouse moves outside the gutter, resets hover tracking.
     ///
-    /// Returns `true` if the visual state changed (e.g. collapsed) and needs redrawing.
+    /// Returns `true` if the visual state changed (e.g. collapsed or expanded) and needs redrawing.
     pub fn handle_mouse_move(&mut self, col: u16, row: u16, in_gutter: bool) -> bool {
         if in_gutter {
             if self.hover_pos == Some((col, row)) {
                 // Mouse stayed in the exact same cell; keep timer running
                 false
             } else {
-                let changed = self.is_expanded;
-                self.is_expanded = false;
+                let was_expanded = self.is_expanded;
                 self.hover_pos = Some((col, row));
                 self.hover_start = Some(Instant::now());
-                changed
+                if self.hover_duration.is_zero() {
+                    self.is_expanded = true;
+                    !was_expanded
+                } else {
+                    self.is_expanded = false;
+                    was_expanded
+                }
             }
         } else if self.hover_pos.is_some() || self.is_expanded {
             let changed = self.is_expanded;
@@ -420,14 +435,19 @@ impl HelpGutterHover {
         changed
     }
 
-    /// Checks whether the 4-second hover threshold has been met.
+    /// Checks whether the hover threshold has been met.
     ///
     /// If stationary for >= `hover_duration` and `has_hidden_text` is true,
-    /// expands the gutter by a row.
+    /// expands the gutter.
     /// Returns `true` if newly expanded and needs redrawing.
     pub fn check_hover_timeout(&mut self, has_hidden_text: bool) -> bool {
         if !self.is_expanded && has_hidden_text {
-            if let Some(start) = self.hover_start {
+            if self.hover_duration.is_zero() {
+                if self.hover_pos.is_some() {
+                    self.is_expanded = true;
+                    return true;
+                }
+            } else if let Some(start) = self.hover_start {
                 if start.elapsed() >= self.hover_duration {
                     self.is_expanded = true;
                     return true;

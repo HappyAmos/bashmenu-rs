@@ -128,6 +128,8 @@ impl MenuView {
 
         let mut config = BashMenuConfig::default();
         config.settings.use_nerd_fonts = Some(use_nerd_fonts);
+        let hover_duration =
+            std::time::Duration::from_secs_f64(config.help_gutter_delay().max(0.0));
 
         let mut view = Self {
             stack: vec![initial_level],
@@ -140,7 +142,7 @@ impl MenuView {
             wallpaper: None,
             marquee_tracker: MarqueeTracker::new(4),
             shortcuts: Vec::new(),
-            gutter_hover: HelpGutterHover::new(),
+            gutter_hover: HelpGutterHover::with_duration(hover_duration),
         };
         view.ensure_selectable();
         view
@@ -159,7 +161,7 @@ impl MenuView {
 
     /// Sets the application configuration
     pub fn with_config(mut self, config: BashMenuConfig) -> Self {
-        self.config = config;
+        self.set_config(config);
         self
     }
 
@@ -185,6 +187,9 @@ impl MenuView {
 
     /// Updates configuration
     pub fn set_config(&mut self, config: BashMenuConfig) {
+        let delay = config.help_gutter_delay();
+        self.gutter_hover
+            .set_duration(std::time::Duration::from_secs_f64(delay.max(0.0)));
         self.config = config;
     }
 
@@ -357,6 +362,68 @@ impl MenuView {
         self.current_level().selected_idx
     }
 
+    /// Calculates the expanded help gutter dimensions and layout.
+    ///
+    /// - Normal state: returns `(normal_rows, normal_layouts)` where `normal_rows` is clamped to 1..=2.
+    /// - Expanded state: expands upward on the left side of `sep_x` to as many rows as needed
+    ///   to display all help tokens and shortcuts, bounded so it never interferes with the visible menu items.
+    ///   Plugins beneath the expansion area are allowed to be temporarily covered.
+    fn calculate_help_layout(
+        &self,
+        area: Rect,
+        left_gutter_w: usize,
+        normal_rows: usize,
+        help_token_refs: &[&str],
+    ) -> (usize, Vec<crate::gutter::GutterLineLayout>) {
+        let content_start_y = area.y + 2;
+        let normal_gutter_border_y = area.y + area.height.saturating_sub(2 + normal_rows as u16);
+        let content_avail_h = normal_gutter_border_y.saturating_sub(content_start_y) as usize;
+
+        let level = self.current_level();
+        let selected = level.selected_idx;
+        let mut offset = level.scroll_offset;
+        if selected < offset {
+            offset = selected;
+        } else if selected >= offset + content_avail_h {
+            offset = selected.saturating_sub(content_avail_h.saturating_sub(1));
+        }
+        let menu_needed_h = level
+            .items
+            .len()
+            .saturating_sub(offset)
+            .min(content_avail_h);
+        let remaining_h = content_avail_h.saturating_sub(menu_needed_h);
+        let active_plugin_rows = if remaining_h > 0 && !self.plugin_rows.is_empty() {
+            remaining_h.min(self.plugin_rows.len())
+        } else {
+            0
+        };
+        let menu_display_h = content_avail_h.saturating_sub(active_plugin_rows);
+        let menu_bottom_y = content_start_y + menu_display_h as u16;
+
+        let bot_y = area.y + area.height.saturating_sub(1);
+        let max_allowed = if bot_y > menu_bottom_y + 1 {
+            ((bot_y - menu_bottom_y - 1) as usize).max(normal_rows)
+        } else {
+            normal_rows
+        };
+
+        let is_expanded = self.gutter_hover.is_expanded()
+            && has_hidden_gutter_text(help_token_refs, left_gutter_w, 2)
+            && area.height >= 7;
+
+        if is_expanded && max_allowed > normal_rows {
+            let layouts =
+                wrap_spread_help_gutter_layout(help_token_refs, left_gutter_w, max_allowed);
+            let help_rows = layouts.len().clamp(normal_rows, max_allowed);
+            (help_rows, layouts)
+        } else {
+            let normal_layouts =
+                wrap_spread_help_gutter_layout(help_token_refs, left_gutter_w, normal_rows);
+            (normal_rows, normal_layouts)
+        }
+    }
+
     /// Returns the screen center coordinate of the currently selected menu item
     /// row, or viewport center if no items exist or area is invalid.
     pub fn selected_item_anchor(&self, area: Rect) -> (u16, u16) {
@@ -384,15 +451,7 @@ impl MenuView {
         let normal_lines = wrap_spread_help_gutter(&help_token_refs, left_gutter_w, 2);
         let status_lines = wrap_gutter_tokens(&status_tokens, right_gutter_w, 2);
         let normal_rows = (normal_lines.len().max(status_lines.len())).clamp(1, 2);
-        let is_expanded = self.gutter_hover.is_expanded()
-            && has_hidden_gutter_text(&help_token_refs, left_gutter_w, 2)
-            && area.height >= 7;
-        let gutter_rows = if is_expanded {
-            (normal_rows + 1).min(3)
-        } else {
-            normal_rows
-        };
-        let gutter_border_y = area.y + area.height.saturating_sub(2 + gutter_rows as u16);
+        let gutter_border_y = area.y + area.height.saturating_sub(2 + normal_rows as u16);
 
         let row_y = content_start_y + (selected.saturating_sub(offset)) as u16;
         let anchor_y = row_y
@@ -814,48 +873,68 @@ impl MenuView {
 
                     let status_lines = wrap_gutter_tokens(&status_tokens, right_gutter_w, 2);
                     let normal_rows = (normal_help.len().max(status_lines.len())).clamp(1, 2);
-                    let is_expanded = self.gutter_hover.is_expanded()
-                        && has_hidden_gutter_text(&help_token_refs, left_gutter_w, 2)
-                        && area.height >= 7;
-                    let gutter_rows = if is_expanded {
-                        (normal_rows + 1).min(3)
-                    } else {
-                        normal_rows
-                    };
-                    let help_layout = if is_expanded {
-                        wrap_spread_help_gutter_layout(&help_token_refs, left_gutter_w, gutter_rows)
-                    } else {
-                        normal_help
-                    };
-                    let gutter_border_y =
-                        area.y + area.height.saturating_sub(2 + gutter_rows as u16);
 
-                    // 1. Check if click is on gutter row
-                    if row > gutter_border_y && row < gutter_border_y + 1 + gutter_rows as u16 {
-                        if col >= area.x + 3 && col < area.x + sep_x as u16 {
-                            let line_idx = (row - (gutter_border_y + 1)) as usize;
-                            let rel_x = (col - (area.x + 3)) as usize;
-                            if let Some((_, items)) = help_layout.get(line_idx) {
-                                for (i, (tok_str, start_c, _)) in items.iter().enumerate() {
-                                    let next_start = items
-                                        .get(i + 1)
-                                        .map(|(_, s, _)| *s)
-                                        .unwrap_or(left_gutter_w);
-                                    if rel_x >= *start_c && rel_x < next_start {
-                                        return self.action_for_gutter_token(tok_str);
-                                    }
+                    let (help_rows, help_layouts) = self.calculate_help_layout(
+                        area,
+                        left_gutter_w,
+                        normal_rows,
+                        &help_token_refs,
+                    );
+                    let bot_y = area.y + area.height.saturating_sub(1);
+                    let help_border_y = bot_y.saturating_sub(help_rows as u16 + 1);
+                    let normal_gutter_border_y =
+                        area.y + area.height.saturating_sub(2 + normal_rows as u16);
+
+                    // 1. Check if click is on help gutter rows
+                    if row > help_border_y
+                        && row < bot_y
+                        && col >= area.x + 3
+                        && col < area.x + sep_x as u16
+                    {
+                        let line_idx = (row - (help_border_y + 1)) as usize;
+                        let rel_x = (col - (area.x + 3)) as usize;
+                        if let Some((_, items)) = help_layouts.get(line_idx) {
+                            for (i, (tok_str, start_c, _)) in items.iter().enumerate() {
+                                let next_start = items
+                                    .get(i + 1)
+                                    .map(|(_, s, _)| *s)
+                                    .unwrap_or(left_gutter_w);
+                                if rel_x >= *start_c && rel_x < next_start {
+                                    return self.action_for_gutter_token(tok_str);
                                 }
                             }
                         }
                         return MenuAction::None;
                     }
 
-                    // 2. Check if click is on menu item rows
+                    // 2. Check if click is on status gutter rows
+                    if row > normal_gutter_border_y && row < bot_y && col >= area.x + sep_x as u16 {
+                        return MenuAction::None;
+                    }
+
+                    // 3. Check if click is on menu item rows
                     let item_start_y = area.y + 2; // Below border and margin
-                    if row >= item_start_y && row < gutter_border_y {
+                    let content_avail_h =
+                        normal_gutter_border_y.saturating_sub(item_start_y) as usize;
+                    let level = self.current_level();
+                    let offset = level.scroll_offset;
+                    let menu_needed_h = level
+                        .items
+                        .len()
+                        .saturating_sub(offset)
+                        .min(content_avail_h);
+                    let remaining_h = content_avail_h.saturating_sub(menu_needed_h);
+                    let active_plugin_rows = if remaining_h > 0 && !self.plugin_rows.is_empty() {
+                        remaining_h.min(self.plugin_rows.len())
+                    } else {
+                        0
+                    };
+                    let menu_display_h = content_avail_h.saturating_sub(active_plugin_rows);
+                    let menu_bottom_y = item_start_y + menu_display_h as u16;
+
+                    if row >= item_start_y && row < menu_bottom_y {
                         let row_idx = (row - item_start_y) as usize;
-                        let level = self.current_level();
-                        let item_idx = level.scroll_offset + row_idx;
+                        let item_idx = offset + row_idx;
                         if item_idx < level.items.len() && !level.items[item_idx].is_divider() {
                             self.current_level_mut().selected_idx = item_idx;
                             return self.activate_selected();
@@ -1029,20 +1108,13 @@ impl MenuView {
         let status_lines = wrap_gutter_tokens(&status_tokens, right_gutter_w, 2);
 
         let normal_rows = (normal_lines.len().max(status_lines.len())).clamp(1, 2);
-        let is_expanded = self.gutter_hover.is_expanded()
-            && has_hidden_gutter_text(&help_token_refs, left_gutter_w, 2)
-            && area.height >= 7;
-        let gutter_rows = if is_expanded {
-            (normal_rows + 1).min(3)
-        } else {
-            normal_rows
-        };
-        let help_lines = if is_expanded {
-            wrap_spread_help_gutter(&help_token_refs, left_gutter_w, gutter_rows)
-        } else {
-            normal_lines
-        };
-        let gutter_border_y = area.y + area.height.saturating_sub(2 + gutter_rows as u16);
+        let normal_gutter_border_y = area.y + area.height.saturating_sub(2 + normal_rows as u16);
+        let (help_rows, help_layouts) =
+            self.calculate_help_layout(area, left_gutter_w, normal_rows, &help_token_refs);
+        let help_lines: Vec<String> = help_layouts.into_iter().map(|(s, _)| s).collect();
+        let bot_y = area.y + area.height.saturating_sub(1);
+        let help_border_y = bot_y.saturating_sub(help_rows as u16 + 1);
+        let gutter_border_y = normal_gutter_border_y;
 
         // 2. Render Header (Top Border) at area.y
         let cfg = self.config.clone();
@@ -1396,55 +1468,172 @@ impl MenuView {
             }
         }
 
-        // 5. Render Gutter Top Border at gutter_border_y
-        let gt_line = format!(
-            "{}{}{}{}{}",
-            b.gutter_left_tee,
-            b.gutter_border.repeat(left_seg_len),
-            b.gutter_top_tee,
-            b.gutter_border.repeat(right_seg_len),
-            b.gutter_right_tee
-        );
-        buf.set_string(area.x, gutter_border_y, &gt_line, border_style);
-
-        // 6. Render Gutter Content Rows
-        let status_offset = gutter_rows - status_lines.len();
-        for r in 0..gutter_rows {
-            let gy = gutter_border_y + 1 + r as u16;
-            buf.set_string(area.x, gy, &b.border_vertical_left, border_style);
-
-            let h_text = help_lines.get(r).map(|s| s.as_str()).unwrap_or("");
-            let h_spans = parse_bbcode_spans(h_text, self.styles.help_text);
-            buf.set_line(area.x + 3, gy, &Line::from(h_spans), left_gutter_w as u16);
-
-            buf.set_string(area.x + sep_x as u16, gy, &b.gutter_separator, border_style);
-
-            let s_idx = r as isize - status_offset as isize;
-            let s_text = if s_idx >= 0 {
-                status_lines
-                    .get(s_idx as usize)
-                    .map(|s| s.as_str())
-                    .unwrap_or("")
-            } else {
-                ""
-            };
-            let s_vis = visible_text_len(s_text);
-            let s_pad = right_gutter_w.saturating_sub(s_vis);
-            let mut s_spans = vec![Span::styled(" ".repeat(s_pad), self.styles.gutter)];
-            s_spans.append(&mut parse_bbcode_spans(s_text, self.styles.gutter));
-            buf.set_line(
-                area.x + sep_x as u16 + 3,
-                gy,
-                &Line::from(s_spans),
-                right_gutter_w as u16,
-            );
-
+        // 5. Render Gutter Borders and Content
+        if help_rows > normal_rows {
+            // 5a. Render help gutter top border at help_border_y
+            buf.set_string(area.x, help_border_y, &b.gutter_left_tee, border_style);
             buf.set_string(
-                area.x + area.width - 1,
-                gy,
-                &b.border_vertical_right,
+                area.x + 1,
+                help_border_y,
+                b.gutter_border.repeat(left_seg_len),
                 border_style,
             );
+            buf.set_string(
+                area.x + sep_x as u16,
+                help_border_y,
+                &b.border_top_right,
+                border_style,
+            );
+
+            // 5b. Render expanded help rows above normal_gutter_border_y (covering plugins on left side)
+            let help_top_content_y = help_border_y + 1;
+            for gy in help_top_content_y..normal_gutter_border_y {
+                let line_idx = (gy - help_top_content_y) as usize;
+                buf.set_string(area.x, gy, &b.border_vertical_left, border_style);
+                for x in (area.x + 1)..(area.x + sep_x as u16) {
+                    buf[(x, gy)].set_char(' ').set_style(self.styles.text);
+                }
+                if let Some(h_text) = help_lines.get(line_idx) {
+                    let h_spans = parse_bbcode_spans(h_text, self.styles.help_text);
+                    buf.set_line(area.x + 3, gy, &Line::from(h_spans), left_gutter_w as u16);
+                }
+                buf.set_string(area.x + sep_x as u16, gy, &b.gutter_separator, border_style);
+            }
+
+            // 5c. Render normal_gutter_border_y row
+            // Left side: help line continues through this row
+            let border_line_idx = (normal_gutter_border_y - help_top_content_y) as usize;
+            buf.set_string(
+                area.x,
+                normal_gutter_border_y,
+                &b.border_vertical_left,
+                border_style,
+            );
+            for x in (area.x + 1)..(area.x + sep_x as u16) {
+                buf[(x, normal_gutter_border_y)]
+                    .set_char(' ')
+                    .set_style(self.styles.text);
+            }
+            if let Some(h_text) = help_lines.get(border_line_idx) {
+                let h_spans = parse_bbcode_spans(h_text, self.styles.help_text);
+                buf.set_line(
+                    area.x + 3,
+                    normal_gutter_border_y,
+                    &Line::from(h_spans),
+                    left_gutter_w as u16,
+                );
+            }
+            // Connector at sep_x: left tee connecting vertical separator to status top border
+            buf.set_string(
+                area.x + sep_x as u16,
+                normal_gutter_border_y,
+                &b.left_tee,
+                border_style,
+            );
+            // Right side: status gutter top border (completely untouched and in normal position!)
+            buf.set_string(
+                area.x + sep_x as u16 + 1,
+                normal_gutter_border_y,
+                b.gutter_border.repeat(right_seg_len),
+                border_style,
+            );
+            buf.set_string(
+                area.x + area.width - 1,
+                normal_gutter_border_y,
+                &b.gutter_right_tee,
+                border_style,
+            );
+
+            // 5d. Render gutter content rows below normal_gutter_border_y
+            let status_offset = normal_rows - status_lines.len();
+            for r in 0..normal_rows {
+                let gy = normal_gutter_border_y + 1 + r as u16;
+                let line_idx = (gy - help_top_content_y) as usize;
+                buf.set_string(area.x, gy, &b.border_vertical_left, border_style);
+
+                let h_text = help_lines.get(line_idx).map(|s| s.as_str()).unwrap_or("");
+                let h_spans = parse_bbcode_spans(h_text, self.styles.help_text);
+                buf.set_line(area.x + 3, gy, &Line::from(h_spans), left_gutter_w as u16);
+
+                buf.set_string(area.x + sep_x as u16, gy, &b.gutter_separator, border_style);
+
+                let s_idx = r as isize - status_offset as isize;
+                let s_text = if s_idx >= 0 {
+                    status_lines
+                        .get(s_idx as usize)
+                        .map(|s| s.as_str())
+                        .unwrap_or("")
+                } else {
+                    ""
+                };
+                let s_vis = visible_text_len(s_text);
+                let s_pad = right_gutter_w.saturating_sub(s_vis);
+                let mut s_spans = vec![Span::styled(" ".repeat(s_pad), self.styles.gutter)];
+                s_spans.append(&mut parse_bbcode_spans(s_text, self.styles.gutter));
+                buf.set_line(
+                    area.x + sep_x as u16 + 3,
+                    gy,
+                    &Line::from(s_spans),
+                    right_gutter_w as u16,
+                );
+
+                buf.set_string(
+                    area.x + area.width - 1,
+                    gy,
+                    &b.border_vertical_right,
+                    border_style,
+                );
+            }
+        } else {
+            // Normal unexpanded gutter rendering
+            let gt_line = format!(
+                "{}{}{}{}{}",
+                b.gutter_left_tee,
+                b.gutter_border.repeat(left_seg_len),
+                b.gutter_top_tee,
+                b.gutter_border.repeat(right_seg_len),
+                b.gutter_right_tee
+            );
+            buf.set_string(area.x, normal_gutter_border_y, &gt_line, border_style);
+
+            let status_offset = normal_rows - status_lines.len();
+            for r in 0..normal_rows {
+                let gy = normal_gutter_border_y + 1 + r as u16;
+                buf.set_string(area.x, gy, &b.border_vertical_left, border_style);
+
+                let h_text = help_lines.get(r).map(|s| s.as_str()).unwrap_or("");
+                let h_spans = parse_bbcode_spans(h_text, self.styles.help_text);
+                buf.set_line(area.x + 3, gy, &Line::from(h_spans), left_gutter_w as u16);
+
+                buf.set_string(area.x + sep_x as u16, gy, &b.gutter_separator, border_style);
+
+                let s_idx = r as isize - status_offset as isize;
+                let s_text = if s_idx >= 0 {
+                    status_lines
+                        .get(s_idx as usize)
+                        .map(|s| s.as_str())
+                        .unwrap_or("")
+                } else {
+                    ""
+                };
+                let s_vis = visible_text_len(s_text);
+                let s_pad = right_gutter_w.saturating_sub(s_vis);
+                let mut s_spans = vec![Span::styled(" ".repeat(s_pad), self.styles.gutter)];
+                s_spans.append(&mut parse_bbcode_spans(s_text, self.styles.gutter));
+                buf.set_line(
+                    area.x + sep_x as u16 + 3,
+                    gy,
+                    &Line::from(s_spans),
+                    right_gutter_w as u16,
+                );
+
+                buf.set_string(
+                    area.x + area.width - 1,
+                    gy,
+                    &b.border_vertical_right,
+                    border_style,
+                );
+            }
         }
 
         // 7. Render Window Bottom Border at area.y + area.height - 1
@@ -1508,20 +1697,12 @@ impl MenuView {
         let normal_lines = wrap_spread_help_gutter(&help_token_refs, left_gutter_w, 2);
         let status_lines = wrap_gutter_tokens(&status_tokens, right_gutter_w, 2);
         let normal_rows = (normal_lines.len().max(status_lines.len())).clamp(1, 2);
-        let is_expanded = self.gutter_hover.is_expanded()
-            && has_hidden_gutter_text(&help_token_refs, left_gutter_w, 2)
-            && area.height >= 7;
-        let gutter_rows = if is_expanded {
-            (normal_rows + 1).min(3)
-        } else {
-            normal_rows
-        };
-        let gutter_border_y = area.y + area.height.saturating_sub(2 + gutter_rows as u16);
+        let (help_rows, _) =
+            self.calculate_help_layout(area, left_gutter_w, normal_rows, &help_token_refs);
+        let bot_y = area.y + area.height.saturating_sub(1);
+        let help_border_y = bot_y.saturating_sub(help_rows as u16 + 1);
 
-        row > gutter_border_y
-            && row < area.y + area.height - 1
-            && col > area.x
-            && col < area.x + sep_x as u16
+        row > help_border_y && row < bot_y && col > area.x && col < area.x + sep_x as u16
     }
 
     /// Handles mouse movement over the view area, updating hover state for tooltip expansion.

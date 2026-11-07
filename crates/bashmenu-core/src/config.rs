@@ -54,6 +54,10 @@ pub struct Settings {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub toast_timeout: Option<f64>,
 
+    /// Delay in seconds before stationary mouse hover expands the help gutter (default: 4.0)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub help_gutter_delay: Option<f64>,
+
     /// Convert tabs to spaces in text editor
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tab_to_spaces: Option<bool>,
@@ -225,6 +229,11 @@ impl BashMenuConfig {
         }
     }
 
+    /// Returns the effective help gutter hover delay in seconds (defaulting to 4.0s).
+    pub fn help_gutter_delay(&self) -> f64 {
+        self.settings.help_gutter_delay.unwrap_or(4.0)
+    }
+
     /// Retrieve value from nested configuration using dot-notation string.
     pub fn get_value(&self, key_path: &str) -> Option<String> {
         let val = serde_json::to_value(self).ok()?;
@@ -298,6 +307,15 @@ impl BashMenuConfig {
             }
             "settings.toast_timeout" | "settings.toast.timeout" => {
                 self.settings.toast_timeout = match &value {
+                    serde_yml::Value::Number(n) => {
+                        n.as_f64().or_else(|| n.as_u64().map(|v| v as f64))
+                    }
+                    serde_yml::Value::String(s) => s.parse::<f64>().ok(),
+                    _ => None,
+                };
+            }
+            "settings.help_gutter_delay" | "settings.help_gutter_hover_delay" => {
+                self.settings.help_gutter_delay = match &value {
                     serde_yml::Value::Number(n) => {
                         n.as_f64().or_else(|| n.as_u64().map(|v| v as f64))
                     }
@@ -499,5 +517,31 @@ mod tests {
             assert!(saved_content.starts_with("# ===================================="));
             let _ = fs::remove_file(test_out);
         }
+    }
+
+    #[test]
+    fn test_help_gutter_delay_config_and_set_value() {
+        let mut config = BashMenuConfig::default();
+        assert_eq!(config.help_gutter_delay(), 4.0);
+
+        // Test set_value with float number
+        assert!(config.set_value(
+            "settings.help_gutter_delay",
+            serde_yml::to_value(2.5).unwrap(),
+        ));
+        assert_eq!(config.settings.help_gutter_delay, Some(2.5));
+        assert_eq!(config.help_gutter_delay(), 2.5);
+
+        // Test set_value with string
+        assert!(config.set_value(
+            "app.settings.help_gutter_delay",
+            serde_yml::Value::String("0.0".to_string()),
+        ));
+        assert_eq!(config.settings.help_gutter_delay, Some(0.0));
+        assert_eq!(config.help_gutter_delay(), 0.0);
+
+        // Test get_value via dot-path
+        let val_str = config.get_value("settings.help_gutter_delay");
+        assert_eq!(val_str, Some("0.0".to_string()));
     }
 }

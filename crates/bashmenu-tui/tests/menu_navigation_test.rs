@@ -1145,3 +1145,138 @@ fn test_gutter_custom_shortcuts_from_manager() {
         "Clicking custom shortcut in gutter should execute it"
     );
 }
+
+#[test]
+fn test_gutter_hover_zero_delay_instant_expansion() {
+    let schema = create_sample_menu();
+    let styles = ResolvedThemeStyles::default();
+    let mut view = MenuView::new(schema, styles, false, "Status".to_string());
+    view.gutter_hover
+        .set_duration(std::time::Duration::from_millis(0));
+
+    let area = Rect::new(0, 0, 80, 24);
+    assert!(view.has_hidden_help_text(area));
+    assert!(!view.gutter_hover.is_expanded());
+
+    // With 0 duration, moving mouse into gutter immediately expands it
+    let redraw = view.handle_mouse_move(10, 22, area);
+    assert!(redraw);
+    assert!(view.gutter_hover.is_expanded());
+}
+
+#[test]
+fn test_help_gutter_expansion_decouples_status_border_and_covers_plugins() {
+    use bashmenu_core::{MenuItemType, PluginDisplayRow, ShortcutEntry};
+
+    let schema = create_sample_menu();
+    let styles = ResolvedThemeStyles::default();
+    let mut view = MenuView::new(schema, styles, false, "StatusInfo | ExtraStat".to_string());
+
+    // Add a plugin row
+    view.set_plugin_rows(vec![PluginDisplayRow {
+        text: "Weather: 72F Sunny".to_string(),
+        is_divider: false,
+    }]);
+
+    // Add multiple shortcuts so help gutter needs >= 3 rows
+    let custom_shortcuts = vec![
+        ShortcutEntry {
+            key: "F10".to_string(),
+            description: "Backup Files".to_string(),
+            r#type: MenuItemType::Command,
+            action: Some("echo backup".to_string()),
+            ..Default::default()
+        },
+        ShortcutEntry {
+            key: "F11".to_string(),
+            description: "Toggle Dev".to_string(),
+            r#type: MenuItemType::Command,
+            action: Some("echo dev".to_string()),
+            ..Default::default()
+        },
+        ShortcutEntry {
+            key: "F12".to_string(),
+            description: "System Info".to_string(),
+            r#type: MenuItemType::Command,
+            action: Some("echo sys".to_string()),
+            ..Default::default()
+        },
+    ];
+    view.set_shortcuts(custom_shortcuts);
+
+    let area = Rect::new(0, 0, 80, 24);
+
+    // 1. Render normal (unexpanded) view
+    let mut buf_normal = Buffer::empty(area);
+    view.render(area, &mut buf_normal);
+
+    // 2. Expand help gutter
+    view.gutter_hover
+        .set_duration(std::time::Duration::from_millis(0));
+    assert!(view.has_hidden_help_text(area));
+    view.handle_mouse_move(10, 22, area);
+    assert!(view.gutter_hover.is_expanded());
+
+    let mut buf_expanded = Buffer::empty(area);
+    view.render(area, &mut buf_expanded);
+
+    // Find separator column on normal status gutter border (row 20)
+    let normal_gutter_border_y = 20;
+    let mut sep_col = None;
+    for x in 0..80 {
+        if buf_normal[(x, normal_gutter_border_y)].symbol() == "┬" {
+            sep_col = Some(x);
+            break;
+        }
+    }
+    let sep_x = sep_col.expect("Gutter separator tee must exist on normal status border");
+
+    // A) The status gutter border on row 20 on the right side (from sep_x + 1 to 79) did NOT move!
+    for x in (sep_x + 1)..80 {
+        assert_eq!(
+            buf_expanded[(x, normal_gutter_border_y)].symbol(),
+            buf_normal[(x, normal_gutter_border_y)].symbol(),
+            "Status gutter border at col {} must be identical across normal and expanded states",
+            x
+        );
+    }
+
+    // At the separator column on row 20, normal has top tee, expanded has left tee connecting status border
+    assert_eq!(buf_normal[(sep_x, normal_gutter_border_y)].symbol(), "┬");
+    assert_eq!(buf_expanded[(sep_x, normal_gutter_border_y)].symbol(), "├");
+
+    // B) The status gutter content rows (21 and 22) on the right side did NOT move!
+    for x in (sep_x + 1)..79 {
+        assert_eq!(
+            buf_expanded[(x, 21)].symbol(),
+            buf_normal[(x, 21)].symbol(),
+            "Status gutter content at row 21, col {} must be identical",
+            x
+        );
+        assert_eq!(
+            buf_expanded[(x, 22)].symbol(),
+            buf_normal[(x, 22)].symbol(),
+            "Status gutter content at row 22, col {} must be identical",
+            x
+        );
+    }
+
+    // C) The help gutter expanded upwards on the left side:
+    // Row 19 is help top border capping at sep_x with corner glyph
+    assert_eq!(buf_expanded[(0, 19)].symbol(), "├");
+    assert_eq!(buf_expanded[(sep_x, 19)].symbol(), "┐");
+
+    // D) Menu items (rows 2..5) must not be overwritten
+    let mut menu_row_found = false;
+    for y in 2..10 {
+        let mut row_str = String::new();
+        for x in 0..80 {
+            row_str.push(buf_expanded[(x, y)].symbol().chars().next().unwrap_or(' '));
+        }
+        if row_str.contains("First Command") {
+            menu_row_found = true;
+            break;
+        }
+    }
+    assert!(menu_row_found, "Menu items must remain intact and visible");
+}
