@@ -140,16 +140,6 @@ for cfg in bashmenu.yml bashmenu.mnu bashmenu.themes shortcuts.yml cheat.yml; do
     fi
 done
 
-# Install vanilla templates into user config directory for easy reference/diff
-mkdir -p "$CONFIG_DIR/templates"
-for cfg in bashmenu.yml bashmenu.mnu bashmenu.themes shortcuts.yml cheat.yml; do
-    fixture="$SCRIPT_DIR/tests/fixtures/$cfg"
-    if [ -f "$fixture" ]; then
-        cp -f "$fixture" "$CONFIG_DIR/templates/$cfg.vanilla"
-    fi
-done
-echo "  [+] Installed default vanilla templates -> $CONFIG_DIR/templates/"
-
 # Symlink assets and scripts into user config directory if present
 if [ -d "$SCRIPT_DIR/assets" ]; then
     ln -sfn "$SCRIPT_DIR/assets" "$CONFIG_DIR/assets"

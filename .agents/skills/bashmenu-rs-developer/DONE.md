@@ -575,7 +575,6 @@
   - Ensured the repository's `bashmenu.mnu` is only loaded if specifically requested with `--menu <path>` or `--local`.
   - Removed legacy local file copy routines from `bashmenu.sh` that were polluting current working directories with template duplicates.
   - Ensured 100% template parity between repo root files (`bashmenu.mnu`, `bashmenu.yml`, `bashmenu.themes`) and test fixtures in `tests/fixtures/`.
-  - Enhanced `install.sh` to install pristine default vanilla templates into `$HOME/.config/bashmenu/templates/*.vanilla` for easy user reference/diffing.
   - Added `--update-menu` / `--reset-menu` flag to `install.sh` allowing users to upgrade an existing user menu to the latest vanilla layout with automatic `.bak` backup.
   - Updated `resolve_shortcuts_path` so user config directory takes strict precedence over `BASHMENU_DIR`.
   - Added integration test `test_user_config_isolation_and_vanilla_separation` in `crates/bashmenu-cli/tests/audit_items_test.rs`.
