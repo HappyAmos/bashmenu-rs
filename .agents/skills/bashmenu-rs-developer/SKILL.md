@@ -72,6 +72,11 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
   - **Instant Scrolling & Zero-Delay Focus:** Set viewport offsets directly without artificial transition animations.
   - **Pre-Baked / Cached Background Compositing:** In live preview widgets and main menus, cache base composited cell buffers. On cursor movement or highlight flashes, modify only the affected row cells rather than re-rendering background wallpapers or full canvas structures.
   - **Universal Selection & Clipboard (`bashmenu_tui::clipboard`):** All single-line (`TextInput`) and multi-line text inputs (`bashedit`, `NoteEditorModal`, `menuedit` multi-line fields) must support `Shift + Left/Right/Up/Down/Home/End` selection anchoring and `Ctrl+C`, `Ctrl+V`, `Ctrl+X`.
+- **Screen Transition Ubiquity & Zero-Dimension Guard:**
+  - Visual transitions are triggered on all screen updates (startup, submenus, Esc, page up/down, modals, command return).
+  - `draw_with_transition` and `draw_with_transition_out` immediately return on zero-dimension viewports (`width == 0 || height == 0`) to prevent artificial sleep delays in headless test runs.
+- **Editor Undo History Bounded Capacity (`bashedit`):**
+  - `EditorBuffer` strictly limits undo history to 100 snapshots; tests must account for this boundary and verify graceful exhaustion.
 - **Inline Macro Parameter Syntax & Help Parity:**
   - Macro placeholders accept colon-separated inline configurations:
     - `{dev_dir}` (dynamic repository root path), `{bashmenu_dir}` (`~/.config/bashmenu`), `{utc_seconds}` (epoch seconds), `{command:<cmd>}` / `{cmd:<cmd>}` (cached shell stdout, cleared via `clear_command_cache()` on `<F5>`).
