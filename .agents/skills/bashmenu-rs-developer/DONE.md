@@ -604,6 +604,13 @@
   - Updated unit tests in `crates/bashmenu-core/src/menu.rs` and `crates/bashmenu-core/tests/schema_fixtures_test.rs` to validate the updated vanilla menu structure (`Notes` notebook item and `Applications` submenu).
   - Verified 100% test pass rate across the workspace, zero Clippy/Rustfmt warnings, zero Shellcheck warnings.
 
+- **Fade Transition Color Flashing Fix on Non-TrueColor Terminals**:
+  - Identified root cause of erratic color flashing and chromatic hue jumping during `Fade` transitions on netbook/basic terminals: `dim_color` in `crates/bashmenu-tui/src/transition.rs` treated `ColorTier::Color256` the same as `TrueColor`, emitting raw `Color::Rgb(dr, dg, db)` escape codes (`\x1b[38;2;...m`) that non-TrueColor terminals misparse as ANSI SGR color change commands.
+  - Updated `dim_color` for `ColorTier::Color256` to downsample dimmed RGB values via `crate::wallpaper::rgb_to_xterm256(dr, dg, db)`, returning proper `Color::Indexed` codes.
+  - Implemented spatial Bayer ordered dithering (`BAYER_4X4`) for `Fade` in `crates/bashmenu-tui/src/terminal.rs` (`draw_with_transition` and `draw_with_transition_out`) when running on `ColorTier::Color8` or `ColorTier::Color16`: replaces mathematical RGB dimming (which jumps through saturated primary hues due to lack of dark luminance ramps) with smooth ordered dithering to black.
+  - Added unit test assertions in `crates/bashmenu-tui/src/transition.rs` (`test_dim_color`) and integration test assertions in `crates/bashmenu-tui/tests/transition_test.rs` (`test_transition_dim_color_levels`) verifying `Color256` outputs `Color::Indexed` and 8/16-color tiers never emit `Color::Rgb`.
+  - Verified 100% test pass rate across the workspace, zero warnings on Clippy and Rustfmt, zero warnings on Shellcheck.
+
 
 
 

@@ -89,6 +89,22 @@ fn test_transition_dim_color_levels() {
 
     let dimmed_full = dim_color(base, 1.0);
     assert_eq!(dimmed_full, Color::Rgb(100, 200, 50));
+
+    // 256-color tier must return Color::Indexed, avoiding raw RGB escapes
+    std::env::set_var("BASHMENU_COLOR_TIER", "256");
+    let dimmed_256 = dim_color(base, 0.5);
+    assert!(matches!(dimmed_256, Color::Indexed(_)));
+
+    // 16-color tier must return standard 16-color ANSI
+    std::env::set_var("BASHMENU_COLOR_TIER", "16");
+    let dimmed_16 = dim_color(base, 0.5);
+    assert!(!matches!(dimmed_16, Color::Rgb(_, _, _)));
+
+    // 8-color tier must return standard 8-color ANSI
+    std::env::set_var("BASHMENU_COLOR_TIER", "8");
+    let dimmed_8 = dim_color(base, 0.5);
+    assert!(!matches!(dimmed_8, Color::Rgb(_, _, _)));
+
     std::env::remove_var("BASHMENU_COLOR_TIER");
 }
 

@@ -100,6 +100,44 @@ impl TerminalGuard {
         match effect {
             TransitionEffect::None | TransitionEffect::Instant => self.draw(|f| render_callback(f)),
             TransitionEffect::Fade => {
+                let tier = crate::style::ColorTier::detect();
+                if tier == crate::style::ColorTier::Color8
+                    || tier == crate::style::ColorTier::Color16
+                {
+                    let size = self.terminal.size()?;
+                    let delay = speed.step_delay_in();
+                    let steps = 6;
+                    for step in 1..=steps {
+                        let fraction = step as f32 / steps as f32;
+                        let threshold = (fraction * 16.0).round() as u8;
+                        let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
+                        let _ = self.terminal.draw(|f| {
+                            render_callback(f);
+                            if step < steps {
+                                let buf = f.buffer_mut();
+                                for y in 0..size.height {
+                                    for x in 0..size.width {
+                                        let dither = BAYER_4X4[(y % 4) as usize][(x % 4) as usize];
+                                        if dither >= threshold {
+                                            let cell = &mut buf[(x, y)];
+                                            cell.set_char(' ');
+                                            cell.set_fg(Color::Black);
+                                            cell.set_bg(Color::Black);
+                                            cell.modifier = Modifier::empty();
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                        let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
+                        let _ = self.terminal.backend_mut().flush();
+                        if step < steps {
+                            std::thread::sleep(delay);
+                        }
+                    }
+                    return Ok(());
+                }
+
                 let size = self.terminal.size()?;
                 let delay = speed.step_delay_in();
                 let steps = 5;
@@ -449,6 +487,40 @@ impl TerminalGuard {
         match effect {
             TransitionEffect::None | TransitionEffect::Instant => Ok(()),
             TransitionEffect::Fade => {
+                let tier = crate::style::ColorTier::detect();
+                if tier == crate::style::ColorTier::Color8
+                    || tier == crate::style::ColorTier::Color16
+                {
+                    let size = self.terminal.size()?;
+                    let delay = speed.step_delay_out();
+                    let steps = 6;
+                    for step in (0..steps).rev() {
+                        let fraction = step as f32 / steps as f32;
+                        let threshold = (fraction * 16.0).round() as u8;
+                        let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
+                        let _ = self.terminal.draw(|f| {
+                            render_callback(f);
+                            let buf = f.buffer_mut();
+                            for y in 0..size.height {
+                                for x in 0..size.width {
+                                    let dither = BAYER_4X4[(y % 4) as usize][(x % 4) as usize];
+                                    if step == 0 || dither >= threshold {
+                                        let cell = &mut buf[(x, y)];
+                                        cell.set_char(' ');
+                                        cell.set_fg(Color::Black);
+                                        cell.set_bg(Color::Black);
+                                        cell.modifier = Modifier::empty();
+                                    }
+                                }
+                            }
+                        });
+                        let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
+                        let _ = self.terminal.backend_mut().flush();
+                        std::thread::sleep(delay);
+                    }
+                    return Ok(());
+                }
+
                 let size = self.terminal.size()?;
                 let delay = speed.step_delay_out();
                 let steps = 5;

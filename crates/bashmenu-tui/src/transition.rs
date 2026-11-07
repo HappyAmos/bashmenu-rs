@@ -178,8 +178,9 @@ pub fn dim_color(color: Color, factor: f32) -> Color {
     let db = ((b as f32) * f).round() as u8;
 
     match crate::style::ColorTier::detect() {
-        crate::style::ColorTier::TrueColor | crate::style::ColorTier::Color256 => {
-            Color::Rgb(dr, dg, db)
+        crate::style::ColorTier::TrueColor => Color::Rgb(dr, dg, db),
+        crate::style::ColorTier::Color256 => {
+            Color::Indexed(crate::wallpaper::rgb_to_xterm256(dr, dg, db))
         }
         crate::style::ColorTier::Color16 => {
             crate::style::downsample_color_to_16(Color::Rgb(dr, dg, db))
@@ -282,6 +283,13 @@ mod tests {
 
         let full = dim_color(Color::Rgb(100, 200, 50), 1.0);
         assert_eq!(full, Color::Rgb(100, 200, 50));
+
+        // 256-color tier should downsample to Color::Indexed
+        std::env::set_var("BASHMENU_COLOR_TIER", "256");
+        let rgb_256 = dim_color(Color::Rgb(100, 200, 50), 0.5);
+        let expected_idx = crate::wallpaper::rgb_to_xterm256(50, 100, 25);
+        assert_eq!(rgb_256, Color::Indexed(expected_idx));
+
         std::env::remove_var("BASHMENU_COLOR_TIER");
     }
 }
