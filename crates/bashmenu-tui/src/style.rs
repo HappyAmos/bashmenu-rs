@@ -45,6 +45,9 @@ impl ColorTier {
             if t == "linux" || t == "console" || t == "vt100" || t == "vt102" || t == "dumb" {
                 return Self::Color8;
             }
+            if t.contains("16color") {
+                return Self::Color16;
+            }
             if t.contains("256color")
                 || t.contains("kitty")
                 || t.contains("alacritty")
@@ -52,14 +55,11 @@ impl ColorTier {
                 || t.contains("foot")
                 || t.contains("wezterm")
             {
-                return Self::Color256;
-            }
-            if t.contains("16color") {
-                return Self::Color16;
+                return Self::TrueColor;
             }
         }
 
-        Self::Color16
+        Self::TrueColor
     }
 }
 
