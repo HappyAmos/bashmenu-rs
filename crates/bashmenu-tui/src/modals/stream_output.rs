@@ -373,7 +373,9 @@ impl StreamOutputModal {
             " [ESC/ENTER]: Close | [▲/▼/PgUp/PgDn]: Scroll ".to_string()
         };
 
-        buf.set_string(inner.x + 1, footer_y, footer_text, footer_style);
+        let avail_footer_w = inner.width.saturating_sub(2) as usize;
+        let clipped_footer: String = footer_text.chars().take(avail_footer_w).collect();
+        buf.set_string(inner.x + 1, footer_y, &clipped_footer, footer_style);
     }
 }
 

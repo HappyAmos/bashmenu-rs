@@ -353,11 +353,13 @@ impl FilePickerModal {
         let inner = render_modal_frame(area, dialog_w, dialog_h, &self.title, styles, buf);
 
         // 1. Current Directory Path Banner
+        let avail_banner_w = inner.width.saturating_sub(2) as usize;
         let path_str = format!(" Dir: {} ", self.current_dir.display());
+        let clipped_path: String = path_str.chars().take(avail_banner_w).collect();
         buf.set_string(
             inner.x + 1,
             inner.y,
-            &path_str,
+            &clipped_path,
             styles.accent.add_modifier(Modifier::BOLD),
         );
 
@@ -407,9 +409,11 @@ impl FilePickerModal {
 
         // 3. Bottom controls / New File input
         let btn_y = inner.y + inner.height.saturating_sub(1);
+        let ctrl_w = inner.width.saturating_sub(4) as usize;
         if self.creating_new {
             let prompt = format!(" New file name: [{}]_ ", self.new_name_input);
-            buf.set_string(inner.x + 2, btn_y, &prompt, styles.highlight);
+            let clipped_prompt: String = prompt.chars().take(ctrl_w).collect();
+            buf.set_string(inner.x + 2, btn_y, &clipped_prompt, styles.highlight);
         } else {
             let hidden_tag = if self.show_hidden {
                 "[h] Hide Hidden"
@@ -424,7 +428,8 @@ impl FilePickerModal {
             } else {
                 format!("[Enter] Select   {}   [Esc] Cancel", hidden_tag)
             };
-            buf.set_string(inner.x + 2, btn_y, &bottom_str, styles.gutter);
+            let clipped_bottom: String = bottom_str.chars().take(ctrl_w).collect();
+            buf.set_string(inner.x + 2, btn_y, &clipped_bottom, styles.gutter);
         }
 
         inner

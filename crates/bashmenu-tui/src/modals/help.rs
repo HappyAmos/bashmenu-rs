@@ -230,12 +230,14 @@ impl HelpModal {
 
         // Render wrapped footer help lines with equal spacing
         let footer_start_y = inner.y + inner.height.saturating_sub(1 + footer_h as u16);
+        let avail_footer_w = inner.width.saturating_sub(2) as usize;
         for (idx, line) in footer_lines.iter().enumerate() {
-            let footer_x = inner.x + (inner.width.saturating_sub(line.len() as u16) / 2);
+            let clipped: String = line.chars().take(avail_footer_w).collect();
+            let footer_x = inner.x + (inner.width.saturating_sub(clipped.len() as u16) / 2);
             buf.set_string(
                 footer_x,
                 footer_start_y + idx as u16,
-                line,
+                &clipped,
                 Style::default().fg(Color::DarkGray),
             );
         }
@@ -246,7 +248,10 @@ impl HelpModal {
 
 /// Simple word wrapper for help modal text
 fn wrap_help_text(text: &str, max_w: usize) -> Vec<String> {
-    if max_w == 0 || text.len() <= max_w {
+    if max_w == 0 {
+        return Vec::new();
+    }
+    if text.len() <= max_w {
         return vec![text.to_string()];
     }
 

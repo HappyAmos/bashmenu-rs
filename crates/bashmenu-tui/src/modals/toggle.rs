@@ -101,17 +101,31 @@ impl ToggleModal {
 
     /// Renders the toggle modal
     pub fn render(&self, area: Rect, styles: &ResolvedThemeStyles, buf: &mut Buffer) -> Rect {
-        let dialog_w = (self.message.len() as u16 + 12).clamp(42, 70);
-        let dialog_h = 8;
+        let max_w = 70_u16.min(area.width.saturating_sub(4));
+        let avail_w = max_w.saturating_sub(6) as usize;
+        let msg_lines = if avail_w > 0 && !self.message.trim().is_empty() {
+            super::input::wrap_prompt_text(&self.message, avail_w)
+        } else {
+            Vec::new()
+        };
+        let msg_count = msg_lines.len().max(1);
+        let max_h = area.height.saturating_sub(2);
+        let dialog_w = (self.message.len() as u16 + 12)
+            .min(max_w)
+            .max(20.min(max_w));
+        let dialog_h = ((msg_count + 5) as u16).min(max_h).max(7.min(max_h));
 
         let inner = render_modal_frame(area, dialog_w, dialog_h, &self.title, styles, buf);
+        let inner_avail_w = inner.width.saturating_sub(4) as usize;
 
-        // 1. Render Message Text
-        let msg_y = inner.y + 1;
-        let msg_x = inner.x + 2;
-        let avail_w = inner.width.saturating_sub(4) as usize;
-        let truncated: String = self.message.chars().take(avail_w).collect();
-        buf.set_string(msg_x, msg_y, &truncated, styles.text);
+        // 1. Render Message Text (wrapped and clipped within inner width)
+        for (i, line) in msg_lines.iter().enumerate() {
+            let py = inner.y + 1 + i as u16;
+            if py < inner.y + inner.height.saturating_sub(2) {
+                let clipped: String = line.chars().take(inner_avail_w).collect();
+                buf.set_string(inner.x + 2, py, &clipped, styles.text);
+            }
+        }
 
         // 2. Render Action Buttons: [ True ]  [ False ]  [ Cancel ]
         let btn_y = inner.y + inner.height.saturating_sub(2);
@@ -152,10 +166,23 @@ impl ToggleModal {
         let t_x = inner.x + 2;
         let f_x = inner.x + third + 2;
         let c_x = inner.x + third * 2 + 2;
+        let right_bound = inner.x + inner.width;
 
-        buf.set_string(t_x, btn_y, true_str, true_style);
-        buf.set_string(f_x, btn_y, false_str, false_style);
-        buf.set_string(c_x, btn_y, cancel_str, cancel_style);
+        if t_x < right_bound {
+            let max_w = (right_bound - t_x) as usize;
+            let clipped: String = true_str.chars().take(max_w).collect();
+            buf.set_string(t_x, btn_y, &clipped, true_style);
+        }
+        if f_x < right_bound {
+            let max_w = (right_bound - f_x) as usize;
+            let clipped: String = false_str.chars().take(max_w).collect();
+            buf.set_string(f_x, btn_y, &clipped, false_style);
+        }
+        if c_x < right_bound {
+            let max_w = (right_bound - c_x) as usize;
+            let clipped: String = cancel_str.chars().take(max_w).collect();
+            buf.set_string(c_x, btn_y, &clipped, cancel_style);
+        }
 
         inner
     }

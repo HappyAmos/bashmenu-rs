@@ -1537,3 +1537,183 @@ fn test_color_picker_modal_truecolor_and_tabs() {
     modal_rgb.tab = ColorPickerTab::HexInput;
     modal_rgb.render(area, &styles, &mut buf);
 }
+
+#[test]
+fn test_wrap_prompt_text_bounds_and_unicode() {
+    use bashmenu_tui::wrap_prompt_text;
+
+    // 0 max width returns empty
+    assert!(wrap_prompt_text("Hello world", 0).is_empty());
+
+    // Single long word chunked strictly <= max_w
+    let long_word = "Supercalifragilisticexpialidocious";
+    let wrapped = wrap_prompt_text(long_word, 8);
+    for line in &wrapped {
+        assert!(unicode_width::UnicodeWidthStr::width(line.as_str()) <= 8);
+    }
+
+    // Paragraph wrapping with preserved newlines
+    let para = "First line here.\n\nSecond line with some words.";
+    let wrapped_para = wrap_prompt_text(para, 12);
+    for line in &wrapped_para {
+        assert!(unicode_width::UnicodeWidthStr::width(line.as_str()) <= 12);
+    }
+
+    // Unicode multi-byte character width wrapping
+    let cjk = "こんにちは世界皆様";
+    let wrapped_cjk = wrap_prompt_text(cjk, 6);
+    for line in &wrapped_cjk {
+        assert!(unicode_width::UnicodeWidthStr::width(line.as_str()) <= 6);
+    }
+}
+
+#[test]
+fn test_all_modals_render_within_frame_bounds() {
+    use bashmenu_tui::{HelpModal, NoteConflictModal, StreamOutputModal};
+
+    let styles = ResolvedThemeStyles::default();
+    let long_title = "A".repeat(120);
+    let long_msg = "SuperLongWordWithoutSpaces".repeat(10);
+    let viewports = [
+        Rect::new(0, 0, 80, 24),
+        Rect::new(0, 0, 50, 15),
+        Rect::new(0, 0, 36, 12),
+    ];
+
+    for &area in &viewports {
+        // 1. ConfirmModal
+        let mut buf = Buffer::empty(area);
+        let confirm = ConfirmModal::new(&long_title, &long_msg);
+        let inner = confirm.render(area, &styles, &mut buf);
+        let right_border_x = inner.x + inner.width;
+        for y in inner.y..inner.y + inner.height {
+            let ch = buf[(right_border_x, y)].symbol();
+            assert_eq!(
+                ch, "│",
+                "ConfirmModal overwrote right border at ({}, {})",
+                right_border_x, y
+            );
+        }
+
+        // 2. InputModal
+        let mut buf = Buffer::empty(area);
+        let input = InputModal::new(&long_title, &long_msg, "InitialValue");
+        let inner = input.render(area, &styles, &mut buf);
+        let right_border_x = inner.x + inner.width;
+        for y in inner.y..inner.y + inner.height {
+            let ch = buf[(right_border_x, y)].symbol();
+            assert_eq!(
+                ch, "│",
+                "InputModal overwrote right border at ({}, {})",
+                right_border_x, y
+            );
+        }
+
+        // 3. MessageModal
+        let mut buf = Buffer::empty(area);
+        let msg_modal = MessageModal::new(&long_title, &long_msg);
+        let inner = msg_modal.render(area, &styles, &mut buf);
+        let right_border_x = inner.x + inner.width;
+        for y in inner.y..inner.y + inner.height {
+            let ch = buf[(right_border_x, y)].symbol();
+            assert_eq!(
+                ch, "│",
+                "MessageModal overwrote right border at ({}, {})",
+                right_border_x, y
+            );
+        }
+
+        // 4. RadioModal
+        let mut buf = Buffer::empty(area);
+        let opts = vec![
+            (
+                "opt1".to_string(),
+                "A very long option label that exceeds window width".to_string(),
+            ),
+            ("opt2".to_string(), "Second option label".to_string()),
+        ];
+        let radio = RadioModal::new(&long_title, &long_msg, opts, "opt1");
+        let inner = radio.render(area, &styles, &mut buf);
+        let right_border_x = inner.x + inner.width;
+        for y in inner.y..inner.y + inner.height {
+            let ch = buf[(right_border_x, y)].symbol();
+            assert_eq!(
+                ch, "│",
+                "RadioModal overwrote right border at ({}, {})",
+                right_border_x, y
+            );
+        }
+
+        // 5. ToggleModal
+        let mut buf = Buffer::empty(area);
+        let toggle = ToggleModal::new(&long_title, &long_msg);
+        let inner = toggle.render(area, &styles, &mut buf);
+        let right_border_x = inner.x + inner.width;
+        for y in inner.y..inner.y + inner.height {
+            let ch = buf[(right_border_x, y)].symbol();
+            assert_eq!(
+                ch, "│",
+                "ToggleModal overwrote right border at ({}, {})",
+                right_border_x, y
+            );
+        }
+
+        // 6. NoteConflictModal
+        let mut buf = Buffer::empty(area);
+        let conflict = NoteConflictModal::new(
+            "Task Note",
+            "notes.yml",
+            "local content",
+            "disk content",
+            "base content",
+        );
+        let inner = conflict.render(area, &styles, &mut buf);
+        let right_border_x = inner.x + inner.width;
+        for y in inner.y..inner.y + inner.height {
+            let ch = buf[(right_border_x, y)].symbol();
+            assert_eq!(
+                ch, "│",
+                "NoteConflictModal overwrote right border at ({}, {})",
+                right_border_x, y
+            );
+        }
+
+        // 7. HelpModal
+        let mut buf = Buffer::empty(area);
+        let help = HelpModal::new(
+            &long_title,
+            &format!("# Heading\n{}\n```\ncode\n```", long_msg),
+        );
+        let inner = help.render(area, &styles, &mut buf);
+        let right_border_x = inner.x + inner.width;
+        for y in inner.y..inner.y + inner.height {
+            let ch = buf[(right_border_x, y)].symbol();
+            assert_eq!(
+                ch, "│",
+                "HelpModal overwrote right border at ({}, {})",
+                right_border_x, y
+            );
+        }
+
+        // 8. StreamOutputModal
+        let mut buf = Buffer::empty(area);
+        let mut stream =
+            StreamOutputModal::new(long_title.clone(), "echo hi".to_string(), 80, true);
+        stream.lines.push(long_msg.clone());
+        stream.render(area, &styles, &mut buf);
+        let (w, h) = (
+            (area.width * 80 / 100).clamp(30, area.width.saturating_sub(4)),
+            (area.height * 80 / 100).clamp(10, area.height.saturating_sub(2)),
+        );
+        let inner = bashmenu_tui::compute_modal_inner(area, w, h);
+        let right_border_x = inner.x + inner.width;
+        for y in inner.y..inner.y + inner.height {
+            let ch = buf[(right_border_x, y)].symbol();
+            assert_eq!(
+                ch, "│",
+                "StreamOutputModal overwrote right border at ({}, {})",
+                right_border_x, y
+            );
+        }
+    }
+}

@@ -144,7 +144,9 @@ impl ColorGridModal {
                     )
                 };
 
-                buf.set_string(px, py, cell_str, cell_style);
+                if px + 2 <= inner.x + inner.width && py < inner.y + inner.height {
+                    buf.set_string(px, py, cell_str, cell_style);
+                }
             }
         }
 
@@ -293,7 +295,9 @@ impl AsciiGridModal {
                 };
 
                 let cell_str = format!(" {} ", ch);
-                buf.set_string(px, py, &cell_str, cell_style);
+                if px + 2 <= inner.x + inner.width && py < inner.y + inner.height {
+                    buf.set_string(px, py, &cell_str, cell_style);
+                }
             }
         }
 

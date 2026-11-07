@@ -147,8 +147,9 @@ impl ConfirmModal {
             .map(|l| l.chars().count())
             .max()
             .unwrap_or(20);
-        let dialog_w = (max_line_w as u16 + 8).clamp(48, max_w);
-        let dialog_h = (wrapped.len() as u16 + 5).clamp(8, area.height.saturating_sub(2));
+        let dialog_w = (max_line_w as u16 + 8).min(max_w).max(20.min(max_w));
+        let max_h = area.height.saturating_sub(2);
+        let dialog_h = (wrapped.len() as u16 + 5).min(max_h).max(8.min(max_h));
 
         let inner = render_modal_frame(area, dialog_w, dialog_h, &self.title, styles, buf);
 
@@ -206,10 +207,23 @@ impl ConfirmModal {
         let yes_x = start_x;
         let no_x = start_x + 11;
         let cancel_x = start_x + 22;
+        let right_bound = inner.x + inner.width;
 
-        buf.set_string(yes_x, btn_y, yes_str, yes_style);
-        buf.set_string(no_x, btn_y, no_str, no_style);
-        buf.set_string(cancel_x, btn_y, cancel_str, cancel_style);
+        if yes_x < right_bound {
+            let max_w = (right_bound - yes_x) as usize;
+            let clipped: String = yes_str.chars().take(max_w).collect();
+            buf.set_string(yes_x, btn_y, &clipped, yes_style);
+        }
+        if no_x < right_bound {
+            let max_w = (right_bound - no_x) as usize;
+            let clipped: String = no_str.chars().take(max_w).collect();
+            buf.set_string(no_x, btn_y, &clipped, no_style);
+        }
+        if cancel_x < right_bound {
+            let max_w = (right_bound - cancel_x) as usize;
+            let clipped: String = cancel_str.chars().take(max_w).collect();
+            buf.set_string(cancel_x, btn_y, &clipped, cancel_style);
+        }
 
         inner
     }

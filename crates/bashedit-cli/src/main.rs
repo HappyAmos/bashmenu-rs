@@ -1355,11 +1355,16 @@ fn render_modal(
             );
             let options_line = "Press: [R]ecover edits  [D]elete swap  [O]pen read-only  [Q]uit";
 
-            buf.set_string(inner.x + 2, inner.y + 1, info_line1, styles.text);
+            let avail_w = inner.width.saturating_sub(4) as usize;
+            let clipped1: String = info_line1.chars().take(avail_w).collect();
+            let clipped2: String = info_line2.chars().take(avail_w).collect();
+            let clipped_opts: String = options_line.chars().take(avail_w).collect();
+
+            buf.set_string(inner.x + 2, inner.y + 1, &clipped1, styles.text);
             buf.set_string(
                 inner.x + 2,
                 inner.y + 2,
-                info_line2,
+                &clipped2,
                 if is_running {
                     Style::default().fg(Color::Red)
                 } else {
@@ -1369,7 +1374,7 @@ fn render_modal(
             buf.set_string(
                 inner.x + 2,
                 inner.y + 4,
-                options_line,
+                &clipped_opts,
                 styles.highlight.add_modifier(Modifier::BOLD),
             );
             None

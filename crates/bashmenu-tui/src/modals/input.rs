@@ -306,19 +306,20 @@ impl InputModal {
     pub fn compute_layout(&self, area: Rect) -> (u16, u16, Vec<String>) {
         let max_w = area.width.saturating_sub(4);
         let preferred_w = 68.max(area.width * 75 / 100);
-        let dialog_w = preferred_w.min(max_w).max(20);
+        let dialog_w = preferred_w.min(max_w).max(20.min(max_w));
 
         let inner_w = dialog_w.saturating_sub(2);
         let content_w = inner_w.saturating_sub(4) as usize;
 
-        let prompt_lines = if self.prompt.trim().is_empty() {
+        let prompt_lines = if self.prompt.trim().is_empty() || content_w == 0 {
             Vec::new()
         } else {
-            wrap_prompt_text(&self.prompt, content_w.max(10))
+            wrap_prompt_text(&self.prompt, content_w)
         };
 
         let prompt_count = prompt_lines.len().max(1) as u16;
-        let dialog_h = (prompt_count + 7).min(area.height.saturating_sub(2)).max(7);
+        let max_h = area.height.saturating_sub(2);
+        let dialog_h = (prompt_count + 7).min(max_h).max(7.min(max_h));
 
         (dialog_w, dialog_h, prompt_lines)
     }
@@ -374,10 +375,12 @@ impl InputModal {
         let inner = render_modal_frame(area, dialog_w, dialog_h, &self.title, styles, buf);
 
         // 1. Prompt lines (wrapped at word boundaries)
+        let avail_w = inner.width.saturating_sub(4) as usize;
         for (idx, line) in prompt_lines.iter().enumerate() {
             let py = inner.y + idx as u16;
             if py < inner.y + inner.height.saturating_sub(4) {
-                buf.set_string(inner.x + 2, py, line, styles.text);
+                let clipped: String = line.chars().take(avail_w).collect();
+                buf.set_string(inner.x + 2, py, &clipped, styles.text);
             }
         }
 
@@ -433,25 +436,39 @@ impl InputModal {
         // 3. Action Buttons [ OK ] and [ Cancel ]
         let btn_y = inner.y + inner.height.saturating_sub(2);
         let center_x = inner.x + inner.width / 2;
-        let ok_x = center_x.saturating_sub(12);
-        let cancel_x = center_x + 2;
+        let right_bound = inner.x + inner.width;
 
-        buf.set_string(
-            ok_x,
-            btn_y,
-            " [ OK ] ",
-            styles.highlight.add_modifier(Modifier::BOLD),
-        );
-        buf.set_string(cancel_x, btn_y, " [ Cancel ] ", styles.text);
+        let ok_str = " [ OK ] ";
+        let cancel_str = " [ Cancel ] ";
+
+        let ok_x = center_x.saturating_sub(12).max(inner.x + 1);
+        let cancel_x = (center_x + 2).max(ok_x + ok_str.len() as u16 + 1);
+
+        if ok_x < right_bound {
+            let max_ok = (right_bound - ok_x) as usize;
+            let clipped_ok: String = ok_str.chars().take(max_ok).collect();
+            buf.set_string(
+                ok_x,
+                btn_y,
+                &clipped_ok,
+                styles.highlight.add_modifier(Modifier::BOLD),
+            );
+        }
+        if cancel_x < right_bound {
+            let max_c = (right_bound - cancel_x) as usize;
+            let clipped_cancel: String = cancel_str.chars().take(max_c).collect();
+            buf.set_string(cancel_x, btn_y, &clipped_cancel, styles.text);
+        }
 
         inner
     }
 }
 
-/// Word wrapper for modal prompt strings. Respects explicit newlines and breaks long words.
+/// Word wrapper for modal prompt strings. Respects explicit newlines and breaks
+/// long words using visible column widths.
 pub fn wrap_prompt_text(text: &str, max_w: usize) -> Vec<String> {
     if max_w == 0 {
-        return vec![text.to_string()];
+        return Vec::new();
     }
     let mut lines = Vec::new();
     for paragraph in text.lines() {
@@ -461,43 +478,52 @@ pub fn wrap_prompt_text(text: &str, max_w: usize) -> Vec<String> {
         }
         let mut current = String::new();
         for word in paragraph.split_whitespace() {
+            let word_w = unicode_width::UnicodeWidthStr::width(word);
+            let current_w = unicode_width::UnicodeWidthStr::width(current.as_str());
+
             if current.is_empty() {
-                if word.chars().count() <= max_w {
+                if word_w <= max_w {
                     current.push_str(word);
                 } else {
-                    let chars: Vec<char> = word.chars().collect();
-                    let mut i = 0;
-                    while i < chars.len() {
-                        let end = (i + max_w).min(chars.len());
-                        let chunk: String = chars[i..end].iter().collect();
-                        if end < chars.len() {
+                    let mut chunk = String::new();
+                    let mut chunk_w = 0;
+                    for ch in word.chars() {
+                        let ch_w = unicode_width::UnicodeWidthChar::width(ch).unwrap_or(1);
+                        if chunk_w + ch_w > max_w && !chunk.is_empty() {
                             lines.push(chunk);
-                        } else {
-                            current.push_str(&chunk);
+                            chunk = String::new();
+                            chunk_w = 0;
                         }
-                        i = end;
+                        chunk.push(ch);
+                        chunk_w += ch_w;
+                    }
+                    if !chunk.is_empty() {
+                        current = chunk;
                     }
                 }
-            } else if current.chars().count() + 1 + word.chars().count() <= max_w {
+            } else if current_w + 1 + word_w <= max_w {
                 current.push(' ');
                 current.push_str(word);
             } else {
                 lines.push(current);
                 current = String::new();
-                if word.chars().count() <= max_w {
+                if word_w <= max_w {
                     current.push_str(word);
                 } else {
-                    let chars: Vec<char> = word.chars().collect();
-                    let mut i = 0;
-                    while i < chars.len() {
-                        let end = (i + max_w).min(chars.len());
-                        let chunk: String = chars[i..end].iter().collect();
-                        if end < chars.len() {
+                    let mut chunk = String::new();
+                    let mut chunk_w = 0;
+                    for ch in word.chars() {
+                        let ch_w = unicode_width::UnicodeWidthChar::width(ch).unwrap_or(1);
+                        if chunk_w + ch_w > max_w && !chunk.is_empty() {
                             lines.push(chunk);
-                        } else {
-                            current.push_str(&chunk);
+                            chunk = String::new();
+                            chunk_w = 0;
                         }
-                        i = end;
+                        chunk.push(ch);
+                        chunk_w += ch_w;
+                    }
+                    if !chunk.is_empty() {
+                        current = chunk;
                     }
                 }
             }

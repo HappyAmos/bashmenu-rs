@@ -108,10 +108,36 @@ editing it.\nChoose how to resolve this concurrent change:"
         }
     }
 
+    /// Selects appropriately sized button labels for the available width.
+    fn button_labels(&self, inner_width: u16) -> [&'static str; 5] {
+        if inner_width >= 68 {
+            BUTTON_LABELS
+        } else if inner_width >= 50 {
+            [
+                "[ Merge ]",
+                "[ Overwrite ]",
+                "[ Reload ]",
+                "[ Save Copy ]",
+                "[ Cancel ]",
+            ]
+        } else {
+            ["[Merge]", "[Over]", "[Reload]", "[Copy]", "[Cancel]"]
+        }
+    }
+
     /// Computes inner bounds and layout for modal frame and button hits.
     fn compute_layout(&self, area: Rect) -> (Rect, u16, u16) {
-        let dialog_w = 72.min(area.width.saturating_sub(4));
-        let dialog_h = 10.min(area.height.saturating_sub(2));
+        let max_w = area.width.saturating_sub(4);
+        let dialog_w = 74.min(max_w).max(20.min(max_w));
+        let avail_w = dialog_w.saturating_sub(6) as usize;
+        let wrapped = if avail_w > 0 {
+            super::input::wrap_prompt_text(&self.message, avail_w)
+        } else {
+            Vec::new()
+        };
+        let msg_lines = wrapped.len().max(1);
+        let max_h = area.height.saturating_sub(2);
+        let dialog_h = ((msg_lines + 5) as u16).min(max_h).max(8.min(max_h));
         let inner = super::frame::compute_modal_inner(area, dialog_w, dialog_h);
         (inner, dialog_w, dialog_h)
     }
@@ -151,8 +177,9 @@ editing it.\nChoose how to resolve this concurrent change:"
     /// Calculates horizontal spans `(start_x, end_x)` for each button.
     fn calculate_button_positions(&self, inner: Rect) -> Vec<(u16, u16)> {
         let mut positions = Vec::new();
-        let total_btn_len: usize = BUTTON_LABELS.iter().map(|l| l.len()).sum();
-        let total_gaps = BUTTON_LABELS.len().saturating_sub(1);
+        let labels = self.button_labels(inner.width);
+        let total_btn_len: usize = labels.iter().map(|l| l.len()).sum();
+        let total_gaps = labels.len().saturating_sub(1);
         let avail = inner.width.saturating_sub(4) as usize;
         let spacing = if avail > total_btn_len && total_gaps > 0 {
             ((avail - total_btn_len) / total_gaps).max(1)
@@ -161,9 +188,10 @@ editing it.\nChoose how to resolve this concurrent change:"
         };
 
         let mut curr_x = inner.x + 2;
-        for label in BUTTON_LABELS {
+        let right_bound = inner.x + inner.width;
+        for label in labels {
             let start = curr_x;
-            let end = curr_x + label.len() as u16;
+            let end = (curr_x + label.len() as u16).min(right_bound);
             positions.push((start, end));
             curr_x = end + spacing as u16;
         }
@@ -171,22 +199,28 @@ editing it.\nChoose how to resolve this concurrent change:"
     }
 
     /// Renders the note conflict resolution dialog.
-    pub fn render(&self, area: Rect, styles: &ResolvedThemeStyles, buf: &mut Buffer) {
+    pub fn render(&self, area: Rect, styles: &ResolvedThemeStyles, buf: &mut Buffer) -> Rect {
         let (inner, dialog_w, dialog_h) = self.compute_layout(area);
         render_modal_frame(area, dialog_w, dialog_h, &self.title, styles, buf);
 
-        // 1. Message Lines
-        let text_lines: Vec<&str> = self.message.lines().collect();
-        for (i, line) in text_lines.iter().enumerate() {
-            let py = inner.y + 1 + i as u16;
-            if py < inner.y + inner.height.saturating_sub(2) {
-                buf.set_string(inner.x + 2, py, line, styles.text);
+        // 1. Message Lines (wrapped and clipped within inner width)
+        let avail_w = inner.width.saturating_sub(4) as usize;
+        if avail_w > 0 {
+            let text_lines = super::input::wrap_prompt_text(&self.message, avail_w);
+            for (i, line) in text_lines.iter().enumerate() {
+                let py = inner.y + 1 + i as u16;
+                if py < inner.y + inner.height.saturating_sub(2) {
+                    let clipped: String = line.chars().take(avail_w).collect();
+                    buf.set_string(inner.x + 2, py, &clipped, styles.text);
+                }
             }
         }
 
         // 2. Buttons
         let btn_y = inner.y + inner.height.saturating_sub(2);
         let positions = self.calculate_button_positions(inner);
+        let labels = self.button_labels(inner.width);
+        let right_bound = inner.x + inner.width;
 
         let normal_style = styles.text;
         let focused_style = styles.highlight.add_modifier(Modifier::BOLD);
@@ -196,8 +230,13 @@ editing it.\nChoose how to resolve this concurrent change:"
             .add_modifier(Modifier::BOLD);
 
         for (idx, (start_x, _)) in positions.into_iter().enumerate() {
+            if start_x >= right_bound {
+                break;
+            }
             let is_cur = idx == self.selected_index;
-            let label = BUTTON_LABELS[idx];
+            let label = labels[idx];
+            let max_w = (right_bound - start_x) as usize;
+            let clipped_label: String = label.chars().take(max_w).collect();
             let st = if is_cur {
                 if idx == 1 {
                     danger_focused
@@ -207,7 +246,9 @@ editing it.\nChoose how to resolve this concurrent change:"
             } else {
                 normal_style
             };
-            buf.set_string(start_x, btn_y, label, st);
+            buf.set_string(start_x, btn_y, &clipped_label, st);
         }
+
+        inner
     }
 }

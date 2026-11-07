@@ -551,8 +551,12 @@ impl Pager {
                 let num = d_idx + 1;
                 let mut display_str = format!(" [{}] {} ({})", num, link.text, link.url);
                 let max_w = self.cols.saturating_sub(2);
-                if display_str.len() > max_w {
-                    display_str = format!("{}...", &display_str[..max_w.saturating_sub(3)]);
+                let char_count = display_str.chars().count();
+                if char_count > max_w {
+                    let mut clipped: String =
+                        display_str.chars().take(max_w.saturating_sub(3)).collect();
+                    clipped.push_str("...");
+                    display_str = clipped;
                 }
 
                 if d_idx == sel {

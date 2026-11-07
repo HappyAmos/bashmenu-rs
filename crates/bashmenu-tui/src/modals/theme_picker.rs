@@ -160,18 +160,21 @@ impl ThemePickerModal {
                 styles.text
             };
             let avail = inner.width.saturating_sub(6) as usize;
-            let padded_name = format!("{marker}{:<width$}", t_name, width = avail);
+            let clipped_name: String = t_name.chars().take(avail).collect();
+            let padded_name = format!("{marker}{:<width$}", clipped_name, width = avail);
             buf.set_string(inner.x + 1, y, &padded_name, row_style);
         }
 
         // Footer
         let footer_y = inner.y + inner.height.saturating_sub(1);
         let footer_text = " [Enter] Select  [Esc] Cancel ";
-        let footer_x = (inner.x + inner.width).saturating_sub(footer_text.len() as u16 + 1);
+        let avail_footer_w = inner.width.saturating_sub(2) as usize;
+        let clipped_footer: String = footer_text.chars().take(avail_footer_w).collect();
+        let footer_x = (inner.x + inner.width).saturating_sub(clipped_footer.len() as u16 + 1);
         buf.set_string(
             footer_x.max(inner.x + 1),
             footer_y,
-            footer_text,
+            &clipped_footer,
             styles.gutter.add_modifier(Modifier::DIM),
         );
 

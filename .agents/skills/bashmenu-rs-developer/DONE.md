@@ -510,6 +510,24 @@
     - `bashmenu-cli`: CLI binary validation for all 8 workspace executables (`--help`, `--version`), adversarial input testing for `ymlcheck` (non-existent paths, empty files, corrupt YAML, binary bytes).
   - Verified all tests pass with zero warnings in `cargo fmt`, `cargo clippy`, and `shellcheck`.
 
+- [x] **Project-Wide Popup Modals Text Bounds Clamping & Word Wrapping Audit:**
+  - Audited all modal frame rendering across `bashmenu-tui`, `menuedit-cli`, `bashedit-cli`, and `bmpager-cli`.
+  - In `crates/bashmenu-tui/src/modals/frame.rs`, clamped title rendering with `UnicodeWidthStr::width` and truncated with an ellipsis `…` so long titles never collide with or overwrite the `[X]` close button or exceed the top border.
+  - In `crates/bashmenu-tui/src/modals/input.rs`, updated `wrap_prompt_text` to handle zero width safely, chunk continuous words using Unicode visible column width, clamped prompt lines to inner width, and guarded `[ OK ]` and `[ Cancel ]` buttons within inner boundaries.
+  - In `crates/bashmenu-tui/src/modals/note_conflict.rs`, wrapped messages with `wrap_prompt_text`, dynamically computed dialog height, and added responsive button sizing (`button_labels`) with clamping to prevent buttons or text from spilling past borders.
+  - In `crates/bashmenu-tui/src/modals/confirm.rs`, guarded against invalid `clamp(min, max)` parameter ordering on narrow viewports and clamped action buttons within inner columns.
+  - In `crates/bashmenu-tui/src/modals/radio.rs` and `toggle.rs`, wrapped message bodies with `wrap_prompt_text`, computed dynamic dialog heights, and clamped all button choices within inner bounds.
+  - In `crates/bashmenu-tui/src/modals/message.rs`, guarded against clamp bounds panics and clamped the `[ OK ]` button.
+  - In `crates/bashmenu-tui/src/modals/file_picker.rs`, clipped current directory banner path and bottom controls hints to inner columns.
+  - In `crates/bashmenu-tui/src/modals/theme_picker.rs` and `stream_output.rs`, clipped row labels and footer status strings to inner bounds.
+  - In `crates/bashmenu-tui/src/modals/grid_picker.rs` and `color_picker.rs`, added coordinate bounds checking to prevent 2D picker cells and swatch panels from drawing over dialog borders.
+  - In `crates/menuedit-cli/src/item_edit.rs`, eliminated Rust format width traps in `FormRow::PreviewBox`, `FormRow::Input`, `FormRow::InputWithBrowse`, `FormRow::ExecMode`, `FormRow::Checkbox`, and `FormRow::Label` by explicitly clipping all text strings to available inner width.
+  - In `crates/menuedit-cli/src/shortcut_editor.rs`, clamped action buttons, checkbox labels, and footer hints within inner boundaries.
+  - In `crates/bashedit-cli/src/main.rs`, clipped swap recovery modal lines and prompt options within inner columns.
+  - In `crates/bmpager-cli/src/pager.rs`, added UTF-8 safe character boundary truncation for link follow dialogs.
+  - Added unit test `test_wrap_prompt_text_bounds_and_unicode` and integration test `test_all_modals_render_within_frame_bounds` in `crates/bashmenu-tui/tests/modals_test.rs` asserting zero right-border spillage across various viewports.
+  - Verified 100% test pass rate across entire workspace with `cargo test --workspace`, zero warnings in `cargo clippy --workspace --all-targets -- -D warnings`, clean `cargo fmt --all --check`, and clean `shellcheck *.sh scripts/*.sh`.
+
 
 
 

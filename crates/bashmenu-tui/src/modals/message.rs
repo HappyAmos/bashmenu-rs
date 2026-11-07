@@ -48,8 +48,9 @@ impl MessageModal {
             .map(|l| l.chars().count())
             .max()
             .unwrap_or(20);
-        let dialog_w = (max_line_w as u16 + 8).clamp(40, max_w);
-        let dialog_h = (wrapped.len() as u16 + 5).clamp(8, area.height.saturating_sub(2));
+        let dialog_w = (max_line_w as u16 + 8).min(max_w).max(20.min(max_w));
+        let max_h = area.height.saturating_sub(2);
+        let dialog_h = (wrapped.len() as u16 + 5).min(max_h).max(8.min(max_h));
 
         let inner = render_modal_frame(area, dialog_w, dialog_h, &self.title, styles, buf);
 
@@ -68,14 +69,20 @@ impl MessageModal {
         // 2. Render [ OK ] button
         let btn_y = inner.y + inner.height.saturating_sub(2);
         let center_x = inner.x + inner.width / 2;
-        let ok_x = center_x.saturating_sub(4);
+        let ok_x = center_x.saturating_sub(4).max(inner.x + 1);
+        let right_bound = inner.x + inner.width;
 
-        buf.set_string(
-            ok_x,
-            btn_y,
-            " [ OK ] ",
-            styles.highlight.add_modifier(Modifier::BOLD),
-        );
+        if ok_x < right_bound {
+            let ok_str = " [ OK ] ";
+            let max_ok = (right_bound - ok_x) as usize;
+            let clipped_ok: String = ok_str.chars().take(max_ok).collect();
+            buf.set_string(
+                ok_x,
+                btn_y,
+                &clipped_ok,
+                styles.highlight.add_modifier(Modifier::BOLD),
+            );
+        }
 
         inner
     }

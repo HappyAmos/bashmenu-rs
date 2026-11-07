@@ -472,9 +472,22 @@ impl ColorPickerModal {
         let t2_x = t1_x + t1_text.len() as u16;
         let t3_x = t2_x + t2_text.len() as u16;
 
-        buf.set_string(t1_x, inner.y, t1_text, t1_s);
-        buf.set_string(t2_x, inner.y, t2_text, t2_s);
-        buf.set_string(t3_x, inner.y, t3_text, t3_s);
+        let right_bound = inner.x + inner.width;
+        if t1_x < right_bound {
+            let max_w = (right_bound - t1_x) as usize;
+            let clipped: String = t1_text.chars().take(max_w).collect();
+            buf.set_string(t1_x, inner.y, &clipped, t1_s);
+        }
+        if t2_x < right_bound {
+            let max_w = (right_bound - t2_x) as usize;
+            let clipped: String = t2_text.chars().take(max_w).collect();
+            buf.set_string(t2_x, inner.y, &clipped, t2_s);
+        }
+        if t3_x < right_bound {
+            let max_w = (right_bound - t3_x) as usize;
+            let clipped: String = t3_text.chars().take(max_w).collect();
+            buf.set_string(t3_x, inner.y, &clipped, t3_s);
+        }
 
         // Divider under tab bar
         let div_w = inner.width as usize;

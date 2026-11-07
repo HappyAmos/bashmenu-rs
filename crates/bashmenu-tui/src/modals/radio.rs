@@ -176,20 +176,34 @@ impl RadioModal {
 
     /// Renders the radio modal
     pub fn render(&self, area: Rect, styles: &ResolvedThemeStyles, buf: &mut Buffer) -> Rect {
-        let dialog_w = 64_u16;
-        let dialog_h = (self.options.len() as u16 + 7).clamp(8, 20);
+        let max_w = 64_u16.min(area.width.saturating_sub(4));
+        let avail_w = max_w.saturating_sub(6) as usize;
+        let msg_lines = if avail_w > 0 && !self.message.trim().is_empty() {
+            super::input::wrap_prompt_text(&self.message, avail_w)
+        } else {
+            Vec::new()
+        };
+        let msg_count = msg_lines.len().max(1);
+        let max_h = area.height.saturating_sub(2);
+        let dialog_w = max_w.max(20.min(max_w));
+        let dialog_h = ((msg_count + self.options.len() + 6) as u16)
+            .min(max_h)
+            .max(8.min(max_h));
 
         let inner = render_modal_frame(area, dialog_w, dialog_h, &self.title, styles, buf);
+        let inner_avail_w = inner.width.saturating_sub(4) as usize;
 
-        // 1. Render Message Text
-        let msg_y = inner.y + 1;
-        let msg_x = inner.x + 2;
-        let avail_w = inner.width.saturating_sub(4) as usize;
-        let truncated: String = self.message.chars().take(avail_w).collect();
-        buf.set_string(msg_x, msg_y, &truncated, styles.text);
+        // 1. Render Message Text (wrapped and clipped within inner width)
+        for (i, line) in msg_lines.iter().enumerate() {
+            let py = inner.y + 1 + i as u16;
+            if py < inner.y + inner.height.saturating_sub(3) {
+                let clipped: String = line.chars().take(inner_avail_w).collect();
+                buf.set_string(inner.x + 2, py, &clipped, styles.text);
+            }
+        }
 
         // 2. Render Options with Radio Buttons
-        let opt_start_y = inner.y + 3;
+        let opt_start_y = inner.y + 1 + msg_lines.len() as u16 + 1;
         for (idx, (val, label)) in self.options.iter().enumerate() {
             let opt_y = opt_start_y + idx as u16;
             if opt_y >= inner.y + inner.height.saturating_sub(2) {
@@ -201,7 +215,7 @@ impl RadioModal {
 
             let radio_mark = if is_checked { "(●)" } else { "(○)" };
             let opt_text = format!(" {} {}. {}", radio_mark, idx + 1, label);
-            let display_text: String = opt_text.chars().take(avail_w).collect();
+            let display_text: String = opt_text.chars().take(inner_avail_w).collect();
 
             let row_style = if is_cursor {
                 styles.accent.add_modifier(Modifier::REVERSED)
@@ -243,8 +257,20 @@ impl RadioModal {
             styles.text
         };
 
-        buf.set_string(center_x.saturating_sub(14), btn_y, ok_str, ok_style);
-        buf.set_string(center_x + 2, btn_y, cancel_str, cancel_style);
+        let right_bound = inner.x + inner.width;
+        let ok_x = center_x.saturating_sub(14).max(inner.x + 1);
+        let cancel_x = (center_x + 2).max(ok_x + ok_str.len() as u16 + 1);
+
+        if ok_x < right_bound {
+            let max_w = (right_bound - ok_x) as usize;
+            let clipped: String = ok_str.chars().take(max_w).collect();
+            buf.set_string(ok_x, btn_y, &clipped, ok_style);
+        }
+        if cancel_x < right_bound {
+            let max_w = (right_bound - cancel_x) as usize;
+            let clipped: String = cancel_str.chars().take(max_w).collect();
+            buf.set_string(cancel_x, btn_y, &clipped, cancel_style);
+        }
 
         inner
     }

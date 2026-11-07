@@ -2394,10 +2394,11 @@ impl FormRow {
         let avail_w = inner.width.saturating_sub(4) as usize;
         match self {
             FormRow::Label(lbl) => {
+                let clipped_lbl: String = lbl.chars().take(avail_w).collect();
                 buf.set_string(
                     inner.x + 2,
                     y,
-                    lbl,
+                    &clipped_lbl,
                     styles.text.add_modifier(Modifier::BOLD),
                 );
             }
@@ -2413,7 +2414,9 @@ impl FormRow {
                 } else {
                     Style::default().fg(Color::White).bg(Color::DarkGray)
                 };
-                let display = format!(" {:<width$} ", text, width = avail_w.saturating_sub(4));
+                let field_w = avail_w.saturating_sub(4);
+                let clipped_text: String = text.chars().take(field_w).collect();
+                let display = format!(" {:<width$} ", clipped_text, width = field_w);
                 buf.set_string(inner.x + 2, y, &display, box_style);
 
                 if is_active {
@@ -2538,7 +2541,8 @@ impl FormRow {
                 } else {
                     Style::default().fg(Color::White).bg(Color::DarkGray)
                 };
-                let display = format!(" {:<width$} ", text, width = inp_w);
+                let clipped_text: String = text.chars().take(inp_w).collect();
+                let display = format!(" {:<width$} ", clipped_text, width = inp_w);
                 buf.set_string(inner.x + 2, y, &display, inp_style);
 
                 if is_inp_active {
@@ -2589,7 +2593,8 @@ impl FormRow {
                 } else {
                     Style::default().fg(styles.border)
                 };
-                buf.set_string(inner.x + 2, y, mode_str, style);
+                let clipped_mode: String = mode_str.chars().take(avail_w).collect();
+                buf.set_string(inner.x + 2, y, &clipped_mode, style);
             }
             FormRow::Checkbox {
                 ctrl,
@@ -2604,16 +2609,18 @@ impl FormRow {
                 } else {
                     styles.text
                 };
-                buf.set_string(inner.x + 2, y, &chk_str, style);
+                let clipped_chk: String = chk_str.chars().take(avail_w).collect();
+                buf.set_string(inner.x + 2, y, &clipped_chk, style);
             }
             FormRow::PreviewBox(preview) => {
                 let border_style = Style::default().fg(Color::Cyan);
                 let text_style = Style::default()
                     .fg(Color::White)
                     .add_modifier(Modifier::BOLD);
-                let box_str = format!("┌─{}─┐", "─".repeat(avail_w.saturating_sub(4)));
-                let content_str =
-                    format!("│ {:<width$} │", preview, width = avail_w.saturating_sub(4));
+                let target_w = avail_w.saturating_sub(4);
+                let clipped_preview: String = preview.chars().take(target_w).collect();
+                let box_str = format!("┌─{}─┐", "─".repeat(target_w));
+                let content_str = format!("│ {:<width$} │", clipped_preview, width = target_w);
                 buf.set_string(inner.x + 2, y, &content_str, text_style);
                 buf.set_string(inner.x + 2, y.saturating_sub(1), &box_str, border_style);
             }

@@ -529,8 +529,20 @@ impl LeaderSettingsModal {
             styles.help_text.bg(base_bg)
         };
         let center_x = inner.x + inner.width / 2;
-        buf.set_string(center_x.saturating_sub(16), btn_y, save_lbl, save_style);
-        buf.set_string(center_x + 2, btn_y, cancel_lbl, cancel_style);
+        let right_bound = inner.x + inner.width;
+        let save_x = center_x.saturating_sub(16).max(inner.x + 1);
+        let cancel_x = (center_x + 2).max(save_x + save_lbl.len() as u16 + 1);
+
+        if save_x < right_bound {
+            let max_w = (right_bound - save_x) as usize;
+            let clipped: String = save_lbl.chars().take(max_w).collect();
+            buf.set_string(save_x, btn_y, &clipped, save_style);
+        }
+        if cancel_x < right_bound {
+            let max_w = (right_bound - cancel_x) as usize;
+            let clipped: String = cancel_lbl.chars().take(max_w).collect();
+            buf.set_string(cancel_x, btn_y, &clipped, cancel_style);
+        }
 
         // 2-line wrapped footer to ensure text NEVER exceeds inner width
         let f_line1 = "[Tab/Up/Down] Navigate | [Ctrl+K] Capture Key";
@@ -946,36 +958,49 @@ impl ShortcutEditModal {
         let alt_x = q_x + q_lbl.len() as u16 + 2;
         let en_x = alt_x + alt_lbl.len() as u16 + 2;
 
-        buf.set_string(
-            q_x,
-            y,
-            &q_lbl,
-            if self.focus_idx == 9 {
-                active_style
-            } else {
-                label_style
-            },
-        );
-        buf.set_string(
-            alt_x,
-            y,
-            &alt_lbl,
-            if self.focus_idx == 10 {
-                active_style
-            } else {
-                label_style
-            },
-        );
-        buf.set_string(
-            en_x,
-            y,
-            &en_lbl,
-            if self.focus_idx == 11 {
-                active_style
-            } else {
-                label_style
-            },
-        );
+        let right_bound = inner.x + inner.width;
+        if q_x < right_bound {
+            let max_w = (right_bound - q_x) as usize;
+            let clipped: String = q_lbl.chars().take(max_w).collect();
+            buf.set_string(
+                q_x,
+                y,
+                &clipped,
+                if self.focus_idx == 9 {
+                    active_style
+                } else {
+                    label_style
+                },
+            );
+        }
+        if alt_x < right_bound {
+            let max_w = (right_bound - alt_x) as usize;
+            let clipped: String = alt_lbl.chars().take(max_w).collect();
+            buf.set_string(
+                alt_x,
+                y,
+                &clipped,
+                if self.focus_idx == 10 {
+                    active_style
+                } else {
+                    label_style
+                },
+            );
+        }
+        if en_x < right_bound {
+            let max_w = (right_bound - en_x) as usize;
+            let clipped: String = en_lbl.chars().take(max_w).collect();
+            buf.set_string(
+                en_x,
+                y,
+                &clipped,
+                if self.focus_idx == 11 {
+                    active_style
+                } else {
+                    label_style
+                },
+            );
+        }
         y += 2;
 
         if let Some(ref err) = self.error_msg {
@@ -1001,8 +1026,19 @@ impl ShortcutEditModal {
             styles.help_text.bg(base_bg)
         };
         let center_x = inner.x + inner.width / 2;
-        buf.set_string(center_x.saturating_sub(24), btn_y, save_lbl, save_style);
-        buf.set_string(center_x + 2, btn_y, cancel_lbl, cancel_style);
+        let save_x = center_x.saturating_sub(24).max(inner.x + 1);
+        let cancel_x = (center_x + 2).max(save_x + save_lbl.len() as u16 + 1);
+
+        if save_x < right_bound {
+            let max_w = (right_bound - save_x) as usize;
+            let clipped: String = save_lbl.chars().take(max_w).collect();
+            buf.set_string(save_x, btn_y, &clipped, save_style);
+        }
+        if cancel_x < right_bound {
+            let max_w = (right_bound - cancel_x) as usize;
+            let clipped: String = cancel_lbl.chars().take(max_w).collect();
+            buf.set_string(cancel_x, btn_y, &clipped, cancel_style);
+        }
 
         // 2-line wrapped footer to ensure text NEVER exceeds inner width
         let f_line1 = if avail_w >= 56 {

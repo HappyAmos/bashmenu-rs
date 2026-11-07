@@ -78,12 +78,39 @@ pub fn render_modal_frame(
         .trim_end_matches(']')
         .trim();
 
-    let block = Block::default()
+    // Guard title length against window width to prevent collision with [X]
+    let max_title_w = (w as usize).saturating_sub(10);
+    let mut title_str = String::new();
+    if max_title_w > 0 && !clean_title.is_empty() {
+        let cur_w = unicode_width::UnicodeWidthStr::width(clean_title);
+        if cur_w <= max_title_w {
+            title_str = format!("─[ {} ]", clean_title);
+        } else if max_title_w > 1 {
+            let mut clipped = String::new();
+            let mut w_count = 0;
+            for ch in clean_title.chars() {
+                let cw = unicode_width::UnicodeWidthChar::width(ch).unwrap_or(1);
+                if w_count + cw + 1 > max_title_w {
+                    break;
+                }
+                clipped.push(ch);
+                w_count += cw;
+            }
+            clipped.push('…');
+            title_str = format!("─[ {} ]", clipped);
+        }
+    }
+
+    let mut block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(styles.border))
-        .style(Style::default().bg(styles.background))
-        .title(format!("─[ {} ]", clean_title))
-        .title_style(styles.title.add_modifier(Modifier::BOLD));
+        .style(Style::default().bg(styles.background));
+
+    if !title_str.is_empty() {
+        block = block
+            .title(title_str)
+            .title_style(styles.title.add_modifier(Modifier::BOLD));
+    }
 
     let inner = block.inner(dialog_rect);
     block.render(dialog_rect, buf);
