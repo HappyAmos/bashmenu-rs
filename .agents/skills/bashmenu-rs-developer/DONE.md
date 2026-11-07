@@ -579,6 +579,14 @@
   - Updated `resolve_shortcuts_path` so user config directory takes strict precedence over `BASHMENU_DIR`.
   - Added integration test `test_user_config_isolation_and_vanilla_separation` in `crates/bashmenu-cli/tests/audit_items_test.rs`.
 
+- **Netbook Theme Wallpaper Rendering Fixes (Quarterblock & Color Tiers)**:
+  - Eliminated vertical grid lines ("venetian blinds") and font advance gaps: in `WallpaperCompositor::get_grid`, when a cell is uniform (such as `mask == 15` or `mask == 0` in quarterblock mode, or `r1 == r2 && g1 == g2 && b1 == b2` in halfblock mode), emits space `" "` with background fill `bg = avg_bg` instead of `"█"` or `"▀"`.
+  - Added luminance variance contrast threshold (`lum_spread < 12.0`) to quarterblock binarization, preventing smooth continuous gradients (e.g., `alaska-mountain` sky) from devolving into pseudo-random dither maze patterns.
+  - Implemented `supports_quadrant_blocks()` in `crates/bashmenu-tui/src/wallpaper.rs`: automatically detects Linux virtual consoles (`TERM=linux`, `console`, `dumb`) and non-UTF-8 environments lacking Unicode quadrant glyphs (`U+2596..U+259F`), cleanly falling back from `quarterblock` to CP437 `halfblock` mode (`"▀"` and `" "`).
+  - Fixed `ColorTier::detect()` evaluation order: checks `TERM` (`linux`, `console`, `dumb`, `vt100`) before `COLORTERM` so inherited environment variables do not cause false `TrueColor` detection on basic consoles.
+  - Added `downsample_color_to_tier()` and wired `color_tier` into `WallpaperCompositor`: downsamples cell colors (`fg`, `bg`, `avg_bg`) according to active `ColorTier` (`Color8`, `Color16`, `Color256`, `TrueColor`), eliminating saturated ANSI rainbow static across dark tones on 8/16/256-color displays.
+  - Added integration tests in `crates/bashmenu-tui/tests/wallpaper_test.rs`: `test_wallpaper_compositor_console_fallback_to_halfblock`, `test_wallpaper_compositor_color_tier_downsampling`, and `test_color_tier_detect_priority`.
+
 
 
 

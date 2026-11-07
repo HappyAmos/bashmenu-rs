@@ -45,8 +45,8 @@ pub use modals::{
 pub use shortcuts_overlay::{key_event_to_token, ShortcutDispatchResult, ShortcutDispatcher};
 pub use style::{
     ansi_index_to_color, ansi_name_to_color, downsample_color_to_16, downsample_color_to_8,
-    parse_color_value, parse_color_value_with_tier, parse_style_pair, parse_style_pair_with_tier,
-    ColorTier, ResolvedThemeStyles,
+    downsample_color_to_tier, parse_color_value, parse_color_value_with_tier, parse_style_pair,
+    parse_style_pair_with_tier, ColorTier, ResolvedThemeStyles,
 };
 pub use terminal::TerminalGuard;
 pub use text_input::TextInput;
@@ -57,8 +57,9 @@ pub use transition::{
 pub use wallpaper::{
     color_to_rgb, composite_buffer, derive_palette_from_image, downsample_color_value_to_16,
     downsample_color_value_to_8, downsample_palette_to_16, downsample_palette_to_8,
-    resolve_wallpaper_path, rgb_to_ansi16_name, rgb_to_ansi8_name, rgb_to_xterm256, WallpaperCell,
-    WallpaperCompositor, WallpaperGrid, ANSI16_NAMES, ANSI8_NAMES,
+    resolve_wallpaper_path, rgb_to_ansi16_name, rgb_to_ansi8_name, rgb_to_xterm256,
+    supports_quadrant_blocks, WallpaperCell, WallpaperCompositor, WallpaperGrid, ANSI16_NAMES,
+    ANSI8_NAMES,
 };
 
 use std::panic;

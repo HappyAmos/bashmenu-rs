@@ -1362,6 +1362,7 @@ impl MenuView {
 
         // 8. Composite background wallpaper if active
         if let Some(compositor) = &mut self.wallpaper {
+            compositor.color_tier = Some(self.styles.tier);
             if let Some(grid) = compositor.get_grid(
                 area.width as usize,
                 area.height as usize,

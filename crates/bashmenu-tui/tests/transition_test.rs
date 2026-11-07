@@ -79,6 +79,7 @@ fn test_transition_speed_profiles() {
 
 #[test]
 fn test_transition_dim_color_levels() {
+    std::env::set_var("BASHMENU_COLOR_TIER", "truecolor");
     let base = Color::Rgb(100, 200, 50);
     let dimmed_half = dim_color(base, 0.5);
     assert_eq!(dimmed_half, Color::Rgb(50, 100, 25));
@@ -88,6 +89,7 @@ fn test_transition_dim_color_levels() {
 
     let dimmed_full = dim_color(base, 1.0);
     assert_eq!(dimmed_full, Color::Rgb(100, 200, 50));
+    std::env::remove_var("BASHMENU_COLOR_TIER");
 }
 
 #[test]

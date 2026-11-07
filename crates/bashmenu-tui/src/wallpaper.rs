@@ -4,6 +4,7 @@
 //! center, tile), color blending with theme backgrounds, and half-block (`▀`)
 //! TrueColor compositing across Ratatui terminal buffers.
 
+use crate::style::{downsample_color_to_tier, ColorTier};
 use bashmenu_core::{interpolate_placeholders, MacroContext, WallpaperConfig};
 use image::{imageops, Rgb, RgbImage};
 use ratatui::buffer::Buffer;
@@ -204,6 +205,35 @@ struct CompositorCacheKey {
     clustering: usize,
     /// Rendering mode ("halfblock" or "quarterblock")
     mode: String,
+    /// Terminal color capability tier
+    color_tier: ColorTier,
+}
+
+/// Checks whether the current terminal/console environment supports Unicode quadrant blocks.
+pub fn supports_quadrant_blocks() -> bool {
+    // 1. Explicit environment variable override takes precedence
+    if let Ok(val) = std::env::var("BASHMENU_QUADRANT_BLOCKS") {
+        match val.trim().to_ascii_lowercase().as_str() {
+            "0" | "false" | "off" | "no" => return false,
+            "1" | "true" | "on" | "yes" => return true,
+            _ => {}
+        }
+    }
+    // 2. Linux VT consoles and basic dumb/vt terminals lack Unicode quadrant characters
+    if let Ok(term) = std::env::var("TERM") {
+        let t = term.trim().to_ascii_lowercase();
+        if t == "linux" || t == "console" || t == "dumb" || t == "vt100" || t == "vt102" {
+            return false;
+        }
+    }
+    // 3. Explicitly non-UTF8 locale (POSIX/C)
+    if let Ok(lang) = std::env::var("LC_ALL").or_else(|_| std::env::var("LANG")) {
+        let l = lang.to_ascii_lowercase();
+        if !l.is_empty() && (l == "c" || l == "posix") {
+            return false;
+        }
+    }
+    true
 }
 
 /// Manages loading, caching, aspect-ratio scaling, and color blending of wallpapers.
@@ -219,6 +249,8 @@ pub struct WallpaperCompositor {
     cached_grid: Option<WallpaperGrid>,
     /// Cache validation key matching current dimensions, opacity, and theme background
     cached_key: Option<CompositorCacheKey>,
+    /// Optional terminal color tier override. Defaults to auto-detection.
+    pub color_tier: Option<ColorTier>,
 }
 
 impl WallpaperCompositor {
@@ -230,6 +262,7 @@ impl WallpaperCompositor {
             raw_image: None,
             cached_grid: None,
             cached_key: None,
+            color_tier: None,
         }
     }
 
@@ -312,6 +345,14 @@ impl WallpaperCompositor {
             .unwrap_or("halfblock")
             .to_lowercase();
 
+        let is_quarterblock = if mode == "quarterblock" {
+            supports_quadrant_blocks()
+        } else {
+            false
+        };
+
+        let tier = self.color_tier.unwrap_or_else(ColorTier::detect);
+
         let key = CompositorCacheKey {
             image: self.config.image.clone().unwrap_or_default(),
             width,
@@ -321,14 +362,18 @@ impl WallpaperCompositor {
             scaling: scaling.clone(),
             quantization: quant,
             clustering,
-            mode: mode.clone(),
+            mode: if is_quarterblock {
+                "quarterblock".to_string()
+            } else {
+                "halfblock".to_string()
+            },
+            color_tier: tier,
         };
 
         if self.cached_key.as_ref() == Some(&key) && self.cached_grid.is_some() {
             return self.cached_grid.as_ref();
         }
 
-        let is_quarterblock = mode == "quarterblock";
         let pixel_w = if is_quarterblock {
             (width * 2) as u32
         } else {
@@ -396,6 +441,11 @@ impl WallpaperCompositor {
                     let lum_br = 0.299 * r_br as f32 + 0.587 * g_br as f32 + 0.114 * b_br as f32;
                     let mean_lum = (lum_tl + lum_tr + lum_bl + lum_br) / 4.0;
 
+                    let lums = [lum_tl, lum_tr, lum_bl, lum_br];
+                    let min_lum = lums.iter().copied().fold(f32::INFINITY, f32::min);
+                    let max_lum = lums.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+                    let lum_spread = max_lum - min_lum;
+
                     let mut mask = 0usize;
                     let mut fg_count = 0u16;
                     let mut fg_sum = (0u16, 0u16, 0u16);
@@ -422,29 +472,43 @@ impl WallpaperCompositor {
                     add_subpixel(lum_bl, r_bl, g_bl, b_bl, 4);
                     add_subpixel(lum_br, r_br, g_br, b_br, 8);
 
-                    let fg = match std::num::NonZeroU16::new(fg_count) {
-                        Some(div) => Color::Rgb(
-                            (fg_sum.0 / div.get()) as u8,
-                            (fg_sum.1 / div.get()) as u8,
-                            (fg_sum.2 / div.get()) as u8,
-                        ),
-                        None => Color::Rgb(avg_r, avg_g, avg_b),
+                    let raw_avg_bg = Color::Rgb(avg_r, avg_g, avg_b);
+
+                    // When subpixel luminance variance is below edge threshold (smooth gradient
+                    // or flat region), or when all subpixels evaluate to same side (mask 0 or 15),
+                    // emit space ' ' with uniform background to eliminate dither maze patterns
+                    // and character-cell side-bearing advance gaps.
+                    let (symbol, raw_fg, raw_bg) = if lum_spread < 12.0 || mask == 0 || mask == 15 {
+                        (" ", raw_avg_bg, raw_avg_bg)
+                    } else {
+                        let fg_col = match std::num::NonZeroU16::new(fg_count) {
+                            Some(div) => Color::Rgb(
+                                (fg_sum.0 / div.get()) as u8,
+                                (fg_sum.1 / div.get()) as u8,
+                                (fg_sum.2 / div.get()) as u8,
+                            ),
+                            None => raw_avg_bg,
+                        };
+                        let bg_col = match std::num::NonZeroU16::new(bg_count) {
+                            Some(div) => Color::Rgb(
+                                (bg_sum.0 / div.get()) as u8,
+                                (bg_sum.1 / div.get()) as u8,
+                                (bg_sum.2 / div.get()) as u8,
+                            ),
+                            None => raw_avg_bg,
+                        };
+                        (QUADRANT_GLYPHS[mask], fg_col, bg_col)
                     };
 
-                    let bg = match std::num::NonZeroU16::new(bg_count) {
-                        Some(div) => Color::Rgb(
-                            (bg_sum.0 / div.get()) as u8,
-                            (bg_sum.1 / div.get()) as u8,
-                            (bg_sum.2 / div.get()) as u8,
-                        ),
-                        None => Color::Rgb(avg_r, avg_g, avg_b),
-                    };
+                    let fg = downsample_color_to_tier(raw_fg, tier);
+                    let bg = downsample_color_to_tier(raw_bg, tier);
+                    let avg_bg = downsample_color_to_tier(raw_avg_bg, tier);
 
                     let c = WallpaperCell {
-                        symbol: QUADRANT_GLYPHS[mask],
+                        symbol,
                         upper: fg,
                         lower: bg,
-                        avg_bg: Color::Rgb(avg_r, avg_g, avg_b),
+                        avg_bg,
                     };
                     let (fg_r, fg_g, fg_b) = color_to_rgb(fg);
                     let (bg_r, bg_g, bg_b) = color_to_rgb(bg);
@@ -458,11 +522,25 @@ impl WallpaperCompositor {
                     let avg_g = ((g1 as u16 + g2 as u16) / 2) as u8;
                     let avg_b = ((b1 as u16 + b2 as u16) / 2) as u8;
 
+                    let raw_avg_bg = Color::Rgb(avg_r, avg_g, avg_b);
+
+                    // When upper and lower subpixels match, emit space with background color
+                    // to prevent glyph bearing gaps on console and bitmap fonts.
+                    let (symbol, raw_upper, raw_lower) = if r1 == r2 && g1 == g2 && b1 == b2 {
+                        (" ", raw_avg_bg, raw_avg_bg)
+                    } else {
+                        ("▀", Color::Rgb(r1, g1, b1), Color::Rgb(r2, g2, b2))
+                    };
+
+                    let upper = downsample_color_to_tier(raw_upper, tier);
+                    let lower = downsample_color_to_tier(raw_lower, tier);
+                    let avg_bg = downsample_color_to_tier(raw_avg_bg, tier);
+
                     let c = WallpaperCell {
-                        symbol: "▀",
-                        upper: Color::Rgb(r1, g1, b1),
-                        lower: Color::Rgb(r2, g2, b2),
-                        avg_bg: Color::Rgb(avg_r, avg_g, avg_b),
+                        symbol,
+                        upper,
+                        lower,
+                        avg_bg,
                     };
                     (c, (r1, g1, b1, r2, g2, b2))
                 };

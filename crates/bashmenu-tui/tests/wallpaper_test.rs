@@ -351,6 +351,7 @@ fn test_downsample_palette_to_16_and_8() {
 fn test_wallpaper_compositor_quarterblock_mode() {
     let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
     std::env::set_var("BASHMENU_DIR", &repo_root);
+    std::env::set_var("BASHMENU_QUADRANT_BLOCKS", "1");
 
     let config = WallpaperConfig {
         enabled: true,
@@ -391,6 +392,119 @@ fn test_wallpaper_compositor_quarterblock_mode() {
         non_halfblock_quadrant_found,
         "Quarterblock mode should generate authentic quadrant characters across a photographic texture"
     );
+}
+
+#[test]
+fn test_wallpaper_compositor_console_fallback_to_halfblock() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
+    std::env::set_var("BASHMENU_DIR", &repo_root);
+    // Explicitly simulate Linux console lacking Unicode quadrant blocks
+    std::env::set_var("BASHMENU_QUADRANT_BLOCKS", "0");
+
+    let config = WallpaperConfig {
+        enabled: true,
+        image: Some("assets/wallpapers/alaska-mountain.png".to_string()),
+        opacity: 0.85,
+        scaling: "stretch".to_string(),
+        clustering: 0,
+        quantization: 1,
+        mode: Some("quarterblock".to_string()),
+    };
+
+    let mut compositor = WallpaperCompositor::new(config);
+    let theme_bg = Color::Indexed(235);
+
+    let grid = compositor.get_grid(20, 10, theme_bg);
+    assert!(grid.is_some());
+    let grid_ref = grid.unwrap();
+
+    // Verify fallback only uses standard halfblock "▀" and space " "
+    for cell in &grid_ref.cells {
+        assert!(
+            cell.symbol == "▀" || cell.symbol == " ",
+            "Fallback mode must only use '▀' and ' ', found: '{}'",
+            cell.symbol
+        );
+    }
+
+    std::env::remove_var("BASHMENU_QUADRANT_BLOCKS");
+}
+
+#[test]
+fn test_wallpaper_compositor_color_tier_downsampling() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
+    std::env::set_var("BASHMENU_DIR", &repo_root);
+
+    let config = WallpaperConfig {
+        enabled: true,
+        image: Some("assets/wallpapers/alaska-mountain.png".to_string()),
+        opacity: 0.85,
+        scaling: "stretch".to_string(),
+        clustering: 0,
+        quantization: 1,
+        mode: Some("halfblock".to_string()),
+    };
+
+    // Test Color8 downsampling
+    let mut comp8 = WallpaperCompositor::new(config.clone());
+    comp8.color_tier = Some(bashmenu_tui::ColorTier::Color8);
+    let g8 = comp8.get_grid(10, 5, Color::Black).unwrap();
+    for cell in &g8.cells {
+        match cell.avg_bg {
+            Color::Black
+            | Color::Red
+            | Color::Green
+            | Color::Yellow
+            | Color::Blue
+            | Color::Magenta
+            | Color::Cyan
+            | Color::White => {}
+            other => panic!(
+                "Color8 tier must emit standard 8 ANSI colors, got {:?}",
+                other
+            ),
+        }
+    }
+
+    // Test Color256 downsampling
+    let mut comp256 = WallpaperCompositor::new(config);
+    comp256.color_tier = Some(bashmenu_tui::ColorTier::Color256);
+    let g256 = comp256.get_grid(10, 5, Color::Black).unwrap();
+    for cell in &g256.cells {
+        match cell.avg_bg {
+            Color::Indexed(_) => {}
+            other => panic!("Color256 tier must emit Color::Indexed, got {:?}", other),
+        }
+    }
+}
+
+#[test]
+fn test_color_tier_detect_priority() {
+    // Basic virtual console must take precedence over inherited COLORTERM=truecolor
+    std::env::remove_var("BASHMENU_COLOR_TIER");
+    std::env::set_var("COLORTERM", "truecolor");
+    std::env::set_var("TERM", "linux");
+    assert_eq!(
+        bashmenu_tui::ColorTier::detect(),
+        bashmenu_tui::ColorTier::Color8
+    );
+
+    std::env::set_var("TERM", "console");
+    assert_eq!(
+        bashmenu_tui::ColorTier::detect(),
+        bashmenu_tui::ColorTier::Color8
+    );
+
+    // Modern emulator with COLORTERM=truecolor
+    std::env::set_var("TERM", "xterm-256color");
+    assert_eq!(
+        bashmenu_tui::ColorTier::detect(),
+        bashmenu_tui::ColorTier::TrueColor
+    );
+
+    // Clean up environment variables
+    std::env::remove_var("COLORTERM");
+    std::env::remove_var("TERM");
 }
 
 #[test]

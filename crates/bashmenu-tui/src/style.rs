@@ -1,7 +1,7 @@
 //! Theme color mapping and Ratatui style conversion.
 
 use crate::borders::ResolvedWindowBorders;
-use crate::wallpaper::{color_to_rgb, rgb_to_ansi16_name, rgb_to_ansi8_name};
+use crate::wallpaper::{color_to_rgb, rgb_to_ansi16_name, rgb_to_ansi8_name, rgb_to_xterm256};
 use bashmenu_core::Theme;
 use ratatui::style::{Color, Modifier, Style};
 
@@ -23,6 +23,7 @@ impl ColorTier {
     /// Detects the active terminal color capability tier from environment
     /// variables.
     pub fn detect() -> Self {
+        // 1. Explicit user override takes highest precedence
         if let Ok(tier) = std::env::var("BASHMENU_COLOR_TIER") {
             match tier.trim().to_ascii_lowercase().as_str() {
                 "8" | "color8" | "basic" => return Self::Color8,
@@ -33,6 +34,19 @@ impl ColorTier {
             }
         }
 
+        // 2. Linux VT consoles lack TrueColor; check linux/console before COLORTERM
+        // so inherited COLORTERM variables do not override basic Linux console.
+        if let Ok(term) = std::env::var("TERM") {
+            let t = term.trim().to_ascii_lowercase();
+            if t == "linux" || t == "console" {
+                return Self::Color8;
+            }
+            if t == "linux-16color" {
+                return Self::Color16;
+            }
+        }
+
+        // 3. Check COLORTERM for TrueColor support in modern terminal emulators
         if let Ok(colorterm) = std::env::var("COLORTERM") {
             let ct = colorterm.trim().to_ascii_lowercase();
             if ct == "truecolor" || ct == "24bit" {
@@ -40,22 +54,25 @@ impl ColorTier {
             }
         }
 
+        // 4. Inspect remaining TERM capabilities
         if let Ok(term) = std::env::var("TERM") {
             let t = term.trim().to_ascii_lowercase();
-            if t == "linux" || t == "console" || t == "vt100" || t == "vt102" || t == "dumb" {
+            if t == "vt100" || t == "vt102" || t == "dumb" {
                 return Self::Color8;
             }
             if t.contains("16color") {
                 return Self::Color16;
             }
-            if t.contains("256color")
-                || t.contains("kitty")
+            if t.contains("kitty")
                 || t.contains("alacritty")
                 || t.contains("ghostty")
                 || t.contains("foot")
                 || t.contains("wezterm")
             {
                 return Self::TrueColor;
+            }
+            if t.contains("256color") {
+                return Self::Color256;
             }
         }
 
@@ -121,6 +138,25 @@ pub fn downsample_color_to_16(color: Color) -> Color {
             let name = rgb_to_ansi16_name(r, g, b);
             ansi_name_to_color(name)
         }
+    }
+}
+
+/// Downsamples a Ratatui `Color` according to the specified terminal `ColorTier`.
+pub fn downsample_color_to_tier(color: Color, tier: ColorTier) -> Color {
+    match tier {
+        ColorTier::Color8 => downsample_color_to_8(color),
+        ColorTier::Color16 => downsample_color_to_16(color),
+        ColorTier::Color256 => {
+            if color == Color::Reset {
+                return Color::Reset;
+            }
+            match color {
+                Color::Indexed(_) => color,
+                Color::Rgb(r, g, b) => Color::Indexed(rgb_to_xterm256(r, g, b)),
+                other => other,
+            }
+        }
+        ColorTier::TrueColor => color,
     }
 }
 
@@ -226,6 +262,8 @@ pub struct ResolvedThemeStyles {
     pub toast_error: Color,
     /// Scrollbar track and thumb styling
     pub scrollbar: Style,
+    /// Active terminal color capability tier
+    pub tier: ColorTier,
 }
 
 impl Default for ResolvedThemeStyles {
@@ -265,6 +303,7 @@ impl Default for ResolvedThemeStyles {
             toast_warning: Color::Rgb(255, 184, 108),
             toast_error: Color::Rgb(255, 85, 85),
             scrollbar: Style::default().fg(Color::Cyan),
+            tier: ColorTier::TrueColor,
         }
     }
 }
@@ -397,7 +436,10 @@ pub fn parse_style_pair(val: Option<&serde_yml::Value>) -> Option<Style> {
 impl ResolvedThemeStyles {
     /// Resolves theme palette from Theme struct using a specific color tier.
     pub fn from_theme_with_tier(theme: &Theme, use_nerd_fonts: bool, tier: ColorTier) -> Self {
-        let mut resolved = Self::default();
+        let mut resolved = Self {
+            tier,
+            ..Default::default()
+        };
         if tier == ColorTier::Color8 {
             resolved.border = Color::Cyan;
             resolved.toast_info = Color::Green;

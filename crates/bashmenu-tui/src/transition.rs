@@ -273,6 +273,7 @@ mod tests {
 
     #[test]
     fn test_dim_color() {
+        std::env::set_var("BASHMENU_COLOR_TIER", "truecolor");
         let white_dim = dim_color(Color::White, 0.0);
         assert_eq!(white_dim, Color::Rgb(0, 0, 0));
 
@@ -281,5 +282,6 @@ mod tests {
 
         let full = dim_color(Color::Rgb(100, 200, 50), 1.0);
         assert_eq!(full, Color::Rgb(100, 200, 50));
+        std::env::remove_var("BASHMENU_COLOR_TIER");
     }
 }
