@@ -499,6 +499,17 @@
   - Documented all new transitions and speed profiles in `bashmenu.md` and `bashmenu.1`.
   - Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, and `shellcheck` pass with zero warnings or errors.
 
+- [x] **Comprehensive Workspace Stress Testing & Boundary Hardening:**
+  - Developed end-to-end stress test suites across all 7 workspace crates:
+    - `bashmenu-core`: Deeply nested curly brace recursion (100 levels), 1MB strings with thousands of macro placeholders, binary and malformed token inputs, multi-threaded concurrent interpolation from 20 threads, large scale 2,000-line 3-way note merge with non-overlapping and conflicting changes, note swap file rapid write/load/remove cycles, 2,000-item YAML menu schema serialization roundtripping.
+    - `bashmenu-tui`: Boundary viewport rendering (0x0, 1x1, 2x2, 80x1, 1x24, 300x200), extreme color dimming factors (-100.0 to 100.0), Bayer 4x4 dither bounds safety across 1,000,000 coordinate pairs, transition effect string fuzzing, 1,000-item menu view scrolling and paging under multi-size buffer renders. Guarded `draw_with_transition` and `draw_with_transition_out` against zero-dimension delays.
+    - `bashedit-cli`: 10,000-line buffer navigation and multi-line searching, rapid undo/redo cycles, verified 100-snapshot bounded capacity behavior.
+    - `bmpager-cli`: Deeply formatted 500-section markdown rendering, streaming 10,000-line piped inputs over non-TTY stdin.
+    - `menuedit-cli`: Scale testing with 500 added items, rapid swap up/down reordering, and disk serialization roundtrip.
+    - `themeedit-cli`: Adversarial non-existent paths and theme targets, visible row selection, category expansion toggling, 256-color palette mutation cycles.
+    - `bashmenu-cli`: CLI binary validation for all 8 workspace executables (`--help`, `--version`), adversarial input testing for `ymlcheck` (non-existent paths, empty files, corrupt YAML, binary bytes).
+  - Verified all tests pass with zero warnings in `cargo fmt`, `cargo clippy`, and `shellcheck`.
+
 
 
 

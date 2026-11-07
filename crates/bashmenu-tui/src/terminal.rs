@@ -84,6 +84,14 @@ impl TerminalGuard {
     where
         F: FnMut(&mut Frame<'_>),
     {
+        if effect == TransitionEffect::None || effect == TransitionEffect::Instant {
+            return self.draw(|f| render_callback(f));
+        }
+        let size = self.terminal.size()?;
+        if size.width == 0 || size.height == 0 {
+            return self.draw(|f| render_callback(f));
+        }
+
         match effect {
             TransitionEffect::None | TransitionEffect::Instant => self.draw(|f| render_callback(f)),
             TransitionEffect::Fade => {
@@ -425,6 +433,14 @@ impl TerminalGuard {
     where
         F: FnMut(&mut Frame<'_>),
     {
+        if effect == TransitionEffect::None || effect == TransitionEffect::Instant {
+            return Ok(());
+        }
+        let size = self.terminal.size()?;
+        if size.width == 0 || size.height == 0 {
+            return Ok(());
+        }
+
         match effect {
             TransitionEffect::None | TransitionEffect::Instant => Ok(()),
             TransitionEffect::Fade => {
