@@ -275,7 +275,7 @@ fn main() -> Result<()> {
     } else {
         ShortcutsConfig::default()
     };
-    let mut shortcut_dispatcher = ShortcutDispatcher::new(shortcuts_cfg);
+    let mut shortcut_dispatcher = ShortcutDispatcher::new(shortcuts_cfg.clone());
 
     // 3. Load Themes
     let themes_path = if cli.local {
@@ -321,8 +321,9 @@ fn main() -> Result<()> {
 
     // 6. Initialize Terminal Guard
     let mut guard = TerminalGuard::init()?;
-    let mut menu_view =
-        MenuView::new(menu, styles.clone(), use_nerd, status_gutter).with_config(config.clone());
+    let mut menu_view = MenuView::new(menu, styles.clone(), use_nerd, status_gutter)
+        .with_config(config.clone())
+        .with_shortcuts(shortcuts_cfg.shortcuts.clone());
     let initial_wallpaper = config.resolve_wallpaper(active_theme);
     menu_view.set_wallpaper(initial_wallpaper.clone());
     if let Some(show) = config.settings.show_menu_shortcuts {
@@ -453,6 +454,14 @@ fn main() -> Result<()> {
             if modal.poll_output() {
                 need_redraw = true;
             }
+        }
+
+        // Periodic check for help gutter hover tooltip expansion (4 seconds)
+        if matches!(active_modal, ActiveModal::None)
+            && !shortcut_dispatcher.is_leader_pending()
+            && menu_view.check_hover_timeout(area)
+        {
+            need_redraw = true;
         }
 
         if need_redraw {
@@ -591,8 +600,15 @@ fn main() -> Result<()> {
             }
             if let Event::Mouse(m) = &ev {
                 if m.kind == crossterm::event::MouseEventKind::Moved {
+                    if matches!(active_modal, ActiveModal::None)
+                        && !shortcut_dispatcher.is_leader_pending()
+                        && menu_view.handle_mouse_move(m.column, m.row, area)
+                    {
+                        need_redraw = true;
+                    }
                     continue;
                 }
+                menu_view.handle_interaction();
                 if m.kind
                     == crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left)
                     && toast_rack.handle_mouse(m.column, m.row)
@@ -605,6 +621,7 @@ fn main() -> Result<()> {
                 if k.kind == crossterm::event::KeyEventKind::Release {
                     continue;
                 }
+                menu_view.handle_interaction();
             }
             need_redraw = true;
             let prev_levels = menu_view.menu_level_titles();
@@ -1716,6 +1733,7 @@ fn main() -> Result<()> {
 
                             if shortcuts_path.exists() {
                                 if let Ok(new_shortcuts) = load_shortcuts(&shortcuts_path) {
+                                    menu_view.set_shortcuts(new_shortcuts.shortcuts.clone());
                                     shortcut_dispatcher.set_config(new_shortcuts);
                                 }
                             }

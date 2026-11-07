@@ -1,12 +1,12 @@
 //! Standardized Help Gutter and Footer layout engine.
 //!
 //! Follows the universal BashMenu rules:
-//! 1. Help gutters may use up to two lines.
+//! 1. Help gutters may use up to two lines (or three lines when hovered).
 //! 2. Help text treats the pipe character `|` as a word boundary for wrapping.
-//! 3. Text is spread evenly across one (if help is only one line) or two lines,
-//!    spreading items apart across the full available width with centered pipe delimiters.
+//! 3. Text is spread evenly across lines with centered pipe delimiters.
 
 use crate::bbcode::{truncate_to_width, visible_text_len};
+use std::time::{Duration, Instant};
 
 /// Parses help text or tokens separated by '|' into cleaned item strings.
 /// Treats '|' as an atomic word / delimiter boundary.
@@ -168,7 +168,7 @@ pub fn wrap_spread_help_gutter_layout(
         return vec![(line_str, items_with_ranges)];
     }
 
-    // 2. Needs 2 lines (max_lines >= 2)
+    // 2. Try 2 lines (max_lines >= 2)
     // Find the most balanced split point k such that both lines fit in max_w
     let n = cleaned_refs.len();
     let mut best_k: Option<usize> = None;
@@ -211,65 +211,243 @@ pub fn wrap_spread_help_gutter_layout(
         return vec![(l1_str, items1), (l2_str, items2)];
     }
 
-    // Fallback: Greedy 2-line packing if items cannot cleanly split without overflow
-    let mut l1_items = Vec::new();
-    let mut cur_len1 = 0;
-    let mut remaining = &cleaned_refs[..];
+    // 3. Try 3 lines if max_lines >= 3
+    if max_lines >= 3 && n >= 3 {
+        let mut best_3way: Option<(usize, usize)> = None;
+        let mut best_imbalance_3 = usize::MAX;
 
-    while !remaining.is_empty() {
-        let it = remaining[0];
-        let needed = if l1_items.is_empty() {
-            visible_text_len(it)
-        } else {
-            3 + visible_text_len(it)
-        };
-        if cur_len1 + needed <= max_w {
-            l1_items.push(it);
-            cur_len1 += needed;
-            remaining = &remaining[1..];
-        } else {
-            break;
+        for k1 in 1..n {
+            for k2 in (k1 + 1)..n {
+                let l1 = &cleaned_refs[..k1];
+                let l2 = &cleaned_refs[k1..k2];
+                let l3 = &cleaned_refs[k2..];
+
+                let l1_len: usize = l1.iter().map(|s| visible_text_len(s)).sum::<usize>()
+                    + (l1.len().saturating_sub(1) * 3);
+                let l2_len: usize = l2.iter().map(|s| visible_text_len(s)).sum::<usize>()
+                    + (l2.len().saturating_sub(1) * 3);
+                let l3_len: usize = l3.iter().map(|s| visible_text_len(s)).sum::<usize>()
+                    + (l3.len().saturating_sub(1) * 3);
+
+                if l1_len <= max_w && l2_len <= max_w && l3_len <= max_w {
+                    let len1 = k1;
+                    let len2 = k2 - k1;
+                    let len3 = n - k2;
+                    let count_diff = len1.abs_diff(len2) + len2.abs_diff(len3);
+                    let len_diff = l1_len.abs_diff(l2_len) + l2_len.abs_diff(l3_len);
+                    let imbalance = count_diff * 10 + len_diff;
+
+                    if imbalance < best_imbalance_3 {
+                        best_imbalance_3 = imbalance;
+                        best_3way = Some((k1, k2));
+                    }
+                }
+            }
+        }
+
+        if let Some((k1, k2)) = best_3way {
+            let (l1_str, r1) = spread_gutter_line_layout(&cleaned_refs[..k1], max_w);
+            let (l2_str, r2) = spread_gutter_line_layout(&cleaned_refs[k1..k2], max_w);
+            let (l3_str, r3) = spread_gutter_line_layout(&cleaned_refs[k2..], max_w);
+            let items1: Vec<(String, usize, usize)> = cleaned_refs[..k1]
+                .iter()
+                .zip(r1)
+                .map(|(&txt, (s, e))| (txt.to_string(), s, e))
+                .collect();
+            let items2: Vec<(String, usize, usize)> = cleaned_refs[k1..k2]
+                .iter()
+                .zip(r2)
+                .map(|(&txt, (s, e))| (txt.to_string(), s, e))
+                .collect();
+            let items3: Vec<(String, usize, usize)> = cleaned_refs[k2..]
+                .iter()
+                .zip(r3)
+                .map(|(&txt, (s, e))| (txt.to_string(), s, e))
+                .collect();
+            return vec![(l1_str, items1), (l2_str, items2), (l3_str, items3)];
         }
     }
 
-    let mut l2_items = Vec::new();
-    let mut cur_len2 = 0;
-    while !remaining.is_empty() {
-        let it = remaining[0];
-        let needed = if l2_items.is_empty() {
-            visible_text_len(it)
-        } else {
-            3 + visible_text_len(it)
-        };
-        if cur_len2 + needed <= max_w {
-            l2_items.push(it);
-            cur_len2 += needed;
-            remaining = &remaining[1..];
-        } else {
+    // 4. Fallback: Greedy packing into at most max_lines
+    let mut packed_lines: Vec<Vec<&str>> = Vec::new();
+    let mut remaining = &cleaned_refs[..];
+
+    for _ in 0..max_lines {
+        if remaining.is_empty() {
             break;
         }
+        let mut cur_line_items = Vec::new();
+        let mut cur_len = 0;
+        while !remaining.is_empty() {
+            let it = remaining[0];
+            let needed = if cur_line_items.is_empty() {
+                visible_text_len(it)
+            } else {
+                3 + visible_text_len(it)
+            };
+            if cur_len + needed <= max_w {
+                cur_line_items.push(it);
+                cur_len += needed;
+                remaining = &remaining[1..];
+            } else {
+                break;
+            }
+        }
+        if cur_line_items.is_empty() && !remaining.is_empty() {
+            cur_line_items.push(remaining[0]);
+            remaining = &remaining[1..];
+        }
+        packed_lines.push(cur_line_items);
     }
 
     let mut result = Vec::new();
-    if !l1_items.is_empty() {
-        let (s, r) = spread_gutter_line_layout(&l1_items, max_w);
-        let items: Vec<(String, usize, usize)> = l1_items
-            .iter()
-            .zip(r)
-            .map(|(&txt, (s_c, e_c))| (txt.to_string(), s_c, e_c))
-            .collect();
-        result.push((s, items));
-    }
-    if !l2_items.is_empty() {
-        let (s, r) = spread_gutter_line_layout(&l2_items, max_w);
-        let items: Vec<(String, usize, usize)> = l2_items
-            .iter()
-            .zip(r)
-            .map(|(&txt, (s_c, e_c))| (txt.to_string(), s_c, e_c))
-            .collect();
-        result.push((s, items));
+    for line_items in packed_lines {
+        if !line_items.is_empty() {
+            let (s, r) = spread_gutter_line_layout(&line_items, max_w);
+            let items: Vec<(String, usize, usize)> = line_items
+                .iter()
+                .zip(r)
+                .map(|(&txt, (s_c, e_c))| (txt.to_string(), s_c, e_c))
+                .collect();
+            result.push((s, items));
+        }
     }
     result
+}
+
+/// Returns whether any items from `items` cannot fully fit in `max_lines` at `max_w`.
+pub fn has_hidden_gutter_text(items: &[&str], max_w: usize, max_lines: usize) -> bool {
+    if items.is_empty() || max_w == 0 || max_lines == 0 {
+        return false;
+    }
+    let cleaned = parse_help_tokens(items);
+    if cleaned.is_empty() {
+        return false;
+    }
+    let layouts = wrap_spread_help_gutter_layout(items, max_w, max_lines);
+    let displayed_count: usize = layouts.iter().map(|(_, l_items)| l_items.len()).sum();
+    if displayed_count < cleaned.len() {
+        return true;
+    }
+    // Check if any displayed item was truncated compared to original
+    let mut idx = 0;
+    for (_, l_items) in &layouts {
+        for (tok, _, _) in l_items {
+            if idx < cleaned.len() && tok != &cleaned[idx] {
+                return true;
+            }
+            idx += 1;
+        }
+    }
+    false
+}
+
+/// Tracks stationary mouse hover over a help gutter for tooltip expansion.
+#[derive(Debug, Clone)]
+pub struct HelpGutterHover {
+    /// The last recorded mouse cell (column, row).
+    hover_pos: Option<(u16, u16)>,
+    /// Timestamp when mouse became stationary at `hover_pos`.
+    hover_start: Option<Instant>,
+    /// Whether the help gutter tooltip is currently expanded by an extra row.
+    is_expanded: bool,
+    /// Duration of stationary hover required to trigger expansion (default 4s).
+    hover_duration: Duration,
+}
+
+impl Default for HelpGutterHover {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl HelpGutterHover {
+    /// Creates a new hover tracker with the standard 4-second delay.
+    pub fn new() -> Self {
+        Self {
+            hover_pos: None,
+            hover_start: None,
+            is_expanded: false,
+            hover_duration: Duration::from_secs(4),
+        }
+    }
+
+    /// Creates a hover tracker with a custom hover duration.
+    pub fn with_duration(hover_duration: Duration) -> Self {
+        Self {
+            hover_pos: None,
+            hover_start: None,
+            is_expanded: false,
+            hover_duration,
+        }
+    }
+
+    /// Handles a mouse movement event.
+    ///
+    /// - If the mouse moves inside `gutter_bounds`, updates hover position.
+    /// - If the mouse was stationary and moved to a new cell, any expansion is collapsed.
+    /// - If the mouse moves outside the gutter, resets hover tracking.
+    ///
+    /// Returns `true` if the visual state changed (e.g. collapsed) and needs redrawing.
+    pub fn handle_mouse_move(&mut self, col: u16, row: u16, in_gutter: bool) -> bool {
+        if in_gutter {
+            if self.hover_pos == Some((col, row)) {
+                // Mouse stayed in the exact same cell; keep timer running
+                false
+            } else {
+                let changed = self.is_expanded;
+                self.is_expanded = false;
+                self.hover_pos = Some((col, row));
+                self.hover_start = Some(Instant::now());
+                changed
+            }
+        } else if self.hover_pos.is_some() || self.is_expanded {
+            let changed = self.is_expanded;
+            self.reset();
+            changed
+        } else {
+            false
+        }
+    }
+
+    /// Handles any user interaction (key press, mouse click, scroll).
+    ///
+    /// Collapses the expanded row and resets hover tracking.
+    /// Returns `true` if previously expanded and needs redrawing.
+    pub fn handle_interaction(&mut self) -> bool {
+        let changed = self.is_expanded;
+        self.reset();
+        changed
+    }
+
+    /// Checks whether the 4-second hover threshold has been met.
+    ///
+    /// If stationary for >= `hover_duration` and `has_hidden_text` is true,
+    /// expands the gutter by a row.
+    /// Returns `true` if newly expanded and needs redrawing.
+    pub fn check_hover_timeout(&mut self, has_hidden_text: bool) -> bool {
+        if !self.is_expanded && has_hidden_text {
+            if let Some(start) = self.hover_start {
+                if start.elapsed() >= self.hover_duration {
+                    self.is_expanded = true;
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// Returns whether the gutter is currently expanded by an extra row.
+    pub fn is_expanded(&self) -> bool {
+        self.is_expanded
+    }
+
+    /// Resets hover coordinates, timer, and expansion state.
+    pub fn reset(&mut self) {
+        self.hover_pos = None;
+        self.hover_start = None;
+        self.is_expanded = false;
+    }
 }
 
 /// Wraps help items into at most `max_lines` (typically 1 or 2),
@@ -347,5 +525,88 @@ mod tests {
         let input = ["[F1] Help | [F2] Toggle All | [F3] ASCII"];
         let tokens = parse_help_tokens(&input);
         assert_eq!(tokens, vec!["[F1] Help", "[F2] Toggle All", "[F3] ASCII"]);
+    }
+
+    #[test]
+    fn test_wrap_spread_help_gutter_three_lines() {
+        let items = [
+            "[ENTER]: Select",
+            "[F1]: Help",
+            "[F2]: Themes",
+            "[F3]: Editor",
+            "[F4]: Edit",
+            "[F5]: Refresh",
+            "[F6]: Keys",
+            "[F7]: Gutter",
+            "[F8]: ThemeEdit",
+            "[F9]: ShortcutEdit",
+            "[F10]: Backup",
+            "[F12]: Notes",
+            "[ESC]: Back",
+        ];
+        let max_w = 45;
+        // On width 45, 13 items cannot fit on 2 lines
+        let lines2 = wrap_spread_help_gutter(&items, max_w, 2);
+        assert_eq!(lines2.len(), 2);
+        assert!(has_hidden_gutter_text(&items, max_w, 2));
+
+        // When max_lines is 3, it should expand to 3 lines
+        let lines3 = wrap_spread_help_gutter(&items, max_w, 3);
+        assert_eq!(lines3.len(), 3);
+    }
+
+    #[test]
+    fn test_has_hidden_gutter_text_detection() {
+        let items = ["[F1]: Help", "[F2]: Themes", "[ESC]: Back"];
+        assert!(!has_hidden_gutter_text(&items, 60, 2));
+
+        let many_items = [
+            "[ENTER]: Select",
+            "[F1]: Help",
+            "[F2]: Themes",
+            "[F3]: Editor",
+            "[F4]: Edit",
+            "[F5]: Refresh",
+            "[F6]: Keys",
+            "[F7]: Gutter",
+            "[F8]: ThemeEdit",
+            "[F9]: ShortcutEdit",
+            "[ESC]: Back",
+        ];
+        // In 40 cols, 11 items cannot fit in 2 lines
+        assert!(has_hidden_gutter_text(&many_items, 40, 2));
+    }
+
+    #[test]
+    fn test_help_gutter_hover_lifecycle() {
+        let mut hover = HelpGutterHover::with_duration(Duration::from_millis(50));
+        assert!(!hover.is_expanded());
+
+        // Mouse enters gutter
+        let changed = hover.handle_mouse_move(10, 20, true);
+        assert!(!changed);
+        assert!(!hover.is_expanded());
+
+        // Same position does not reset timer
+        assert!(!hover.handle_mouse_move(10, 20, true));
+
+        // Check before duration expires
+        assert!(!hover.check_hover_timeout(true));
+        assert!(!hover.is_expanded());
+
+        // Wait for duration to expire
+        std::thread::sleep(Duration::from_millis(60));
+        let expanded = hover.check_hover_timeout(true);
+        assert!(expanded);
+        assert!(hover.is_expanded());
+
+        // Mouse moves to a new cell: should collapse
+        let collapsed = hover.handle_mouse_move(12, 20, true);
+        assert!(collapsed);
+        assert!(!hover.is_expanded());
+
+        // Interaction resets state
+        hover.handle_interaction();
+        assert!(!hover.is_expanded());
     }
 }

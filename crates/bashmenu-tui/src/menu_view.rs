@@ -3,13 +3,16 @@
 use crate::bbcode::{
     parse_bbcode_spans, split_label_brackets, truncate_to_width, visible_text_len,
 };
-use crate::gutter::{wrap_spread_help_gutter, wrap_spread_help_gutter_layout};
+use crate::gutter::{
+    has_hidden_gutter_text, wrap_spread_help_gutter, wrap_spread_help_gutter_layout,
+    HelpGutterHover,
+};
 use crate::marquee::{get_marquee_slice, MarqueeTracker};
 use crate::style::ResolvedThemeStyles;
 use crate::wallpaper::{composite_buffer, WallpaperCompositor};
 use bashmenu_core::{
     format_icon_slot, interpolate_placeholders, BashMenuConfig, MacroContext, MenuItem,
-    MenuItemType, MenuSchema, PluginDisplayRow, WallpaperConfig,
+    MenuItemType, MenuSchema, PluginDisplayRow, ShortcutEntry, WallpaperConfig,
 };
 use crossterm::event::{KeyCode, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
@@ -100,6 +103,10 @@ pub struct MenuView {
     wallpaper: Option<WallpaperCompositor>,
     /// Marquee scroll offset and pause tracker for long selected item labels
     marquee_tracker: MarqueeTracker,
+    /// Configured shortcuts from the shortcut manager
+    shortcuts: Vec<ShortcutEntry>,
+    /// Stationary mouse hover tracker for help gutter expansion
+    pub gutter_hover: HelpGutterHover,
 }
 
 impl MenuView {
@@ -132,9 +139,22 @@ impl MenuView {
             config,
             wallpaper: None,
             marquee_tracker: MarqueeTracker::new(4),
+            shortcuts: Vec::new(),
+            gutter_hover: HelpGutterHover::new(),
         };
         view.ensure_selectable();
         view
+    }
+
+    /// Sets configured shortcuts from the shortcut manager
+    pub fn with_shortcuts(mut self, shortcuts: Vec<ShortcutEntry>) -> Self {
+        self.set_shortcuts(shortcuts);
+        self
+    }
+
+    /// Sets configured shortcuts from the shortcut manager
+    pub fn set_shortcuts(&mut self, shortcuts: Vec<ShortcutEntry>) {
+        self.shortcuts = shortcuts;
     }
 
     /// Sets the application configuration
@@ -359,15 +379,19 @@ impl MenuView {
         };
         let (left_gutter_w, right_gutter_w, _) =
             calculate_gutter_dimensions(area.width as usize, &status_tokens);
-        let help_raw = self.get_help_raw();
-        let help_tokens: Vec<&str> = help_raw
-            .split('|')
-            .map(|s| s.trim())
-            .filter(|s| !s.is_empty())
-            .collect();
-        let help_lines = wrap_spread_help_gutter(&help_tokens, left_gutter_w, 2);
+        let help_tokens = self.get_help_tokens();
+        let help_token_refs: Vec<&str> = help_tokens.iter().map(|s| s.as_str()).collect();
+        let normal_lines = wrap_spread_help_gutter(&help_token_refs, left_gutter_w, 2);
         let status_lines = wrap_gutter_tokens(&status_tokens, right_gutter_w, 2);
-        let gutter_rows = (help_lines.len().max(status_lines.len())).clamp(1, 2);
+        let normal_rows = (normal_lines.len().max(status_lines.len())).clamp(1, 2);
+        let is_expanded = self.gutter_hover.is_expanded()
+            && has_hidden_gutter_text(&help_token_refs, left_gutter_w, 2)
+            && area.height >= 7;
+        let gutter_rows = if is_expanded {
+            (normal_rows + 1).min(3)
+        } else {
+            normal_rows
+        };
         let gutter_border_y = area.y + area.height.saturating_sub(2 + gutter_rows as u16);
 
         let row_y = content_start_y + (selected.saturating_sub(offset)) as u16;
@@ -542,6 +566,7 @@ impl MenuView {
 
     /// Handles keyboard event
     pub fn handle_key(&mut self, code: KeyCode) -> MenuAction {
+        self.gutter_hover.handle_interaction();
         match code {
             KeyCode::Up | KeyCode::Char('k') => {
                 self.move_up();
@@ -649,8 +674,62 @@ impl MenuView {
         }
     }
 
+    /// Returns the combined contextual help tokens and configured shortcut tokens.
+    pub fn get_help_tokens(&self) -> Vec<String> {
+        let help_raw = self.get_help_raw();
+        let mut tokens: Vec<String> = help_raw
+            .split('|')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        // Append configured shortcuts from shortcut manager
+        for sc in &self.shortcuts {
+            let key = sc.key.trim();
+            if key.is_empty() {
+                continue;
+            }
+            let key_display = if (key.starts_with('<') && key.ends_with('>'))
+                || (key.starts_with('[') && key.ends_with(']'))
+            {
+                key.to_string()
+            } else {
+                format!("[{}]", key.to_uppercase())
+            };
+            let desc = sc.description.trim();
+            let token = if desc.is_empty() {
+                key_display
+            } else {
+                format!("{}: {}", key_display, desc)
+            };
+            if !tokens.contains(&token) {
+                tokens.push(token);
+            }
+        }
+        tokens
+    }
+
     /// Maps a clicked status gutter button token (e.g., `[F1]` or `[F2]`) to its corresponding MenuAction.
     fn action_for_gutter_token(&mut self, tok: &str) -> MenuAction {
+        // 1. Check configured shortcuts first
+        for sc in &self.shortcuts {
+            let key_norm = sc.key.trim().to_uppercase();
+            let key_bracket = format!("[{}]", key_norm);
+            if !key_norm.is_empty()
+                && (tok.to_uppercase().starts_with(&key_bracket)
+                    || tok.to_uppercase().starts_with(&format!("<{}>", key_norm))
+                    || tok.to_uppercase().starts_with(&key_norm))
+            {
+                let item = sc.to_menu_item();
+                if item.r#type == MenuItemType::Notebook {
+                    return MenuAction::OpenNotebook(Box::new(item));
+                } else {
+                    return MenuAction::Execute(Box::new(item));
+                }
+            }
+        }
+
+        // 2. Contextual menu actions
         if tok.contains("[F1]") || tok.contains("Help") {
             MenuAction::Help
         } else if tok.contains("[F2]") || tok.contains("Themes") {
@@ -669,7 +748,7 @@ impl MenuView {
             MenuAction::ToggleShortcuts
         } else if tok.contains("[F7]") || tok.contains("Gutter") {
             MenuAction::ConfigureGutter
-        } else if tok.contains("[ESC]") || tok.contains("Back") {
+        } else if tok.contains("[ESC]") || tok.contains(": Back") || tok.ends_with(" Back") {
             self.go_back()
         } else if tok.contains("[ENTER]") || tok.contains("Select") || tok.contains("Read") {
             self.activate_selected()
@@ -702,6 +781,7 @@ impl MenuView {
 
     /// Handles immediate mouse event (invoking MouseDown immediately)
     pub fn handle_mouse(&mut self, mouse: MouseEvent, area: Rect) -> MenuAction {
+        self.gutter_hover.handle_interaction();
         match mouse.kind {
             MouseEventKind::Down(MouseButton::Left) => {
                 let col = mouse.column;
@@ -726,17 +806,27 @@ impl MenuView {
                     let (left_gutter_w, right_gutter_w, sep_x) =
                         calculate_gutter_dimensions(w, &status_tokens);
 
-                    let help_raw = self.get_help_raw();
-                    let help_tokens: Vec<&str> = help_raw
-                        .split('|')
-                        .map(|s| s.trim())
-                        .filter(|s| !s.is_empty())
-                        .collect();
-                    let help_layout =
-                        wrap_spread_help_gutter_layout(&help_tokens, left_gutter_w, 2);
+                    let help_tokens = self.get_help_tokens();
+                    let help_token_refs: Vec<&str> =
+                        help_tokens.iter().map(|s| s.as_str()).collect();
+                    let normal_help =
+                        wrap_spread_help_gutter_layout(&help_token_refs, left_gutter_w, 2);
 
                     let status_lines = wrap_gutter_tokens(&status_tokens, right_gutter_w, 2);
-                    let gutter_rows = (help_layout.len().max(status_lines.len())).clamp(1, 2);
+                    let normal_rows = (normal_help.len().max(status_lines.len())).clamp(1, 2);
+                    let is_expanded = self.gutter_hover.is_expanded()
+                        && has_hidden_gutter_text(&help_token_refs, left_gutter_w, 2)
+                        && area.height >= 7;
+                    let gutter_rows = if is_expanded {
+                        (normal_rows + 1).min(3)
+                    } else {
+                        normal_rows
+                    };
+                    let help_layout = if is_expanded {
+                        wrap_spread_help_gutter_layout(&help_token_refs, left_gutter_w, gutter_rows)
+                    } else {
+                        normal_help
+                    };
                     let gutter_border_y =
                         area.y + area.height.saturating_sub(2 + gutter_rows as u16);
 
@@ -932,17 +1022,26 @@ impl MenuView {
         let left_seg_len = sep_x.saturating_sub(1);
         let right_seg_len = w.saturating_sub(2 + sep_x);
 
-        let help_raw = self.get_help_raw();
-        let help_tokens: Vec<&str> = help_raw
-            .split('|')
-            .map(|s| s.trim())
-            .filter(|s| !s.is_empty())
-            .collect();
-        let help_lines = wrap_spread_help_gutter(&help_tokens, left_gutter_w, 2);
+        let help_tokens = self.get_help_tokens();
+        let help_token_refs: Vec<&str> = help_tokens.iter().map(|s| s.as_str()).collect();
+        let normal_lines = wrap_spread_help_gutter(&help_token_refs, left_gutter_w, 2);
 
         let status_lines = wrap_gutter_tokens(&status_tokens, right_gutter_w, 2);
 
-        let gutter_rows = (help_lines.len().max(status_lines.len())).clamp(1, 2);
+        let normal_rows = (normal_lines.len().max(status_lines.len())).clamp(1, 2);
+        let is_expanded = self.gutter_hover.is_expanded()
+            && has_hidden_gutter_text(&help_token_refs, left_gutter_w, 2)
+            && area.height >= 7;
+        let gutter_rows = if is_expanded {
+            (normal_rows + 1).min(3)
+        } else {
+            normal_rows
+        };
+        let help_lines = if is_expanded {
+            wrap_spread_help_gutter(&help_token_refs, left_gutter_w, gutter_rows)
+        } else {
+            normal_lines
+        };
         let gutter_border_y = area.y + area.height.saturating_sub(2 + gutter_rows as u16);
 
         // 2. Render Header (Top Border) at area.y
@@ -1371,6 +1470,83 @@ impl MenuView {
                 composite_buffer(area, buf, grid, self.styles.background);
             }
         }
+    }
+
+    /// Returns whether the help gutter has hidden items due to width/height constraints.
+    pub fn has_hidden_help_text(&self, area: Rect) -> bool {
+        let w = area.width as usize;
+        let status_tokens: Vec<&str> = if self.status_gutter.is_empty() {
+            Vec::new()
+        } else {
+            self.status_gutter
+                .split('|')
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .collect()
+        };
+        let (left_gutter_w, _, _) = calculate_gutter_dimensions(w, &status_tokens);
+        let help_tokens = self.get_help_tokens();
+        let help_token_refs: Vec<&str> = help_tokens.iter().map(|s| s.as_str()).collect();
+        has_hidden_gutter_text(&help_token_refs, left_gutter_w, 2)
+    }
+
+    /// Checks if screen coordinates (col, row) fall inside the help gutter.
+    pub fn is_over_help_gutter(&self, col: u16, row: u16, area: Rect) -> bool {
+        let w = area.width as usize;
+        let status_tokens: Vec<&str> = if self.status_gutter.is_empty() {
+            Vec::new()
+        } else {
+            self.status_gutter
+                .split('|')
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .collect()
+        };
+        let (left_gutter_w, right_gutter_w, sep_x) = calculate_gutter_dimensions(w, &status_tokens);
+        let help_tokens = self.get_help_tokens();
+        let help_token_refs: Vec<&str> = help_tokens.iter().map(|s| s.as_str()).collect();
+        let normal_lines = wrap_spread_help_gutter(&help_token_refs, left_gutter_w, 2);
+        let status_lines = wrap_gutter_tokens(&status_tokens, right_gutter_w, 2);
+        let normal_rows = (normal_lines.len().max(status_lines.len())).clamp(1, 2);
+        let is_expanded = self.gutter_hover.is_expanded()
+            && has_hidden_gutter_text(&help_token_refs, left_gutter_w, 2)
+            && area.height >= 7;
+        let gutter_rows = if is_expanded {
+            (normal_rows + 1).min(3)
+        } else {
+            normal_rows
+        };
+        let gutter_border_y = area.y + area.height.saturating_sub(2 + gutter_rows as u16);
+
+        row > gutter_border_y
+            && row < area.y + area.height - 1
+            && col > area.x
+            && col < area.x + sep_x as u16
+    }
+
+    /// Handles mouse movement over the view area, updating hover state for tooltip expansion.
+    /// Returns true if the visual state changed (e.g. collapsed) and needs redrawing.
+    pub fn handle_mouse_move(&mut self, col: u16, row: u16, area: Rect) -> bool {
+        let in_gutter = self.is_over_help_gutter(col, row, area);
+        let has_hidden = self.has_hidden_help_text(area) && area.height >= 7;
+        if !has_hidden && self.gutter_hover.is_expanded() {
+            self.gutter_hover.reset();
+            return true;
+        }
+        self.gutter_hover
+            .handle_mouse_move(col, row, in_gutter && has_hidden)
+    }
+
+    /// Polls whether stationary mouse hover has reached the 4-second tooltip threshold.
+    /// Returns true if newly expanded, requiring a redraw.
+    pub fn check_hover_timeout(&mut self, area: Rect) -> bool {
+        let has_hidden = self.has_hidden_help_text(area) && area.height >= 7;
+        self.gutter_hover.check_hover_timeout(has_hidden)
+    }
+
+    /// Resets gutter hover tooltip expansion on user interaction (key press, click, scroll).
+    pub fn handle_interaction(&mut self) -> bool {
+        self.gutter_hover.handle_interaction()
     }
 }
 

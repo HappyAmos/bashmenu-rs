@@ -118,6 +118,7 @@ fn main() -> Result<()> {
     let mut toast_rack = ToastRack::new();
     let mut is_editing_name = false;
     let mut preview_buffer = Buffer::empty(Rect::default());
+    let mut footer_hover = bashmenu_tui::HelpGutterHover::new();
 
     loop {
         let size = guard.terminal_mut().size()?;
@@ -166,10 +167,26 @@ fn main() -> Result<()> {
                 }
 
                 // Split into Left Panel (Tokens) and Right Panel (Live Preview)
-                // Reserve bottom 2 rows for gutter divider and gutter help bar
+                // Reserve bottom rows for gutter divider and gutter help bar
+                let bottom_items = [
+                    "[F5] Derive",
+                    "[F6] New",
+                    "[F7] Rename",
+                    "[F8] Del",
+                    "[Ctrl+S] Save",
+                    "[Ctrl+A] Save As",
+                    "[TAB] View",
+                    "[q] Exit",
+                ];
+                let bottom_avail_w = area.width.saturating_sub(4) as usize;
+                let has_hidden =
+                    bashmenu_tui::has_hidden_gutter_text(&bottom_items, bottom_avail_w, 1);
+                let is_expanded = footer_hover.is_expanded() && has_hidden && area.height >= 12;
+                let footer_rows: u16 = if is_expanded { 2 } else { 1 };
+
                 let bot_y = area.y + area.height - 1;
                 let footer_y = bot_y.saturating_sub(1);
-                let gt_y = footer_y.saturating_sub(1);
+                let gt_y = bot_y.saturating_sub(1 + footer_rows);
                 let panel_y = area.y + 2;
                 let panel_h = gt_y.saturating_sub(panel_y);
 
@@ -344,34 +361,43 @@ fn main() -> Result<()> {
                     border_style,
                 );
 
-                // Gutter row side borders
-                buf.set_string(area.x, footer_y, &b.border_vertical_left, border_style);
-                buf.set_string(
-                    area.x + area.width - 1,
-                    footer_y,
-                    &b.border_vertical_right,
-                    border_style,
-                );
-
-                let bottom_items = [
-                    "[F5] Derive",
-                    "[F6] New",
-                    "[F7] Rename",
-                    "[F8] Del",
-                    "[Ctrl+S] Save",
-                    "[Ctrl+A] Save As",
-                    "[TAB] View",
-                    "[q] Exit",
-                ];
-                let bottom_avail_w = area.width.saturating_sub(4) as usize;
-                let bottom_spread =
-                    bashmenu_tui::format_spread_gutter_line(&bottom_items, bottom_avail_w);
-                buf.set_string(
-                    area.x + 2,
-                    footer_y,
-                    bottom_spread,
-                    Style::default().fg(preview_styles.help_text.fg.unwrap_or(Color::White)),
-                );
+                if is_expanded {
+                    let lines =
+                        bashmenu_tui::wrap_spread_help_gutter(&bottom_items, bottom_avail_w, 2);
+                    for (r_idx, line) in lines.iter().enumerate() {
+                        let y = footer_y.saturating_sub((lines.len() - 1 - r_idx) as u16);
+                        buf.set_string(area.x, y, &b.border_vertical_left, border_style);
+                        buf.set_string(
+                            area.x + area.width - 1,
+                            y,
+                            &b.border_vertical_right,
+                            border_style,
+                        );
+                        buf.set_string(
+                            area.x + 2,
+                            y,
+                            line,
+                            Style::default()
+                                .fg(preview_styles.help_text.fg.unwrap_or(Color::White)),
+                        );
+                    }
+                } else {
+                    buf.set_string(area.x, footer_y, &b.border_vertical_left, border_style);
+                    buf.set_string(
+                        area.x + area.width - 1,
+                        footer_y,
+                        &b.border_vertical_right,
+                        border_style,
+                    );
+                    let bottom_spread =
+                        bashmenu_tui::format_spread_gutter_line(&bottom_items, bottom_avail_w);
+                    buf.set_string(
+                        area.x + 2,
+                        footer_y,
+                        bottom_spread,
+                        Style::default().fg(preview_styles.help_text.fg.unwrap_or(Color::White)),
+                    );
+                }
 
                 // 4. Render Active Toasts
                 toast_rack.render(area, &preview_styles, buf);
@@ -436,14 +462,38 @@ fn main() -> Result<()> {
             Duration::from_millis(50)
         };
 
+        let bottom_items = [
+            "[F5] Derive",
+            "[F6] New",
+            "[F7] Rename",
+            "[F8] Del",
+            "[Ctrl+S] Save",
+            "[Ctrl+A] Save As",
+            "[TAB] View",
+            "[q] Exit",
+        ];
+        let bottom_avail_w = area.width.saturating_sub(4) as usize;
+        let has_hidden = bashmenu_tui::has_hidden_gutter_text(&bottom_items, bottom_avail_w, 1);
+
         if event::poll(poll_dur)? {
             let ev = event::read()?;
 
-            // Ignore pure mouse movement events to avoid event queue flooding and latency
-            if let Event::Mouse(m) = ev {
+            if let Event::Mouse(m) = &ev {
                 if m.kind == MouseEventKind::Moved {
+                    let footer_rows: u16 = if footer_hover.is_expanded() { 2 } else { 1 };
+                    let in_gutter = m.row >= (area.y + area.height).saturating_sub(1 + footer_rows)
+                        && m.row < area.y + area.height - 1;
+                    if matches!(active_modal, ActiveModal::None)
+                        && footer_hover.handle_mouse_move(m.column, m.row, in_gutter && has_hidden)
+                    {
+                        need_redraw = true;
+                    }
                     continue;
                 }
+                footer_hover.handle_interaction();
+            }
+            if let Event::Key(_) = &ev {
+                footer_hover.handle_interaction();
             }
 
             need_redraw = true;
@@ -1384,10 +1434,17 @@ fn main() -> Result<()> {
                     }
                 }
             }
-        } else if let Some((flash_start, _)) = click_flash {
-            if flash_start.elapsed() >= Duration::from_millis(200) {
-                click_flash = None;
+        } else {
+            if matches!(active_modal, ActiveModal::None)
+                && footer_hover.check_hover_timeout(has_hidden && area.height >= 12)
+            {
                 need_redraw = true;
+            }
+            if let Some((flash_start, _)) = click_flash {
+                if flash_start.elapsed() >= Duration::from_millis(200) {
+                    click_flash = None;
+                    need_redraw = true;
+                }
             }
         }
     }

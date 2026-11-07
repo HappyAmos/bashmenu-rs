@@ -255,6 +255,7 @@ fn main() -> Result<()> {
     let mut inspector_scroll = 0;
     let mut is_modified = false;
     let mut active_modal = ActiveModal::None;
+    let mut footer_hover = bashmenu_tui::HelpGutterHover::new();
 
     loop {
         let size = guard.terminal_mut().size()?;
@@ -312,7 +313,8 @@ fn main() -> Result<()> {
             let inner_x = area.x + 2;
             let inner_y = area.y + 1;
             let avail_w = area.width.saturating_sub(4);
-            let avail_h = area.height.saturating_sub(4);
+            let footer_h: u16 = if footer_hover.is_expanded() { 3 } else { 2 };
+            let avail_h = area.height.saturating_sub(2 + footer_h);
 
             let left_w = avail_w / 2;
             let right_w = avail_w.saturating_sub(left_w);
@@ -448,11 +450,8 @@ fn main() -> Result<()> {
                 );
             }
 
-            // Footer (2 Lines matching Python Menuedit, raised above bottom border)
-            let footer_y1 = (area.y + area.height).saturating_sub(3);
-            let footer_y2 = (area.y + area.height).saturating_sub(2);
-
-            let items_r1 = [
+            // Footer (2 or 3 lines depending on hover expansion)
+            let items_all: [(&str, MenuEditFooterAction); 16] = [
                 ("[F1] Help", MenuEditFooterAction::Help),
                 ("[F2] Toggle All", MenuEditFooterAction::ToggleAll),
                 ("[F3] ASCII", MenuEditFooterAction::Ascii),
@@ -461,8 +460,6 @@ fn main() -> Result<()> {
                 ("[a] Add", MenuEditFooterAction::Add),
                 ("[e/ENTER] Edit", MenuEditFooterAction::Edit),
                 ("[t] Type", MenuEditFooterAction::Type),
-            ];
-            let items_r2 = [
                 ("[SPACE] Toggle", MenuEditFooterAction::Toggle),
                 ("[d] Delete", MenuEditFooterAction::Delete),
                 ("[m] Move Dn", MenuEditFooterAction::MoveDown),
@@ -473,53 +470,37 @@ fn main() -> Result<()> {
                 ("[ESC/q] Exit", MenuEditFooterAction::Exit),
             ];
 
-            let labels_r1: Vec<&str> = items_r1.iter().map(|(lbl, _)| *lbl).collect();
-            let labels_r2: Vec<&str> = items_r2.iter().map(|(lbl, _)| *lbl).collect();
+            let all_labels: Vec<&str> = items_all.iter().map(|(lbl, _)| *lbl).collect();
+            let has_hidden = bashmenu_tui::has_hidden_gutter_text(&all_labels, avail_w as usize, 2);
+            let is_expanded = footer_hover.is_expanded() && has_hidden && area.height >= 12;
+            let footer_rows: usize = if is_expanded { 3 } else { 2 };
 
-            let (line_r1, ranges_r1) =
-                bashmenu_tui::spread_gutter_line_layout(&labels_r1, avail_w as usize);
-            let (line_r2, ranges_r2) =
-                bashmenu_tui::spread_gutter_line_layout(&labels_r2, avail_w as usize);
-
-            buf.set_string(
-                inner_x,
-                footer_y1,
-                &line_r1,
-                Style::default().fg(Color::DarkGray),
+            let gutter_layouts = bashmenu_tui::wrap_spread_help_gutter_layout(
+                &all_labels,
+                avail_w as usize,
+                footer_rows,
             );
-            for (idx, (start, end)) in ranges_r1.into_iter().enumerate() {
-                if idx < items_r1.len() {
-                    let (label, action) = items_r1[idx];
-                    let screen_start = inner_x + start as u16;
-                    let screen_end = inner_x + end as u16;
-                    buf.set_string(screen_start, footer_y1, label, styles.accent);
-                    footer_hit_regions.push(FooterHitRegion {
-                        row: footer_y1,
-                        start_x: screen_start,
-                        end_x: screen_end,
-                        action,
-                    });
-                }
-            }
 
-            buf.set_string(
-                inner_x,
-                footer_y2,
-                &line_r2,
-                Style::default().fg(Color::DarkGray),
-            );
-            for (idx, (start, end)) in ranges_r2.into_iter().enumerate() {
-                if idx < items_r2.len() {
-                    let (label, action) = items_r2[idx];
-                    let screen_start = inner_x + start as u16;
-                    let screen_end = inner_x + end as u16;
-                    buf.set_string(screen_start, footer_y2, label, styles.accent);
-                    footer_hit_regions.push(FooterHitRegion {
-                        row: footer_y2,
-                        start_x: screen_start,
-                        end_x: screen_end,
-                        action,
-                    });
+            for (r_idx, (line_str, ranges)) in gutter_layouts.into_iter().enumerate() {
+                let row_y = (area.y + area.height).saturating_sub(1 + (footer_rows - r_idx) as u16);
+                buf.set_string(
+                    inner_x,
+                    row_y,
+                    &line_str,
+                    Style::default().fg(Color::DarkGray),
+                );
+                for (tok_label, start, end) in ranges {
+                    if let Some((_, action)) = items_all.iter().find(|(lbl, _)| *lbl == tok_label) {
+                        let screen_start = inner_x + start as u16;
+                        let screen_end = inner_x + end as u16;
+                        buf.set_string(screen_start, row_y, &tok_label, styles.accent);
+                        footer_hit_regions.push(FooterHitRegion {
+                            row: row_y,
+                            start_x: screen_start,
+                            end_x: screen_end,
+                            action: *action,
+                        });
+                    }
                 }
             }
 
@@ -574,8 +555,44 @@ fn main() -> Result<()> {
 
         toast_rack.tick();
 
+        let all_labels = [
+            "[F1] Help",
+            "[F2] Toggle All",
+            "[F3] ASCII",
+            "[F4] Glyphs",
+            "[F5] Placeholders",
+            "[a] Add",
+            "[e/ENTER] Edit",
+            "[t] Type",
+            "[SPACE] Toggle",
+            "[d] Delete",
+            "[m] Move Dn",
+            "[M] Move Up",
+            "[>] Indent",
+            "[<] Outdent",
+            "[s] Save",
+            "[ESC/q] Exit",
+        ];
+        let avail_w = area.width.saturating_sub(4);
+        let has_hidden = bashmenu_tui::has_hidden_gutter_text(&all_labels, avail_w as usize, 2);
+
         if event::poll(Duration::from_millis(50))? {
             let ev = event::read()?;
+            if let Event::Mouse(m) = &ev {
+                if m.kind == MouseEventKind::Moved {
+                    let footer_rows: u16 = if footer_hover.is_expanded() { 3 } else { 2 };
+                    let in_footer = m.row >= (area.y + area.height).saturating_sub(1 + footer_rows)
+                        && m.row < area.y + area.height - 1;
+                    if matches!(active_modal, ActiveModal::None) {
+                        footer_hover.handle_mouse_move(m.column, m.row, in_footer && has_hidden);
+                    }
+                    continue;
+                }
+                footer_hover.handle_interaction();
+            }
+            if let Event::Key(_) = &ev {
+                footer_hover.handle_interaction();
+            }
 
             match &mut active_modal {
                 ActiveModal::TypePicker(modal, target_path_opt) => match ev {
@@ -1503,6 +1520,10 @@ fn main() -> Result<()> {
                     }
                 }
             }
+        } else if matches!(active_modal, ActiveModal::None)
+            && footer_hover.check_hover_timeout(has_hidden && area.height >= 12)
+        {
+            // loop redraws
         }
     }
 

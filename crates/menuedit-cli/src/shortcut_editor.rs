@@ -8,10 +8,10 @@ use bashmenu_core::{
     PLACEHOLDER_HELP_TEXT,
 };
 use bashmenu_tui::{
-    compute_modal_inner, is_close_button_clicked, key_event_to_token, render_modal_frame,
-    visible_text_len, wrap_prompt_text, wrap_spread_help_gutter_layout, ConfirmChoice,
-    ConfirmModal, FilePickerModal, HelpModal, ResolvedThemeStyles, TerminalGuard, TextInput,
-    ToastRack,
+    compute_modal_inner, has_hidden_gutter_text, is_close_button_clicked, key_event_to_token,
+    render_modal_frame, visible_text_len, wrap_prompt_text, wrap_spread_help_gutter_layout,
+    ConfirmChoice, ConfirmModal, FilePickerModal, HelpGutterHover, HelpModal, ResolvedThemeStyles,
+    TerminalGuard, TextInput, ToastRack,
 };
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEventKind};
 use ratatui::buffer::Buffer;
@@ -31,6 +31,8 @@ pub struct ShortcutEditorState {
     pub scroll_offset: usize,
     /// Dirty flag indicating unsaved modifications
     pub dirty: bool,
+    /// Stationary mouse hover tracker for help gutter expansion
+    pub gutter_hover: HelpGutterHover,
 }
 
 impl ShortcutEditorState {
@@ -41,6 +43,7 @@ impl ShortcutEditorState {
             selected_idx: 0,
             scroll_offset: 0,
             dirty: false,
+            gutter_hover: HelpGutterHover::new(),
         }
     }
 
@@ -1506,7 +1509,29 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
             need_redraw = false;
         }
 
+        let help_items = [
+            "[a] Add",
+            "[e/ENTER] Edit",
+            "[c/F2] Capture Key",
+            "[l] Leader Key",
+            "[SPACE] On/Off",
+            "[d] Delete",
+            "[m/M] Move",
+            "[Ctrl+P] Macros",
+            "[s/Ctrl+S] Save",
+            "[ESC/q] Exit",
+        ];
+        let inner_w = area.width.saturating_sub(4) as usize;
+
         if !event::poll(Duration::from_millis(50))? {
+            let has_hidden = has_hidden_gutter_text(&help_items, inner_w, 2);
+            if matches!(active_modal, ActiveShortcutModal::None)
+                && state
+                    .gutter_hover
+                    .check_hover_timeout(has_hidden && area.height >= 8)
+            {
+                need_redraw = true;
+            }
             continue;
         }
         let ev = event::read()?;
@@ -1514,11 +1539,26 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
             if k.kind == crossterm::event::KeyEventKind::Release {
                 continue;
             }
+            state.gutter_hover.handle_interaction();
         }
         if let Event::Mouse(m) = &ev {
             if m.kind == MouseEventKind::Moved {
+                let gutter_y = area.height.saturating_sub(4);
+                let in_gutter = m.row >= gutter_y && m.row < area.height;
+                let has_hidden =
+                    has_hidden_gutter_text(&help_items, inner_w, 2) && area.height >= 8;
+                if matches!(active_modal, ActiveShortcutModal::None)
+                    && state.gutter_hover.handle_mouse_move(
+                        m.column,
+                        m.row,
+                        in_gutter && has_hidden,
+                    )
+                {
+                    need_redraw = true;
+                }
                 continue;
             }
+            state.gutter_hover.handle_interaction();
             if m.kind == MouseEventKind::Down(MouseButton::Left)
                 && toast_rack.handle_mouse(m.column, m.row)
             {
@@ -2244,8 +2284,20 @@ pub fn render_shortcut_editor_screen(
     let help_raw = "[a] Add | [e/ENTER] Edit | [c/F2] Capture Key | [l] Leader Key | [SPACE] On/Off | [d] Delete | [m/M] Move | [Ctrl+P] Macros | [s/Ctrl+S] Save | [ESC/q] Exit";
     let inner_w = area.width.saturating_sub(4) as usize;
     let help_items: Vec<&str> = help_raw.split(" | ").collect();
-    let gutter_lines = wrap_spread_help_gutter_layout(&help_items, inner_w, 2);
-    let gutter_h = gutter_lines.len().max(1) as u16;
+    let normal_lines = wrap_spread_help_gutter_layout(&help_items, inner_w, 2);
+    let normal_h = normal_lines.len().max(1) as u16;
+    let has_hidden = has_hidden_gutter_text(&help_items, inner_w, 2);
+    let is_expanded = state.gutter_hover.is_expanded() && has_hidden && area.height >= 8;
+    let gutter_h = if is_expanded {
+        (normal_h + 1).min(3)
+    } else {
+        normal_h
+    };
+    let gutter_lines = if is_expanded {
+        wrap_spread_help_gutter_layout(&help_items, inner_w, gutter_h as usize)
+    } else {
+        normal_lines
+    };
 
     let panel_h = area.height.saturating_sub(gutter_h + 1);
     let left_w = area.width / 2;

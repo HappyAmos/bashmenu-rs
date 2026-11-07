@@ -611,6 +611,16 @@
   - Added unit test assertions in `crates/bashmenu-tui/src/transition.rs` (`test_dim_color`) and integration test assertions in `crates/bashmenu-tui/tests/transition_test.rs` (`test_transition_dim_color_levels`) verifying `Color256` outputs `Color::Indexed` and 8/16-color tiers never emit `Color::Rgb`.
   - Verified 100% test pass rate across the workspace, zero warnings on Clippy and Rustfmt, zero warnings on Shellcheck.
 
+- **Help Gutter Stationary Hover Expansion (Tooltip) & Custom Shortcuts Display**:
+  - Implemented `HelpGutterHover` tracker in `crates/bashmenu-tui/src/gutter.rs` to detect when the mouse hovers over the help gutter for 4 seconds without moving.
+  - Implemented `has_hidden_gutter_text` and generalized `wrap_spread_help_gutter_layout` in `gutter.rs` to support 3-line balanced partitioning and multi-line packing when height/width constraints truncate or hide help items.
+  - Extended `MenuView` in `crates/bashmenu-tui/src/menu_view.rs` and `bashmenu-cli`: when stationary hover exceeds 4 seconds on a gutter with hidden items, the gutter dynamically grows by an extra row (+1 row, up to 3 rows), shifting the gutter border up and displaying the hidden help text.
+  - Integrated configured shortcuts from the shortcut manager (`ShortcutsConfig`) into `MenuView` help tokens, displaying them in the expanded gutter row and enabling mouse click execution.
+  - When the mouse moves or user interaction occurs (key press, click, scroll), the extra row immediately collapses and returns the screen to normal.
+  - Extended hover expansion to `menuedit-cli` (`shortcut_editor.rs` and `main.rs`) and `themeedit-cli` (`main.rs`).
+  - Added unit and integration tests in `crates/bashmenu-tui/src/gutter.rs` and `crates/bashmenu-tui/tests/menu_navigation_test.rs` (`test_gutter_hover_expansion_and_collapse`, `test_gutter_custom_shortcuts_from_manager`).
+  - Verified 100% test pass rate across the workspace, zero warnings on Clippy and Rustfmt, zero warnings on Shellcheck.
+
 
 
 

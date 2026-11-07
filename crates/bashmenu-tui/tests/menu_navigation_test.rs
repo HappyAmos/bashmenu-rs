@@ -1055,3 +1055,93 @@ fn test_menu_level_titles_and_paging() {
     view.handle_key(KeyCode::PageUp);
     assert_eq!(view.selected_index(), 1);
 }
+
+#[test]
+fn test_gutter_hover_expansion_and_collapse() {
+    let schema = create_sample_menu();
+    let styles = ResolvedThemeStyles::default();
+    let mut view = MenuView::new(schema, styles, false, "Status".to_string());
+    // Use short duration for test speed
+    view.gutter_hover =
+        bashmenu_tui::HelpGutterHover::with_duration(std::time::Duration::from_millis(50));
+
+    let area = Rect::new(0, 0, 80, 24);
+    assert!(view.has_hidden_help_text(area));
+
+    // Initially not expanded
+    assert!(!view.gutter_hover.is_expanded());
+
+    // Mouse enters the help gutter (e.g. col 10, row 22)
+    assert!(view.is_over_help_gutter(10, 22, area));
+    let redraw = view.handle_mouse_move(10, 22, area);
+    assert!(!redraw);
+    assert!(!view.gutter_hover.is_expanded());
+
+    // Hover timeout not met yet
+    assert!(!view.check_hover_timeout(area));
+
+    // Wait 60ms for hover duration to expire
+    std::thread::sleep(std::time::Duration::from_millis(60));
+    let expanded = view.check_hover_timeout(area);
+    assert!(expanded);
+    assert!(view.gutter_hover.is_expanded());
+
+    // Render with expansion: buffer should have 3 gutter rows
+    let mut buf = Buffer::empty(area);
+    view.render(area, &mut buf);
+
+    // Mouse moves: gutter tooltip collapses immediately
+    let collapsed = view.handle_mouse_move(15, 22, area);
+    assert!(collapsed);
+    assert!(!view.gutter_hover.is_expanded());
+}
+
+#[test]
+fn test_gutter_custom_shortcuts_from_manager() {
+    use bashmenu_core::{MenuItemType, ShortcutEntry};
+    let schema = create_sample_menu();
+    let styles = ResolvedThemeStyles::default();
+    let mut view = MenuView::new(schema, styles, false, "Status".to_string());
+
+    let custom_sc = ShortcutEntry {
+        key: "F10".to_string(),
+        description: "Backup Files".to_string(),
+        r#type: MenuItemType::Command,
+        action: Some("echo backup".to_string()),
+        ..Default::default()
+    };
+    view.set_shortcuts(vec![custom_sc.clone()]);
+
+    let tokens = view.get_help_tokens();
+    assert!(tokens
+        .iter()
+        .any(|t| t.contains("[F10]") && t.contains("Backup Files")));
+
+    // When clicked, custom shortcut returns MenuAction::Execute
+    let area = Rect::new(0, 0, 160, 24);
+    let mut found = false;
+    for r in 20..24 {
+        for c in 0..160 {
+            let mouse = MouseEvent {
+                kind: MouseEventKind::Down(MouseButton::Left),
+                column: c,
+                row: r,
+                modifiers: KeyModifiers::empty(),
+            };
+            let action = view.handle_mouse(mouse, area);
+            if let MenuAction::Execute(item) = action {
+                if item.action.as_deref() == Some("echo backup") {
+                    found = true;
+                    break;
+                }
+            }
+        }
+        if found {
+            break;
+        }
+    }
+    assert!(
+        found,
+        "Clicking custom shortcut in gutter should execute it"
+    );
+}
