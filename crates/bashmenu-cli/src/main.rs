@@ -23,16 +23,17 @@ use anyhow::Result;
 use bashmenu_core::{
     add_or_update_note, build_notebook_submenu, clear_command_cache, delete_note, extract_toasts,
     get_note_by_title, interpolate_placeholders, load_config, load_menu, load_notebook,
-    load_shortcuts, load_themes, rename_note, resolve_notebook_path, resolve_shortcuts_path,
-    save_config, save_notebook, BashMenuConfig, ConfirmAction, ExecutionMode, MacroContext,
-    MenuItem, MenuItemType, MenuSchema, NoteItem, PluginEngine, ShortcutsConfig, ToastNotification,
+    load_shortcuts, load_themes, merge_note_content, rename_note, resolve_notebook_path,
+    resolve_shortcuts_path, save_config, save_notebook, BashMenuConfig, ConfirmAction,
+    ExecutionMode, MacroContext, MenuItem, MenuItemType, MenuSchema, NoteItem, NoteSwapFile,
+    PluginEngine, ShortcutsConfig, ToastNotification,
 };
 use bashmenu_tui::{
     install_panic_hook, ConfirmChoice, ConfirmModal, FilePickerModal, HelpModal, InputModal,
-    MenuAction, MenuView, MessageModal, NoteEditorAction, NoteEditorModal, NoteViewerAction,
-    NoteViewerModal, RadioModal, ResolvedThemeStyles, ShortcutDispatchResult, ShortcutDispatcher,
-    StreamOutputAction, StreamOutputModal, TerminalGuard, ThemePickerModal, ToastRack,
-    ToggleChoice, ToggleModal,
+    MenuAction, MenuView, MessageModal, NoteConflictChoice, NoteConflictModal, NoteEditorAction,
+    NoteEditorModal, NoteViewerAction, NoteViewerModal, RadioModal, ResolvedThemeStyles,
+    ShortcutDispatchResult, ShortcutDispatcher, StreamOutputAction, StreamOutputModal,
+    TerminalGuard, ThemePickerModal, ToastRack, ToggleChoice, ToggleModal, TransitionEffect,
 };
 use clap::Parser;
 use crossterm::event::{self, Event};
@@ -126,6 +127,8 @@ enum ActiveModal {
     ItemFilePicker(Box<bashmenu_core::MenuItem>, bool, FilePickerModal),
     /// Live process streaming output modal.
     StreamOutput(StreamOutputModal),
+    /// Concurrent editing conflict resolution modal.
+    NoteConflict(NoteConflictModal),
 }
 
 /// Resolves a configuration or asset file path, choosing between local
@@ -264,6 +267,7 @@ fn main() -> Result<()> {
 
     // 7. Interactive Event Loop
     let mut need_redraw = true;
+    let mut pending_transition = false;
     loop {
         let size = guard.terminal_mut().size()?;
         let area = ratatui::layout::Rect::new(0, 0, size.width, size.height);
@@ -347,7 +351,14 @@ fn main() -> Result<()> {
         }
 
         if need_redraw {
-            guard.draw(|f| {
+            let transition_effect = if pending_transition {
+                pending_transition = false;
+                TransitionEffect::parse(config.settings.transition.as_deref())
+            } else {
+                TransitionEffect::None
+            };
+
+            let render_fn = |f: &mut ratatui::Frame<'_>| {
                 menu_view.render(f.area(), f.buffer_mut());
                 match &mut active_modal {
                     ActiveModal::None => {
@@ -404,10 +415,19 @@ fn main() -> Result<()> {
                     ActiveModal::StreamOutput(modal) => {
                         modal.render(f.area(), &styles, f.buffer_mut());
                     }
+                    ActiveModal::NoteConflict(modal) => {
+                        modal.render(f.area(), &styles, f.buffer_mut());
+                    }
                 }
                 // Render non-blocking toast notifications on top
                 toast_rack.render(f.area(), &styles, f.buffer_mut());
-            })?;
+            };
+
+            if transition_effect != TransitionEffect::None {
+                guard.draw_with_transition(transition_effect, render_fn)?;
+            } else {
+                guard.draw(render_fn)?;
+            }
             need_redraw = false;
         }
 
@@ -425,6 +445,7 @@ fn main() -> Result<()> {
                             let _ = Command::new("sh").arg("-c").arg(&cmd).status();
                             Ok(())
                         });
+                        pending_transition = true;
                         need_redraw = true;
                     }
                 }
@@ -536,12 +557,40 @@ fn main() -> Result<()> {
                             }
                         }
                         NoteViewerAction::Edit => {
+                            let p = Path::new(&modal.filepath);
+                            if let Some(existing_swp) = NoteSwapFile::load(p, &modal.title) {
+                                if existing_swp.pid != std::process::id() {
+                                    toast_rack.add(ToastNotification::new(
+                                        format!(
+                                            "Swap file found (PID {}); concurrent session detected",
+                                            existing_swp.pid
+                                        ),
+                                        Some("Warning: Swap File".to_string()),
+                                        4.0,
+                                    ));
+                                }
+                            }
+                            NoteSwapFile::create(p, &modal.title, &modal.content);
                             active_modal = ActiveModal::NoteEditor(
                                 NoteEditorModal::new(&modal.title, &modal.filepath, &modal.content)
                                     .with_cursor(modal.selected_line, 0),
                             );
                         }
                         NoteViewerAction::FullEdit => {
+                            let p = Path::new(&modal.filepath);
+                            if let Some(existing_swp) = NoteSwapFile::load(p, &modal.title) {
+                                if existing_swp.pid != std::process::id() {
+                                    toast_rack.add(ToastNotification::new(
+                                        format!(
+                                            "Swap file found (PID {}); concurrent session detected",
+                                            existing_swp.pid
+                                        ),
+                                        Some("Warning: Swap File".to_string()),
+                                        4.0,
+                                    ));
+                                }
+                            }
+                            NoteSwapFile::create(p, &modal.title, &modal.content);
                             let editor_bin = locate_tool("bashedit");
                             let temp_dir = std::env::temp_dir();
                             let sanitized_title: String = modal
@@ -569,43 +618,62 @@ fn main() -> Result<()> {
                                     let _ = cmd.status();
                                     Ok(())
                                 });
+                                pending_transition = true;
 
                                 if let Ok(new_content) = fs::read_to_string(&temp_file) {
                                     if new_content != original_content {
-                                        if let Ok(mut nb) = load_notebook(&modal.filepath) {
-                                            add_or_update_note(
-                                                &mut nb,
-                                                NoteItem {
-                                                    title: modal.title.clone(),
-                                                    content: new_content.clone(),
-                                                    ..Default::default()
-                                                },
-                                            );
-                                            let _ = save_notebook(&modal.filepath, &nb);
-                                            let sub = build_notebook_submenu(&modal.filepath, &nb);
-                                            menu_view.reload_current_notebook(
-                                                sub.items,
-                                                Some(modal.title.as_str()),
-                                            );
+                                        let disk_content = load_notebook(&modal.filepath)
+                                            .ok()
+                                            .and_then(|nb| get_note_by_title(&nb, &modal.title))
+                                            .map(|n| n.content)
+                                            .unwrap_or_default();
+
+                                        if disk_content != original_content {
+                                            active_modal =
+                                                ActiveModal::NoteConflict(NoteConflictModal::new(
+                                                    &modal.title,
+                                                    &modal.filepath,
+                                                    &new_content,
+                                                    &disk_content,
+                                                    &original_content,
+                                                ));
+                                        } else {
+                                            if let Ok(mut nb) = load_notebook(&modal.filepath) {
+                                                add_or_update_note(
+                                                    &mut nb,
+                                                    NoteItem {
+                                                        title: modal.title.clone(),
+                                                        content: new_content.clone(),
+                                                        ..Default::default()
+                                                    },
+                                                );
+                                                let _ = save_notebook(&modal.filepath, &nb);
+                                                NoteSwapFile::remove(p, &modal.title);
+                                                let sub =
+                                                    build_notebook_submenu(&modal.filepath, &nb);
+                                                menu_view.reload_current_notebook(
+                                                    sub.items,
+                                                    Some(modal.title.as_str()),
+                                                );
+                                            }
+                                            modal.content = new_content;
+                                            modal.selected_line = 0;
+                                            modal.scroll_offset = 0;
+                                            toast_rack.add(ToastNotification::new(
+                                                "Notebook saved from editor",
+                                                Some("Note Updated".to_string()),
+                                                3.0,
+                                            ));
                                         }
-                                        modal.content = new_content;
-                                        modal.selected_line = 0;
-                                        modal.scroll_offset = 0;
-                                        toast_rack.add(ToastNotification::new(
-                                            "Notebook saved from editor",
-                                            Some("Note Updated".to_string()),
-                                            3.0,
-                                        ));
+                                    } else {
+                                        NoteSwapFile::remove(p, &modal.title);
                                     }
+                                } else {
+                                    NoteSwapFile::remove(p, &modal.title);
                                 }
                                 let _ = fs::remove_file(&temp_file);
-                                if let Some(parent) = temp_file.parent() {
-                                    if let Some(fname) = temp_file.file_name() {
-                                        let swap_file = parent
-                                            .join(format!(".{}.swp", fname.to_string_lossy()));
-                                        let _ = fs::remove_file(swap_file);
-                                    }
-                                }
+                            } else {
+                                NoteSwapFile::remove(p, &modal.title);
                             }
                             need_redraw = true;
                         }
@@ -644,27 +712,50 @@ fn main() -> Result<()> {
                     };
                     match action {
                         NoteEditorAction::Save(saved_content) => {
-                            if let Ok(mut nb) = load_notebook(modal.filepath.as_str()) {
-                                add_or_update_note(
-                                    &mut nb,
-                                    NoteItem {
-                                        title: modal.title.clone(),
-                                        content: saved_content.clone(),
-                                        ..Default::default()
-                                    },
-                                );
-                                let _ = save_notebook(modal.filepath.as_str(), &nb);
-                                let sub = build_notebook_submenu(modal.filepath.as_str(), &nb);
-                                menu_view
-                                    .reload_current_notebook(sub.items, Some(modal.title.as_str()));
+                            let p = Path::new(&modal.filepath);
+                            let disk_content = load_notebook(modal.filepath.as_str())
+                                .ok()
+                                .and_then(|nb| get_note_by_title(&nb, &modal.title))
+                                .map(|n| n.content)
+                                .unwrap_or_default();
+
+                            if !modal.base_content.is_empty() && disk_content != modal.base_content
+                            {
+                                active_modal = ActiveModal::NoteConflict(NoteConflictModal::new(
+                                    &modal.title,
+                                    &modal.filepath,
+                                    &saved_content,
+                                    &disk_content,
+                                    &modal.base_content,
+                                ));
+                            } else {
+                                if let Ok(mut nb) = load_notebook(modal.filepath.as_str()) {
+                                    add_or_update_note(
+                                        &mut nb,
+                                        NoteItem {
+                                            title: modal.title.clone(),
+                                            content: saved_content.clone(),
+                                            ..Default::default()
+                                        },
+                                    );
+                                    let _ = save_notebook(modal.filepath.as_str(), &nb);
+                                    NoteSwapFile::remove(p, &modal.title);
+                                    let sub = build_notebook_submenu(modal.filepath.as_str(), &nb);
+                                    menu_view.reload_current_notebook(
+                                        sub.items,
+                                        Some(modal.title.as_str()),
+                                    );
+                                }
+                                active_modal = ActiveModal::NoteViewer(NoteViewerModal::new(
+                                    &modal.title,
+                                    &modal.filepath,
+                                    &saved_content,
+                                ));
                             }
-                            active_modal = ActiveModal::NoteViewer(NoteViewerModal::new(
-                                &modal.title,
-                                &modal.filepath,
-                                &saved_content,
-                            ));
                         }
                         NoteEditorAction::Cancel => {
+                            let p = Path::new(&modal.filepath);
+                            NoteSwapFile::remove(p, &modal.title);
                             active_modal = ActiveModal::NoteViewer(NoteViewerModal::new(
                                 &modal.title,
                                 &modal.filepath,
@@ -1120,6 +1211,132 @@ fn main() -> Result<()> {
                         active_modal = ActiveModal::None;
                     }
                 }
+                ActiveModal::NoteConflict(modal) => {
+                    let choice = match ev {
+                        Event::Key(key) => modal.handle_key(key.code),
+                        Event::Mouse(mouse) => modal.handle_mouse(mouse, area),
+                        _ => None,
+                    };
+                    if let Some(ch) = choice {
+                        match ch {
+                            NoteConflictChoice::Merge => {
+                                let merge_res = merge_note_content(
+                                    &modal.base_content,
+                                    &modal.disk_content,
+                                    &modal.local_content,
+                                );
+                                let mut ed = NoteEditorModal::new(
+                                    &modal.note_title,
+                                    &modal.filepath,
+                                    &merge_res.content,
+                                );
+                                ed.is_modified = true;
+                                if merge_res.has_conflicts {
+                                    toast_rack.add(ToastNotification::new(
+                                        "Merge conflicts marked with <<<<<<< and >>>>>>>",
+                                        Some("Conflict Merge".to_string()),
+                                        4.0,
+                                    ));
+                                } else {
+                                    toast_rack.add(ToastNotification::new(
+                                        "Cleanly merged non-conflicting changes",
+                                        Some("Merged Successfully".to_string()),
+                                        3.0,
+                                    ));
+                                }
+                                active_modal = ActiveModal::NoteEditor(ed);
+                            }
+                            NoteConflictChoice::Overwrite => {
+                                if let Ok(mut nb) = load_notebook(&modal.filepath) {
+                                    add_or_update_note(
+                                        &mut nb,
+                                        NoteItem {
+                                            title: modal.note_title.clone(),
+                                            content: modal.local_content.clone(),
+                                            ..Default::default()
+                                        },
+                                    );
+                                    let _ = save_notebook(&modal.filepath, &nb);
+                                    NoteSwapFile::remove(
+                                        Path::new(&modal.filepath),
+                                        &modal.note_title,
+                                    );
+                                    let sub = build_notebook_submenu(&modal.filepath, &nb);
+                                    menu_view.reload_current_notebook(
+                                        sub.items,
+                                        Some(modal.note_title.as_str()),
+                                    );
+                                }
+                                toast_rack.add(ToastNotification::new(
+                                    "Overwrote disk version with local changes",
+                                    Some("Note Overwritten".to_string()),
+                                    3.0,
+                                ));
+                                active_modal = ActiveModal::NoteViewer(NoteViewerModal::new(
+                                    &modal.note_title,
+                                    &modal.filepath,
+                                    &modal.local_content,
+                                ));
+                            }
+                            NoteConflictChoice::Reload => {
+                                NoteSwapFile::remove(Path::new(&modal.filepath), &modal.note_title);
+                                toast_rack.add(ToastNotification::new(
+                                    "Discarded local changes and reloaded from disk",
+                                    Some("Note Reloaded".to_string()),
+                                    3.0,
+                                ));
+                                active_modal = ActiveModal::NoteViewer(NoteViewerModal::new(
+                                    &modal.note_title,
+                                    &modal.filepath,
+                                    &modal.disk_content,
+                                ));
+                            }
+                            NoteConflictChoice::SaveAsCopy => {
+                                let copy_title = format!("{} (User Copy)", modal.note_title);
+                                if let Ok(mut nb) = load_notebook(&modal.filepath) {
+                                    add_or_update_note(
+                                        &mut nb,
+                                        NoteItem {
+                                            title: copy_title.clone(),
+                                            content: modal.local_content.clone(),
+                                            ..Default::default()
+                                        },
+                                    );
+                                    let _ = save_notebook(&modal.filepath, &nb);
+                                    NoteSwapFile::remove(
+                                        Path::new(&modal.filepath),
+                                        &modal.note_title,
+                                    );
+                                    let sub = build_notebook_submenu(&modal.filepath, &nb);
+                                    menu_view.reload_current_notebook(
+                                        sub.items,
+                                        Some(copy_title.as_str()),
+                                    );
+                                }
+                                toast_rack.add(ToastNotification::new(
+                                    format!("Saved local edits as '{}'", copy_title),
+                                    Some("Saved As Copy".to_string()),
+                                    3.0,
+                                ));
+                                active_modal = ActiveModal::NoteViewer(NoteViewerModal::new(
+                                    &copy_title,
+                                    &modal.filepath,
+                                    &modal.local_content,
+                                ));
+                            }
+                            NoteConflictChoice::Cancel => {
+                                let mut ed = NoteEditorModal::new(
+                                    &modal.note_title,
+                                    &modal.filepath,
+                                    &modal.local_content,
+                                );
+                                ed.is_modified = true;
+                                active_modal = ActiveModal::NoteEditor(ed);
+                            }
+                        }
+                        need_redraw = true;
+                    }
+                }
                 ActiveModal::None => {
                     let action = if let Some(act) = pending_action.take() {
                         act
@@ -1193,7 +1410,7 @@ fn main() -> Result<()> {
                                         .status();
                                     Ok(())
                                 });
-                                need_redraw = true;
+                                pending_transition = true;
                             } else {
                                 let help_content = "BashMenu Documentation\n\nNavigation:\n  Up/Down, k/j: Navigate items\n  Enter: Select item\n  Esc/q: Back or exit\n\nFunction Keys:\n  F1: Help manual\n  F2: Theme picker\n  F3: Text editor\n  F4: Menu editor\n  F5: Reload config and menus\n  F6: Toggle shortcut numbers\n  F7: Configure status gutter\n  F8: Theme editor\n  F9: Keyboard shortcut editor".to_string();
                                 active_modal = ActiveModal::Help(HelpModal::new(
@@ -1215,6 +1432,7 @@ fn main() -> Result<()> {
                                 let _ = Command::new(&editor_bin).status();
                                 Ok(())
                             });
+                            pending_transition = true;
                             pending_action = Some(MenuAction::Reload);
                         }
                         MenuAction::EditMenu => {
@@ -1242,6 +1460,7 @@ fn main() -> Result<()> {
                                 let _ = cmd.status();
                                 Ok(())
                             });
+                            pending_transition = true;
                             pending_action = Some(MenuAction::Reload);
                         }
                         MenuAction::Reload => {
@@ -1334,6 +1553,7 @@ fn main() -> Result<()> {
                                     .status();
                                 Ok(())
                             });
+                            pending_transition = true;
                             pending_action = Some(MenuAction::Reload);
                         }
                         MenuAction::LaunchShortcutEditor => {
@@ -1353,6 +1573,7 @@ fn main() -> Result<()> {
                                 }
                                 Ok(())
                             });
+                            pending_transition = true;
                             pending_action = Some(MenuAction::Reload);
                         }
                         MenuAction::OpenNotebook(item) => {
@@ -1720,6 +1941,7 @@ fn main() -> Result<()> {
                                     let _ = cmd.status();
                                     Ok(())
                                 });
+                                pending_transition = true;
                                 pending_action = Some(MenuAction::Reload);
                             } else {
                                 let action_str = item.action.as_deref().unwrap_or_default();
@@ -1739,6 +1961,7 @@ fn main() -> Result<()> {
                                             .status();
                                         Ok(())
                                     });
+                                    pending_transition = true;
                                     pending_action = Some(MenuAction::Reload);
                                 } else if action_str == "menuedit"
                                     || action_str == "menuedit.py"
@@ -1770,6 +1993,7 @@ fn main() -> Result<()> {
                                         let _ = cmd.status();
                                         Ok(())
                                     });
+                                    pending_transition = true;
                                     pending_action = Some(MenuAction::Reload);
                                 } else if action_str == "shortcutedit"
                                     || action_str == "shortcuts_editor"
@@ -1900,6 +2124,7 @@ fn main() -> Result<()> {
                                                     } else {
                                                         let _ = guard.suspend(run_console);
                                                     }
+                                                    pending_transition = true;
                                                     need_redraw = true;
                                                 }
                                             }

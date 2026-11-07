@@ -98,6 +98,10 @@ pub struct Settings {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub background: Option<WallpaperSetting>,
 
+    /// Menu return transition effect ("instant", "fade", "curtain", "none")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transition: Option<String>,
+
     /// Additional arbitrary user-defined settings preserved across saves
     #[serde(flatten)]
     pub extra: HashMap<String, serde_yml::Value>,
@@ -138,7 +142,7 @@ fn default_theme() -> String {
 }
 
 impl Default for BashMenuConfig {
-    /// Returns default application configuration with `"alaska-mountain"` theme.
+    /// Returns default application configuration with default theme.
     fn default() -> Self {
         Self {
             version: default_version(),
@@ -151,7 +155,7 @@ impl Default for BashMenuConfig {
 }
 
 impl BashMenuConfig {
-    /// Returns the effective wallpaper config, combining user settings override with theme config.
+    /// Returns effective wallpaper config, combining settings with theme.
     pub fn resolve_wallpaper(&self, theme: Option<&Theme>) -> Option<WallpaperConfig> {
         let user_bg = self.settings.background.as_ref().map(|s| s.to_config());
         let theme_bg = theme.and_then(|t| t.wallpaper_config());
@@ -291,6 +295,12 @@ impl BashMenuConfig {
                     _ => None,
                 };
             }
+            "settings.transition" => {
+                self.settings.transition = match &value {
+                    serde_yml::Value::String(s) => Some(s.clone()),
+                    _ => None,
+                };
+            }
             "settings.refresh_interval" => {
                 self.settings.refresh_interval = Some(value);
             }
@@ -349,7 +359,7 @@ pub fn get_user_config_dir() -> PathBuf {
 /// BashMenu single-source-of-truth rules:
 ///
 /// 1. If `target` is absolute, return it directly.
-/// 2. If `target` contains directory components (e.g. `./local.yml` or `sub/menu.mnu`),
+/// 2. If `target` contains directory components (e.g. `./local.yml`),
 ///    treat it as an explicit relative path.
 /// 3. Standard User Configuration Path:
 ///    Look in `get_user_config_dir().join(target)`. If it exists, return it.
@@ -358,9 +368,8 @@ pub fn get_user_config_dir() -> PathBuf {
 /// 5. Test Fixtures fallback (for unit tests running inside workspace crates):
 ///    If `tests/fixtures/<target>` exists, return it.
 /// 6. Default fallback:
-///    Return `get_user_config_dir().join(target)`. This ensures newly created/saved
-///    files always persist to the single source of truth in `~/.config/bashmenu/`
-///    regardless of which directory the command was launched from.
+///    Return `get_user_config_dir().join(target)`. This ensures saved files
+///    always persist to `~/.config/bashmenu/` regardless of working directory.
 pub fn resolve_app_path<P: AsRef<Path>>(target: P) -> PathBuf {
     let target = target.as_ref();
     if target.is_absolute() {
@@ -412,7 +421,7 @@ pub fn load_config<P: AsRef<Path>>(path: P) -> Result<BashMenuConfig> {
     Ok(config)
 }
 
-/// Persists configuration to `bashmenu.yml` with the top-level comment header preserved.
+/// Persists configuration to `bashmenu.yml` preserving comment header.
 pub fn save_config<P: AsRef<Path>>(path: P, config: &BashMenuConfig) -> Result<()> {
     let p = path.as_ref();
     let yaml_body = serde_yml::to_string(config)?;

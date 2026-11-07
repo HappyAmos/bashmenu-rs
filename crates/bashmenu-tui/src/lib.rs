@@ -1,4 +1,4 @@
-//! Reusable TUI primitives, widgets, terminal guards, modals, and panic safety hooks for BashMenu.
+//! Reusable TUI primitives, widgets, terminal guards, modals, and panic hooks.
 
 pub mod ansi;
 pub mod bbcode;
@@ -13,6 +13,7 @@ pub mod style;
 pub mod terminal;
 pub mod text_input;
 pub mod toast;
+pub mod transition;
 pub mod wallpaper;
 
 pub use ansi::ansi_to_line;
@@ -32,15 +33,21 @@ pub use modals::{
     compute_modal_inner, is_close_button_clicked, render_modal_frame, wrap_prompt_text,
     AsciiGridModal, BackgroundConfigAction, BackgroundConfigModal, BackgroundFocus, ColorGridModal,
     ColorPickerModal, ColorPickerTab, ConfirmChoice, ConfirmModal, FilePickerModal, HelpModal,
-    InputModal, MessageModal, NoteEditorAction, NoteEditorModal, NoteViewerAction, NoteViewerModal,
-    RadioModal, StreamOutputAction, StreamOutputModal, StreamOutputMsg, ThemePickerModal,
-    ToggleChoice, ToggleModal, MODE_OPTIONS, SCALING_OPTIONS,
+    InputModal, MessageModal, NoteConflictChoice, NoteConflictModal, NoteEditorAction,
+    NoteEditorModal, NoteViewerAction, NoteViewerModal, RadioModal, StreamOutputAction,
+    StreamOutputModal, StreamOutputMsg, ThemePickerModal, ToggleChoice, ToggleModal, MODE_OPTIONS,
+    SCALING_OPTIONS,
 };
 pub use shortcuts_overlay::{key_event_to_token, ShortcutDispatchResult, ShortcutDispatcher};
-pub use style::{parse_color_value, ResolvedThemeStyles};
+pub use style::{
+    ansi_index_to_color, ansi_name_to_color, downsample_color_to_16, downsample_color_to_8,
+    parse_color_value, parse_color_value_with_tier, parse_style_pair, parse_style_pair_with_tier,
+    ColorTier, ResolvedThemeStyles,
+};
 pub use terminal::TerminalGuard;
 pub use text_input::TextInput;
 pub use toast::{ActiveToast, ToastRack};
+pub use transition::{dim_color, TransitionEffect};
 pub use wallpaper::{
     color_to_rgb, composite_buffer, derive_palette_from_image, downsample_color_value_to_16,
     downsample_color_value_to_8, downsample_palette_to_16, downsample_palette_to_8,
@@ -50,8 +57,8 @@ pub use wallpaper::{
 
 use std::panic;
 
-/// Registers a global panic hook ensuring terminal raw mode and alternate screen
-/// are cleanly restored before printing panic diagnostics.
+/// Registers global panic hook restoring raw mode and alternate screen
+/// before printing panic diagnostics.
 pub fn install_panic_hook() {
     let default_hook = panic::take_hook();
     panic::set_hook(Box::new(move |info| {

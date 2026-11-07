@@ -529,22 +529,16 @@ impl BackgroundConfigModal {
         let browse_x = inner_area.x + inner_area.width.saturating_sub(browse_w + 2);
         let inp_w = browse_x.saturating_sub(left_x + 1) as usize;
 
-        let img_str = self.image_input.as_string();
-        let display_img = if img_str.is_empty() {
-            format!("{:<width$}", "(None / disabled)", width = inp_w)
-        } else {
-            format!("{:<width$}", img_str, width = inp_w)
-        };
-        let img_st = if self.focus == BackgroundFocus::Image {
-            focused_input_style
-        } else {
-            normal_input_style
-        };
-        buf.set_string(
+        render_text_input_field(
+            buf,
             left_x,
             y_start + 1,
-            &display_img[..display_img.len().min(inp_w)],
-            img_st,
+            inp_w,
+            &self.image_input,
+            self.focus == BackgroundFocus::Image,
+            normal_input_style,
+            focused_input_style,
+            Some("(None / disabled)"),
         );
 
         let browse_st = if self.focus == BackgroundFocus::Browse {
@@ -561,18 +555,16 @@ impl BackgroundConfigModal {
         buf.set_string(left_x, y_start + 2, "Opacity (0.0 to 1.0):", label_style);
         buf.set_string(col2_x, y_start + 2, "Scaling Mode:", label_style);
 
-        let op_str = self.opacity_input.as_string();
-        let display_op = format!("{:<width$}", op_str, width = col_w);
-        let op_st = if self.focus == BackgroundFocus::Opacity {
-            focused_input_style
-        } else {
-            normal_input_style
-        };
-        buf.set_string(
+        render_text_input_field(
+            buf,
             left_x,
             y_start + 3,
-            &display_op[..display_op.len().min(col_w)],
-            op_st,
+            col_w,
+            &self.opacity_input,
+            self.focus == BackgroundFocus::Opacity,
+            normal_input_style,
+            focused_input_style,
+            None,
         );
 
         let scaling_label = SCALING_OPTIONS[self.scaling_idx].1;
@@ -620,18 +612,16 @@ impl BackgroundConfigModal {
             md_st,
         );
 
-        let cl_str = self.clustering_input.as_string();
-        let display_cl = format!("{:<width$}", cl_str, width = col_w);
-        let cl_st = if self.focus == BackgroundFocus::Clustering {
-            focused_input_style
-        } else {
-            normal_input_style
-        };
-        buf.set_string(
+        render_text_input_field(
+            buf,
             col2_x,
             y_start + 5,
-            &display_cl[..display_cl.len().min(col_w)],
-            cl_st,
+            col_w,
+            &self.clustering_input,
+            self.focus == BackgroundFocus::Clustering,
+            normal_input_style,
+            focused_input_style,
+            None,
         );
 
         // 4. Palette Quantization
@@ -641,18 +631,16 @@ impl BackgroundConfigModal {
             "Palette Quantization (1=off, 16-256):",
             label_style,
         );
-        let qu_str = self.quantization_input.as_string();
-        let display_qu = format!("{:<width$}", qu_str, width = col_w);
-        let qu_st = if self.focus == BackgroundFocus::Quantization {
-            focused_input_style
-        } else {
-            normal_input_style
-        };
-        buf.set_string(
+        render_text_input_field(
+            buf,
             left_x,
             y_start + 7,
-            &display_qu[..display_qu.len().min(col_w)],
-            qu_st,
+            col_w,
+            &self.quantization_input,
+            self.focus == BackgroundFocus::Quantization,
+            normal_input_style,
+            focused_input_style,
+            None,
         );
 
         // 5. Action Buttons Row: [ Apply ]   [ Remove Wallpaper ]   [ Cancel ]
@@ -681,5 +669,63 @@ impl BackgroundConfigModal {
         buf.set_string(b1_x, btn_y, "[ Apply ]", b_apply_st);
         buf.set_string(b2_x, btn_y, "[ Remove Wallpaper ]", b_remove_st);
         buf.set_string(b3_x, btn_y, "[ Cancel ]", b_cancel_st);
+    }
+}
+
+/// Helper to render an interactive TextInput field with an inverted cursor
+/// cell when focused.
+#[allow(clippy::too_many_arguments)]
+fn render_text_input_field(
+    buf: &mut Buffer,
+    x: u16,
+    y: u16,
+    width: usize,
+    input: &TextInput,
+    is_focused: bool,
+    normal_style: Style,
+    focused_style: Style,
+    placeholder: Option<&str>,
+) {
+    if width == 0 {
+        return;
+    }
+    let raw_text = input.as_string();
+    if raw_text.is_empty() && !is_focused {
+        let ph = placeholder.unwrap_or("");
+        let padded = format!("{:<w$}", ph, w = width);
+        buf.set_string(x, y, &padded[..padded.len().min(width)], normal_style);
+        return;
+    }
+
+    let chars: Vec<char> = raw_text.chars().collect();
+    let cursor = input.cursor.min(chars.len());
+    let scroll = if cursor >= width {
+        cursor - width + 1
+    } else {
+        0
+    };
+
+    let vis_chars: Vec<char> = chars.iter().skip(scroll).take(width).copied().collect();
+    let relative_cursor = cursor.saturating_sub(scroll);
+
+    for i in 0..width {
+        let ch = if i < vis_chars.len() {
+            vis_chars[i]
+        } else {
+            ' '
+        };
+        let cell_style = if is_focused {
+            if i == relative_cursor {
+                focused_style.add_modifier(Modifier::REVERSED)
+            } else {
+                focused_style
+            }
+        } else {
+            normal_style
+        };
+
+        let cell = &mut buf[(x + i as u16, y)];
+        cell.set_char(ch);
+        cell.set_style(cell_style);
     }
 }

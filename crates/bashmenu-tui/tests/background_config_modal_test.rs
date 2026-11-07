@@ -214,3 +214,31 @@ fn test_background_config_modal_mouse_interaction() {
     // verify handle_mouse executes cleanly without panic
     let _ = act;
 }
+
+#[test]
+fn test_background_config_modal_focused_input_cursor() {
+    use ratatui::style::Modifier;
+    let modal = BackgroundConfigModal::new(None);
+    let area = Rect::new(0, 0, 80, 24);
+    let styles = ResolvedThemeStyles::default();
+    let mut buf = Buffer::empty(area);
+    modal.render(area, &styles, &mut buf);
+
+    // Scan the buffer for a cell with Modifier::REVERSED representing the cursor
+    let mut reversed_cursor_found = false;
+    for y in 0..24 {
+        for x in 0..80 {
+            if buf[(x, y)].modifier.contains(Modifier::REVERSED) {
+                reversed_cursor_found = true;
+                break;
+            }
+        }
+        if reversed_cursor_found {
+            break;
+        }
+    }
+    assert!(
+        reversed_cursor_found,
+        "Focused input field must display a cell with inverted cursor"
+    );
+}

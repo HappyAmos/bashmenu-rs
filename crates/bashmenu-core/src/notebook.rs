@@ -122,7 +122,7 @@ pub fn resolve_notebook_path(raw_path: Option<&str>, ctx: &MacroContext) -> Path
     cand1
 }
 
-/// Converts a whitespace-separated string into Title Case by capitalizing the first character of each word.
+/// Converts whitespace-separated string into Title Case.
 fn title_case(s: &str) -> String {
     s.split_whitespace()
         .map(|word| {
@@ -136,7 +136,7 @@ fn title_case(s: &str) -> String {
         .join(" ")
 }
 
-/// Loads a notebook YAML file. If it doesn't exist, initializes an empty notebook.
+/// Loads a notebook YAML file or initializes an empty notebook if missing.
 pub fn load_notebook(path: impl AsRef<Path>) -> Result<NotebookSchema> {
     let p = path.as_ref();
     if !p.exists() {
@@ -436,6 +436,176 @@ pub fn build_notebook_submenu(filepath: &str, nb: &NotebookSchema) -> Submenu {
     }
 }
 
+/// Swap file metadata for concurrent editing protection.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct NoteSwapFile {
+    /// Process ID holding the edit session
+    pub pid: u32,
+    /// Unix timestamp when session began
+    pub timestamp: u64,
+    /// Note title being edited
+    pub note_title: String,
+    /// Original base content of the note when editing began
+    pub base_content: String,
+}
+
+impl NoteSwapFile {
+    /// Computes canonical path to swap file for a notebook file and note
+    /// title.
+    pub fn swap_path(notebook_path: &Path, note_title: &str) -> PathBuf {
+        let parent = notebook_path.parent().unwrap_or_else(|| Path::new("."));
+        let file_stem = notebook_path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("notes.yml");
+        let slug: String = note_title
+            .chars()
+            .map(|c| if c.is_alphanumeric() { c } else { '_' })
+            .collect();
+        parent.join(format!(".{file_stem}.note.{slug}.swp"))
+    }
+
+    /// Creates and writes the swap file to disk.
+    pub fn create(notebook_path: &Path, note_title: &str, base_content: &str) -> Option<PathBuf> {
+        let path = Self::swap_path(notebook_path, note_title);
+        let swap = Self {
+            pid: std::process::id(),
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0),
+            note_title: note_title.to_string(),
+            base_content: base_content.to_string(),
+        };
+        let yaml = serde_yml::to_string(&swap).ok()?;
+        fs::write(&path, yaml).ok()?;
+        Some(path)
+    }
+
+    /// Reads existing swap file if present.
+    pub fn load(notebook_path: &Path, note_title: &str) -> Option<Self> {
+        let path = Self::swap_path(notebook_path, note_title);
+        if path.exists() {
+            let data = fs::read_to_string(&path).ok()?;
+            serde_yml::from_str(&data).ok()
+        } else {
+            None
+        }
+    }
+
+    /// Removes swap file from disk.
+    pub fn remove(notebook_path: &Path, note_title: &str) {
+        let path = Self::swap_path(notebook_path, note_title);
+        let _ = fs::remove_file(path);
+    }
+}
+
+/// Result of a 3-way merge attempt on note content.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NoteMergeResult {
+    /// Merged content string
+    pub content: String,
+    /// Whether any line conflicts were detected and marked with conflict
+    /// markers
+    pub has_conflicts: bool,
+}
+
+/// Performs a 3-way line merge between base, disk (external), and local
+/// changes.
+pub fn merge_note_content(base: &str, disk: &str, local: &str) -> NoteMergeResult {
+    // If local equals disk, no conflict at all
+    if local == disk {
+        return NoteMergeResult {
+            content: local.to_string(),
+            has_conflicts: false,
+        };
+    }
+    // If disk hasn't changed from base, local wins
+    if disk == base {
+        return NoteMergeResult {
+            content: local.to_string(),
+            has_conflicts: false,
+        };
+    }
+    // If local hasn't changed from base, disk wins
+    if local == base {
+        return NoteMergeResult {
+            content: disk.to_string(),
+            has_conflicts: false,
+        };
+    }
+
+    let base_lines: Vec<&str> = base.lines().collect();
+    let disk_lines: Vec<&str> = disk.lines().collect();
+    let local_lines: Vec<&str> = local.lines().collect();
+
+    let mut merged = Vec::new();
+    let mut has_conflicts = false;
+
+    let mut b_idx = 0;
+    let mut d_idx = 0;
+    let mut l_idx = 0;
+
+    while d_idx < disk_lines.len() || l_idx < local_lines.len() {
+        let b_line = base_lines.get(b_idx).copied();
+        let d_line = disk_lines.get(d_idx).copied();
+        let l_line = local_lines.get(l_idx).copied();
+
+        if d_line == l_line {
+            if let Some(line) = d_line {
+                merged.push(line.to_string());
+            }
+            b_idx += 1;
+            d_idx += 1;
+            l_idx += 1;
+        } else if d_line == b_line {
+            if let Some(line) = l_line {
+                merged.push(line.to_string());
+            }
+            b_idx += 1;
+            d_idx += 1;
+            l_idx += 1;
+        } else if l_line == b_line {
+            if let Some(line) = d_line {
+                merged.push(line.to_string());
+            }
+            b_idx += 1;
+            d_idx += 1;
+            l_idx += 1;
+        } else if b_line.is_none() {
+            if let Some(ll) = l_line {
+                merged.push(ll.to_string());
+                l_idx += 1;
+            }
+            if let Some(dl) = d_line {
+                if d_line != l_line {
+                    merged.push(dl.to_string());
+                }
+                d_idx += 1;
+            }
+        } else {
+            has_conflicts = true;
+            merged.push("<<<<<<< Local Edits".to_string());
+            if let Some(ll) = l_line {
+                merged.push(ll.to_string());
+            }
+            merged.push("=======".to_string());
+            if let Some(dl) = d_line {
+                merged.push(dl.to_string());
+            }
+            merged.push(">>>>>>> Disk Version".to_string());
+            b_idx += 1;
+            d_idx += 1;
+            l_idx += 1;
+        }
+    }
+
+    NoteMergeResult {
+        content: merged.join("\n"),
+        has_conflicts,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -489,6 +659,43 @@ mod tests {
         let sub_empty = build_notebook_submenu(nb_path.to_str().unwrap(), &nb_mut);
         assert_eq!(sub_empty.items[1].r#type, MenuItemType::NotebookEmpty);
 
+        let _ = fs::remove_dir_all(&tmp_dir);
+    }
+
+    #[test]
+    fn test_note_swap_file_and_3way_merge() {
+        let tmp_dir = std::env::temp_dir().join(format!("swp_test_{}", std::process::id()));
+        let _ = fs::create_dir_all(&tmp_dir);
+        let nb_path = tmp_dir.join("test_nb.yml");
+
+        let base_content = "Line 1\nLine 2\nLine 3";
+        let swp_path = NoteSwapFile::create(&nb_path, "My Note", base_content);
+        assert!(swp_path.is_some());
+        let swp = NoteSwapFile::load(&nb_path, "My Note");
+        assert!(swp.is_some());
+        let loaded = swp.unwrap();
+        assert_eq!(loaded.note_title, "My Note");
+        assert_eq!(loaded.base_content, base_content);
+
+        // Non-conflicting append merge: disk added Line 4, local added Line 0
+        let disk_content = "Line 1\nLine 2\nLine 3\nDisk Appended";
+        let local_content = "Line 1\nLine 2\nLine 3\nLocal Appended";
+        let merge_res = merge_note_content(base_content, disk_content, local_content);
+        assert!(!merge_res.has_conflicts);
+        assert!(merge_res.content.contains("Local Appended"));
+        assert!(merge_res.content.contains("Disk Appended"));
+
+        // Conflicting change on Line 2
+        let disk_conflict = "Line 1\nLine 2 Changed By Disk\nLine 3";
+        let local_conflict = "Line 1\nLine 2 Changed By Local\nLine 3";
+        let conflict_res = merge_note_content(base_content, disk_conflict, local_conflict);
+        assert!(conflict_res.has_conflicts);
+        assert!(conflict_res.content.contains("<<<<<<< Local Edits"));
+        assert!(conflict_res.content.contains("======="));
+        assert!(conflict_res.content.contains(">>>>>>> Disk Version"));
+
+        NoteSwapFile::remove(&nb_path, "My Note");
+        assert!(NoteSwapFile::load(&nb_path, "My Note").is_none());
         let _ = fs::remove_dir_all(&tmp_dir);
     }
 }

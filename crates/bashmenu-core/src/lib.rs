@@ -1,4 +1,4 @@
-//! Core domain models, configuration loaders, serializers, and macro engines for BashMenu.
+//! Core domain models, configuration loaders, serializers, and macro engine.
 
 pub mod config;
 pub mod constants;
@@ -32,8 +32,8 @@ pub use menu::{
 };
 pub use notebook::{
     add_or_update_note, build_notebook_submenu, delete_note, get_note_by_title, get_notes,
-    load_notebook, rename_note, resolve_notebook_path, save_notebook, NoteItem, NotebookData,
-    NotebookSchema,
+    load_notebook, merge_note_content, rename_note, resolve_notebook_path, save_notebook, NoteItem,
+    NoteMergeResult, NoteSwapFile, NotebookData, NotebookSchema,
 };
 pub use plugin::{
     PluginCacheEntry, PluginConfig, PluginDef, PluginDisplayRow, PluginEngine, PluginLayout,

@@ -628,6 +628,25 @@ items:
                       interactive: true
                       quiet: false
                       alt_buffer: true
+                  - Menu Transition Effect [{settings.transition}]:
+                      type: radio
+                      key: settings.transition
+                      title: Return Transition Effect [{settings.transition}]
+                      prompt: 'Select transition effect when returning to menu:'
+                      options:
+                        - label: Instant (Synchronized DEC Mode 2026 buffered redraw)
+                          value: instant
+                        - label: Fade (Brightness ramp reveal)
+                          value: fade
+                        - label: Curtain (Center-out vertical wipe reveal)
+                          value: curtain
+                        - label: None (Standard immediate redraw)
+                          value: none
+                      icon: '{nf::#f0d0}'
+                      action: settings.transition
+                      interactive: true
+                      quiet: false
+                      alt_buffer: true
                   - Configure Status Gutter [{settings.status_gutter}]:
                       type: config
                       key: settings.status_gutter

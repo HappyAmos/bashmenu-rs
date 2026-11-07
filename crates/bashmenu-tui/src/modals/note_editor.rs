@@ -1,4 +1,4 @@
-//! Interactive in-modal note editor with auto-formatting, cursor navigation, and direct save.
+//! Interactive in-modal note editor with auto-formatting, cursor navigation.
 
 use super::frame::render_modal_frame;
 use super::note_viewer::wrap_footer_tokens;
@@ -24,7 +24,7 @@ pub enum NoteEditorAction {
 pub struct VisualLine {
     /// 0-based index of the logical line in the document
     pub logical_row: usize,
-    /// 0-based character offset within the logical line where this visual line starts
+    /// 0-based character offset within logical line where visual line starts
     pub start_col: usize,
     /// Unicode characters comprising this visual wrapped line
     pub chars: Vec<char>,
@@ -57,6 +57,8 @@ pub struct NoteEditorModal {
     pub last_inner_rect: Rect,
     /// Selection anchor (row, col) when selecting text range
     pub selection_anchor: Option<(usize, usize)>,
+    /// Initial base content when editor session began
+    pub base_content: String,
 }
 
 impl NoteEditorModal {
@@ -83,10 +85,11 @@ impl NoteEditorModal {
             last_inner_w: 76,
             last_inner_rect: Rect::default(),
             selection_anchor: None,
+            base_content: content.to_string(),
         }
     }
 
-    /// Computes ordered `((start_y, start_x), (end_y, end_x))` bounds of active selection
+    /// Computes ordered `((start_y, start_x), (end_y, end_x))` bounds
     pub fn selection_range(&self) -> Option<((usize, usize), (usize, usize))> {
         self.selection_anchor.and_then(|anchor| {
             let cur = (self.cursor_row, self.cursor_col);
@@ -719,14 +722,14 @@ impl NoteEditorModal {
         self.cursor_col = col + 1;
     }
 
-    /// Inserts a string at current cursor position by inserting individual characters sequentially.
+    /// Inserts a string at current cursor position character-by-character.
     fn insert_str(&mut self, s: &str) {
         for c in s.chars() {
             self.insert_char(c);
         }
     }
 
-    /// Deletes the character before cursor or merges current row into preceding row.
+    /// Deletes character before cursor or merges current row into previous row.
     fn handle_backspace(&mut self) {
         if self.cursor_col > 0 {
             let mut chars: Vec<char> = self.lines[self.cursor_row].chars().collect();
@@ -744,7 +747,7 @@ impl NoteEditorModal {
         }
     }
 
-    /// Deletes the character under cursor or pulls following row into current row.
+    /// Deletes character under cursor or pulls following row into current row.
     fn handle_delete(&mut self) {
         if self.cursor_row < self.lines.len() {
             let mut chars: Vec<char> = self.lines[self.cursor_row].chars().collect();
@@ -758,7 +761,7 @@ impl NoteEditorModal {
         }
     }
 
-    /// Handles Enter key: splits line, handling markdown checkbox/list item continuation or de-escalation.
+    /// Handles Enter key: splits line, handling markdown continuation.
     fn handle_enter(&mut self) {
         let chars: Vec<char> = self.current_line().chars().collect();
         let col = self.cursor_col.min(chars.len());
@@ -998,7 +1001,7 @@ impl NoteEditorModal {
     }
 }
 
-/// Parses an ordered list prefix (e.g. `1. `, `12. `) returning numeric string and following text.
+/// Parses an ordered list prefix returning numeric string and following text.
 fn parse_ordered_list(text: &str) -> Option<(&str, &str)> {
     let dot_idx = text.find(". ")?;
     let num_part = &text[..dot_idx];
@@ -1009,7 +1012,7 @@ fn parse_ordered_list(text: &str) -> Option<(&str, &str)> {
     }
 }
 
-/// Computes continuation line indentation margin for markdown checkboxes and list bullets.
+/// Computes continuation line indentation margin for checkboxes and bullets.
 fn detect_list_margin(line: &str) -> Option<usize> {
     let indent_len = line.chars().take_while(|c| c.is_whitespace()).count();
     let trimmed = line.trim_start();
@@ -1031,7 +1034,7 @@ fn detect_list_margin(line: &str) -> Option<usize> {
     }
 }
 
-/// Word-wraps character slice with separate widths for first line and continuation lines.
+/// Word-wraps character slice with separate widths for continuation lines.
 fn wrap_chars_by_word_with_margin(
     chars: &[char],
     first_w: usize,
