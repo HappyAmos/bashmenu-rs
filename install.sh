@@ -122,17 +122,20 @@ echo "  [+] Created shortcut 'rich' -> $BIN_DIR/rich"
 CONFIG_DIR="$HOME/.config/bashmenu"
 mkdir -p "$CONFIG_DIR"
 for cfg in bashmenu.yml bashmenu.mnu bashmenu.themes shortcuts.yml cheat.yml; do
-    fixture="$SCRIPT_DIR/tests/fixtures/$cfg"
+    src="$SCRIPT_DIR/$cfg"
+    if [ ! -f "$src" ]; then
+        src="$SCRIPT_DIR/tests/fixtures/$cfg"
+    fi
     dest="$CONFIG_DIR/$cfg"
-    if [ "$cfg" = "bashmenu.mnu" ] && [ "$UPDATE_MENU" = "true" ] && [ -f "$fixture" ]; then
+    if [ "$cfg" = "bashmenu.mnu" ] && [ "$UPDATE_MENU" = "true" ] && [ -f "$src" ]; then
         if [ -f "$dest" ]; then
             cp -f "$dest" "$dest.bak"
             echo "  [+] Backed up existing menu -> $dest.bak"
         fi
-        cp -f "$fixture" "$dest"
+        cp -f "$src" "$dest"
         echo "  [+] Updated user menu with latest vanilla template: $dest"
-    elif [ ! -f "$dest" ] && [ -f "$fixture" ]; then
-        cp "$fixture" "$dest"
+    elif [ ! -f "$dest" ] && [ -f "$src" ]; then
+        cp "$src" "$dest"
         echo "  [+] Initialized user config: $dest"
     elif [ "$cfg" = "bashmenu.mnu" ] && [ -f "$dest" ]; then
         echo "  [*] Preserving existing user menu: $dest"

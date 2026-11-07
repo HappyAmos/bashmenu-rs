@@ -1,921 +1,750 @@
-version: 0.0.1
+version: '0.0.1'
 title: Bash Menu
 items:
-  - '{divider}':
-  - BM Developer Shortcuts:
-      type: submenu
-      submenu:
-        title: New submenu
-        items:
-          - Convert Image To BM Wallpaper [80x48]:
-              type: command
-              icon: '{nf::#f11e7}'
-              command: convert "{file_picker:path:{bashmenu_dir}/assets/wallpapers}"
-                -resize 80x48\! -blur 0x0.5 +dither -colors 16 -scale 480x360\! "{file_picker:stem}.pixel.png"
-              prompt: 'Convert image to BM friendly wallpaper:'
-              start_dir: ~/Pictures
-              interactive: true
-              quiet: false
-              alt_buffer: true
-          - Edit bashmenu.md [{bashmenu_dir}/bashmenu.md]:
-              type: editor
-              file: '{bashmenu_dir}/bashmenu.md'
-              tabstop: 4
-              interactive: true
-              quiet: false
-              alt_buffer: true
-              icon: '{nf::#f11e7}'
-          - Edit DONE.md:
-              type: editor
-              icon: '{nf:\:#ec46}'
-              file: '{bashmenu_dir}/.agents/skills/bashmenu-rs-developer/DONE.md'
-              tabstop: 4
-              interactive: true
-              quiet: false
-              alt_buffer: true
-          - Edit README.md:
-              type: editor
-              icon: '{nf::#f1781}'
-              tabstop: 4
-              interactive: true
-              quiet: false
-              alt_buffer: true
-              file: '{bashmenu_dir}/README.md'
-          - Edit SKILL.md:
-              type: editor
-              file: '{bashmenu_dir}/.agents/skills/bashmenu-rs-developer/SKILL.md'
-              tabstop: 4
-              interactive: true
-              quiet: false
-              alt_buffer: true
-              icon: '{nf::#f11e7}'
-          - Edit TODO.md:
-              type: editor
-              icon: '{nf::#f11e7}'
-              tabstop: 4
-              interactive: true
-              quiet: false
-              alt_buffer: true
-              file: '{bashmenu_dir}/.agents/skills/bashmenu-rs-developer/TODO.md'
-          - Toast Test:
-              type: script
-              script: '{toast:2:"Hello, world. {date_time_24_short} Using theme: {theme}"}'
-              interactive: true
-              quiet: false
-              alt_buffer: true
-              icon: '{nf:t:#f0669}'
-      interactive: true
-      quiet: false
-      alt_buffer: true
-      icon: '{nf:/:#f14d3}'
-      action: BM Developer Shortcuts
-  - Notes [{notebooks_dir}/notes.yml]:
-      type: notebook
-      file: '{notebooks_dir}/notes.yml'
-      interactive: true
-      quiet: false
-      alt_buffer: true
-      icon: '{nf:/:#f1a7c}'
-      action: '{notebooks_dir}/notes.yml'
-  - '{divider}':
-  - Applications:
-      icon: '{nf::#f003b:}'
-      submenu:
-        title: Applications
-        items:
-          - '{divider}':
-          - Antigravity [Resume Last Session]:
-              icon: '{nf::#eb44:}'
-              type: command
-              action: cd {dir_picker_new} && agy
-              interactive: true
-              quiet: true
-              alt_buffer: true
-          - Brow6el:
-              type: script
-              action: '{home}/github/brow6el/build/brow6el'
-              icon: '{nf::#f059f:}'
-              interactive: true
-              quiet: true
-          - Built-In Text Editor:
-              icon: '{nf::#f11e7}'
-              type: editor
-              show_whitespace: true
-              tabstop: 4
-          - Copilot:
-              icon: '{nf::#F0372}'
-              type: command
-              action: cd {dir_picker_new} && copilot
-              interactive: true
-              quiet: true
-              alt_buffer: true
-          - Carbonyl [https://duckduckgo.com]:
-              type: command
-              action: carbonyl https://duckduckgo.com
-              icon: '{nf::#f059f:}'
-              interactive: true
-              quiet: true
-          - Gemini [Resume Last Session]:
-              icon: '{nf::#F1A0}'
-              type: command
-              action: cd {dir_picker_new} && gemini --resume latest
-              interactive: true
-              quiet: true
-              alt_buffer: true
-          - Glow:
-              type: command
-              action: glow -t {home}/cheat
-              interactive: true
-              quiet: true
-              icon: '{nf::#eeab:}'
-              alt_buffer: true
-          - Internet:
-              type: submenu
-              submenu:
-                title: New submenu
-                items: []
-              interactive: true
-              quiet: false
-              alt_buffer: true
-              icon: '{nf::#f059f}'
-          - Midnight Commander:
-              icon: '{nf::#f0ab6}'
-              type: script
-              action: /usr/bin/mc
-              interactive: true
-              quiet: true
-          - Open Code:
-              type: command
-              icon: '{nf::#f4b0}'
-              command: cd {dir_picker_new} && opencode
-              interactive: true
-              quiet: false
-              alt_buffer: true
-          - Search Nerd Font & Emoji [{scripts_dir}/glyphs.sh]:
-              type: script
-              action: '{scripts_dir}/glyphs.sh {param}'
-              prompt: 'Enter search term:'
-              stream: true
-              window_percent: 75
-              icon: '{nf::#f422}'
-          - Unicode Block Explorer:
-              type: script
-              action: '{scripts_dir}/unicode.sh'
-              icon: '{nf::#f0ed0:}'
-              interactive: true
-              quiet: true
-          - View ASCII Symbols [Standard and Extended]:
-              type: script
-              action: '{scripts_dir}/rich.sh {bashmenu_dir}/assets/ascii.md'
-              icon: '{nf::#f07ef:}'
-              stream: true
-              quiet: true
-          - View Colors:
-              type: script
-              action: '{scripts_dir}/ncurses_colors.py'
-              icon: '{nf::#f0301:}'
-              stream: true
-              quiet: true
-              external: true
-          - Vim:
-              icon: '{nf::#e62b}'
-              type: command
-              action: vim
-              interactive: true
-              quiet: true
-          - '{divider}':
-          - Back to Main Menu:
-              icon: '{nf::#f048}'
-              type: back
-              interactive: true
-              quiet: false
-              alt_buffer: true
-          - '{divider}':
-      type: submenu
-      interactive: true
-      quiet: false
-      alt_buffer: true
-  - Experiments:
-      type: submenu
-      submenu:
-        title: New submenu
-        items:
-          - '{divider}':
-          - Discover New proot Containers:
-              type: script
-              script: '{scripts_dir}/webopen.sh https://hub.docker.com/categories/operating-systems'
-              interactive: true
-              quiet: true
-              alt_buffer: true
-          - Install proot-distro Container:
-              type: command
-              command: proot-distro install {param}
-              prompt: 'Name of the proot-distro to install [name:tag]:'
-              stream: true
-              interactive: false
-              quiet: true
-              alt_buffer: true
-          - "List Installed proot-distro's":
-              type: command
-              command: proot-distro list
-              stream: true
-              interactive: false
-              quiet: true
-              alt_buffer: true
-          - Remove Installed proot-distro:
-              type: command
-              command: proot-distro remove {param}
-              prompt: 'Name of proot-distro to remove:'
-              stream: true
-              interactive: false
-              quiet: true
-              alt_buffer: true
-          - Run proot-distro Container:
-              type: command
-              command: proot-distro login {param}
-              interactive: true
-              quiet: true
-              alt_buffer: true
-              prompt: 'Name of the proot-distro to run:'
-          - '{divider}':
-          - Back To Main Menu:
-              type: back
-              interactive: true
-              quiet: false
-              alt_buffer: true
-              icon: '{nf::#f048}'
-          - '{divider}':
-      action: Experiments
-      interactive: true
-      quiet: false
-      icon: '{nf::#f0668}'
-  - Games:
-      submenu:
-        title: Games
-        items:
-          - '{divider}':
-          - BSD Games:
-              type: script
-              action: '{scripts_dir}/bsdgames.sh'
-              icon: '{nf::#f30c:}'
-              interactive: true
-              quiet: true
-          - Console Games:
-              type: command
-              action: '{scripts_dir}/games.sh'
-              icon: '{nf::#f11b:}'
-              interactive: true
-              quiet: true
-          - Space:
-              type: command
-              command: /home/andrew/github/spacetrader/spacetrader
-              interactive: true
-              quiet: true
-              alt_buffer: true
-              icon: '{nf::#f197}'
-          - QBasic Gorillas Clone:
-              type: script
-              action: python3 {scripts_dir}/gorillas.py
-              icon: '{nf::#f1e2:}'
-              interactive: true
-              quiet: true
-          - '{divider}':
-          - Back to Main Menu:
-              type: back
-              icon: '{nf::#f048}'
-              interactive: true
-              quiet: false
-              alt_buffer: true
-          - '{divider}':
-      icon: '{nf::#f003b:}'
-      type: submenu
-      interactive: true
-      quiet: false
-      alt_buffer: true
-  - Install:
-      icon: '{nf::#f01da:}'
-      submenu:
-        title: Install Tools Menu
-        items:
-          - '{divider}':
-          - Apt update && upgrade:
-              type: script
-              action: '{scripts_dir}/system_update.sh'
-              interactive: true
-              quiet: true
-              icon: '{nf::#f487}'
-          - Install autoexec.sh Launcher:
-              type: inject_block
-              template: '{templates_dir}/autoexec.sh.tmpl'
-              target: ~/.bashrc
-              block_id: launch_autoexec
-              icon: '{nf::#ead3}'
-          - Install bash_aliases From Template:
-              type: inject_block
-              template: '{templates_dir}/bash_aliases.tmpl'
-              target: ~/.bash_aliases
-              block_id: bash_aliases
-              icon: '{nf::#eeb6}'
-          - Install Basics [vim mc htop glow gum curl wget git shellcheck shfmt jq yq]:
-              type: submenu
-              action: '{scripts_dir}/install_basics.sh'
-              stream: true
-              icon: '{nf::#ed5b}'
-              submenu:
-                title: Install Basics [vim mc htop glow gum curl wget git shellcheck
-                  shfmt jq yq]
-                items: []
-          - Install Brow6el [https://tangled.org/janantos.tngl.sh/brow6el/raw/main/download_cef.sh]:
-              type: command
-              action: bash -c "$(curl -fsSL https://tangled.org/janantos.tngl.sh/brow6el/raw/main/download_cef.sh)"
-              icon: '{nf::#f059f:}'
-              interactive: true
-          - Install Cheatsheets From Private Repo [https://github.com/HappyAmos/cheat.git]:
-              type: script
-              action: '{scripts_dir}/install_cheat.sh'
-              stream: true
-              icon: '{nf::#f02aa}'
-          - Install Kitty [curl -L https://sw.kovidgoyal.net/kitty/installer.sh | sh /dev/stdin]:
-              type: command
-              action: curl -fsSL https://sw.kovidgoyal.net/kitty/installer.sh | sh /dev/stdin
-              icon: '{nf::#f26b:}'
-              interactive: true
-              quiet: true
-          - Install Games [{scripts_dir}/install_games.sh]:
-              type: script
-              action: '{scripts_dir}/install_games.sh'
-              icon: '{nf::#f11b:}'
-              external: true
-              interactive: true
-          - Install kmscon [{scripts_dir}/install_kmscon.sh]:
-              type: script
-              action: '{scripts_dir}/install_kmscon.sh'
-              stream: true
-              icon: '{nf::#f0e51}'
-          - Install Nerd Fonts [curl https://raw.githubusercontent.com/officialrajdeepsingh/nerd-fonts-installer/main/install.sh]:
-              type: command
-              action: bash -c "$(curl -fsSL https://raw.githubusercontent.com/officialrajdeepsingh/nerd-fonts-installer/main/install.sh)"
-              icon: '{nf::#eb54:}'
-              interactive: true
-          - Install Scripts From Private Repo [https://github.com/HappyAmos/scripts.git]:
-              type: script
-              action: '{scripts_dir}/install_scripts.sh'
-              stream: true
-              icon: '{nf::#ee79}'
-          - '{divider}':
-          - Back to Main Menu:
-              type: back
-              icon: '{nf::#f048}'
-          - '{divider}':
-      type: submenu
-      interactive: true
-      quiet: false
-      alt_buffer: true
-  - Internet:
-      type: submenu
-      icon: '{nf::#f059f:}'
-      submenu:
-        title: Internet Options
-        items:
-          - '{divider}':
-          - Bookmarks:
-              type: submenu
-              submenu:
-                title: New submenu
-                items:
-                  - Rust Book:
-                      type: command
-                      icon: '{nf::#f02d}'
-                      command: '{scripts_dir}/webopen.sh https://doc.rust-lang.org/rust-by-example/hello/print.html'
-                      interactive: true
-                      quiet: false
-                      alt_buffer: true
-              icon: '{nf::#f461}'
-              interactive: true
-              quiet: false
-              alt_buffer: true
-          - Github.com:
-              type: command
-              command: '{scripts_dir}/webopen.sh https://github.com'
-              interactive: true
-              quiet: false
-              alt_buffer: true
-              icon: '{nf::#ea84}'
-          - Google.com:
-              type: script
-              script: '{scripts_dir}/webopen.sh https://google.com'
-              interactive: true
-              quiet: false
-              alt_buffer: true
-              icon: '{nf::#f02ad}'
-          - Launch GUI Web Browser [{scripts_dir}/webopen.sh --gui]:
-              type: command
-              action: '{scripts_dir}/webopen.sh --gui'
-              icon: '{nf::#f268:}'
-              interactive: true
-              quiet: true
-              alt_buffer: true
-          - Launch Terminal Web Browser [{scripts_dir}/webopen.sh --tty]:
-              type: command
-              action: '{scripts_dir}/webopen.sh --tty'
-              icon: '{nf::#f120:}'
-              interactive: true
-              quiet: true
-              alt_buffer: true
-          - '{divider}':
-          - Back to Main Menu:
-              type: back
-              icon: '{nf::#f048}'
-          - '{divider}':
-      interactive: true
-      quiet: false
-      alt_buffer: true
-  - Network Utilities:
-      icon: '{nf::#ef09:}'
-      submenu:
-        title: Network Utilities Options
-        items:
-          - '{divider}':
-          - Configure DNS servers [dnsconfig.sh]:
-              type: script
-              action: '{scripts_dir}/dnsconfig.sh {settings.dns.ipv4.primary} {settings.dns.ipv4.secondary}
-                {settings.dns.ipv6.primary} {settings.dns.ipv6.secondary}'
-              stream: true
-              icon: '{nf::#f0b8c}'
-          - Configure Ping Target [{settings.ping_target}]:
-              type: config
-              key: settings.ping_target
-              title: Edit Ping Target
-              prompt: 'Enter Hostname or IP Address:'
-              icon: '{nf::#f11ab}'
-          - IP Information:
-              type: script
-              action: '{scripts_dir}/ip_info.sh'
-              icon: '{nf::#F0A5F:}'
-              interactive: false
-              stream: true
-          - Ping Target [{settings.ping_target}]:
-              type: confirm
-              title: Confirm Ping Task
-              message: Start pinging target host {settings.ping_target}?
-              on_yes:
+- '{divider}': null
+- Notes [{notebooks_dir}/notes.yml]:
+    type: notebook
+    icon: '{nf:/:#f1a7c}'
+    action: '{notebooks_dir}/notes.yml'
+    file: '{notebooks_dir}/notes.yml'
+    interactive: true
+    quiet: false
+    alt_buffer: true
+- '{divider}': null
+- Applications:
+    type: submenu
+    icon: '{nf::#f003b:}'
+    interactive: true
+    quiet: false
+    alt_buffer: true
+    submenu:
+      title: Applications
+      items:
+      - '{divider}': null
+      - Midnight Commander:
+          type: script
+          icon: '{nf::#f0ab6}'
+          action: /usr/bin/mc
+          interactive: true
+          quiet: true
+      - Search Nerd Font & Emoji [{scripts_dir}/glyphs.sh]:
+          type: script
+          icon: '{nf::#f422}'
+          action: '{scripts_dir}/glyphs.sh {param}'
+          prompt: 'Enter search term:'
+          stream: true
+          window_percent: 75
+      - Unicode Block Explorer:
+          type: script
+          icon: '{nf::#f0ed0:}'
+          action: '{scripts_dir}/unicode.sh'
+          interactive: true
+          quiet: true
+      - Vim:
+          type: command
+          icon: '{nf::#e62b}'
+          action: vim
+          interactive: true
+          quiet: true
+      - '{divider}': null
+      - Back to Main Menu:
+          type: back
+          icon: '{nf::#f048}'
+          interactive: true
+          quiet: false
+          alt_buffer: true
+      - '{divider}': null
+- Experiments:
+    type: submenu
+    icon: '{nf::#f0668}'
+    action: Experiments
+    interactive: true
+    quiet: false
+    submenu:
+      title: New submenu
+      items:
+      - '{divider}': null
+      - Discover New proot Containers:
+          type: script
+          script: '{scripts_dir}/webopen.sh https://hub.docker.com/categories/operating-systems'
+          interactive: true
+          quiet: true
+          alt_buffer: true
+      - Install proot-distro Container:
+          type: command
+          command: proot-distro install {param}
+          prompt: 'Name of the proot-distro to install [name:tag]:'
+          interactive: false
+          quiet: true
+          alt_buffer: true
+          stream: true
+      - List Installed proot-distro's:
+          type: command
+          command: proot-distro list
+          interactive: false
+          quiet: true
+          alt_buffer: true
+          stream: true
+      - Remove Installed proot-distro:
+          type: command
+          command: proot-distro remove {param}
+          prompt: 'Name of proot-distro to remove:'
+          interactive: false
+          quiet: true
+          alt_buffer: true
+          stream: true
+      - Run proot-distro Container:
+          type: command
+          command: proot-distro login {param}
+          prompt: 'Name of the proot-distro to run:'
+          interactive: true
+          quiet: true
+          alt_buffer: true
+      - '{divider}': null
+      - Back To Main Menu:
+          type: back
+          icon: '{nf::#f048}'
+          interactive: true
+          quiet: false
+          alt_buffer: true
+      - '{divider}': null
+- Games:
+    type: submenu
+    icon: '{nf::#f003b:}'
+    interactive: true
+    quiet: false
+    alt_buffer: true
+    submenu:
+      title: Games
+      items:
+      - '{divider}': null
+      - BSD Games:
+          type: script
+          icon: '{nf::#f30c:}'
+          action: '{scripts_dir}/bsdgames.sh'
+          interactive: true
+          quiet: true
+      - Console Games:
+          type: command
+          icon: '{nf::#f11b:}'
+          action: '{scripts_dir}/games.sh'
+          interactive: true
+          quiet: true
+      - '{divider}': null
+      - Back to Main Menu:
+          type: back
+          icon: '{nf::#f048}'
+          interactive: true
+          quiet: false
+          alt_buffer: true
+      - '{divider}': null
+- Install:
+    type: submenu
+    icon: '{nf::#f01da:}'
+    interactive: true
+    quiet: false
+    alt_buffer: true
+    submenu:
+      title: Install Tools Menu
+      items:
+      - '{divider}': null
+      - Apt update && upgrade:
+          type: script
+          icon: '{nf::#f487}'
+          action: '{scripts_dir}/system_update.sh'
+          interactive: true
+          quiet: true
+      - Install autoexec.sh Launcher:
+          type: inject_block
+          icon: '{nf::#ead3}'
+          template: '{templates_dir}/autoexec.sh.tmpl'
+          target: ~/.bashrc
+          block_id: launch_autoexec
+      - Install bash_aliases From Template:
+          type: inject_block
+          icon: '{nf::#eeb6}'
+          target: ~/.bash_aliases
+          template: '{templates_dir}/bash_aliases.tmpl'
+          block_id: bash_aliases
+      - Install Basics [vim mc htop glow gum curl wget git shellcheck shfmt jq yq]:
+          type: submenu
+          icon: '{nf::#ed5b}'
+          action: '{scripts_dir}/install_basics.sh'
+          submenu:
+            title: Install Basics [vim mc htop glow gum curl wget git shellcheck shfmt jq yq]
+            items: []
+          stream: true
+      - Install Cheatsheets From Private Repo [https://github.com/HappyAmos/cheat.git]:
+          type: script
+          icon: '{nf::#f02aa}'
+          action: '{scripts_dir}/install_cheat.sh'
+          stream: true
+      - Install Games [{scripts_dir}/install_games.sh]:
+          type: script
+          icon: '{nf::#f11b:}'
+          action: '{scripts_dir}/install_games.sh'
+          interactive: true
+          external: true
+      - Install Nerd Fonts [curl https://raw.githubusercontent.com/officialrajdeepsingh/nerd-fonts-installer/main/install.sh]:
+          type: command
+          icon: '{nf::#eb54:}'
+          action: bash -c "$(curl -fsSL https://raw.githubusercontent.com/officialrajdeepsingh/nerd-fonts-installer/main/install.sh)"
+          interactive: true
+      - '{divider}': null
+      - Back to Main Menu:
+          type: back
+          icon: '{nf::#f048}'
+      - '{divider}': null
+- Internet:
+    type: submenu
+    icon: '{nf::#f059f:}'
+    interactive: true
+    quiet: false
+    alt_buffer: true
+    submenu:
+      title: Internet Options
+      items:
+      - '{divider}': null
+      - Bookmarks:
+          type: submenu
+          icon: '{nf::#f461}'
+          interactive: true
+          quiet: false
+          alt_buffer: true
+          submenu:
+            title: New submenu
+            items:
+            - Rust Book:
                 type: command
-                action: '{scripts_dir}/ping.sh {settings.ping_target}'
-                stream: true
-              on_no:
-                type: message
-                title: Task Cancelled
-                message: Ping request was cancelled by user.
-              icon: '{nf::#f11ab}'
-              prompt: Start pinging target host {settings.ping_target}?
-              interactive: true
-              quiet: false
-              alt_buffer: true
-          - Show Configured DNS [getdns.py]:
-              type: script
-              action: '{scripts_dir}/getdns.py'
-              stream: true
-              icon: '{nf::#f01d6}'
-          - Show Hostname Information [{scripts_dir}/hostname.sh]:
-              type: script
-              action: '{scripts_dir}/hostname.sh'
-              stream: true
-              icon: '{nf::#f08ad}'
-          - Show Network Interfaces [ip a]:
-              type: command
-              action: ip a
-              icon: '{nf::#ef09}'
-              stream: true
-              interactive: false
-              quiet: true
-          - '{divider}':
-          - Back to Main Menu:
-              type: back
-              icon: '{nf::#f048}'
-          - '{divider}':
-      type: submenu
-      interactive: true
-      quiet: false
-      alt_buffer: true
-  - Options & Settings:
-      icon: '{nf::#f423:}'
-      submenu:
-        title: Options & Settings
-        items:
-          - '{divider}':
-          - '[b]Bashmenu Settings[/b]':
-              type: submenu
-              submenu:
-                title: Bashmenu Settings
-                items:
-                  - '{divider}':
-                  - Change Theme:
-                      type: theme_selector
-                      icon: '{nf::#f03d8}'
-                  - Theme Editor [themeedit]:
-                      type: script
-                      action: themeedit
-                      icon: '{nf::#f0426}'
-                      interactive: true
-                      quiet: true
-                      refresh: true
-                  - Keyboard Shortcuts Editor [shortcutedit]:
-                      type: script
-                      action: shortcutedit
-                      icon: '{nf::#f11c}'
-                      interactive: true
-                      quiet: true
-                      refresh: true
-                  - Edit Shortcuts File [{shortcuts_file}]:
-                      type: editor
-                      action: '{shortcuts_file}'
-                      file: '{shortcuts_file}'
-                      icon: '{nf::#f11c}'
-                      tabstop: 4
-                      interactive: true
-                      quiet: false
-                      alt_buffer: true
-                  - Edit Configuration File [{bashmenu_dir}/bashmenu.yml]:
-                      type: editor
-                      action: '{bashmenu_dir}/bashmenu.yml'
-                      icon: '{nf::#f1de}'
-                      show_whitespace: true
-                      tabstop: 4
-                      interactive: true
-                      quiet: false
-                      alt_buffer: true
-                  - Edit Menu Layout [{bashmenu_dir}/bashmenu.mnu]:
-                      type: editor
-                      action: '{bashmenu_dir}/bashmenu.mnu'
-                      icon: '{nf::#f0279}'
-                      show_whitespace: true
-                      tabstop: 4
-                      interactive: true
-                      quiet: false
-                      alt_buffer: true
-                  - Edit Scripts [{scripts_dir}]:
-                      type: editor
-                      action: '{scripts_dir}/{file_picker_new}'
-                      icon: '{nf::#eae9}'
-                      file: '{file_picker_new}'
-                      start_dir: '{scripts_dir}'
-                      tabstop: 4
-                      interactive: true
-                      quiet: false
-                      alt_buffer: true
-                  - Edit Templates [{templates_dir}]:
-                      type: editor
-                      action: '{templates_dir}/{file_picker}'
-                      icon: '{nf::#f09ee}'
-                      show_whitespace: true
-                      file: '{file_picker}'
-                      start_dir: '{templates_dir}'
-                      tabstop: 4
-                      interactive: true
-                      quiet: false
-                      alt_buffer: true
-                  - Edit Themes File [bashmenu.themes]:
-                      type: editor
-                      action: bashmenu.themes
-                      icon: '{nf::#e22b}'
-                      file: '{bashmenu_dir}/bashmenu.themes'
-                      tabstop: 4
-                      interactive: true
-                      quiet: false
-                      alt_buffer: true
-                  - Enable Automatic Updates (git pull) [{settings.check_for_updates}]:
-                      type: toggle
-                      key: settings.check_for_updates
-                      title: Toggle Auto Update
-                      message: Enable automatic updates?
-                      icon: '{nf::#ea77}'
-                  - Enable Nerd Fonts [{settings.use_nerd_fonts}]:
-                      type: toggle
-                      key: settings.use_nerd_fonts
-                      title: Toggle Nerd Fonts
-                      message: Enable colorful menu emojis and Nerd Fonts?
-                      icon: '{nf::#f031}'
-                  - Nerd Font Display Width [{settings.nerd_font_width}]:
-                      type: config
-                      key: settings.nerd_font_width
-                      title: Configure Nerd Font Glyph Width
-                      prompt: 'Enter Nerd Font character width mode (auto, 1, 2):'
-                      icon: '{nf::#f07e}'
-                  - Editor Tab to Spaces Mode [{settings.tab_to_spaces}]:
-                      type: toggle
-                      key: settings.tab_to_spaces
-                      title: Configure Tab Mode
-                      prompt: 'Convert TAB key to spaces? (true/false):'
-                      icon: '{nf::#ec3c}'
-                  - Editor Tabstop Distance [{settings.tabstop}]:
-                      type: config
-                      key: settings.tabstop
-                      title: Configure Tabstop Distance
-                      prompt: 'Enter tabstop distance (spaces per TAB press):'
-                      icon: '{nf::#ee10}'
-                  - Pager Text Editor [{settings.pager_editor}]:
-                      type: radio
-                      key: settings.pager_editor
-                      title: Pager Text Editor [{settings.pager_editor}]
-                      prompt: 'Select editor launched when pressing [e] in pager:'
-                      options:
-                        - label: Default System Editor ($EDITOR)
-                          value: default
-                        - label: Built-in Editor (BashEdit)
-                          value: builtin
-                        - label: Vim
-                          value: vim
-                      icon: '{nf::#f044}'
-                      action: settings.pager_editor
-                      interactive: true
-                      quiet: false
-                      alt_buffer: true
-                  - Menu Transition Effect [{settings.transition}]:
-                      type: radio
-                      key: settings.transition
-                      title: Return Transition Effect [{settings.transition}]
-                      prompt: 'Select transition effect when returning to menu:'
-                      options:
-                        - label: Instant (Synchronized DEC Mode 2026 buffered redraw)
-                          value: instant
-                        - label: Fade (Brightness ramp reveal)
-                          value: fade
-                        - label: Curtain (Center-out vertical wipe reveal)
-                          value: curtain
-                        - label: Dissolve (Retro Bayer matrix dither dissolve)
-                          value: dissolve
-                        - label: Matrix (Cascading green digital rain)
-                          value: matrix
-                        - label: Slide Left (Horizontal slide wipe right to left)
-                          value: slide_left
-                        - label: Slide Right (Horizontal slide wipe left to right)
-                          value: slide_right
-                        - label: Blinds (Venetian blinds horizontal slats opening)
-                          value: blinds
-                        - label: Iris (Rectangular box zoom aperture expanding from center)
-                          value: iris
-                        - label: Wipe Down (Vertical top-to-bottom roll wipe)
-                          value: wipedown
-                        - label: None (Standard immediate redraw)
-                          value: none
-                      icon: '{nf::#f0d0}'
-                      action: settings.transition
-                      interactive: true
-                      quiet: false
-                      alt_buffer: true
-                  - Menu Transition Speed [{settings.transition_speed}]:
-                      type: radio
-                      key: settings.transition_speed
-                      title: Screen Transition Speed [{settings.transition_speed}]
-                      prompt: 'Select animation speed for screen transitions:'
-                      options:
-                        - label: Fast (~60-75ms, snappy 15ms/step)
-                          value: fast
-                        - label: Normal (Recommended, ~100-125ms, 25ms/step)
-                          value: normal
-                        - label: Slow (Deliberate, ~200-250ms, 50ms/step)
-                          value: slow
-                      icon: '{nf::#f0e7}'
-                      action: settings.transition_speed
-                      interactive: true
-                      quiet: false
-                      alt_buffer: true
-                  - Modal Animation Effect [{settings.modal_animation}]:
-                      type: radio
-                      key: settings.modal_animation
-                      title: Modal Animation Effect [{settings.modal_animation}]
-                      prompt: 'Select animation style for popup modal dialogs:'
-                      options:
-                        - label: Zoom (Animated grow from launch point and shrink on close)
-                          value: zoom
-                        - label: None (Instant popup open and close)
-                          value: none
-                      icon: '{nf::#f065}'
-                      action: settings.modal_animation
-                      interactive: true
-                      quiet: false
-                      alt_buffer: true
-                  - Modal Animation Speed [{settings.modal_animation_speed}]:
-                      type: radio
-                      key: settings.modal_animation_speed
-                      title: Modal Animation Speed [{settings.modal_animation_speed}]
-                      prompt: 'Select animation speed for popup modal dialogs:'
-                      options:
-                        - label: Fast (~36ms, snappy 12ms/step)
-                          value: fast
-                        - label: Normal (~60ms, smooth 20ms/step)
-                          value: normal
-                        - label: Slow (~120ms, deliberate 40ms/step)
-                          value: slow
-                      icon: '{nf::#f0e7}'
-                      action: settings.modal_animation_speed
-                      interactive: true
-                      quiet: false
-                      alt_buffer: true
-                  - Linux Framebuffer Support [{settings.framebuffer}]:
-                      type: radio
-                      key: settings.framebuffer
-                      title: Linux Framebuffer Support [{settings.framebuffer}]
-                      prompt: 'Configure direct Linux framebuffer (/dev/fb0) rendering:'
-                      options:
-                        - label: Auto (Detect /dev/fb0 on Linux console)
-                          value: auto
-                        - label: Enabled (Force direct framebuffer rendering)
-                          value: 'true'
-                        - label: Disabled (Standard terminal TUI rendering)
-                          value: 'false'
-                      icon: '{nf::#f2db}'
-                      action: settings.framebuffer
-                      interactive: true
-                      quiet: false
-                      alt_buffer: true
-                  - Configure Status Gutter [{settings.status_gutter}]:
-                      type: config
-                      key: settings.status_gutter
-                      title: Configure Status Gutter
-                      prompt: 'Enter status gutter format. Available options: {user},
-                        {battery}, {date}, {date_time_24}, {date_time_24_short}, {date_time_12},
-                        {date_time_12_short}, {host}, {user-mode}, {version}, {utc_seconds}'
-                      icon: '{nf::#ebf3}'
-                  - Status Gutter Refresh Rate [[{app.settings.refresh_interval}] seconds]:
-                      type: config
-                      icon: '{nf:@:#f1452}'
-                      key: app.settings.refresh_interval
-                      prompt: 'Seconds until next status gutter refresh:'
-                      interactive: true
-                      quiet: false
-                      alt_buffer: true
-                  - Toast Message Timeout [[{app.settings.toast_timeout}] seconds]:
-                      type: config
-                      icon: '{nf::#f0f3}'
-                      key: app.settings.toast_timeout
-                      title: Configure Toast Message Timeout
-                      prompt: 'Seconds to display popup toast notifications:'
-                      interactive: true
-                      quiet: false
-                      alt_buffer: true
-                  - Visual Menu Editor [menuedit]:
-                      type: script
-                      action: menuedit
-                      icon: '{nf::#f044}'
-                      interactive: true
-                      quiet: true
-                      refresh: true
-                  - '{divider}':
-                  - Back to Options & Settings:
-                      type: back
-                      icon: '{nf::#f048}'
-                  - '{divider}':
-              icon: '{nf::#f013}'
-          - Edit autoexec.sh [{home}/autoexec.sh]:
-              type: editor
-              action: '{home}/autoexec.sh'
-              icon: '{nf::#f11e7}'
-          - Edit .bashrc [{bashrc}]:
-              type: editor
-              action: '{bashrc}'
-              show_whitespace: true
-              icon: '{nf::#f11e7}'
-          - Edit .bash_aliases [{bash_aliases}]:
-              type: editor
-              action: '{bash_aliases}'
-              show_whitespace: true
-              icon: '{nf::#f11e7}'
-          - Edit .vimrc [{vimrc}]:
-              type: editor
-              action: '{vimrc}'
-              tabstop: 4
-              icon: '{nf::#f11e7}'
-          - '{divider}':
-          - Back to Main Menu:
-              type: back
-              icon: '{nf::#f048}'
-          - '{divider}':
-      type: submenu
-      interactive: true
-      quiet: false
-      alt_buffer: true
-  - System Information:
-      icon: '{nf::#e66a:}'
-      submenu:
-        title: System Information Options
-        items:
-          - '{divider}':
-          - Check Disk Usage [df -h]:
-              type: command
-              action: df -h 2>/dev/null
-              icon: '{nf::#f02ca:}'
-              stream: true
-              quiet: false
-              interactive: false
-          - Check RAM Usage [free -h]:
-              type: command
-              action: free -h
-              icon: '{nf::#f035b:}'
-              stream: true
-              quiet: false
-              interactive: false
-          - Check USB Controller [lsusb -vt]:
-              type: command
-              action: lsusb -vt
-              stream: true
-              quiet: false
-              icon: '{nf::#f287:}'
-              interactive: false
-          - Display Block Devices [lsblk]:
-              type: command
-              action: lsblk
-              icon: '{nf::#f233:}'
-              stream: true
-              quiet: false
-              interactive: false
-          - Display CPU Information [lscpu]:
-              type: command
-              action: lscpu
-              quiet: false
-              stream: true
-              icon: '{nf::#f2db:}'
-              interactive: false
-          - Display PCI Devices and Drivers [lspci -k]:
-              type: command
-              action: lspci -k
-              quiet: false
-              stream: true
-              icon: '{nf::#f08ae:}'
-              interactive: false
-          - Kernel Information [uname -r]:
-              type: command
-              action: uname -r
-              icon: '{nf::#f31a:}'
-              stream: true
-              quiet: true
-          - Which [which [param]]:
-              type: command
-              action: which {param}
-              stream: true
-              quiet: true
-              icon: '{nf::#f002:}'
-          - '{divider}':
-          - Back to Main Menu:
-              type: back
-              icon: '{nf::#f048}'
-          - '{divider}':
-      type: submenu
-      interactive: true
-      quiet: false
-      alt_buffer: true
-  - Weather:
-      submenu:
-        title: Weather
-        items:
-          - '{divider}':
-          - Weather Location [{user.postal_code}]:
-              type: config
-              action: user.postal_code
-              icon: '{nf::#eef0:}'
-              interactive: false
-              stream: true
-              quiet: true
-              key: user.postal_code
-              title: Weather Location [{user.postal_code}]
-              prompt: 'Enter your postal code/zip code:'
-              picker: none
-          - Weather -> 3 Day [curl wttr.in/{user.postal_code}]:
-              type: command
-              action: curl -s wttr.in/{user.postal_code} | {scripts_dir}/pager.sh
-              icon: '{nf::#eef0:}'
-              quiet: true
-              interactive: true
-              alt_buffer: true
-          - Weather -> 3 Day v.2. [curl v2.wttr.in/{user.postal_code}]:
-              type: command
-              action: curl -s v2.wttr.in/{user.postal_code} | {scripts_dir}/pager.sh
-              icon: '{nf::#eef0:}'
-              interactive: true
-              quiet: true
-              alt_buffer: true
-          - '{divider}':
-          - Back to Main Menu:
-              type: back
-              icon: '{nf::#f048:}'
-          - '{divider}':
-      icon: '{nf::#eef0:}'
-      type: submenu
-      interactive: true
-      quiet: false
-      alt_buffer: true
-  - '{divider}':
-  - Help [rich.sh bashmenu.md]:
-      icon: '{nf::#f02d6:}'
-      type: command
-      action: '{scripts_dir}/rich.sh {bashmenu_dir}/bashmenu.md'
-      interactive: true
-      quiet: true
-      alt_buffer: true
-  - Exit Menu:
-      icon: '{nf::#f0a48:}'
-      type: exit
-      interactive: true
-      quiet: false
-      alt_buffer: true
-  - '{divider}':
+                icon: '{nf::#f02d}'
+                command: '{scripts_dir}/webopen.sh https://doc.rust-lang.org/rust-by-example/hello/print.html'
+                interactive: true
+                quiet: false
+                alt_buffer: true
+            - Github.com:
+                type: command
+                icon: '{nf::#ea84}'
+                command: '{scripts_dir}/webopen.sh https://github.com'
+                interactive: true
+                quiet: false
+                alt_buffer: true
+            - Google.com:
+                type: script
+                icon: '{nf::#f02ad}'
+                script: '{scripts_dir}/webopen.sh https://google.com'
+                interactive: true
+                quiet: false
+                alt_buffer: true
+      - Launch GUI Web Browser [{scripts_dir}/webopen.sh --gui]:
+          type: command
+          icon: '{nf::#f268:}'
+          action: '{scripts_dir}/webopen.sh --gui'
+          interactive: true
+          quiet: true
+          alt_buffer: true
+      - Launch Terminal Web Browser [{scripts_dir}/webopen.sh --tty]:
+          type: command
+          icon: '{nf::#f120:}'
+          action: '{scripts_dir}/webopen.sh --tty'
+          interactive: true
+          quiet: true
+          alt_buffer: true
+      - '{divider}': null
+      - Back to Main Menu:
+          type: back
+          icon: '{nf::#f048}'
+      - '{divider}': null
+- Network Utilities:
+    type: submenu
+    icon: '{nf::#ef09:}'
+    interactive: true
+    quiet: false
+    alt_buffer: true
+    submenu:
+      title: Network Utilities Options
+      items:
+      - '{divider}': null
+      - Configure DNS servers [dnsconfig.sh]:
+          type: script
+          icon: '{nf::#f0b8c}'
+          action: '{scripts_dir}/dnsconfig.sh {settings.dns.ipv4.primary} {settings.dns.ipv4.secondary} {settings.dns.ipv6.primary} {settings.dns.ipv6.secondary}'
+          stream: true
+      - Configure Ping Target [{settings.ping_target}]:
+          type: config
+          icon: '{nf::#f11ab}'
+          prompt: 'Enter Hostname or IP Address:'
+          key: settings.ping_target
+          title: Edit Ping Target
+      - IP Information:
+          type: script
+          icon: '{nf::#F0A5F:}'
+          action: '{scripts_dir}/ip_info.sh'
+          interactive: false
+          stream: true
+      - Ping Target [{settings.ping_target}]:
+          type: confirm
+          icon: '{nf::#f11ab}'
+          prompt: Start pinging target host {settings.ping_target}?
+          interactive: true
+          quiet: false
+          alt_buffer: true
+          on_yes:
+            type: command
+            action: '{scripts_dir}/ping.sh {settings.ping_target}'
+            stream: true
+          on_no:
+            type: message
+            title: Task Cancelled
+            message: Ping request was cancelled by user.
+          title: Confirm Ping Task
+          message: Start pinging target host {settings.ping_target}?
+      - Show Configured DNS [getdns.py]:
+          type: script
+          icon: '{nf::#f01d6}'
+          action: '{scripts_dir}/getdns.py'
+          stream: true
+      - Show Hostname Information [{scripts_dir}/hostname.sh]:
+          type: script
+          icon: '{nf::#f08ad}'
+          action: '{scripts_dir}/hostname.sh'
+          stream: true
+      - Show Network Interfaces [ip a]:
+          type: command
+          icon: '{nf::#ef09}'
+          action: ip a
+          interactive: false
+          quiet: true
+          stream: true
+      - '{divider}': null
+      - Back to Main Menu:
+          type: back
+          icon: '{nf::#f048}'
+      - '{divider}': null
+- Options & Settings:
+    type: submenu
+    icon: '{nf::#f423:}'
+    interactive: true
+    quiet: false
+    alt_buffer: true
+    submenu:
+      title: Options & Settings
+      items:
+      - '{divider}': null
+      - '[b]Bashmenu Settings[/b]':
+          type: submenu
+          icon: '{nf::#f013}'
+          submenu:
+            title: Bashmenu Settings
+            items:
+            - '{divider}': null
+            - Edit Shortcuts File [{shortcuts_file}]:
+                type: editor
+                icon: '{nf::#f11c}'
+                action: '{shortcuts_file}'
+                file: '{shortcuts_file}'
+                interactive: true
+                quiet: false
+                alt_buffer: true
+                tabstop: 4
+            - Edit Configuration File [{bashmenu_dir}/bashmenu.yml]:
+                type: editor
+                icon: '{nf::#f1de}'
+                action: '{bashmenu_dir}/bashmenu.yml'
+                interactive: true
+                quiet: false
+                alt_buffer: true
+                tabstop: 4
+                show_whitespace: true
+            - Edit Menu Layout [{bashmenu_dir}/bashmenu.mnu]:
+                type: editor
+                icon: '{nf::#f0279}'
+                action: '{bashmenu_dir}/bashmenu.mnu'
+                interactive: true
+                quiet: false
+                alt_buffer: true
+                tabstop: 4
+                show_whitespace: true
+            - Edit Scripts [{scripts_dir}]:
+                type: editor
+                icon: '{nf::#eae9}'
+                action: '{scripts_dir}/{file_picker_new}'
+                file: '{file_picker_new}'
+                start_dir: '{scripts_dir}'
+                interactive: true
+                quiet: false
+                alt_buffer: true
+                tabstop: 4
+            - Edit Templates [{templates_dir}]:
+                type: editor
+                icon: '{nf::#f09ee}'
+                action: '{templates_dir}/{file_picker}'
+                file: '{file_picker}'
+                start_dir: '{templates_dir}'
+                interactive: true
+                quiet: false
+                alt_buffer: true
+                tabstop: 4
+                show_whitespace: true
+            - Edit Themes File [bashmenu.themes]:
+                type: editor
+                icon: '{nf::#e22b}'
+                action: bashmenu.themes
+                file: '{bashmenu_dir}/bashmenu.themes'
+                interactive: true
+                quiet: false
+                alt_buffer: true
+                tabstop: 4
+            - Enable Automatic Updates (git pull) [{settings.check_for_updates}]:
+                type: toggle
+                icon: '{nf::#ea77}'
+                key: settings.check_for_updates
+                message: Enable automatic updates?
+                title: Toggle Auto Update
+            - Enable Nerd Fonts [{settings.use_nerd_fonts}]:
+                type: toggle
+                icon: '{nf::#f031}'
+                title: Toggle Nerd Fonts
+                message: Enable colorful menu emojis and Nerd Fonts?
+                key: settings.use_nerd_fonts
+            - Nerd Font Display Width [{settings.nerd_font_width}]:
+                type: config
+                icon: '{nf::#f07e}'
+                prompt: 'Enter Nerd Font character width mode (auto, 1, 2):'
+                title: Configure Nerd Font Glyph Width
+                key: settings.nerd_font_width
+            - Editor Tab to Spaces Mode [{settings.tab_to_spaces}]:
+                type: toggle
+                icon: '{nf::#ec3c}'
+                prompt: 'Convert TAB key to spaces? (true/false):'
+                title: Configure Tab Mode
+                key: settings.tab_to_spaces
+            - Editor Tabstop Distance [{settings.tabstop}]:
+                type: config
+                icon: '{nf::#ee10}'
+                prompt: 'Enter tabstop distance (spaces per TAB press):'
+                title: Configure Tabstop Distance
+                key: settings.tabstop
+            - Pager Text Editor [{settings.pager_editor}]:
+                type: radio
+                icon: '{nf::#f044}'
+                action: settings.pager_editor
+                prompt: 'Select editor launched when pressing [e] in pager:'
+                interactive: true
+                quiet: false
+                alt_buffer: true
+                title: Pager Text Editor [{settings.pager_editor}]
+                key: settings.pager_editor
+                options:
+                - label: Default System Editor ($EDITOR)
+                  value: default
+                - label: Built-in Editor (BashEdit)
+                  value: builtin
+                - label: Vim
+                  value: vim
+            - Menu Transition Effect [{settings.transition}]:
+                type: radio
+                icon: '{nf::#f0d0}'
+                action: settings.transition
+                prompt: 'Select transition effect when returning to menu:'
+                interactive: true
+                quiet: false
+                alt_buffer: true
+                title: Return Transition Effect [{settings.transition}]
+                options:
+                - label: Instant (Synchronized DEC Mode 2026 buffered redraw)
+                  value: instant
+                - label: Fade (Brightness ramp reveal)
+                  value: fade
+                - label: Curtain (Center-out vertical wipe reveal)
+                  value: curtain
+                - label: Dissolve (Retro Bayer matrix dither dissolve)
+                  value: dissolve
+                - label: Matrix (Cascading green digital rain)
+                  value: matrix
+                - label: Slide Left (Horizontal slide wipe right to left)
+                  value: slide_left
+                - label: Slide Right (Horizontal slide wipe left to right)
+                  value: slide_right
+                - label: Blinds (Venetian blinds horizontal slats opening)
+                  value: blinds
+                - label: Iris (Rectangular box zoom aperture expanding from center)
+                  value: iris
+                - label: Wipe Down (Vertical top-to-bottom roll wipe)
+                  value: wipedown
+                - label: None (Standard immediate redraw)
+                  value: none
+                key: settings.transition
+            - Menu Transition Speed [{settings.transition_speed}]:
+                type: radio
+                icon: '{nf::#f0e7}'
+                action: settings.transition_speed
+                prompt: 'Select animation speed for screen transitions:'
+                interactive: true
+                quiet: false
+                alt_buffer: true
+                key: settings.transition_speed
+                options:
+                - label: Fast (~60-75ms, snappy 15ms/step)
+                  value: fast
+                - label: Normal (Recommended, ~100-125ms, 25ms/step)
+                  value: normal
+                - label: Slow (Deliberate, ~200-250ms, 50ms/step)
+                  value: slow
+                title: Screen Transition Speed [{settings.transition_speed}]
+            - Modal Animation Effect [{settings.modal_animation}]:
+                type: radio
+                icon: '{nf::#f065}'
+                action: settings.modal_animation
+                prompt: 'Select animation style for popup modal dialogs:'
+                interactive: true
+                quiet: false
+                alt_buffer: true
+                options:
+                - label: Zoom (Animated grow from launch point and shrink on close)
+                  value: zoom
+                - label: None (Instant popup open and close)
+                  value: none
+                title: Modal Animation Effect [{settings.modal_animation}]
+                key: settings.modal_animation
+            - Modal Animation Speed [{settings.modal_animation_speed}]:
+                type: radio
+                icon: '{nf::#f0e7}'
+                action: settings.modal_animation_speed
+                prompt: 'Select animation speed for popup modal dialogs:'
+                interactive: true
+                quiet: false
+                alt_buffer: true
+                title: Modal Animation Speed [{settings.modal_animation_speed}]
+                key: settings.modal_animation_speed
+                options:
+                - label: Fast (~36ms, snappy 12ms/step)
+                  value: fast
+                - label: Normal (~60ms, smooth 20ms/step)
+                  value: normal
+                - label: Slow (~120ms, deliberate 40ms/step)
+                  value: slow
+            - Linux Framebuffer Support [{settings.framebuffer}]:
+                type: radio
+                icon: '{nf::#f2db}'
+                action: settings.framebuffer
+                prompt: 'Configure direct Linux framebuffer (/dev/fb0) rendering:'
+                interactive: true
+                quiet: false
+                alt_buffer: true
+                options:
+                - label: Auto (Detect /dev/fb0 on Linux console)
+                  value: auto
+                - label: Enabled (Force direct framebuffer rendering)
+                  value: 'true'
+                - label: Disabled (Standard terminal TUI rendering)
+                  value: 'false'
+                key: settings.framebuffer
+                title: Linux Framebuffer Support [{settings.framebuffer}]
+            - Configure Status Gutter [{settings.status_gutter}]:
+                type: config
+                icon: '{nf::#ebf3}'
+                prompt: 'Enter status gutter format. Available options: {user}, {battery}, {date}, {date_time_24}, {date_time_24_short}, {date_time_12}, {date_time_12_short}, {host}, {user-mode}, {version}, {utc_seconds}'
+                title: Configure Status Gutter
+                key: settings.status_gutter
+            - Status Gutter Refresh Rate [[{app.settings.refresh_interval}] seconds]:
+                type: config
+                icon: '{nf:@:#f1452}'
+                prompt: 'Seconds until next status gutter refresh:'
+                interactive: true
+                quiet: false
+                alt_buffer: true
+                key: app.settings.refresh_interval
+            - Toast Message Timeout [[{app.settings.toast_timeout}] seconds]:
+                type: config
+                icon: '{nf::#f0f3}'
+                prompt: 'Seconds to display popup toast notifications:'
+                interactive: true
+                quiet: false
+                alt_buffer: true
+                key: app.settings.toast_timeout
+                title: Configure Toast Message Timeout
+            - '{divider}': null
+            - Back to Options & Settings:
+                type: back
+                icon: '{nf::#f048}'
+            - '{divider}': null
+      - Edit autoexec.sh [{home}/autoexec.sh]:
+          type: editor
+          icon: '{nf::#f11e7}'
+          action: '{home}/autoexec.sh'
+      - Edit .bashrc [{bashrc}]:
+          type: editor
+          icon: '{nf::#f11e7}'
+          action: '{bashrc}'
+          show_whitespace: true
+      - Edit Grub Configuration:
+          type: command
+          icon: '{nf::#f11e7}'
+          command: sudo nano /etc/default/grub
+          action: sudo nano /etc/default/grub
+          interactive: true
+          quiet: true
+          alt_buffer: true
+          tabstop: 4
+          no_formatting: false
+          exec_mode: console
+          refresh: false
+          masked: false
+          external: false
+          show_whitespace: false
+          stream: false
+      - Update Grub:
+          type: command
+          icon: '{nf::#f11e7}'
+          command: sudo update-grub
+          action: sudo update-grub
+          interactive: false
+          quiet: true
+          tabstop: 4
+          window_percent: 65
+          external: false
+          exec_mode: streaming
+          no_formatting: false
+          refresh: false
+          show_whitespace: false
+          masked: false
+          stream: true
+      - Edit .bash_aliases [{bash_aliases}]:
+          type: editor
+          icon: '{nf::#f11e7}'
+          action: '{bash_aliases}'
+          show_whitespace: true
+      - Edit .vimrc [{vimrc}]:
+          type: editor
+          icon: '{nf::#f11e7}'
+          action: '{vimrc}'
+          tabstop: 4
+      - '{divider}': null
+      - Back to Main Menu:
+          type: back
+          icon: '{nf::#f048}'
+      - '{divider}': null
+- System Information:
+    type: submenu
+    icon: '{nf::#e66a:}'
+    interactive: true
+    quiet: false
+    alt_buffer: true
+    submenu:
+      title: System Information Options
+      items:
+      - '{divider}': null
+      - Check Disk Usage [df -h]:
+          type: command
+          icon: '{nf::#f02ca:}'
+          action: df -h 2>/dev/null
+          interactive: false
+          quiet: false
+          stream: true
+      - Check RAM Usage [free -h]:
+          type: command
+          icon: '{nf::#f035b:}'
+          action: free -h
+          interactive: false
+          quiet: false
+          stream: true
+      - Check USB Controller [lsusb -vt]:
+          type: command
+          icon: '{nf::#f287:}'
+          action: lsusb -vt
+          interactive: false
+          quiet: false
+          stream: true
+      - Display Block Devices [lsblk]:
+          type: command
+          icon: '{nf::#f233:}'
+          action: lsblk
+          interactive: false
+          quiet: false
+          stream: true
+      - Display CPU Information [lscpu]:
+          type: command
+          icon: '{nf::#f2db:}'
+          action: lscpu
+          interactive: false
+          quiet: false
+          stream: true
+      - Display PCI Devices and Drivers [lspci -k]:
+          type: command
+          icon: '{nf::#f08ae:}'
+          action: lspci -k
+          interactive: false
+          quiet: false
+          stream: true
+      - Kernel Information [uname -r]:
+          type: command
+          icon: '{nf::#f31a:}'
+          action: uname -r
+          quiet: true
+          stream: true
+      - Which [which [param]]:
+          type: command
+          icon: '{nf::#f002:}'
+          action: which {param}
+          quiet: true
+          stream: true
+      - '{divider}': null
+      - Back to Main Menu:
+          type: back
+          icon: '{nf::#f048}'
+      - '{divider}': null
+- Weather:
+    type: submenu
+    icon: '{nf::#eef0:}'
+    interactive: true
+    quiet: false
+    alt_buffer: true
+    submenu:
+      title: Weather
+      items:
+      - '{divider}': null
+      - Weather Location [{user.postal_code}]:
+          type: config
+          icon: '{nf::#eef0:}'
+          action: user.postal_code
+          prompt: 'Enter your postal code/zip code:'
+          interactive: false
+          quiet: true
+          picker: none
+          stream: true
+          key: user.postal_code
+          title: Weather Location [{user.postal_code}]
+      - Weather -> 3 Day [curl wttr.in/{user.postal_code}]:
+          type: command
+          icon: '{nf::#eef0:}'
+          action: curl -s wttr.in/{user.postal_code} | {scripts_dir}/pager.sh
+          interactive: true
+          quiet: true
+          alt_buffer: true
+      - Weather -> 3 Day v.2. [curl v2.wttr.in/{user.postal_code}]:
+          type: command
+          icon: '{nf::#eef0:}'
+          action: curl -s v2.wttr.in/{user.postal_code} | {scripts_dir}/pager.sh
+          interactive: true
+          quiet: true
+          alt_buffer: true
+      - '{divider}': null
+      - Back to Main Menu:
+          type: back
+          icon: '{nf::#f048:}'
+      - '{divider}': null
+- '{divider}': null
+- Help [rich.sh bashmenu.md]:
+    type: command
+    icon: '{nf::#f02d6:}'
+    action: '{scripts_dir}/rich.sh {bashmenu_dir}/bashmenu.md'
+    interactive: true
+    quiet: true
+    alt_buffer: true
+- Exit Menu:
+    type: exit
+    icon: '{nf::#f0a48:}'
+    interactive: true
+    quiet: false
+    alt_buffer: true
+- '{divider}': null

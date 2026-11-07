@@ -598,6 +598,13 @@
   - Added unit tests in `crates/bashmenu-tui/src/ansi.rs` (`test_ansi_to_line_nerd_font_and_emoji`, `test_ansi_to_line_carriage_return_and_osc`), integration test in `crates/bashmenu-tui/tests/modals_test.rs` (`test_stream_output_modal_nerd_fonts_and_emoji`), and CLI test in `crates/bashmenu-cli/tests/audit_items_test.rs` (`test_search_nerd_font_and_emoji_menu_item_streaming`).
   - Verified 100% test pass rate across the workspace, zero warnings on Clippy and Rustfmt, zero warnings on Shellcheck, and deployed via `install.sh`.
 
+- **Repo Root Config Deployment & Vanilla Menu Fixture Synchronization (`install.sh`)**:
+  - Fixed `install.sh` config deployment source: changed `fixture="$SCRIPT_DIR/tests/fixtures/$cfg"` to prioritize the repository root files (`$SCRIPT_DIR/$cfg`) with fallback to `tests/fixtures/$cfg` only if missing.
+  - Synchronized `tests/fixtures/bashmenu.mnu` with the clean repository root vanilla menu layout (`bashmenu.mnu`), eliminating stale developer shortcuts and custom entries.
+  - Updated unit tests in `crates/bashmenu-core/src/menu.rs` and `crates/bashmenu-core/tests/schema_fixtures_test.rs` to validate the updated vanilla menu structure (`Notes` notebook item and `Applications` submenu).
+  - Verified 100% test pass rate across the workspace, zero Clippy/Rustfmt warnings, zero Shellcheck warnings.
+
+
 
 
 

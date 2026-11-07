@@ -979,13 +979,18 @@ mod tests {
             // First item is a divider
             assert!(menu.items[0].is_divider());
 
-            // Second item is "BM Developer Shortcuts" submenu
-            let dev_shortcuts = &menu.items[1];
-            assert_eq!(dev_shortcuts.label, "BM Developer Shortcuts");
-            assert_eq!(dev_shortcuts.r#type, MenuItemType::Submenu);
-            assert!(dev_shortcuts.submenu.is_some());
+            // Second item is "Notes [{notebooks_dir}/notes.yml]"
+            let notes_item = &menu.items[1];
+            assert_eq!(notes_item.label, "Notes [{notebooks_dir}/notes.yml]");
+            assert_eq!(notes_item.r#type, MenuItemType::Notebook);
 
-            let sub = dev_shortcuts.submenu.as_ref().unwrap();
+            // Submenu item is "Applications"
+            let app_submenu = &menu.items[3];
+            assert_eq!(app_submenu.label, "Applications");
+            assert_eq!(app_submenu.r#type, MenuItemType::Submenu);
+            assert!(app_submenu.submenu.is_some());
+
+            let sub = app_submenu.submenu.as_ref().unwrap();
             assert!(!sub.items.is_empty());
         }
     }

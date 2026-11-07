@@ -75,26 +75,36 @@ fn test_parse_production_bashmenu_mnu() {
     // Item 0 is divider
     assert!(menu.items[0].is_divider(), "First item must be a divider");
 
-    // Item 1 is submenu
-    let dev_shortcuts = &menu.items[1];
-    assert_eq!(dev_shortcuts.label, "BM Developer Shortcuts");
-    assert_eq!(dev_shortcuts.r#type, MenuItemType::Submenu);
-    let sub = dev_shortcuts
+    // Item 1 is notebook
+    let notes_item = &menu.items[1];
+    assert_eq!(notes_item.label, "Notes [{notebooks_dir}/notes.yml]");
+    assert_eq!(notes_item.r#type, MenuItemType::Notebook);
+
+    // Item 3 is submenu
+    let app_submenu = &menu.items[3];
+    assert_eq!(app_submenu.label, "Applications");
+    assert_eq!(app_submenu.r#type, MenuItemType::Submenu);
+    let sub = app_submenu
         .submenu
         .as_ref()
         .expect("Submenu must be present");
     assert!(!sub.items.is_empty(), "Submenu items must not be empty");
 
-    // Check an editor item inside submenu
-    let edit_item = sub
+    // Check script item inside submenu
+    let script_item = sub
         .items
         .iter()
-        .find(|i| i.label.starts_with("Edit bashmenu.md"));
-    assert!(edit_item.is_some(), "Edit bashmenu.md item must exist");
-    let item = edit_item.unwrap();
-    assert_eq!(item.r#type, MenuItemType::Editor);
-    assert_eq!(item.file, Some("{bashmenu_dir}/bashmenu.md".to_string()));
-    assert_eq!(item.tabstop, Some(4));
+        .find(|i| i.label.starts_with("Search Nerd Font & Emoji"));
+    assert!(
+        script_item.is_some(),
+        "Search Nerd Font & Emoji item must exist"
+    );
+    let item = script_item.unwrap();
+    assert_eq!(item.r#type, MenuItemType::Script);
+    assert_eq!(
+        item.action,
+        Some("{scripts_dir}/glyphs.sh {param}".to_string())
+    );
 
     // Verify roundtrip save
     let tmp = std::env::temp_dir().join("test_bashmenu_roundtrip.mnu");
