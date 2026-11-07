@@ -582,6 +582,7 @@ fn main() -> Result<()> {
                             let _ = Command::new("sh").arg("-c").arg(&cmd).status();
                             Ok(())
                         });
+                        last_interaction = Instant::now();
                         pending_transition = true;
                         need_redraw = true;
                     }
@@ -595,7 +596,7 @@ fn main() -> Result<()> {
             } else {
                 event::read()?
             };
-            if matches!(ev, Event::Key(_) | Event::Mouse(_)) {
+            if matches!(ev, Event::Key(_) | Event::Mouse(_) | Event::FocusGained) {
                 last_interaction = Instant::now();
             }
             if let Event::Mouse(m) = &ev {
@@ -796,6 +797,7 @@ fn main() -> Result<()> {
                                     let _ = cmd.status();
                                     Ok(())
                                 });
+                                last_interaction = Instant::now();
                                 pending_transition = true;
 
                                 if let Ok(new_content) = fs::read_to_string(&temp_file) {
@@ -1391,6 +1393,7 @@ fn main() -> Result<()> {
                     };
                     if action == StreamOutputAction::Close {
                         active_modal = ActiveModal::None;
+                        last_interaction = Instant::now();
                     }
                 }
                 ActiveModal::NoteConflict(modal) => {
@@ -1651,6 +1654,7 @@ fn main() -> Result<()> {
                                         .status();
                                     Ok(())
                                 });
+                                last_interaction = Instant::now();
                                 pending_transition = true;
                             } else {
                                 let help_content = "BashMenu Documentation\n\nNavigation:\n  Up/Down, k/j: Navigate items\n  Enter: Select item\n  Esc/q: Back or exit\n\nFunction Keys:\n  F1: Help manual\n  F2: Theme picker\n  F3: Text editor\n  F4: Menu editor\n  F5: Reload config and menus\n  F6: Toggle shortcut numbers\n  F7: Configure status gutter\n  F8: Theme editor\n  F9: Keyboard shortcut editor".to_string();
@@ -1680,6 +1684,7 @@ fn main() -> Result<()> {
                                 let _ = Command::new(&editor_bin).status();
                                 Ok(())
                             });
+                            last_interaction = Instant::now();
                             pending_transition = true;
                             pending_action = Some(MenuAction::Reload);
                         }
@@ -1715,10 +1720,12 @@ fn main() -> Result<()> {
                                 let _ = cmd.status();
                                 Ok(())
                             });
+                            last_interaction = Instant::now();
                             pending_transition = true;
                             pending_action = Some(MenuAction::Reload);
                         }
                         MenuAction::Reload => {
+                            last_interaction = Instant::now();
                             clear_command_cache();
 
                             if let Ok(new_config) = load_config(&config_path) {
@@ -1825,6 +1832,7 @@ fn main() -> Result<()> {
                                     .status();
                                 Ok(())
                             });
+                            last_interaction = Instant::now();
                             pending_transition = true;
                             pending_action = Some(MenuAction::Reload);
                         }
@@ -1852,6 +1860,7 @@ fn main() -> Result<()> {
                                 }
                                 Ok(())
                             });
+                            last_interaction = Instant::now();
                             pending_transition = true;
                             pending_action = Some(MenuAction::Reload);
                         }
@@ -2241,6 +2250,7 @@ fn main() -> Result<()> {
                                     let _ = cmd.status();
                                     Ok(())
                                 });
+                                last_interaction = Instant::now();
                                 if trans_enabled {
                                     pending_transition = true;
                                 }
@@ -2280,6 +2290,7 @@ fn main() -> Result<()> {
                                             .status();
                                         Ok(())
                                     });
+                                    last_interaction = Instant::now();
                                     if trans_enabled {
                                         pending_transition = true;
                                     }
@@ -2331,6 +2342,7 @@ fn main() -> Result<()> {
                                         let _ = cmd.status();
                                         Ok(())
                                     });
+                                    last_interaction = Instant::now();
                                     pending_transition = true;
                                     pending_action = Some(MenuAction::Reload);
                                 } else if action_str == "shortcutedit"
@@ -2495,6 +2507,7 @@ fn main() -> Result<()> {
                                                     } else {
                                                         let _ = guard.suspend(run_console);
                                                     }
+                                                    last_interaction = Instant::now();
                                                     if trans_enabled {
                                                         pending_transition = true;
                                                     }

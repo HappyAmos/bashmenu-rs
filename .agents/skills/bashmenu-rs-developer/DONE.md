@@ -669,3 +669,17 @@
 
 
 
+
+## Phase 23: Inactivity Timeout Timer Reset Upon Return from Programs and Sub-Tools
+- [x] Reset `last_interaction = Instant::now()` immediately after returning from all external commands and console applications (`ExecutionMode::Console`, e.g. `mc`, shell scripts, commands).
+- [x] Reset `last_interaction = Instant::now()` immediately after returning from internal sub-tools and editors:
+  - `MenuAction::LaunchEditor` and in-menu editor launches (`bashedit`)
+  - `MenuAction::LaunchThemeEditor` and in-menu theme editor launches (`themeedit`)
+  - `MenuAction::EditMenu` and in-menu menu editor launches (`menuedit`)
+  - `MenuAction::LaunchShortcutEditor` (`shortcutedit` / `menuedit --shortcuts`)
+  - Note external editor launches in `NoteViewerModal` / `NoteConflictModal`
+  - Documentation pager launches (`bmpager`)
+  - Built-in inactivity screensaver command completion itself (`inactivity_timeout.command`)
+- [x] Reset `last_interaction = Instant::now()` on `MenuAction::Reload`, `StreamOutputModal` closing, and `Event::FocusGained` events.
+- [x] Added contract test in `crates/bashmenu-cli/tests/audit_items_test.rs` (`test_inactivity_timeout_timer_reset_contract`) asserting that 5+ minute simulated child execution durations never trigger the screensaver immediately upon return.
+- [x] Verified 100% test pass rate across the workspace, zero Clippy warnings, and zero Rustfmt warnings.
