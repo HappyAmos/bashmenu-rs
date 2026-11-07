@@ -56,3 +56,6 @@ settings:
   refresh_interval: 10
   toast_timeout: 2.0
   pager_editor: vim
+  transition: fade
+  transition_speed: normal
+  framebuffer: auto

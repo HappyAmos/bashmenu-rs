@@ -12,7 +12,7 @@ use ratatui::{Frame, Terminal};
 use std::io::{self, BufWriter, Stdout, Write};
 use std::time::Duration;
 
-use crate::transition::{dim_color, TransitionEffect};
+use crate::transition::{dim_color, TransitionEffect, TransitionSpeed};
 
 /// RAII guard managing terminal state (raw mode, alternate screen, mouse).
 pub struct TerminalGuard {
@@ -78,6 +78,7 @@ impl TerminalGuard {
     pub fn draw_with_transition<F>(
         &mut self,
         effect: TransitionEffect,
+        speed: TransitionSpeed,
         mut render_callback: F,
     ) -> io::Result<()>
     where
@@ -87,12 +88,14 @@ impl TerminalGuard {
             TransitionEffect::None | TransitionEffect::Instant => self.draw(|f| render_callback(f)),
             TransitionEffect::Fade => {
                 let size = self.terminal.size()?;
-                for step in 1..=3 {
-                    let factor = (step as f32) / 3.0;
+                let delay = speed.step_delay_in();
+                let steps = 5;
+                for step in 1..=steps {
+                    let factor = (step as f32) / (steps as f32);
                     let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
                     let _ = self.terminal.draw(|f| {
                         render_callback(f);
-                        if step < 3 {
+                        if step < steps {
                             let buf = f.buffer_mut();
                             for y in 0..size.height {
                                 for x in 0..size.width {
@@ -105,31 +108,33 @@ impl TerminalGuard {
                     });
                     let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
                     let _ = self.terminal.backend_mut().flush();
-                    if step < 3 {
-                        std::thread::sleep(Duration::from_millis(25));
+                    if step < steps {
+                        std::thread::sleep(delay);
                     }
                 }
                 Ok(())
             }
             TransitionEffect::Curtain => {
                 let size = self.terminal.size()?;
-                for step in 1..=3 {
-                    let fraction = (step as f32) / 3.0;
+                let delay = speed.step_delay_in();
+                let steps = 6;
+                for step in 1..=steps {
+                    let fraction = (step as f32) / (steps as f32);
                     let visible_width = ((size.width as f32) * fraction).round() as u16;
                     let left_bound = (size.width.saturating_sub(visible_width)) / 2;
                     let right_bound = left_bound + visible_width;
                     let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
                     let _ = self.terminal.draw(|f| {
                         render_callback(f);
-                        if step < 3 {
+                        if step < steps {
                             let buf = f.buffer_mut();
                             for y in 0..size.height {
                                 for x in 0..size.width {
                                     if x < left_bound || x >= right_bound {
                                         let cell = &mut buf[(x, y)];
                                         cell.set_char(' ');
-                                        cell.set_fg(Color::Reset);
-                                        cell.set_bg(Color::Reset);
+                                        cell.set_fg(Color::Black);
+                                        cell.set_bg(Color::Black);
                                         cell.modifier = Modifier::empty();
                                     }
                                 }
@@ -138,8 +143,8 @@ impl TerminalGuard {
                     });
                     let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
                     let _ = self.terminal.backend_mut().flush();
-                    if step < 3 {
-                        std::thread::sleep(Duration::from_millis(20));
+                    if step < steps {
+                        std::thread::sleep(delay);
                     }
                 }
                 Ok(())
@@ -152,6 +157,7 @@ impl TerminalGuard {
     pub fn draw_with_transition_out<F>(
         &mut self,
         effect: TransitionEffect,
+        speed: TransitionSpeed,
         mut render_callback: F,
     ) -> io::Result<()>
     where
@@ -161,8 +167,10 @@ impl TerminalGuard {
             TransitionEffect::None | TransitionEffect::Instant => Ok(()),
             TransitionEffect::Fade => {
                 let size = self.terminal.size()?;
-                for step in (0..=2).rev() {
-                    let factor = (step as f32) / 3.0;
+                let delay = speed.step_delay_out();
+                let steps = 5;
+                for step in (0..steps).rev() {
+                    let factor = (step as f32) / (steps as f32);
                     let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
                     let _ = self.terminal.draw(|f| {
                         render_callback(f);
@@ -170,25 +178,30 @@ impl TerminalGuard {
                         for y in 0..size.height {
                             for x in 0..size.width {
                                 let cell = &mut buf[(x, y)];
-                                cell.fg = dim_color(cell.fg, factor);
-                                cell.bg = dim_color(cell.bg, factor);
                                 if step == 0 {
                                     cell.set_char(' ');
+                                    cell.set_fg(Color::Black);
+                                    cell.set_bg(Color::Black);
                                     cell.modifier = Modifier::empty();
+                                } else {
+                                    cell.fg = dim_color(cell.fg, factor);
+                                    cell.bg = dim_color(cell.bg, factor);
                                 }
                             }
                         }
                     });
                     let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
                     let _ = self.terminal.backend_mut().flush();
-                    std::thread::sleep(Duration::from_millis(20));
+                    std::thread::sleep(delay);
                 }
                 Ok(())
             }
             TransitionEffect::Curtain => {
                 let size = self.terminal.size()?;
-                for step in (0..=2).rev() {
-                    let fraction = (step as f32) / 3.0;
+                let delay = speed.step_delay_out();
+                let steps = 6;
+                for step in (0..steps).rev() {
+                    let fraction = (step as f32) / (steps as f32);
                     let visible_width = ((size.width as f32) * fraction).round() as u16;
                     let left_bound = (size.width.saturating_sub(visible_width)) / 2;
                     let right_bound = left_bound + visible_width;
@@ -201,8 +214,8 @@ impl TerminalGuard {
                                 if step == 0 || x < left_bound || x >= right_bound {
                                     let cell = &mut buf[(x, y)];
                                     cell.set_char(' ');
-                                    cell.set_fg(Color::Reset);
-                                    cell.set_bg(Color::Reset);
+                                    cell.set_fg(Color::Black);
+                                    cell.set_bg(Color::Black);
                                     cell.modifier = Modifier::empty();
                                 }
                             }
@@ -210,7 +223,7 @@ impl TerminalGuard {
                     });
                     let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
                     let _ = self.terminal.backend_mut().flush();
-                    std::thread::sleep(Duration::from_millis(20));
+                    std::thread::sleep(delay);
                 }
                 Ok(())
             }

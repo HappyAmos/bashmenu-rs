@@ -34,10 +34,10 @@ use bashmenu_tui::{
     NoteConflictChoice, NoteConflictModal, NoteEditorAction, NoteEditorModal, NoteViewerAction,
     NoteViewerModal, RadioModal, ResolvedThemeStyles, ShortcutDispatchResult, ShortcutDispatcher,
     StreamOutputAction, StreamOutputModal, TerminalGuard, ThemePickerModal, ToastRack,
-    ToggleChoice, ToggleModal, TransitionEffect,
+    ToggleChoice, ToggleModal, TransitionEffect, TransitionSpeed,
 };
 use clap::Parser;
-use crossterm::event::{self, Event};
+use crossterm::event::{self, Event, KeyCode};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -294,6 +294,7 @@ fn main() -> Result<()> {
     loop {
         let size = guard.terminal_mut().size()?;
         let area = ratatui::layout::Rect::new(0, 0, size.width, size.height);
+        let trans_speed = TransitionSpeed::parse(config.settings.transition_speed.as_deref());
 
         // Drain plugin background updates
         let mut plugins_updated = false;
@@ -447,7 +448,7 @@ fn main() -> Result<()> {
             };
 
             if transition_effect != TransitionEffect::None {
-                guard.draw_with_transition(transition_effect, render_fn)?;
+                guard.draw_with_transition(transition_effect, trans_speed, render_fn)?;
             } else {
                 guard.draw(render_fn)?;
             }
@@ -466,7 +467,7 @@ fn main() -> Result<()> {
                     if !cmd.trim().is_empty() {
                         let eff = TransitionEffect::parse(config.settings.transition.as_deref());
                         if eff != TransitionEffect::None && eff != TransitionEffect::Instant {
-                            let _ = guard.draw_with_transition_out(eff, |f| {
+                            let _ = guard.draw_with_transition_out(eff, trans_speed, |f| {
                                 menu_view.render(f.area(), f.buffer_mut());
                             });
                         }
@@ -648,7 +649,7 @@ fn main() -> Result<()> {
                                     TransitionEffect::parse(config.settings.transition.as_deref());
                                 if eff != TransitionEffect::None && eff != TransitionEffect::Instant
                                 {
-                                    let _ = guard.draw_with_transition_out(eff, |f| {
+                                    let _ = guard.draw_with_transition_out(eff, trans_speed, |f| {
                                         menu_view.render(f.area(), f.buffer_mut());
                                     });
                                 }
@@ -1384,6 +1385,38 @@ fn main() -> Result<()> {
                         match ev {
                             Event::Key(key) => match shortcut_dispatcher.handle_key(key) {
                                 ShortcutDispatchResult::PassThrough => {
+                                    let will_transition = match key.code {
+                                        KeyCode::Enter => {
+                                            if let Some(item) = menu_view.selected_item() {
+                                                item.r#type == MenuItemType::Submenu
+                                                    || item.submenu.is_some()
+                                                    || item.r#type == MenuItemType::Notebook
+                                            } else {
+                                                false
+                                            }
+                                        }
+                                        KeyCode::Esc | KeyCode::Backspace | KeyCode::Char('q') => {
+                                            menu_view.stack_depth() > 1
+                                        }
+                                        KeyCode::PageUp | KeyCode::PageDown => true,
+                                        _ => false,
+                                    };
+                                    if will_transition {
+                                        let eff = TransitionEffect::parse(
+                                            config.settings.transition.as_deref(),
+                                        );
+                                        if eff != TransitionEffect::None
+                                            && eff != TransitionEffect::Instant
+                                        {
+                                            let _ = guard.draw_with_transition_out(
+                                                eff,
+                                                trans_speed,
+                                                |f| {
+                                                    menu_view.render(f.area(), f.buffer_mut());
+                                                },
+                                            );
+                                        }
+                                    }
                                     menu_view.handle_key(key.code)
                                 }
                                 ShortcutDispatchResult::LeaderActivated
@@ -1419,7 +1452,26 @@ fn main() -> Result<()> {
                                         _ => MenuAction::None,
                                     }
                                 } else {
-                                    menu_view.handle_mouse(mouse, area)
+                                    let prev_levels = menu_view.menu_level_titles();
+                                    let act = menu_view.handle_mouse(mouse, area);
+                                    let curr_levels = menu_view.menu_level_titles();
+                                    if prev_levels != curr_levels {
+                                        let eff = TransitionEffect::parse(
+                                            config.settings.transition.as_deref(),
+                                        );
+                                        if eff != TransitionEffect::None
+                                            && eff != TransitionEffect::Instant
+                                        {
+                                            let _ = guard.draw_with_transition_out(
+                                                eff,
+                                                trans_speed,
+                                                |f| {
+                                                    menu_view.render(f.area(), f.buffer_mut());
+                                                },
+                                            );
+                                        }
+                                    }
+                                    act
                                 }
                             }
                             Event::Resize(_, _) => MenuAction::None,
@@ -1447,7 +1499,7 @@ fn main() -> Result<()> {
                                     TransitionEffect::parse(config.settings.transition.as_deref());
                                 if eff != TransitionEffect::None && eff != TransitionEffect::Instant
                                 {
-                                    let _ = guard.draw_with_transition_out(eff, |f| {
+                                    let _ = guard.draw_with_transition_out(eff, trans_speed, |f| {
                                         menu_view.render(f.area(), f.buffer_mut());
                                     });
                                 }
@@ -1468,6 +1520,13 @@ fn main() -> Result<()> {
                             }
                         }
                         MenuAction::ThemeSelector => {
+                            let eff =
+                                TransitionEffect::parse(config.settings.transition.as_deref());
+                            if eff != TransitionEffect::None && eff != TransitionEffect::Instant {
+                                let _ = guard.draw_with_transition_out(eff, trans_speed, |f| {
+                                    menu_view.render(f.area(), f.buffer_mut());
+                                });
+                            }
                             let theme_names: Vec<String> = themes.keys().cloned().collect();
                             active_modal = ActiveModal::ThemePicker(ThemePickerModal::new(
                                 theme_names,
@@ -1479,7 +1538,7 @@ fn main() -> Result<()> {
                             let eff =
                                 TransitionEffect::parse(config.settings.transition.as_deref());
                             if eff != TransitionEffect::None && eff != TransitionEffect::Instant {
-                                let _ = guard.draw_with_transition_out(eff, |f| {
+                                let _ = guard.draw_with_transition_out(eff, trans_speed, |f| {
                                     menu_view.render(f.area(), f.buffer_mut());
                                 });
                             }
@@ -1503,7 +1562,7 @@ fn main() -> Result<()> {
                             let eff =
                                 TransitionEffect::parse(config.settings.transition.as_deref());
                             if eff != TransitionEffect::None && eff != TransitionEffect::Instant {
-                                let _ = guard.draw_with_transition_out(eff, |f| {
+                                let _ = guard.draw_with_transition_out(eff, trans_speed, |f| {
                                     menu_view.render(f.area(), f.buffer_mut());
                                 });
                             }
@@ -1582,7 +1641,9 @@ fn main() -> Result<()> {
                             menu_view.set_plugin_rows(rows);
                             plugin_engine.trigger_refresh(&config, true);
 
-                            guard.request_clear();
+                            if !pending_transition {
+                                guard.request_clear();
+                            }
                             need_redraw = true;
                         }
                         MenuAction::ToggleShortcuts => {
@@ -1592,6 +1653,13 @@ fn main() -> Result<()> {
                             menu_view.set_config(config.clone());
                         }
                         MenuAction::ConfigureGutter => {
+                            let eff =
+                                TransitionEffect::parse(config.settings.transition.as_deref());
+                            if eff != TransitionEffect::None && eff != TransitionEffect::Instant {
+                                let _ = guard.draw_with_transition_out(eff, trans_speed, |f| {
+                                    menu_view.render(f.area(), f.buffer_mut());
+                                });
+                            }
                             let current_gutter = config
                                 .settings
                                 .status_gutter
@@ -1609,7 +1677,7 @@ fn main() -> Result<()> {
                             let eff =
                                 TransitionEffect::parse(config.settings.transition.as_deref());
                             if eff != TransitionEffect::None && eff != TransitionEffect::Instant {
-                                let _ = guard.draw_with_transition_out(eff, |f| {
+                                let _ = guard.draw_with_transition_out(eff, trans_speed, |f| {
                                     menu_view.render(f.area(), f.buffer_mut());
                                 });
                             }
@@ -1631,7 +1699,7 @@ fn main() -> Result<()> {
                             let eff =
                                 TransitionEffect::parse(config.settings.transition.as_deref());
                             if eff != TransitionEffect::None && eff != TransitionEffect::Instant {
-                                let _ = guard.draw_with_transition_out(eff, |f| {
+                                let _ = guard.draw_with_transition_out(eff, trans_speed, |f| {
                                     menu_view.render(f.area(), f.buffer_mut());
                                 });
                             }
@@ -1653,6 +1721,13 @@ fn main() -> Result<()> {
                             pending_action = Some(MenuAction::Reload);
                         }
                         MenuAction::OpenNotebook(item) => {
+                            let eff =
+                                TransitionEffect::parse(config.settings.transition.as_deref());
+                            if eff != TransitionEffect::None && eff != TransitionEffect::Instant {
+                                let _ = guard.draw_with_transition_out(eff, trans_speed, |f| {
+                                    menu_view.render(f.area(), f.buffer_mut());
+                                });
+                            }
                             let mut ctx = MacroContext::new(&config);
                             ctx.window_width = size.width as usize;
                             ctx.window_height = size.height as usize;
@@ -2001,9 +2076,10 @@ fn main() -> Result<()> {
                                     if eff != TransitionEffect::None
                                         && eff != TransitionEffect::Instant
                                     {
-                                        let _ = guard.draw_with_transition_out(eff, |f| {
-                                            menu_view.render(f.area(), f.buffer_mut());
-                                        });
+                                        let _ =
+                                            guard.draw_with_transition_out(eff, trans_speed, |f| {
+                                                menu_view.render(f.area(), f.buffer_mut());
+                                            });
                                     }
                                 }
                                 let _ = guard.suspend_keep_alt(|| {
@@ -2051,9 +2127,13 @@ fn main() -> Result<()> {
                                         if eff != TransitionEffect::None
                                             && eff != TransitionEffect::Instant
                                         {
-                                            let _ = guard.draw_with_transition_out(eff, |f| {
-                                                menu_view.render(f.area(), f.buffer_mut());
-                                            });
+                                            let _ = guard.draw_with_transition_out(
+                                                eff,
+                                                trans_speed,
+                                                |f| {
+                                                    menu_view.render(f.area(), f.buffer_mut());
+                                                },
+                                            );
                                         }
                                     }
                                     let _ = guard.suspend_keep_alt(|| {
@@ -2092,9 +2172,13 @@ fn main() -> Result<()> {
                                         if eff != TransitionEffect::None
                                             && eff != TransitionEffect::Instant
                                         {
-                                            let _ = guard.draw_with_transition_out(eff, |f| {
-                                                menu_view.render(f.area(), f.buffer_mut());
-                                            });
+                                            let _ = guard.draw_with_transition_out(
+                                                eff,
+                                                trans_speed,
+                                                |f| {
+                                                    menu_view.render(f.area(), f.buffer_mut());
+                                                },
+                                            );
                                         }
                                     }
                                     let _ = guard.suspend_keep_alt(|| {
@@ -2221,6 +2305,7 @@ fn main() -> Result<()> {
                                                         {
                                                             let _ = guard.draw_with_transition_out(
                                                                 eff,
+                                                                trans_speed,
                                                                 |f| {
                                                                     menu_view.render(
                                                                         f.area(),

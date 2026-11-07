@@ -647,6 +647,23 @@ items:
                       interactive: true
                       quiet: false
                       alt_buffer: true
+                  - Menu Transition Speed [{settings.transition_speed}]:
+                      type: radio
+                      key: settings.transition_speed
+                      title: Screen Transition Speed [{settings.transition_speed}]
+                      prompt: 'Select animation speed for screen transitions:'
+                      options:
+                        - label: Fast (~60-75ms, snappy 15ms/step)
+                          value: fast
+                        - label: Normal (Recommended, ~100-125ms, 25ms/step)
+                          value: normal
+                        - label: Slow (Deliberate, ~200-250ms, 50ms/step)
+                          value: slow
+                      icon: '{nf::#f0e7}'
+                      action: settings.transition_speed
+                      interactive: true
+                      quiet: false
+                      alt_buffer: true
                   - Linux Framebuffer Support [{settings.framebuffer}]:
                       type: radio
                       key: settings.framebuffer

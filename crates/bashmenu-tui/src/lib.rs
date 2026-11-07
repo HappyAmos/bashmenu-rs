@@ -51,7 +51,7 @@ pub use style::{
 pub use terminal::TerminalGuard;
 pub use text_input::TextInput;
 pub use toast::{ActiveToast, ToastRack};
-pub use transition::{dim_color, TransitionEffect};
+pub use transition::{dim_color, TransitionEffect, TransitionSpeed};
 pub use wallpaper::{
     color_to_rgb, composite_buffer, derive_palette_from_image, downsample_color_value_to_16,
     downsample_color_value_to_8, downsample_palette_to_16, downsample_palette_to_8,

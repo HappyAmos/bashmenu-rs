@@ -1,5 +1,6 @@
 use bashmenu_tui::{
     dim_color, format_pixel_16, format_pixel_32, is_framebuffer_available, TransitionEffect,
+    TransitionSpeed,
 };
 use image::RgbImage;
 use ratatui::style::Color;
@@ -24,9 +25,27 @@ fn test_transition_effect_all_modes() {
     );
     assert_eq!(
         TransitionEffect::parse(Some("invalid")),
-        TransitionEffect::Instant
+        TransitionEffect::Fade
     );
-    assert_eq!(TransitionEffect::parse(None), TransitionEffect::Instant);
+    assert_eq!(TransitionEffect::parse(None), TransitionEffect::Fade);
+}
+
+#[test]
+fn test_transition_speed_profiles() {
+    assert_eq!(TransitionSpeed::parse(Some("fast")), TransitionSpeed::Fast);
+    assert_eq!(
+        TransitionSpeed::parse(Some("normal")),
+        TransitionSpeed::Normal
+    );
+    assert_eq!(TransitionSpeed::parse(Some("slow")), TransitionSpeed::Slow);
+    assert_eq!(
+        TransitionSpeed::parse(Some("20")),
+        TransitionSpeed::Custom(20)
+    );
+    assert_eq!(TransitionSpeed::parse(None), TransitionSpeed::Normal);
+
+    assert!(TransitionSpeed::Fast.step_delay_in() < TransitionSpeed::Normal.step_delay_in());
+    assert!(TransitionSpeed::Normal.step_delay_in() < TransitionSpeed::Slow.step_delay_in());
 }
 
 #[test]

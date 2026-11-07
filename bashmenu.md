@@ -430,21 +430,32 @@ The main menu dynamically calculates its status refresh interval to balance real
   ```
   *(Note: Background plugins configured under `settings.plugins.<name>` control their own individual polling frequencies via their `sleep:` setting in milliseconds, e.g. `sleep: 10000`.)*
 
-#### Visual Screen Transitions (`settings.transition`):
+#### Visual Screen Transitions & Speed (`settings.transition` & `settings.transition_speed`):
 HA Bash Menu features hardware-synchronized visual transitions rendered
 between screens, submenus, paging jumps, modal dialogs, and external application
 switches.
 
 ```yaml
 settings:
-  transition: fade   # Options: fade, curtain, instant, none
+  transition: fade            # Options: fade, curtain, instant, none (default: fade)
+  transition_speed: normal    # Options: fast, normal, slow, or milliseconds (default: normal)
 ```
 
 | Transition Effect | Description |
 | :--- | :--- |
-| `fade` | Smooth ramp-down and ramp-up luminance reduction over 120ms with DEC Mode 2026 synchronized updates. |
+| `fade` | Smooth multi-step luminance ramp-down and ramp-up with TrueColor scaling and DEC Mode 2026 synchronized output. |
 | `curtain` | High-contrast horizontal curtain wipe expanding symmetrically outward from the screen center. |
-| `instant` / `none` | Instantaneous frame swaps without intermediate animation frames. |
+| `instant` / `none` | Immediate frame swaps without intermediate animation frames. |
+
+##### Transition Speed Profiles (`settings.transition_speed`):
+You can configure animation playback speed using preset profiles or explicit millisecond step delays:
+
+| Speed Profile | Animation Duration | Step Interval | Recommended Use Case |
+| :--- | :--- | :--- | :--- |
+| `fast` | ~60–75ms | 15ms in / 12ms out | High-speed navigation and power users desiring rapid response with subtle visual motion. |
+| **`normal`** (Default) | ~100–125ms | 25ms in / 20ms out | Balanced, buttery-smooth cinematic pacing across modern terminals and netbook displays. |
+| `slow` | ~200–250ms | 50ms in / 40ms out | Deliberate, relaxed pacing ideal for presentations, high-contrast themes, or low-power screens. |
+| `<integer>` (e.g. `30`) | Custom | User-specified ms | Explicit custom step interval in milliseconds (clamped between 5ms and 500ms). |
 
 Visual transitions are automatically triggered:
 - On initial startup launch.

@@ -1,29 +1,84 @@
 //! Screen transition animations when returning to menu from external commands.
 
 use ratatui::style::Color;
+use std::time::Duration;
 
 /// Supported screen transition animation styles.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TransitionEffect {
-    /// Instant atomic redraw via DEC Mode 2026 synchronized output.
-    #[default]
-    Instant,
     /// Progressive brightness ramp from dark to full color.
+    #[default]
     Fade,
     /// Center-to-outer vertical curtain wipe reveal.
     Curtain,
+    /// Instant atomic redraw via DEC Mode 2026 synchronized output.
+    Instant,
     /// Standard immediate draw without animation.
     None,
 }
 
 impl TransitionEffect {
-    /// Parses a transition name from configuration string.
+    /// Parses a transition name from configuration string. Defaults to `Fade`.
     pub fn parse(s: Option<&str>) -> Self {
         match s.map(|v| v.trim().to_ascii_lowercase()).as_deref() {
-            Some("fade") => Self::Fade,
             Some("curtain") => Self::Curtain,
-            Some("none") | Some("disabled") | Some("off") => Self::None,
-            _ => Self::Instant,
+            Some("instant") => Self::Instant,
+            Some("none") | Some("disabled") | Some("off") | Some("0") | Some("false") => Self::None,
+            Some("fade") => Self::Fade,
+            _ => Self::Fade,
+        }
+    }
+}
+
+/// Supported transition animation speed profiles.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TransitionSpeed {
+    /// Snappy fast transition (~60-75ms total duration).
+    Fast,
+    /// Balanced standard transition (~100-125ms total duration).
+    #[default]
+    Normal,
+    /// Deliberate relaxed transition (~200-250ms total duration).
+    Slow,
+    /// Custom millisecond step interval.
+    Custom(u64),
+}
+
+impl TransitionSpeed {
+    /// Parses transition speed ("fast", "normal", "slow", or milliseconds).
+    pub fn parse(s: Option<&str>) -> Self {
+        match s.map(|v| v.trim().to_ascii_lowercase()).as_deref() {
+            Some("fast") | Some("quick") => Self::Fast,
+            Some("slow") => Self::Slow,
+            Some("normal") | Some("medium") | Some("default") => Self::Normal,
+            Some(custom) => {
+                if let Ok(ms) = custom.parse::<u64>() {
+                    Self::Custom(ms.clamp(5, 500))
+                } else {
+                    Self::Normal
+                }
+            }
+            None => Self::Normal,
+        }
+    }
+
+    /// Returns the step sleep duration for transition-in animations.
+    pub fn step_delay_in(&self) -> Duration {
+        match self {
+            Self::Fast => Duration::from_millis(15),
+            Self::Normal => Duration::from_millis(25),
+            Self::Slow => Duration::from_millis(50),
+            Self::Custom(ms) => Duration::from_millis(*ms),
+        }
+    }
+
+    /// Returns the step sleep duration for transition-out animations.
+    pub fn step_delay_out(&self) -> Duration {
+        match self {
+            Self::Fast => Duration::from_millis(12),
+            Self::Normal => Duration::from_millis(20),
+            Self::Slow => Duration::from_millis(40),
+            Self::Custom(ms) => Duration::from_millis((*ms * 4) / 5),
         }
     }
 }
@@ -31,57 +86,30 @@ impl TransitionEffect {
 /// Dims a color by a scaling factor between 0.0 and 1.0.
 pub fn dim_color(color: Color, factor: f32) -> Color {
     let f = factor.clamp(0.0, 1.0);
-    match color {
-        Color::Rgb(r, g, b) => Color::Rgb(
-            ((r as f32) * f).round() as u8,
-            ((g as f32) * f).round() as u8,
-            ((b as f32) * f).round() as u8,
-        ),
-        Color::Indexed(idx) => {
-            if f < 0.5 {
-                Color::DarkGray
-            } else {
-                Color::Indexed(idx)
-            }
+    if (f - 1.0).abs() <= 0.001 {
+        return color;
+    }
+
+    let (r, g, b) = match color {
+        Color::Rgb(r, g, b) => (r, g, b),
+        Color::Reset => (200, 200, 200),
+        other => crate::wallpaper::color_to_rgb(other),
+    };
+
+    let dr = ((r as f32) * f).round() as u8;
+    let dg = ((g as f32) * f).round() as u8;
+    let db = ((b as f32) * f).round() as u8;
+
+    match crate::style::ColorTier::detect() {
+        crate::style::ColorTier::TrueColor | crate::style::ColorTier::Color256 => {
+            Color::Rgb(dr, dg, db)
         }
-        Color::White
-        | Color::LightCyan
-        | Color::LightBlue
-        | Color::LightGreen
-        | Color::LightYellow
-        | Color::LightMagenta
-        | Color::LightRed => {
-            if f < 0.4 {
-                Color::DarkGray
-            } else if f < 0.75 {
-                match color {
-                    Color::White => Color::Gray,
-                    Color::LightCyan => Color::Cyan,
-                    Color::LightBlue => Color::Blue,
-                    Color::LightGreen => Color::Green,
-                    Color::LightYellow => Color::Yellow,
-                    Color::LightMagenta => Color::Magenta,
-                    Color::LightRed => Color::Red,
-                    other => other,
-                }
-            } else {
-                color
-            }
+        crate::style::ColorTier::Color16 => {
+            crate::style::downsample_color_to_16(Color::Rgb(dr, dg, db))
         }
-        Color::Cyan
-        | Color::Blue
-        | Color::Green
-        | Color::Yellow
-        | Color::Magenta
-        | Color::Red
-        | Color::Gray => {
-            if f < 0.5 {
-                Color::DarkGray
-            } else {
-                color
-            }
+        crate::style::ColorTier::Color8 => {
+            crate::style::downsample_color_to_8(Color::Rgb(dr, dg, db))
         }
-        _ => color,
     }
 }
 
@@ -115,18 +143,38 @@ mod tests {
             TransitionEffect::parse(Some("disabled")),
             TransitionEffect::None
         );
-        assert_eq!(TransitionEffect::parse(None), TransitionEffect::Instant);
+        assert_eq!(TransitionEffect::parse(None), TransitionEffect::Fade);
+    }
+
+    #[test]
+    fn test_transition_speed_parse() {
+        assert_eq!(TransitionSpeed::parse(Some("fast")), TransitionSpeed::Fast);
+        assert_eq!(TransitionSpeed::parse(Some("quick")), TransitionSpeed::Fast);
+        assert_eq!(
+            TransitionSpeed::parse(Some("normal")),
+            TransitionSpeed::Normal
+        );
+        assert_eq!(TransitionSpeed::parse(Some("slow")), TransitionSpeed::Slow);
+        assert_eq!(
+            TransitionSpeed::parse(Some("30")),
+            TransitionSpeed::Custom(30)
+        );
+        assert_eq!(TransitionSpeed::parse(None), TransitionSpeed::Normal);
+        assert_eq!(
+            TransitionSpeed::parse(Some("invalid")),
+            TransitionSpeed::Normal
+        );
     }
 
     #[test]
     fn test_dim_color() {
-        let white_dim = dim_color(Color::White, 0.2);
-        assert_eq!(white_dim, Color::DarkGray);
+        let white_dim = dim_color(Color::White, 0.0);
+        assert_eq!(white_dim, Color::Rgb(0, 0, 0));
 
         let rgb = dim_color(Color::Rgb(100, 200, 50), 0.5);
         assert_eq!(rgb, Color::Rgb(50, 100, 25));
 
-        let reset = dim_color(Color::Reset, 0.5);
-        assert_eq!(reset, Color::Reset);
+        let full = dim_color(Color::Rgb(100, 200, 50), 1.0);
+        assert_eq!(full, Color::Rgb(100, 200, 50));
     }
 }

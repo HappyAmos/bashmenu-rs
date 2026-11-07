@@ -102,6 +102,10 @@ pub struct Settings {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transition: Option<String>,
 
+    /// Animation transition speed ("fast", "normal", "slow", or milliseconds)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transition_speed: Option<String>,
+
     /// Direct Linux framebuffer (/dev/fb0) rendering ("auto", "true", "false")
     #[serde(skip_serializing_if = "Option::is_none")]
     pub framebuffer: Option<String>,
@@ -302,6 +306,13 @@ impl BashMenuConfig {
             "settings.transition" => {
                 self.settings.transition = match &value {
                     serde_yml::Value::String(s) => Some(s.clone()),
+                    _ => None,
+                };
+            }
+            "settings.transition_speed" => {
+                self.settings.transition_speed = match &value {
+                    serde_yml::Value::String(s) => Some(s.clone()),
+                    serde_yml::Value::Number(n) => Some(n.to_string()),
                     _ => None,
                 };
             }
