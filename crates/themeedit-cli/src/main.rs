@@ -21,8 +21,9 @@ use ratatui::widgets::{Block, Borders, Widget};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use themeedit_cli::{
-    extract_preview_color_at, get_token_preview_spans, render_preview_pane, PreviewMode,
-    ThemeEditorState, TokenKind, TreeRow,
+    extract_preview_cell_color, extract_preview_color_at, format_color_code,
+    get_token_preview_spans, render_preview_pane, PreviewMode, ThemeEditorState, TokenKind,
+    TreeRow,
 };
 
 /// Command-line argument configuration for the Theme Editor (`themeedit`).
@@ -477,6 +478,7 @@ fn main() -> Result<()> {
             "[Ctrl+S] Save",
             "[Ctrl+A] Save As",
             "[TAB] View",
+            "[R-Click] Dropper",
             "[q] Exit",
         ];
         let bottom_avail_w = area.width.saturating_sub(4) as usize;
@@ -1028,6 +1030,67 @@ fn main() -> Result<()> {
                                         ));
                                         need_redraw = true;
                                     }
+                                    continue;
+                                }
+                            }
+
+                            if m.kind == MouseEventKind::Down(MouseButton::Right) {
+                                // Color Dropper: right-click in preview pane samples pixel color and assigns it to selected token
+                                if m.column >= right_area.x
+                                    && m.column < right_area.x + right_area.width
+                                    && m.row >= right_area.y
+                                    && m.row < right_area.y + right_area.height
+                                {
+                                    let sampled_color = extract_preview_cell_color(
+                                        &preview_buffer,
+                                        m.column,
+                                        m.row,
+                                        &preview_styles,
+                                    );
+                                    let color_str = format_color_code(sampled_color);
+                                    let clipboard_val = match sampled_color {
+                                        Color::Indexed(code) => format!("{}", code),
+                                        Color::Rgb(r, g, b) => {
+                                            format!("#{r:02x}{g:02x}{b:02x}")
+                                        }
+                                        _ => {
+                                            let (r, g, b) =
+                                                bashmenu_tui::color_to_rgb(sampled_color);
+                                            format!("#{r:02x}{g:02x}{b:02x}")
+                                        }
+                                    };
+                                    bashmenu_tui::set_clipboard_text(&clipboard_val);
+
+                                    let token = state.current_selected_token().cloned();
+                                    if let Some(tok) = token {
+                                        if let TokenKind::Color(ref key) = tok.kind {
+                                            state.set_color_token_value(key, sampled_color);
+                                            toast_rack.add(ToastNotification {
+                                                title: Some("Color Dropper".to_string()),
+                                                message: format!(
+                                                    "Sampled: {}\nAssigned to: {}",
+                                                    color_str, tok.label
+                                                ),
+                                                severity: ToastSeverity::Information,
+                                                timeout_secs: 1.5,
+                                            });
+                                        } else {
+                                            toast_rack.add(ToastNotification {
+                                                title: Some("Color Dropper".to_string()),
+                                                message: format!(
+                                                    "Sampled: {}\n'{}' is not a color setting",
+                                                    color_str, tok.label
+                                                ),
+                                                severity: ToastSeverity::Information,
+                                                timeout_secs: 1.5,
+                                            });
+                                        }
+                                    }
+                                    click_flash = Some((
+                                        std::time::Instant::now(),
+                                        vec![(m.row, m.column, m.column + 1)],
+                                    ));
+                                    need_redraw = true;
                                     continue;
                                 }
                             }

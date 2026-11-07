@@ -1,7 +1,9 @@
 //! Library module for ThemeEdit core state, actions, and theme manipulation.
 
 pub mod preview;
-pub use preview::{extract_preview_color_at, format_color_code, render_preview_pane};
+pub use preview::{
+    extract_preview_cell_color, extract_preview_color_at, format_color_code, render_preview_pane,
+};
 
 use anyhow::Result;
 use bashmenu_core::{
@@ -1113,6 +1115,17 @@ impl ThemeEditorState {
         }
         self.selected_row = row_idx.min(rows.len().saturating_sub(1));
         self.sync_selected_idx_from_row(&rows);
+    }
+
+    /// Returns the currently selected TokenItem, if the active tree row points to a token
+    /// (or falls back to `self.tokens[self.selected_idx]`).
+    pub fn current_selected_token(&self) -> Option<&TokenItem> {
+        let rows = self.visible_rows();
+        if let Some(TreeRow::Token(idx)) = rows.get(self.selected_row) {
+            self.tokens.get(*idx)
+        } else {
+            self.tokens.get(self.selected_idx)
+        }
     }
 
     /// Handles Right arrow key navigation (expanding categories or descending into tokens).

@@ -816,16 +816,16 @@ pub fn format_color_code(color: Color) -> String {
     }
 }
 
-/// Extracts the color code string of the rendered cell at (col, row).
-pub fn extract_preview_color_at(
+/// Extracts the effective Ratatui Color of the rendered cell at (col, row).
+pub fn extract_preview_cell_color(
     buf: &Buffer,
     col: u16,
     row: u16,
     fallback_styles: &ResolvedThemeStyles,
-) -> String {
+) -> Color {
     if let Some(cell) = buf.cell((col, row)) {
         let sym = cell.symbol();
-        let color = if sym == " " || sym.is_empty() {
+        if sym == " " || sym.is_empty() {
             // Padding space: visible pixel color is the background
             if cell.bg != Color::Reset {
                 cell.bg
@@ -848,9 +848,19 @@ pub fn extract_preview_color_at(
             } else {
                 fallback_styles.text.fg.unwrap_or(Color::White)
             }
-        };
-        format_color_code(color)
+        }
     } else {
-        format_color_code(fallback_styles.background)
+        fallback_styles.background
     }
+}
+
+/// Extracts the color code string of the rendered cell at (col, row).
+pub fn extract_preview_color_at(
+    buf: &Buffer,
+    col: u16,
+    row: u16,
+    fallback_styles: &ResolvedThemeStyles,
+) -> String {
+    let color = extract_preview_cell_color(buf, col, row, fallback_styles);
+    format_color_code(color)
 }

@@ -222,6 +222,7 @@ The visual theme editor provides a split-screen interface featuring a collapsibl
 | `F8` / `Delete` | Delete current theme from `bashmenu.themes` (with confirmation modal), or clear wallpaper image when `Wallpaper Image` token is focused. |
 | `Ctrl+S` | Save theme directly to `bashmenu.themes` (prompts Save As only if `untitled`). |
 | `Ctrl+A` | Save As under a new theme name. |
+| `Right Click` (Preview) | **Color Dropper**: Samples the visible pixel color from the clicked location in the preview pane, copies the color code to the system clipboard, and assigns it directly to the currently selected Theme Token (if it is a color setting). |
 | `ESC` / `q` | Exit theme editor (prompts if unsaved changes exist). |
 
 ### 3.5 Interactive Terminal Pager (`bmpager`)

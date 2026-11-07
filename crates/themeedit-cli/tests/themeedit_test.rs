@@ -1306,3 +1306,104 @@ fn test_themeedit_truecolor_token_support() {
     assert_eq!(styles.accent.fg, Some(dracula_purple));
     assert_eq!(styles.background, catppuccin_base);
 }
+
+#[test]
+fn test_preview_color_dropper_sampling_and_assignment() {
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::style::{Color, Style};
+    use themeedit_cli::{extract_preview_cell_color, TokenKind, TreeRow};
+
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(fixture_path, Some("dracula".to_string()));
+    let styles = bashmenu_tui::ResolvedThemeStyles::from_theme(&state.current_theme, true);
+
+    let area = Rect::new(0, 0, 10, 10);
+    let mut buf = Buffer::empty(area);
+
+    // 1. Cell (1, 1): empty space with background Color::Indexed(42)
+    buf[(1, 1)]
+        .set_char(' ')
+        .set_style(Style::default().bg(Color::Indexed(42)));
+    assert_eq!(
+        extract_preview_cell_color(&buf, 1, 1, &styles),
+        Color::Indexed(42)
+    );
+
+    // 2. Cell (2, 1): character 'X' with TrueColor RGB fg
+    let test_rgb = Color::Rgb(250, 128, 114); // Salmon
+    buf[(2, 1)]
+        .set_char('X')
+        .set_style(Style::default().fg(test_rgb));
+    assert_eq!(extract_preview_cell_color(&buf, 2, 1, &styles), test_rgb);
+
+    // 3. Cell (3, 1): half-block '▀' with fg
+    let fg_rgb = Color::Rgb(100, 200, 255);
+    buf[(3, 1)]
+        .set_char('▀')
+        .set_style(Style::default().fg(fg_rgb));
+    assert_eq!(extract_preview_cell_color(&buf, 3, 1, &styles), fg_rgb);
+
+    // 4. Cell (4, 1): unstyled empty space (falls back to theme background)
+    assert_eq!(
+        extract_preview_cell_color(&buf, 4, 1, &styles),
+        styles.background
+    );
+
+    // Expand Colors category and select the first color token
+    state.expand_category(themeedit_cli::TokenCategory::Colors);
+    let rows = state.visible_rows();
+    let token_row_idx = rows
+        .iter()
+        .position(|r| {
+            if let TreeRow::Token(idx) = r {
+                matches!(state.tokens[*idx].kind, TokenKind::Color(_))
+            } else {
+                false
+            }
+        })
+        .expect("must find a visible color token");
+
+    state.selected_row = token_row_idx;
+    let selected_tok = state
+        .current_selected_token()
+        .cloned()
+        .expect("token must be selected");
+    let key = match &selected_tok.kind {
+        TokenKind::Color(k) => k.clone(),
+        _ => panic!("selected row should be a Color token"),
+    };
+
+    // Simulate right click sampling cell (2, 1) and assigning it
+    let sampled = extract_preview_cell_color(&buf, 2, 1, &styles);
+    assert_eq!(sampled, test_rgb);
+    state.set_color_token_value(&key, sampled);
+
+    assert!(state.is_modified);
+    assert_eq!(state.get_color_token_color(&key), test_rgb);
+    let updated_tok = state
+        .tokens
+        .iter()
+        .find(|t| match &t.kind {
+            TokenKind::Color(k) => k == &key,
+            _ => false,
+        })
+        .unwrap();
+    assert_eq!(state.get_token_value_display(updated_tok), "#fa8072");
+
+    // 5. Test when non-color token is selected (e.g. Border token)
+    let border_idx = state
+        .tokens
+        .iter()
+        .position(|t| matches!(t.kind, TokenKind::Border(_)))
+        .expect("border token exists");
+    state.selected_idx = border_idx;
+    // Set selected_row out of bounds so current_selected_token falls back to selected_idx
+    state.selected_row = 9999;
+    let non_color_tok = state
+        .current_selected_token()
+        .expect("token should fall back to selected_idx");
+    assert!(matches!(non_color_tok.kind, TokenKind::Border(_)));
+    // Confirm kind is not TokenKind::Color
+    assert!(!matches!(non_color_tok.kind, TokenKind::Color(_)));
+}

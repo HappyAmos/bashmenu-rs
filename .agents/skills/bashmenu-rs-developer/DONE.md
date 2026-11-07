@@ -611,15 +611,27 @@
   - Added unit test assertions in `crates/bashmenu-tui/src/transition.rs` (`test_dim_color`) and integration test assertions in `crates/bashmenu-tui/tests/transition_test.rs` (`test_transition_dim_color_levels`) verifying `Color256` outputs `Color::Indexed` and 8/16-color tiers never emit `Color::Rgb`.
   - Verified 100% test pass rate across the workspace, zero warnings on Clippy and Rustfmt, zero warnings on Shellcheck.
 
-- **Help Gutter Stationary Hover Expansion (Tooltip) & Custom Shortcuts Display**:
-  - Implemented `HelpGutterHover` tracker in `crates/bashmenu-tui/src/gutter.rs` to detect when the mouse hovers over the help gutter for 4 seconds without moving.
-  - Implemented `has_hidden_gutter_text` and generalized `wrap_spread_help_gutter_layout` in `gutter.rs` to support 3-line balanced partitioning and multi-line packing when height/width constraints truncate or hide help items.
-  - Extended `MenuView` in `crates/bashmenu-tui/src/menu_view.rs` and `bashmenu-cli`: when stationary hover exceeds 4 seconds on a gutter with hidden items, the gutter dynamically grows by an extra row (+1 row, up to 3 rows), shifting the gutter border up and displaying the hidden help text.
-  - Integrated configured shortcuts from the shortcut manager (`ShortcutsConfig`) into `MenuView` help tokens, displaying them in the expanded gutter row and enabling mouse click execution.
-  - When the mouse moves or user interaction occurs (key press, click, scroll), the extra row immediately collapses and returns the screen to normal.
-  - Extended hover expansion to `menuedit-cli` (`shortcut_editor.rs` and `main.rs`) and `themeedit-cli` (`main.rs`).
-  - Added unit and integration tests in `crates/bashmenu-tui/src/gutter.rs` and `crates/bashmenu-tui/tests/menu_navigation_test.rs` (`test_gutter_hover_expansion_and_collapse`, `test_gutter_custom_shortcuts_from_manager`).
-  - Verified 100% test pass rate across the workspace, zero warnings on Clippy and Rustfmt, zero warnings on Shellcheck.
+## Phase 19: Customizable Help Gutter Hover Delay, Decoupled Status Border, and Unbounded Expansion
+- [x] Added `help_gutter_delay` configuration to `Settings` in `crates/bashmenu-core/src/config.rs` (with default 4.0s, helper method `help_gutter_delay()`, and `set_value` support for float and string representations).
+- [x] Added `Help Gutter Hover Delay [[{app.settings.help_gutter_delay}] seconds]` setting under `Bashmenu Settings` in `bashmenu.mnu` and `tests/fixtures/bashmenu.mnu`.
+- [x] Updated `HelpGutterHover` in `crates/bashmenu-tui/src/gutter.rs` with `set_duration()`, `duration()`, and instantaneous expansion support when duration is `0.0`.
+- [x] Decoupled status gutter border from help gutter expansion in `crates/bashmenu-tui/src/menu_view.rs`: when the help gutter expands upward, the status gutter top border on row `normal_gutter_border_y` (from `sep_x` to right edge) and status content remain strictly anchored in place and are completely unaffected.
+- [x] Implemented dynamic unbounded row expansion in `MenuView`: the help gutter expands upward to as many rows as needed to display all help items and shortcuts without truncation, covering background plugins on the left side of `sep_x` while cleanly stopping below visible menu items without interfering with menu navigation or click hits.
+- [x] Updated `menuedit-cli`, `themeedit-cli`, and `shortcut_editor` to utilize `help_gutter_delay` from config.
+- [x] Documented `settings.help_gutter_delay` and the decoupled expansion behavior in `bashmenu.md` and `bashmenu.1`.
+- [x] Added tests in `crates/bashmenu-core/src/config.rs` (`test_help_gutter_delay_config_and_set_value`) and `crates/bashmenu-tui/tests/menu_navigation_test.rs` (`test_gutter_hover_zero_delay_instant_expansion`, `test_help_gutter_expansion_decouples_status_border_and_covers_plugins`).
+- [x] Verified all tests pass, clippy clean, rustfmt clean, shellcheck clean, and verified remote GitHub Actions CI run `42416115070`.
+
+## Phase 20: Theme Editor Right Click Color Dropper Tool
+- [x] Added `extract_preview_cell_color` in `crates/themeedit-cli/src/preview.rs` to extract the effective Ratatui `Color` of the clicked preview cell (handling background, character glyphs, and wallpaper half-blocks).
+- [x] Added `current_selected_token` in `crates/themeedit-cli/src/lib.rs` to inspect the active token in the collapsible sidebar tree.
+- [x] Implemented right-click mouse handler (`MouseEventKind::Down(MouseButton::Right)`) in `crates/themeedit-cli/src/main.rs`: clicking anywhere in the preview pane samples the cell color, copies the formatted color code to the system clipboard via `bashmenu_tui::set_clipboard_text`, and if a color token is currently selected, assigns the sampled color via `state.set_color_token_value`.
+- [x] Added visual feedback: 200ms reverse flash on clicked preview cell and informational toast notification displaying sampled color and target token (or informative toast if selected item is not a color setting).
+- [x] Added `[R-Click] Dropper` to bottom footer legend in `themeedit`.
+- [x] Updated man page `bashmenu.1` and `bashmenu.md` documentation.
+- [x] Added unit and integration tests in `crates/themeedit-cli/tests/themeedit_test.rs` (`test_preview_color_dropper_sampling_and_assignment`).
+- [x] Verified all workspace tests pass and clippy clean.
+
 
 
 
