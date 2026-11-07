@@ -1667,3 +1667,108 @@ pub fn get_token_preview_spans(
     }
     spans
 }
+
+/// Returns the default directory when looking for wallpaper images.
+///
+/// Prioritizes the repository's `assets/wallpapers` directory across multiple discovery
+/// strategies:
+/// 1. `$BASHMENU_DIR/assets/wallpapers` if `$BASHMENU_DIR` environment variable is set.
+/// 2. Ancestor traversal from the current working directory (`CWD`) looking for `assets/wallpapers`.
+/// 3. Ancestor traversal from the current executable looking for `assets/wallpapers`.
+/// 4. Compile-time `$CARGO_MANIFEST_DIR` ancestor traversal.
+/// 5. Standard user config (`~/.config/bashmenu/assets/wallpapers` or `~/.config/bashmenu/wallpapers`)
+///    and system share directories (`/usr/local/share/bashmenu/assets/wallpapers`, `/opt/bashmenu/assets/wallpapers`).
+/// 6. Falls back to CWD if no wallpapers directory is found.
+pub fn default_wallpaper_dir() -> PathBuf {
+    use std::path::Path;
+
+    // 1. Check $BASHMENU_DIR/assets/wallpapers
+    if let Ok(bdir) = std::env::var("BASHMENU_DIR") {
+        let p = PathBuf::from(bdir).join("assets/wallpapers");
+        if p.is_dir() {
+            return p;
+        }
+    }
+
+    // 2. Search upward from current working directory
+    if let Ok(cwd) = std::env::current_dir() {
+        let mut cur: Option<&Path> = Some(&cwd);
+        while let Some(dir) = cur {
+            let p = dir.join("assets/wallpapers");
+            if p.is_dir() {
+                return p;
+            }
+            cur = dir.parent();
+        }
+    }
+
+    // 3. Search upward from current executable directory
+    if let Ok(exe) = std::env::current_exe() {
+        let mut cur = exe.parent();
+        while let Some(dir) = cur {
+            let p = dir.join("assets/wallpapers");
+            if p.is_dir() {
+                return p;
+            }
+            cur = dir.parent();
+        }
+    }
+
+    // 4. Compile-time CARGO_MANIFEST_DIR fallback (for developer builds / checkouts)
+    if let Some(manifest) = option_env!("CARGO_MANIFEST_DIR") {
+        let mut cur = Path::new(manifest).parent();
+        while let Some(dir) = cur {
+            let p = dir.join("assets/wallpapers");
+            if p.is_dir() {
+                return p;
+            }
+            cur = dir.parent();
+        }
+    }
+
+    // 5. User config & system installation directories
+    let user_wp = bashmenu_core::get_user_config_dir().join("assets/wallpapers");
+    if user_wp.is_dir() {
+        return user_wp;
+    }
+    let alt_user_wp = bashmenu_core::get_user_config_dir().join("wallpapers");
+    if alt_user_wp.is_dir() {
+        return alt_user_wp;
+    }
+    let share_wp = PathBuf::from("/usr/local/share/bashmenu/assets/wallpapers");
+    if share_wp.is_dir() {
+        return share_wp;
+    }
+    let opt_wp = PathBuf::from("/opt/bashmenu/assets/wallpapers");
+    if opt_wp.is_dir() {
+        return opt_wp;
+    }
+
+    // 6. Final fallback to current directory
+    std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+}
+
+/// Formats a picked image path into an appropriate representation for storing in a theme.
+///
+/// If the file is inside the repository's `assets/wallpapers` directory (or any ancestor
+/// containing `assets/wallpapers`), formats it as `assets/wallpapers/<filename>`.
+/// If the file is inside CWD, strips CWD prefix.
+/// Otherwise returns the path as a string.
+pub fn relativize_wallpaper_path(path: &std::path::Path) -> String {
+    // Check if path is inside assets/wallpapers
+    let default_dir = default_wallpaper_dir();
+    if let Ok(rel) = path.strip_prefix(&default_dir) {
+        return format!("assets/wallpapers/{}", rel.to_string_lossy());
+    }
+    if let Some(repo_root) = default_dir.parent() {
+        if let Ok(rel) = path.strip_prefix(repo_root) {
+            return rel.to_string_lossy().to_string();
+        }
+    }
+    if let Ok(cwd) = std::env::current_dir() {
+        if let Ok(rel) = path.strip_prefix(&cwd) {
+            return rel.to_string_lossy().to_string();
+        }
+    }
+    path.to_string_lossy().to_string()
+}

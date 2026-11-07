@@ -21,9 +21,9 @@ use ratatui::widgets::{Block, Borders, Widget};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use themeedit_cli::{
-    extract_preview_cell_color, extract_preview_color_at, format_color_code,
-    get_token_preview_spans, render_preview_pane, PreviewMode, ThemeEditorState, TokenKind,
-    TreeRow,
+    default_wallpaper_dir, extract_preview_cell_color, extract_preview_color_at, format_color_code,
+    get_token_preview_spans, relativize_wallpaper_path, render_preview_pane, PreviewMode,
+    ThemeEditorState, TokenKind, TreeRow,
 };
 
 /// Command-line argument configuration for the Theme Editor (`themeedit`).
@@ -778,15 +778,25 @@ fn main() -> Result<()> {
                     match action {
                         BackgroundConfigAction::None => {}
                         BackgroundConfigAction::Browse => {
-                            let start_dir = if let Ok(cwd) = std::env::current_dir() {
-                                let wp_dir = cwd.join("assets/wallpapers");
-                                if wp_dir.is_dir() {
-                                    wp_dir
+                            let existing_img = modal.build_config().image.unwrap_or_default();
+                            let start_dir = if !existing_img.trim().is_empty() {
+                                if let Some(resolved) =
+                                    bashmenu_tui::resolve_wallpaper_path(&existing_img)
+                                {
+                                    if let Some(parent) = resolved.parent() {
+                                        if parent.is_dir() {
+                                            parent.to_path_buf()
+                                        } else {
+                                            default_wallpaper_dir()
+                                        }
+                                    } else {
+                                        default_wallpaper_dir()
+                                    }
                                 } else {
-                                    cwd
+                                    default_wallpaper_dir()
                                 }
                             } else {
-                                PathBuf::from(".")
+                                default_wallpaper_dir()
                             };
                             let file_picker =
                                 FilePickerModal::new("Choose Wallpaper Image", &start_dir, false);
@@ -827,15 +837,7 @@ fn main() -> Result<()> {
                     if let Some(res) = picked {
                         if let Some(path) = res {
                             if path.is_file() {
-                                let rel_path = if let Ok(cwd) = std::env::current_dir() {
-                                    if let Ok(rel) = path.strip_prefix(&cwd) {
-                                        rel.to_string_lossy().to_string()
-                                    } else {
-                                        path.to_string_lossy().to_string()
-                                    }
-                                } else {
-                                    path.to_string_lossy().to_string()
-                                };
+                                let rel_path = relativize_wallpaper_path(&path);
                                 bg_modal.set_image_path(&rel_path);
                             }
                         }

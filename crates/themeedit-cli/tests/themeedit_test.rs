@@ -1407,3 +1407,60 @@ fn test_preview_color_dropper_sampling_and_assignment() {
     // Confirm kind is not TokenKind::Color
     assert!(!matches!(non_color_tok.kind, TokenKind::Color(_)));
 }
+
+#[test]
+fn test_default_wallpaper_dir_and_path_relativization() {
+    use std::path::PathBuf;
+    use themeedit_cli::{default_wallpaper_dir, relativize_wallpaper_path};
+
+    // 1. default_wallpaper_dir resolves to repo's assets/wallpapers
+    let wp_dir = default_wallpaper_dir();
+    assert!(
+        wp_dir.is_dir(),
+        "default_wallpaper_dir must be an existing directory: {:?}",
+        wp_dir
+    );
+    assert!(
+        wp_dir.ends_with("assets/wallpapers"),
+        "default_wallpaper_dir must end with 'assets/wallpapers', got: {:?}",
+        wp_dir
+    );
+
+    // Verify key wallpaper images exist in the default directory
+    assert!(wp_dir.join("abstract.png").is_file());
+    assert!(wp_dir.join("alaska-mountain.png").is_file());
+    assert!(wp_dir.join("twilight.png").is_file());
+    assert!(wp_dir.join("lighthouse.jpg").is_file());
+
+    // 2. relativize_wallpaper_path converts files in assets/wallpapers to "assets/wallpapers/<name>"
+    let file_in_wp = wp_dir.join("lighthouse.jpg");
+    assert_eq!(
+        relativize_wallpaper_path(&file_in_wp),
+        "assets/wallpapers/lighthouse.jpg"
+    );
+
+    let nested_file = wp_dir.join("subfolder/image.png");
+    assert_eq!(
+        relativize_wallpaper_path(&nested_file),
+        "assets/wallpapers/subfolder/image.png"
+    );
+
+    // 3. Files outside the repo return their path string
+    let external_path = PathBuf::from("/tmp/custom_background.png");
+    assert_eq!(
+        relativize_wallpaper_path(&external_path),
+        "/tmp/custom_background.png"
+    );
+
+    // 4. Test BASHMENU_DIR environment override
+    let temp_path = std::env::temp_dir().join(format!("bashmenu_wp_test_{}", std::process::id()));
+    let custom_wp = temp_path.join("assets/wallpapers");
+    std::fs::create_dir_all(&custom_wp).expect("create custom wallpapers dir");
+    std::env::set_var("BASHMENU_DIR", &temp_path);
+
+    let resolved_override = default_wallpaper_dir();
+    assert_eq!(resolved_override, custom_wp);
+
+    std::env::remove_var("BASHMENU_DIR");
+    let _ = std::fs::remove_dir_all(&temp_path);
+}

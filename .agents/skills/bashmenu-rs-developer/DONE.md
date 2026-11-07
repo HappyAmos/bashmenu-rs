@@ -630,7 +630,14 @@
 - [x] Added `[R-Click] Dropper` to bottom footer legend in `themeedit`.
 - [x] Updated man page `bashmenu.1` and `bashmenu.md` documentation.
 - [x] Added unit and integration tests in `crates/themeedit-cli/tests/themeedit_test.rs` (`test_preview_color_dropper_sampling_and_assignment`).
-- [x] Verified all workspace tests pass and clippy clean.
+- [x] Verified all workspace tests pass, clippy clean, rustfmt clean, and verified remote GitHub Actions CI run `42417064867`.
+
+## Phase 21: Theme Editor Default Directory for Wallpaper Images
+- [x] Implemented `default_wallpaper_dir()` in `crates/themeedit-cli/src/lib.rs` prioritizing the repository's `assets/wallpapers` directory via multiple discovery strategies (`$BASHMENU_DIR`, ancestor traversal from CWD and executable, compile-time `$CARGO_MANIFEST_DIR`, and standard user config / system share locations).
+- [x] Implemented `relativize_wallpaper_path()` in `crates/themeedit-cli/src/lib.rs`: when picking files inside `assets/wallpapers`, automatically formats the stored theme image path as `assets/wallpapers/<filename>` regardless of the user's working directory.
+- [x] Updated `BackgroundConfigAction::Browse` and `ActiveModal::BackgroundBrowse` in `crates/themeedit-cli/src/main.rs` to start in `default_wallpaper_dir()` (or the parent of the currently configured wallpaper if valid), and format selected images cleanly.
+- [x] Added unit and integration tests in `crates/themeedit-cli/tests/themeedit_test.rs` (`test_default_wallpaper_dir_and_path_relativization`) verifying wallpaper directory resolution, file existence, path relativization, and `$BASHMENU_DIR` override.
+- [x] Verified all tests pass, clippy clean, and rustfmt clean.
 
 
 
