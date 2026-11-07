@@ -17,8 +17,62 @@ echo "==================================================================="
 
 # Verify Cargo toolchain
 if ! command -v cargo >/dev/null 2>&1; then
-    echo "Error: Cargo is required to compile BashMenu, but is not installed." >&2
-    echo "Install Rust and Cargo via rustup: https://rustup.rs" >&2
+    echo "  [!] Cargo/Rust toolchain is not detected on your system."
+    OS_NAME="$(uname -s 2>/dev/null || echo "Unknown")"
+
+    # Interactive prompt if connected to terminal
+    if [ -t 0 ]; then
+        printf "  [?] Would you like to install Rust now? [y/N]: "
+        read -r reply
+        case "$reply" in
+            [yY]|[yY][eE][sS])
+                echo "==> Installing Rust toolchain..."
+                case "$OS_NAME" in
+                    OpenBSD)
+                        if [ "$(id -u)" = "0" ]; then
+                            pkg_add rust
+                        elif command -v doas >/dev/null 2>&1; then
+                            doas pkg_add rust
+                        else
+                            echo "Error: Root or doas privileges required to run 'pkg_add rust'." >&2
+                            exit 1
+                        fi
+                        ;;
+                    *)
+                        if command -v curl >/dev/null 2>&1; then
+                            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+                        elif command -v wget >/dev/null 2>&1; then
+                            wget --https-only -qO- https://sh.rustup.rs | sh -s -- -y
+                        else
+                            echo "Error: Neither curl nor wget was found. Please install curl or wget first." >&2
+                            exit 1
+                        fi
+                        ;;
+                esac
+
+                # Source cargo environment immediately for this session
+                if [ -f "$HOME/.cargo/env" ]; then
+                    # shellcheck disable=SC1091
+                    . "$HOME/.cargo/env"
+                fi
+                export PATH="$HOME/.cargo/bin:$PATH"
+                ;;
+            *)
+                echo "Aborting installation. Rust is required to build BashMenu." >&2
+                exit 1
+                ;;
+        esac
+    else
+        echo "Error: Cargo is required to compile BashMenu, but is not installed." >&2
+        echo "Install Rust via https://rustup.rs (or 'pkg_add rust' on OpenBSD)." >&2
+        exit 1
+    fi
+fi
+
+# Final check for cargo
+if ! command -v cargo >/dev/null 2>&1; then
+    echo "Error: Cargo is required to compile BashMenu, but was not found in PATH." >&2
+    echo "Please ensure '$HOME/.cargo/bin' is in your PATH and rerun ./install.sh" >&2
     exit 1
 fi
 

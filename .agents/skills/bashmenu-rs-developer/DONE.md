@@ -539,18 +539,16 @@
   - Rebuilt and reinstalled release binaries via `cargo build --release --workspace && ./install.sh`.
   - Pushed commit `74c4f62` and verified GitHub Actions CI run `42381487336` passed with `'success'`.
 
-- **Eliminate Full Screen Transitions for Modals & Implement Modal Zoom Animations (Item #3)**:
-  - Decoupled full screen transitions (`settings.transition`) from modal popups in `crates/bashmenu-cli/src/main.rs`: removed `modal_changed` from triggering `pending_transition`, and removed `draw_with_transition_out` from `MenuAction::ThemeSelector`. Full-screen transitions now apply strictly to screen navigation, submenu changes, paging, and external application launches/returns.
-  - Implemented dedicated modal zoom animations in `crates/bashmenu-tui/src/terminal.rs`:
-    - `animate_modal_grow`: interpolates expanding dialog frames outward from the initiating launch point (`(anchor_x, anchor_y)`) to the full modal rectangle over synchronized DEC Mode 2026 frames.
-    - `animate_modal_shrink`: interpolates contracting dialog frames in reverse from the modal rectangle down to the launch anchor.
-    - Anchor resolution: menu-activated modals anchor to the initiating menu item's row screen coordinates via `menu_view.selected_item_anchor(area)`; function key and leader shortcuts anchor symmetrically to the screen center.
-  - Added `settings.modal_animation` (`zoom` [default], `none`) and `settings.modal_animation_speed` (`fast` [default], `normal`, `slow`, or ms) to `BashMenuConfig` schema in `crates/bashmenu-core/src/config.rs`, with seamless fallback to `transition_speed`.
-  - Added interactive radio configuration options for modal animation effect and speed under "Transitions & Effects" in `bashmenu.mnu` and `tests/fixtures/bashmenu.mnu`.
-  - Standardized `dialog_dimensions` across all modal types in `crates/bashmenu-tui/src/modals/`.
-  - Added unit and integration tests in `crates/bashmenu-tui/tests/transition_test.rs` and `crates/bashmenu-cli/tests/audit_items_test.rs`.
-  - Updated documentation in `bashmenu.md`, `bashmenu.1`, and `.agents/rules/invariants.md`.
-  - Rebuilt release binaries and installed via `cargo build --release --workspace && ./install.sh`.
+- **Multi-OS Rust Installation Prompt in `install.sh` (Item #4)**:
+  - Investigated and resolved platform-specific Rust toolchain installation methods across Linux, macOS, FreeBSD, NetBSD, OpenBSD, and Windows POSIX environments (Git Bash / MSYS2 / MinGW).
+  - Enhanced `install.sh` to detect missing `cargo` and interactively prompt the user (`[?] Would you like to install Rust now? [y/N]: `) when connected to an interactive terminal (`[ -t 0 ]`).
+  - Added OS-aware installation logic:
+    - On OpenBSD: uses native package manager `pkg_add rust` (with `doas` or root verification) since `rustup` does not support OpenBSD due to security architecture constraints (W^X and pledge/unveil).
+    - On Linux, macOS, FreeBSD, NetBSD, and Windows POSIX shells: uses `curl` (with fallback to `wget`) piping to official `https://sh.rustup.rs` with automated `-s -- -y` flags.
+  - Automatically sources `$HOME/.cargo/env` and exports `$HOME/.cargo/bin` to `PATH` in-process upon successful installation so `cargo build --release --workspace` can continue immediately without restarting the shell.
+  - Verified non-interactive handling (e.g. CI / redirected input) exits cleanly with clear guidance.
+  - Passed `shellcheck *.sh scripts/*.sh` with 0 warnings and `cargo test --workspace` with 100% pass rate.
+
 
 
 
