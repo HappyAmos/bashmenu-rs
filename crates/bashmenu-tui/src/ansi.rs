@@ -9,35 +9,59 @@ pub fn ansi_to_line(text: &str, default_style: Style) -> Line<'static> {
     let mut current_style = default_style;
     let mut buf = String::new();
 
-    let bytes = text.as_bytes();
-    let mut idx = 0;
+    let mut chars = text.chars().peekable();
 
-    while idx < bytes.len() {
-        if bytes[idx] == 0x1b && idx + 1 < bytes.len() && bytes[idx + 1] == b'[' {
-            // Flush text before ANSI code
-            if !buf.is_empty() {
-                spans.push(Span::styled(std::mem::take(&mut buf), current_style));
-            }
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            match chars.peek() {
+                Some(&'[') => {
+                    chars.next(); // skip '['
+                    if !buf.is_empty() {
+                        spans.push(Span::styled(std::mem::take(&mut buf), current_style));
+                    }
 
-            idx += 2; // skip \x1b[
-            let start_param = idx;
-            while idx < bytes.len() && !bytes[idx].is_ascii_alphabetic() {
-                idx += 1;
-            }
+                    let mut param_str = String::new();
+                    let mut cmd = None;
 
-            if idx < bytes.len() {
-                let cmd = bytes[idx];
-                let param_str = std::str::from_utf8(&bytes[start_param..idx]).unwrap_or("");
-                idx += 1; // skip final letter
+                    while let Some(&next_c) = chars.peek() {
+                        if next_c.is_ascii_alphabetic() {
+                            cmd = Some(next_c);
+                            chars.next();
+                            break;
+                        } else if next_c == '\x1b' || next_c == '\n' {
+                            break;
+                        } else {
+                            param_str.push(next_c);
+                            chars.next();
+                        }
+                    }
 
-                if cmd == b'm' {
-                    // SGR sequence
-                    current_style = apply_sgr(param_str, current_style, default_style);
+                    if cmd == Some('m') {
+                        current_style = apply_sgr(&param_str, current_style, default_style);
+                    }
+                }
+                Some(&']') => {
+                    // OSC sequence: skip until BEL (\x07) or ST (\x1b\\)
+                    chars.next(); // skip ']'
+                    while let Some(osc_c) = chars.next() {
+                        if osc_c == '\x07' {
+                            break;
+                        }
+                        if osc_c == '\x1b' && chars.peek() == Some(&'\\') {
+                            chars.next();
+                            break;
+                        }
+                    }
+                }
+                _ => {
+                    // Unknown or unsupported escape sequence; skip
                 }
             }
+        } else if c == '\r' {
+            spans.clear();
+            buf.clear();
         } else {
-            buf.push(bytes[idx] as char);
-            idx += 1;
+            buf.push(c);
         }
     }
 
@@ -168,5 +192,26 @@ mod tests {
         assert_eq!(line.spans[2].content, "Bold Green");
         assert_eq!(line.spans[2].style.fg, Some(Color::Green));
         assert!(line.spans[2].style.add_modifier.contains(Modifier::BOLD));
+    }
+
+    #[test]
+    fn test_ansi_to_line_nerd_font_and_emoji() {
+        let text = "\x1b[34m\x1b[0m - [ea83] - (cod-folder) and \x1b[32m📁\x1b[0m - [file folder]";
+        let line = ansi_to_line(text, Style::default());
+        assert_eq!(line.spans[0].content, "");
+        assert_eq!(line.spans[0].style.fg, Some(Color::Blue));
+        assert_eq!(line.spans[1].content, " - [ea83] - (cod-folder) and ");
+        assert_eq!(line.spans[2].content, "📁");
+        assert_eq!(line.spans[2].style.fg, Some(Color::Green));
+        assert_eq!(line.spans[3].content, " - [file folder]");
+    }
+
+    #[test]
+    fn test_ansi_to_line_carriage_return_and_osc() {
+        let text = "Loading...\r\x1b]0;Title\x07Done! \x1b[33mOK\x1b[0m";
+        let line = ansi_to_line(text, Style::default());
+        assert_eq!(line.spans[0].content, "Done! ");
+        assert_eq!(line.spans[1].content, "OK");
+        assert_eq!(line.spans[1].style.fg, Some(Color::Yellow));
     }
 }

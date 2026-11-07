@@ -587,6 +587,18 @@
   - Added `downsample_color_to_tier()` and wired `color_tier` into `WallpaperCompositor`: downsamples cell colors (`fg`, `bg`, `avg_bg`) according to active `ColorTier` (`Color8`, `Color16`, `Color256`, `TrueColor`), eliminating saturated ANSI rainbow static across dark tones on 8/16/256-color displays.
   - Added integration tests in `crates/bashmenu-tui/tests/wallpaper_test.rs`: `test_wallpaper_compositor_console_fallback_to_halfblock`, `test_wallpaper_compositor_color_tier_downsampling`, and `test_color_tier_detect_priority`.
 
+- **Nerd Font and Emoji Rendering Fix in Terminal Popup Modal (`glyphs.sh`)**:
+  - Identified and fixed garbled UTF-8 character rendering in `crates/bashmenu-tui/src/ansi.rs`: `ansi_to_line` previously cast raw bytes with `bytes[idx] as char`, corrupting all multi-byte UTF-8 sequences (Nerd Font PUA glyphs and 4-byte emoji) into Latin-1 characters (`îª...` / `ð...`).
+  - Rewrote ANSI parser in `ansi_to_line` using `text.chars().peekable()` to preserve full 32-bit Unicode scalar values, gracefully skip CSI/OSC escape sequences, and properly emulate carriage return line resets (`\r`).
+  - Added tab sanitization (`line.replace('\t', "    ")`) in `StreamOutputModal` poll handler to prevent cell alignment artifacts.
+  - Enhanced `StreamOutputModal` dialog title derivation in `crates/bashmenu-cli/src/main.rs`: falls back to cleaned menu label with bracketed commands stripped (e.g. `Search Nerd Font & Emoji`) instead of displaying the raw script path.
+  - Extended `execution_mode` in `crates/bashmenu-core/src/menu.rs` to support `"popup"` and `"stream_output"`, and updated `is_streaming` to recognize `popup: true`.
+  - Updated `scripts/glyphs.sh`: switched `NERD_URL` to secure `https://` upstream URL, added robust multi-OS UTF-8 locale detection, and added descriptive error messaging when neither `jq` nor `python3` is available.
+  - Configured `Search Nerd Font & Emoji` in `bashmenu.mnu` and `tests/fixtures/bashmenu.mnu` with `prompt: 'Enter search term:'`, `stream: true`, and `window_percent: 75`.
+  - Added unit tests in `crates/bashmenu-tui/src/ansi.rs` (`test_ansi_to_line_nerd_font_and_emoji`, `test_ansi_to_line_carriage_return_and_osc`), integration test in `crates/bashmenu-tui/tests/modals_test.rs` (`test_stream_output_modal_nerd_fonts_and_emoji`), and CLI test in `crates/bashmenu-cli/tests/audit_items_test.rs` (`test_search_nerd_font_and_emoji_menu_item_streaming`).
+  - Verified 100% test pass rate across the workspace, zero warnings on Clippy and Rustfmt, zero warnings on Shellcheck, and deployed via `install.sh`.
+
+
 
 
 

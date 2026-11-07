@@ -1286,6 +1286,53 @@ fn test_stream_output_modal_lifecycle_and_rendering() {
 }
 
 #[test]
+fn test_stream_output_modal_nerd_fonts_and_emoji() {
+    use bashmenu_tui::{ResolvedThemeStyles, StreamOutputModal};
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+
+    let mut modal = StreamOutputModal::new(
+        "Glyphs Test".to_string(),
+        "echo ' - [ea83] - (cod-folder)'; echo '📁 - [file folder]'".to_string(),
+        75,
+        false,
+    );
+
+    modal.start();
+    let start = std::time::Instant::now();
+    while modal.is_running && start.elapsed().as_secs() < 3 {
+        modal.poll_output();
+        std::thread::sleep(std::time::Duration::from_millis(15));
+    }
+
+    assert!(!modal.is_running);
+    assert!(modal.lines.iter().any(|l| l.contains('')));
+    assert!(modal.lines.iter().any(|l| l.contains('📁')));
+
+    let styles = ResolvedThemeStyles::default();
+    let area = Rect::new(0, 0, 80, 24);
+    let mut buf = Buffer::empty(area);
+    modal.render(area, &styles, &mut buf);
+
+    let mut found_glyph = false;
+    let mut found_emoji = false;
+    for y in 0..area.height {
+        let mut row_str = String::new();
+        for x in 0..area.width {
+            row_str.push_str(buf[(x, y)].symbol());
+        }
+        if row_str.contains('') {
+            found_glyph = true;
+        }
+        if row_str.contains('📁') {
+            found_emoji = true;
+        }
+    }
+    assert!(found_glyph, "Nerd font glyph was not rendered into buffer");
+    assert!(found_emoji, "Emoji glyph was not rendered into buffer");
+}
+
+#[test]
 fn test_input_modal_selection_and_clipboard() {
     bashmenu_tui::clipboard::set_test_mode(true);
     use bashmenu_tui::InputModal;

@@ -46,3 +46,46 @@ fn test_user_config_isolation_and_vanilla_separation() {
     assert!(stdout.contains("-m, --menu") || stdout.contains("--menu <MENU>"));
     assert!(stdout.contains("-c, --config") || stdout.contains("--config <CONFIG>"));
 }
+
+#[test]
+fn test_search_nerd_font_and_emoji_menu_item_streaming() {
+    let repo_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
+    let menu_path = repo_root.join("bashmenu.mnu");
+    let schema = bashmenu_core::load_menu(&menu_path).expect("bashmenu.mnu must load");
+
+    // Search for the glyphs menu item across all submenus
+    let mut found_item = None;
+    for item in &schema.items {
+        if item.label.contains("Search Nerd Font & Emoji") {
+            found_item = Some(item.clone());
+            break;
+        }
+        if let Some(ref sub) = item.submenu {
+            for sub_item in &sub.items {
+                if sub_item.label.contains("Search Nerd Font & Emoji") {
+                    found_item = Some(sub_item.clone());
+                    break;
+                }
+            }
+        }
+    }
+
+    let glyph_item = found_item.expect("Search Nerd Font & Emoji item must exist");
+    assert_eq!(
+        glyph_item.execution_mode(),
+        bashmenu_core::ExecutionMode::Streaming
+    );
+    assert!(glyph_item.is_streaming());
+    assert_eq!(glyph_item.window_percent(), 75);
+    assert_eq!(glyph_item.param_modal_prompt(), "Enter search term:");
+
+    // Verify macro expansion with param
+    let mut resolved = glyph_item.clone();
+    resolved.apply_param_placeholder("folder");
+    let action = resolved
+        .action
+        .as_ref()
+        .or(resolved.command.as_ref())
+        .unwrap();
+    assert!(action.contains("glyphs.sh folder"));
+}

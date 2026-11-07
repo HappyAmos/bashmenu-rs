@@ -494,8 +494,8 @@ impl MenuItem {
             .and_then(|v| v.as_str())
         {
             match s.to_lowercase().as_str() {
-                "streaming" | "stream" => ExecutionMode::Streaming,
-                "interactive" => ExecutionMode::Interactive,
+                "streaming" | "stream" | "popup" | "stream_output" => ExecutionMode::Streaming,
+                "interactive" | "floating" => ExecutionMode::Interactive,
                 "console" | "standard" | "terminal" => ExecutionMode::Console,
                 _ => ExecutionMode::Console,
             }
@@ -516,6 +516,11 @@ impl MenuItem {
     /// Whether this item executes in streaming mode
     pub fn is_streaming(&self) -> bool {
         if let Some(b) = self.extra.get("stream").and_then(|v| v.as_bool()) {
+            if b {
+                return true;
+            }
+        }
+        if let Some(b) = self.extra.get("popup").and_then(|v| v.as_bool()) {
             if b {
                 return true;
             }
@@ -546,6 +551,8 @@ impl MenuItem {
             .get("window_percent")
             .and_then(|v| {
                 if let Some(n) = v.as_u64() {
+                    Some(n as u16)
+                } else if let Some(n) = v.as_i64() {
                     Some(n as u16)
                 } else if let Some(s) = v.as_str() {
                     s.trim().trim_end_matches('%').parse::<u16>().ok()

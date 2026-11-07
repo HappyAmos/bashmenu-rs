@@ -2394,7 +2394,20 @@ fn main() -> Result<()> {
                                                     let title = item
                                                         .title()
                                                         .map(|t| interpolate_placeholders(t, &ctx))
-                                                        .unwrap_or_else(|| clean_cmd.clone());
+                                                        .unwrap_or_else(|| {
+                                                            let (main_lbl, _) =
+                                                                bashmenu_tui::split_label_brackets(
+                                                                    &item.label,
+                                                                );
+                                                            let trimmed = main_lbl.trim();
+                                                            if !trimmed.is_empty() {
+                                                                interpolate_placeholders(
+                                                                    trimmed, &ctx,
+                                                                )
+                                                            } else {
+                                                                clean_cmd.clone()
+                                                            }
+                                                        });
                                                     let mut modal = StreamOutputModal::new(
                                                         title,
                                                         effective_cmd,

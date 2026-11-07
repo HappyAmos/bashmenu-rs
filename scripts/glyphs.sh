@@ -7,8 +7,22 @@
 # OPTIONS:     -h, --help        Show usage information and exit.
 # ==============================================================================
 
-export LANG=en_US.UTF-8
-export LC_ALL=en_US.UTF-8
+# UTF-8 locale handling
+if command -v locale >/dev/null 2>&1; then
+    if locale -a 2>/dev/null | grep -qiE "^en_US\.(utf-?8)$"; then
+        export LANG=en_US.UTF-8
+        export LC_ALL=en_US.UTF-8
+    elif locale -a 2>/dev/null | grep -qiE "^c\.(utf-?8)$"; then
+        export LANG=C.UTF-8
+        export LC_ALL=C.UTF-8
+    else
+        export LANG="${LANG:-C.UTF-8}"
+        export LC_ALL="${LC_ALL:-C.UTF-8}"
+    fi
+else
+    export LANG="${LANG:-C.UTF-8}"
+    export LC_ALL="${LC_ALL:-C.UTF-8}"
+fi
 
 # Check if search term was provided
 if [ -z "$1" ]; then
@@ -27,7 +41,7 @@ if [[ "$1" == "-h" || "$1" == "--help" ]]; then
 fi
 
 # URL to a reliable, clean JSON list of emojis
-NERD_URL="http://raw.githubusercontent.com/ryanoasis/nerd-fonts/master/glyphnames.json"
+NERD_URL="https://raw.githubusercontent.com/ryanoasis/nerd-fonts/master/glyphnames.json"
 EMOJI_URL="https://raw.githubusercontent.com/muan/unicode-emoji-json/refs/heads/main/data-by-emoji.json"
 CACHE_DIR="${CACHE_DIR:-"$HOME/.cache/bashmenu"}"
 NERD_CACHE="$CACHE_DIR/glyphs.json"
@@ -108,6 +122,9 @@ try:
 except Exception:
     pass
 ' "$mode" "$term" "$cache"
+    else
+        echo "Error: jq or python3 is required to query glyphs." >&2
+        return 1
     fi
 }
 

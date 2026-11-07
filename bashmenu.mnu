@@ -154,7 +154,9 @@ items:
           - Search Nerd Font & Emoji [{scripts_dir}/glyphs.sh]:
               type: script
               action: '{scripts_dir}/glyphs.sh {param}'
+              prompt: 'Enter search term:'
               stream: true
+              window_percent: 75
               icon: '{nf::#f422}'
           - Unicode Block Explorer:
               type: script

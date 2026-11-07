@@ -145,7 +145,7 @@ impl StreamOutputModal {
                 updated = true;
                 match msg {
                     StreamOutputMsg::Line(line) => {
-                        self.lines.push(line);
+                        self.lines.push(line.replace('\t', "    "));
                     }
                     StreamOutputMsg::Finished(code) => {
                         self.is_running = false;
