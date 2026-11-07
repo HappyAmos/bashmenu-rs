@@ -437,7 +437,7 @@ switches.
 
 ```yaml
 settings:
-  transition: fade            # Options: fade, curtain, instant, none (default: fade)
+  transition: fade            # Options: fade, curtain, dissolve, matrix, slide_left, slide_right, blinds, iris, wipedown, instant, none (default: fade)
   transition_speed: normal    # Options: fast, normal, slow, or milliseconds (default: normal)
 ```
 
@@ -445,6 +445,13 @@ settings:
 | :--- | :--- |
 | `fade` | Smooth multi-step luminance ramp-down and ramp-up with TrueColor scaling and DEC Mode 2026 synchronized output. |
 | `curtain` | High-contrast horizontal curtain wipe expanding symmetrically outward from the screen center. |
+| `dissolve` | Retro game style 4x4 Bayer matrix dither dissolve. |
+| `matrix` | Cascading green digital rain resolving smoothly into the target view. |
+| `slide_left` | Horizontal slide wipe across columns moving from right to left. |
+| `slide_right` | Horizontal slide wipe across columns moving from left to right. |
+| `blinds` | Venetian blinds horizontal multi-row slats opening simultaneously. |
+| `iris` | Rectangular box aperture zoom expanding outward from the center. |
+| `wipedown` | Vertical top-to-bottom roll wipe revealing rows from upper to lower. |
 | `instant` / `none` | Immediate frame swaps without intermediate animation frames. |
 
 ##### Transition Speed Profiles (`settings.transition_speed`):

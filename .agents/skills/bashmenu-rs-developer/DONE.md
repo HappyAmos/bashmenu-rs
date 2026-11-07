@@ -490,6 +490,15 @@
   - **`ymlcheck` Option Type Parity**: Added `"toast"`, `"inject_block"`, and `"message"` to `VALID_OPTION_TYPES` in `ymlcheck-cli`, validated with unit tests.
   - **Verification & CI**: Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass with zero warnings or errors. Pushed commit `c7fc9df` to `origin/main`, verified remote GitHub Actions CI run `42324278916` passed with `'success'`.
 
+- [x] **Extended Screen Transitions & Speed Configuration:**
+  - Extended `TransitionEffect` enum with 6 new effects: `Dissolve` (retro Bayer 4x4 dither dissolve), `Matrix` (cascading green digital rain resolving into view), `SlideLeft` (horizontal slide wipe across columns from right to left), `SlideRight` (horizontal slide wipe across columns from left to right), `Blinds` (venetian blinds horizontal slats opening simultaneously), `Iris` (rectangular box aperture zoom expanding from center), and `WipeDown` (vertical top-to-bottom roll wipe).
+  - Implemented both transition-in (`draw_with_transition`) and transition-out (`draw_with_transition_out`) algorithms for all effects directly against Ratatui's `Buffer` in `crates/bashmenu-tui/src/terminal.rs`.
+  - Implemented `TransitionSpeed` enum (`Fast`, `Normal` [default], `Slow`, `Custom(u64)`) with tuned step delays in `crates/bashmenu-tui/src/transition.rs` and wired into `bashmenu-core` config schema (`settings.transition_speed`).
+  - Ensured transitions are active between all interface changes (launch, submenu navigation, back/Esc, page up/down, modals open/close, and app launches/returns).
+  - Added radio configuration items for both transition effect and transition speed in `bashmenu.mnu`, `tests/fixtures/bashmenu.mnu`, and `~/.config/bashmenu/bashmenu.mnu`.
+  - Documented all new transitions and speed profiles in `bashmenu.md` and `bashmenu.1`.
+  - Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, and `shellcheck` pass with zero warnings or errors.
+
 
 
 

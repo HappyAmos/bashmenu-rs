@@ -11,6 +11,20 @@ pub enum TransitionEffect {
     Fade,
     /// Center-to-outer vertical curtain wipe reveal.
     Curtain,
+    /// Retro game Bayer matrix pixel dither dissolve.
+    Dissolve,
+    /// Cascading green digital rain resolving into view.
+    Matrix,
+    /// Horizontal slide from right to left.
+    SlideLeft,
+    /// Horizontal slide from left to right.
+    SlideRight,
+    /// Horizontal venetian blinds slats opening simultaneously.
+    Blinds,
+    /// Rectangular box aperture zoom expanding from center.
+    Iris,
+    /// Vertical top-to-bottom roll wipe down.
+    WipeDown,
     /// Instant atomic redraw via DEC Mode 2026 synchronized output.
     Instant,
     /// Standard immediate draw without animation.
@@ -22,6 +36,13 @@ impl TransitionEffect {
     pub fn parse(s: Option<&str>) -> Self {
         match s.map(|v| v.trim().to_ascii_lowercase()).as_deref() {
             Some("curtain") => Self::Curtain,
+            Some("dissolve") | Some("dither") | Some("pixel") => Self::Dissolve,
+            Some("matrix") | Some("rain") | Some("cyber") => Self::Matrix,
+            Some("slide_left") | Some("slideleft") | Some("slide") => Self::SlideLeft,
+            Some("slide_right") | Some("slideright") => Self::SlideRight,
+            Some("blinds") | Some("venetian") | Some("slats") => Self::Blinds,
+            Some("iris") | Some("zoom") | Some("box") => Self::Iris,
+            Some("wipedown") | Some("wipe_down") | Some("blind") | Some("roll") => Self::WipeDown,
             Some("instant") => Self::Instant,
             Some("none") | Some("disabled") | Some("off") | Some("0") | Some("false") => Self::None,
             Some("fade") => Self::Fade,
@@ -29,6 +50,9 @@ impl TransitionEffect {
         }
     }
 }
+
+/// 4x4 Bayer dither matrix for dissolve transitions.
+pub const BAYER_4X4: [[u8; 4]; 4] = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
 
 /// Supported transition animation speed profiles.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -142,6 +166,34 @@ mod tests {
         assert_eq!(
             TransitionEffect::parse(Some("disabled")),
             TransitionEffect::None
+        );
+        assert_eq!(
+            TransitionEffect::parse(Some("dissolve")),
+            TransitionEffect::Dissolve
+        );
+        assert_eq!(
+            TransitionEffect::parse(Some("matrix")),
+            TransitionEffect::Matrix
+        );
+        assert_eq!(
+            TransitionEffect::parse(Some("slide")),
+            TransitionEffect::SlideLeft
+        );
+        assert_eq!(
+            TransitionEffect::parse(Some("slide_right")),
+            TransitionEffect::SlideRight
+        );
+        assert_eq!(
+            TransitionEffect::parse(Some("blinds")),
+            TransitionEffect::Blinds
+        );
+        assert_eq!(
+            TransitionEffect::parse(Some("iris")),
+            TransitionEffect::Iris
+        );
+        assert_eq!(
+            TransitionEffect::parse(Some("wipedown")),
+            TransitionEffect::WipeDown
         );
         assert_eq!(TransitionEffect::parse(None), TransitionEffect::Fade);
     }

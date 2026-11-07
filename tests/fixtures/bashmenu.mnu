@@ -640,6 +640,20 @@ items:
                           value: fade
                         - label: Curtain (Center-out vertical wipe reveal)
                           value: curtain
+                        - label: Dissolve (Retro Bayer matrix dither dissolve)
+                          value: dissolve
+                        - label: Matrix (Cascading green digital rain)
+                          value: matrix
+                        - label: Slide Left (Horizontal slide wipe right to left)
+                          value: slide_left
+                        - label: Slide Right (Horizontal slide wipe left to right)
+                          value: slide_right
+                        - label: Blinds (Venetian blinds horizontal slats opening)
+                          value: blinds
+                        - label: Iris (Rectangular box zoom aperture expanding from center)
+                          value: iris
+                        - label: Wipe Down (Vertical top-to-bottom roll wipe)
+                          value: wipedown
                         - label: None (Standard immediate redraw)
                           value: none
                       icon: '{nf::#f0d0}'

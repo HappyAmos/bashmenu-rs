@@ -12,7 +12,7 @@ use ratatui::{Frame, Terminal};
 use std::io::{self, BufWriter, Stdout, Write};
 use std::time::Duration;
 
-use crate::transition::{dim_color, TransitionEffect, TransitionSpeed};
+use crate::transition::{dim_color, TransitionEffect, TransitionSpeed, BAYER_4X4};
 
 /// RAII guard managing terminal state (raw mode, alternate screen, mouse).
 pub struct TerminalGuard {
@@ -149,6 +149,268 @@ impl TerminalGuard {
                 }
                 Ok(())
             }
+            TransitionEffect::Dissolve => {
+                let size = self.terminal.size()?;
+                let delay = speed.step_delay_in();
+                let steps = 6;
+                for step in 1..=steps {
+                    let fraction = step as f32 / steps as f32;
+                    let threshold = (fraction * 16.0).round() as u8;
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
+                    let _ = self.terminal.draw(|f| {
+                        render_callback(f);
+                        if step < steps {
+                            let buf = f.buffer_mut();
+                            for y in 0..size.height {
+                                for x in 0..size.width {
+                                    let dither = BAYER_4X4[(y % 4) as usize][(x % 4) as usize];
+                                    if dither >= threshold {
+                                        let cell = &mut buf[(x, y)];
+                                        cell.set_char(' ');
+                                        cell.set_fg(Color::Black);
+                                        cell.set_bg(Color::Black);
+                                        cell.modifier = Modifier::empty();
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
+                    let _ = self.terminal.backend_mut().flush();
+                    if step < steps {
+                        std::thread::sleep(delay);
+                    }
+                }
+                Ok(())
+            }
+            TransitionEffect::Matrix => {
+                let size = self.terminal.size()?;
+                let delay = speed.step_delay_in();
+                let steps = 6;
+                for step in 1..=steps {
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
+                    let _ = self.terminal.draw(|f| {
+                        render_callback(f);
+                        if step < steps {
+                            let buf = f.buffer_mut();
+                            let fraction = step as f32 / steps as f32;
+                            for x in 0..size.width {
+                                let col_offset =
+                                    ((x as u32).wrapping_mul(37).wrapping_add(11) % 5) as i32;
+                                let lead_y =
+                                    ((size.height as f32 + 4.0) * fraction) as i32 - col_offset;
+                                for y in 0..size.height {
+                                    let yi = y as i32;
+                                    if yi > lead_y {
+                                        let cell = &mut buf[(x, y)];
+                                        cell.set_char(' ');
+                                        cell.set_fg(Color::Black);
+                                        cell.set_bg(Color::Black);
+                                        cell.modifier = Modifier::empty();
+                                    } else if yi == lead_y || yi == lead_y - 1 {
+                                        let cell = &mut buf[(x, y)];
+                                        let seed = (x as u32)
+                                            .wrapping_mul(1103515245)
+                                            .wrapping_add((y as u32).wrapping_mul(12345))
+                                            .wrapping_add(step as u32);
+                                        let glyph =
+                                            b"0123456789ABCDEF@#$%&*"[(seed % 22) as usize] as char;
+                                        cell.set_char(glyph);
+                                        if yi == lead_y {
+                                            cell.set_fg(Color::LightGreen);
+                                        } else {
+                                            cell.set_fg(Color::Green);
+                                        }
+                                        cell.set_bg(Color::Black);
+                                        cell.modifier = Modifier::BOLD;
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
+                    let _ = self.terminal.backend_mut().flush();
+                    if step < steps {
+                        std::thread::sleep(delay);
+                    }
+                }
+                Ok(())
+            }
+            TransitionEffect::SlideLeft => {
+                let size = self.terminal.size()?;
+                let delay = speed.step_delay_in();
+                let steps = 6;
+                for step in 1..=steps {
+                    let fraction = step as f32 / steps as f32;
+                    let offset = ((1.0 - fraction) * size.width as f32).round() as u16;
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
+                    let _ = self.terminal.draw(|f| {
+                        render_callback(f);
+                        if step < steps && offset > 0 {
+                            let buf = f.buffer_mut();
+                            for y in 0..size.height {
+                                for x in (0..size.width).rev() {
+                                    if x >= offset {
+                                        let src = buf[(x - offset, y)].clone();
+                                        buf[(x, y)] = src;
+                                    } else {
+                                        let cell = &mut buf[(x, y)];
+                                        cell.set_char(' ');
+                                        cell.set_fg(Color::Black);
+                                        cell.set_bg(Color::Black);
+                                        cell.modifier = Modifier::empty();
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
+                    let _ = self.terminal.backend_mut().flush();
+                    if step < steps {
+                        std::thread::sleep(delay);
+                    }
+                }
+                Ok(())
+            }
+            TransitionEffect::SlideRight => {
+                let size = self.terminal.size()?;
+                let delay = speed.step_delay_in();
+                let steps = 6;
+                for step in 1..=steps {
+                    let fraction = step as f32 / steps as f32;
+                    let offset = ((1.0 - fraction) * size.width as f32).round() as u16;
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
+                    let _ = self.terminal.draw(|f| {
+                        render_callback(f);
+                        if step < steps && offset > 0 {
+                            let buf = f.buffer_mut();
+                            for y in 0..size.height {
+                                for x in 0..size.width {
+                                    if x + offset < size.width {
+                                        let src = buf[(x + offset, y)].clone();
+                                        buf[(x, y)] = src;
+                                    } else {
+                                        let cell = &mut buf[(x, y)];
+                                        cell.set_char(' ');
+                                        cell.set_fg(Color::Black);
+                                        cell.set_bg(Color::Black);
+                                        cell.modifier = Modifier::empty();
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
+                    let _ = self.terminal.backend_mut().flush();
+                    if step < steps {
+                        std::thread::sleep(delay);
+                    }
+                }
+                Ok(())
+            }
+            TransitionEffect::Blinds => {
+                let size = self.terminal.size()?;
+                let delay = speed.step_delay_in();
+                let steps = 6;
+                let slat_size = 4u16;
+                for step in 1..=steps {
+                    let fraction = step as f32 / steps as f32;
+                    let visible_per_slat = (slat_size as f32 * fraction).ceil() as u16;
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
+                    let _ = self.terminal.draw(|f| {
+                        render_callback(f);
+                        if step < steps {
+                            let buf = f.buffer_mut();
+                            for y in 0..size.height {
+                                if (y % slat_size) >= visible_per_slat {
+                                    for x in 0..size.width {
+                                        let cell = &mut buf[(x, y)];
+                                        cell.set_char(' ');
+                                        cell.set_fg(Color::Black);
+                                        cell.set_bg(Color::Black);
+                                        cell.modifier = Modifier::empty();
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
+                    let _ = self.terminal.backend_mut().flush();
+                    if step < steps {
+                        std::thread::sleep(delay);
+                    }
+                }
+                Ok(())
+            }
+            TransitionEffect::Iris => {
+                let size = self.terminal.size()?;
+                let delay = speed.step_delay_in();
+                let steps = 6;
+                let cx = size.width / 2;
+                let cy = size.height / 2;
+                for step in 1..=steps {
+                    let fraction = step as f32 / steps as f32;
+                    let rx = ((size.width as f32 / 2.0) * fraction).round() as u16;
+                    let ry = ((size.height as f32 / 2.0) * fraction).round() as u16;
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
+                    let _ = self.terminal.draw(|f| {
+                        render_callback(f);
+                        if step < steps {
+                            let buf = f.buffer_mut();
+                            for y in 0..size.height {
+                                let dy = y.abs_diff(cy);
+                                for x in 0..size.width {
+                                    let dx = x.abs_diff(cx);
+                                    if dx > rx || dy > ry {
+                                        let cell = &mut buf[(x, y)];
+                                        cell.set_char(' ');
+                                        cell.set_fg(Color::Black);
+                                        cell.set_bg(Color::Black);
+                                        cell.modifier = Modifier::empty();
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
+                    let _ = self.terminal.backend_mut().flush();
+                    if step < steps {
+                        std::thread::sleep(delay);
+                    }
+                }
+                Ok(())
+            }
+            TransitionEffect::WipeDown => {
+                let size = self.terminal.size()?;
+                let delay = speed.step_delay_in();
+                let steps = 6;
+                for step in 1..=steps {
+                    let fraction = step as f32 / steps as f32;
+                    let visible_height = ((size.height as f32) * fraction).round() as u16;
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
+                    let _ = self.terminal.draw(|f| {
+                        render_callback(f);
+                        if step < steps {
+                            let buf = f.buffer_mut();
+                            for y in visible_height..size.height {
+                                for x in 0..size.width {
+                                    let cell = &mut buf[(x, y)];
+                                    cell.set_char(' ');
+                                    cell.set_fg(Color::Black);
+                                    cell.set_bg(Color::Black);
+                                    cell.modifier = Modifier::empty();
+                                }
+                            }
+                        }
+                    });
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
+                    let _ = self.terminal.backend_mut().flush();
+                    if step < steps {
+                        std::thread::sleep(delay);
+                    }
+                }
+                Ok(())
+            }
         }
     }
 
@@ -212,6 +474,250 @@ impl TerminalGuard {
                         for y in 0..size.height {
                             for x in 0..size.width {
                                 if step == 0 || x < left_bound || x >= right_bound {
+                                    let cell = &mut buf[(x, y)];
+                                    cell.set_char(' ');
+                                    cell.set_fg(Color::Black);
+                                    cell.set_bg(Color::Black);
+                                    cell.modifier = Modifier::empty();
+                                }
+                            }
+                        }
+                    });
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
+                    let _ = self.terminal.backend_mut().flush();
+                    std::thread::sleep(delay);
+                }
+                Ok(())
+            }
+            TransitionEffect::Dissolve => {
+                let size = self.terminal.size()?;
+                let delay = speed.step_delay_out();
+                let steps = 6;
+                for step in (0..steps).rev() {
+                    let fraction = step as f32 / steps as f32;
+                    let threshold = (fraction * 16.0).round() as u8;
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
+                    let _ = self.terminal.draw(|f| {
+                        render_callback(f);
+                        let buf = f.buffer_mut();
+                        for y in 0..size.height {
+                            for x in 0..size.width {
+                                let dither = BAYER_4X4[(y % 4) as usize][(x % 4) as usize];
+                                if step == 0 || dither >= threshold {
+                                    let cell = &mut buf[(x, y)];
+                                    cell.set_char(' ');
+                                    cell.set_fg(Color::Black);
+                                    cell.set_bg(Color::Black);
+                                    cell.modifier = Modifier::empty();
+                                }
+                            }
+                        }
+                    });
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
+                    let _ = self.terminal.backend_mut().flush();
+                    std::thread::sleep(delay);
+                }
+                Ok(())
+            }
+            TransitionEffect::Matrix => {
+                let size = self.terminal.size()?;
+                let delay = speed.step_delay_out();
+                let steps = 6;
+                for step in (0..steps).rev() {
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
+                    let _ = self.terminal.draw(|f| {
+                        render_callback(f);
+                        let buf = f.buffer_mut();
+                        if step == 0 {
+                            for y in 0..size.height {
+                                for x in 0..size.width {
+                                    let cell = &mut buf[(x, y)];
+                                    cell.set_char(' ');
+                                    cell.set_fg(Color::Black);
+                                    cell.set_bg(Color::Black);
+                                    cell.modifier = Modifier::empty();
+                                }
+                            }
+                        } else {
+                            let fraction = (steps - step) as f32 / steps as f32;
+                            for x in 0..size.width {
+                                let col_offset =
+                                    ((x as u32).wrapping_mul(37).wrapping_add(11) % 5) as i32;
+                                let lead_y =
+                                    ((size.height as f32 + 4.0) * fraction) as i32 - col_offset;
+                                for y in 0..size.height {
+                                    let yi = y as i32;
+                                    if yi < lead_y - 1 {
+                                        let cell = &mut buf[(x, y)];
+                                        cell.set_char(' ');
+                                        cell.set_fg(Color::Black);
+                                        cell.set_bg(Color::Black);
+                                        cell.modifier = Modifier::empty();
+                                    } else if yi == lead_y || yi == lead_y - 1 {
+                                        let cell = &mut buf[(x, y)];
+                                        let seed = (x as u32)
+                                            .wrapping_mul(1103515245)
+                                            .wrapping_add((y as u32).wrapping_mul(12345))
+                                            .wrapping_add(step as u32);
+                                        let glyph =
+                                            b"0123456789ABCDEF@#$%&*"[(seed % 22) as usize] as char;
+                                        cell.set_char(glyph);
+                                        cell.set_fg(Color::LightGreen);
+                                        cell.set_bg(Color::Black);
+                                        cell.modifier = Modifier::BOLD;
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
+                    let _ = self.terminal.backend_mut().flush();
+                    std::thread::sleep(delay);
+                }
+                Ok(())
+            }
+            TransitionEffect::SlideLeft => {
+                let size = self.terminal.size()?;
+                let delay = speed.step_delay_out();
+                let steps = 6;
+                for step in (0..steps).rev() {
+                    let shift =
+                        (((steps - step) as f32 / steps as f32) * size.width as f32).round() as u16;
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
+                    let _ = self.terminal.draw(|f| {
+                        render_callback(f);
+                        let buf = f.buffer_mut();
+                        for y in 0..size.height {
+                            for x in 0..size.width {
+                                if step == 0 || x + shift >= size.width {
+                                    let cell = &mut buf[(x, y)];
+                                    cell.set_char(' ');
+                                    cell.set_fg(Color::Black);
+                                    cell.set_bg(Color::Black);
+                                    cell.modifier = Modifier::empty();
+                                } else {
+                                    let src = buf[(x + shift, y)].clone();
+                                    buf[(x, y)] = src;
+                                }
+                            }
+                        }
+                    });
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
+                    let _ = self.terminal.backend_mut().flush();
+                    std::thread::sleep(delay);
+                }
+                Ok(())
+            }
+            TransitionEffect::SlideRight => {
+                let size = self.terminal.size()?;
+                let delay = speed.step_delay_out();
+                let steps = 6;
+                for step in (0..steps).rev() {
+                    let shift =
+                        (((steps - step) as f32 / steps as f32) * size.width as f32).round() as u16;
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
+                    let _ = self.terminal.draw(|f| {
+                        render_callback(f);
+                        let buf = f.buffer_mut();
+                        for y in 0..size.height {
+                            for x in (0..size.width).rev() {
+                                if step == 0 || x < shift {
+                                    let cell = &mut buf[(x, y)];
+                                    cell.set_char(' ');
+                                    cell.set_fg(Color::Black);
+                                    cell.set_bg(Color::Black);
+                                    cell.modifier = Modifier::empty();
+                                } else {
+                                    let src = buf[(x - shift, y)].clone();
+                                    buf[(x, y)] = src;
+                                }
+                            }
+                        }
+                    });
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
+                    let _ = self.terminal.backend_mut().flush();
+                    std::thread::sleep(delay);
+                }
+                Ok(())
+            }
+            TransitionEffect::Blinds => {
+                let size = self.terminal.size()?;
+                let delay = speed.step_delay_out();
+                let steps = 6;
+                let slat_size = 4u16;
+                for step in (0..steps).rev() {
+                    let fraction = step as f32 / steps as f32;
+                    let visible_per_slat = (slat_size as f32 * fraction).floor() as u16;
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
+                    let _ = self.terminal.draw(|f| {
+                        render_callback(f);
+                        let buf = f.buffer_mut();
+                        for y in 0..size.height {
+                            if step == 0 || (y % slat_size) >= visible_per_slat {
+                                for x in 0..size.width {
+                                    let cell = &mut buf[(x, y)];
+                                    cell.set_char(' ');
+                                    cell.set_fg(Color::Black);
+                                    cell.set_bg(Color::Black);
+                                    cell.modifier = Modifier::empty();
+                                }
+                            }
+                        }
+                    });
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
+                    let _ = self.terminal.backend_mut().flush();
+                    std::thread::sleep(delay);
+                }
+                Ok(())
+            }
+            TransitionEffect::Iris => {
+                let size = self.terminal.size()?;
+                let delay = speed.step_delay_out();
+                let steps = 6;
+                let cx = size.width / 2;
+                let cy = size.height / 2;
+                for step in (0..steps).rev() {
+                    let fraction = step as f32 / steps as f32;
+                    let rx = ((size.width as f32 / 2.0) * fraction).round() as u16;
+                    let ry = ((size.height as f32 / 2.0) * fraction).round() as u16;
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
+                    let _ = self.terminal.draw(|f| {
+                        render_callback(f);
+                        let buf = f.buffer_mut();
+                        for y in 0..size.height {
+                            let dy = y.abs_diff(cy);
+                            for x in 0..size.width {
+                                let dx = x.abs_diff(cx);
+                                if step == 0 || dx > rx || dy > ry {
+                                    let cell = &mut buf[(x, y)];
+                                    cell.set_char(' ');
+                                    cell.set_fg(Color::Black);
+                                    cell.set_bg(Color::Black);
+                                    cell.modifier = Modifier::empty();
+                                }
+                            }
+                        }
+                    });
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
+                    let _ = self.terminal.backend_mut().flush();
+                    std::thread::sleep(delay);
+                }
+                Ok(())
+            }
+            TransitionEffect::WipeDown => {
+                let size = self.terminal.size()?;
+                let delay = speed.step_delay_out();
+                let steps = 6;
+                for step in (0..steps).rev() {
+                    let fraction = step as f32 / steps as f32;
+                    let visible_height = ((size.height as f32) * fraction).round() as u16;
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
+                    let _ = self.terminal.draw(|f| {
+                        render_callback(f);
+                        let buf = f.buffer_mut();
+                        for y in 0..size.height {
+                            if step == 0 || y >= visible_height {
+                                for x in 0..size.width {
                                     let cell = &mut buf[(x, y)];
                                     cell.set_char(' ');
                                     cell.set_fg(Color::Black);

@@ -20,6 +20,34 @@ fn test_transition_effect_all_modes() {
         TransitionEffect::Curtain
     );
     assert_eq!(
+        TransitionEffect::parse(Some("dissolve")),
+        TransitionEffect::Dissolve
+    );
+    assert_eq!(
+        TransitionEffect::parse(Some("matrix")),
+        TransitionEffect::Matrix
+    );
+    assert_eq!(
+        TransitionEffect::parse(Some("slide_left")),
+        TransitionEffect::SlideLeft
+    );
+    assert_eq!(
+        TransitionEffect::parse(Some("slide_right")),
+        TransitionEffect::SlideRight
+    );
+    assert_eq!(
+        TransitionEffect::parse(Some("blinds")),
+        TransitionEffect::Blinds
+    );
+    assert_eq!(
+        TransitionEffect::parse(Some("iris")),
+        TransitionEffect::Iris
+    );
+    assert_eq!(
+        TransitionEffect::parse(Some("wipedown")),
+        TransitionEffect::WipeDown
+    );
+    assert_eq!(
         TransitionEffect::parse(Some("none")),
         TransitionEffect::None
     );
