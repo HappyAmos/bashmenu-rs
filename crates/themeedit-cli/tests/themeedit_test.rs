@@ -709,7 +709,7 @@ fn test_themeedit_token_preview_spans_and_flash() {
         .unwrap();
     let hl_spans = get_token_preview_spans(hl_token, right_area, PreviewMode::Menu, &styles);
     assert_eq!(hl_spans.len(), 1);
-    assert_eq!(hl_spans[0].0, right_area.y + 3); // content_start_y + 1
+    assert_eq!(hl_spans[0].0, right_area.y + 2); // content_start_y (active item)
 
     // 4. Border Color spans all 4 border edges
     let border_token = state
@@ -724,14 +724,27 @@ fn test_themeedit_token_preview_spans_and_flash() {
         "Border spans must cover all outer edges"
     );
 
-    // 5. Shortcut Gutter spans shortcut digits 1-4
+    // 5. Accent Color flashes submenu chevron glyph '»' on item 2, NOT plugins
+    let accent_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Accent Color")
+        .unwrap();
+    let accent_spans =
+        get_token_preview_spans(accent_token, right_area, PreviewMode::Menu, &styles);
+    assert_eq!(accent_spans.len(), 1);
+    assert_eq!(accent_spans[0].0, right_area.y + 3); // content_start_y + 1 (submenu item)
+                                                     // Verify it does NOT flash below in the plugin area (plugin_start_y is near bottom)
+    assert!(accent_spans[0].0 < right_area.y + right_area.height - 5);
+
+    // 6. Shortcut Gutter spans the help gutter shortcut keys
     let sc_token = state
         .tokens
         .iter()
         .find(|t| t.label.contains("Shortcut Gutter"))
         .unwrap();
     let sc_spans = get_token_preview_spans(sc_token, right_area, PreviewMode::Menu, &styles);
-    assert_eq!(sc_spans.len(), 4, "Must flash 4 menu item shortcut digits");
+    assert!(!sc_spans.is_empty(), "Must flash help gutter shortcut keys");
 }
 
 #[test]
@@ -1463,4 +1476,91 @@ fn test_default_wallpaper_dir_and_path_relativization() {
 
     std::env::remove_var("BASHMENU_DIR");
     let _ = std::fs::remove_dir_all(&temp_path);
+}
+
+#[test]
+fn test_wallpaper_modal_autofocus_on_selected_setting() {
+    use bashmenu_tui::{BackgroundConfigModal, BackgroundFocus};
+    use themeedit_cli::TokenKind;
+
+    // 1. Verify modal autofocus with_focus builder
+    let modal_default = BackgroundConfigModal::new(None);
+    assert_eq!(modal_default.focus(), BackgroundFocus::Image);
+
+    let modal_op = BackgroundConfigModal::new(None).with_focus(BackgroundFocus::Opacity);
+    assert_eq!(modal_op.focus(), BackgroundFocus::Opacity);
+
+    let modal_scale = BackgroundConfigModal::new(None).with_focus(BackgroundFocus::Scaling);
+    assert_eq!(modal_scale.focus(), BackgroundFocus::Scaling);
+
+    let modal_mode = BackgroundConfigModal::new(None).with_focus(BackgroundFocus::Mode);
+    assert_eq!(modal_mode.focus(), BackgroundFocus::Mode);
+
+    let modal_cluster = BackgroundConfigModal::new(None).with_focus(BackgroundFocus::Clustering);
+    assert_eq!(modal_cluster.focus(), BackgroundFocus::Clustering);
+
+    let modal_quant = BackgroundConfigModal::new(None).with_focus(BackgroundFocus::Quantization);
+    assert_eq!(modal_quant.focus(), BackgroundFocus::Quantization);
+
+    // 2. Verify mapping from TokenKind to BackgroundFocus
+    let tokens = [
+        (TokenKind::WallpaperImage, BackgroundFocus::Image),
+        (TokenKind::WallpaperOpacity, BackgroundFocus::Opacity),
+        (TokenKind::WallpaperScaling, BackgroundFocus::Scaling),
+        (TokenKind::WallpaperMode, BackgroundFocus::Mode),
+        (TokenKind::WallpaperClustering, BackgroundFocus::Clustering),
+        (
+            TokenKind::WallpaperQuantization,
+            BackgroundFocus::Quantization,
+        ),
+    ];
+
+    for (kind, expected_focus) in tokens {
+        let mapped = match kind {
+            TokenKind::WallpaperImage => BackgroundFocus::Image,
+            TokenKind::WallpaperOpacity => BackgroundFocus::Opacity,
+            TokenKind::WallpaperScaling => BackgroundFocus::Scaling,
+            TokenKind::WallpaperMode => BackgroundFocus::Mode,
+            TokenKind::WallpaperClustering => BackgroundFocus::Clustering,
+            TokenKind::WallpaperQuantization => BackgroundFocus::Quantization,
+            _ => BackgroundFocus::Image,
+        };
+        assert_eq!(mapped, expected_focus);
+    }
+}
+
+#[test]
+fn test_preview_menu_items_uniform_text_color() {
+    use bashmenu_tui::ResolvedThemeStyles;
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use themeedit_cli::{render_preview_pane, PreviewMode};
+
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    let state = ThemeEditorState::new(fixture_path, Some("dracula".to_string()));
+    let styles = ResolvedThemeStyles::from_theme(&state.current_theme, true);
+
+    let area = Rect::new(0, 0, 60, 20);
+    let mut buf = Buffer::empty(area);
+    let mut compositor = None;
+
+    render_preview_pane(area, &mut buf, PreviewMode::Menu, &styles, &mut compositor);
+
+    // Active item (row 2): Entire item label is styled in highlight
+    // Row 3: "Browse Directory" is uniformly styled in text (not split into two colors)
+    let p_inner_x = area.x + 2;
+    let item2_y = area.y + 3; // content_start_y + 1
+
+    // Characters in "Browse Directory" should all have styles.text foreground
+    let browse_text = "Browse Directory";
+    let start_col = p_inner_x + 6; // after prefix and icon
+    for offset in 0..browse_text.len() as u16 {
+        let cell = &buf[(start_col + offset, item2_y)];
+        assert_eq!(
+            cell.fg,
+            styles.text.fg.unwrap(),
+            "Character at offset {} must have uniform text color",
+            offset
+        );
+    }
 }

@@ -364,6 +364,37 @@ items:
                 alt_buffer: true
                 tabstop: 4
                 show_whitespace: true
+            - Edit Screensaver Delay [{app.settings.inactivity_timeout.milliseconds}]:
+                type: config
+                action: app.settings.inactivity_timeout.milliseconds
+                prompt: Number of milliseconds before screensaver runs
+                interactive: true
+                quiet: false
+                alt_buffer: true
+                tabstop: 4
+                exec_mode: console
+                no_formatting: false
+                refresh: false
+                show_whitespace: false
+                external: false
+                key: app.settings.inactivity_timeout.milliseconds
+                stream: false
+                masked: false
+            - Edit Screensaver Program [{app.settings.inactivity_timeout.command}]:
+                type: config
+                action: app.settings.inactivity_timeout.command
+                interactive: true
+                quiet: false
+                alt_buffer: true
+                tabstop: 4
+                masked: false
+                exec_mode: console
+                show_whitespace: false
+                stream: false
+                no_formatting: false
+                external: false
+                key: app.settings.inactivity_timeout.command
+                refresh: false
             - Edit Scripts [{scripts_dir}]:
                 type: editor
                 icon: '{nf::#eae9}'

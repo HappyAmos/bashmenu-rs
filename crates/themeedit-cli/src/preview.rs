@@ -161,15 +161,9 @@ pub fn render_preview_pane(
 
             // Active item
             let ind = &preview_styles.indicator_symbol;
-            let sc_active_style = Style::default()
-                .fg(preview_styles.shortcut_key.fg.unwrap_or(Color::Magenta))
-                .bg(preview_styles.highlight.bg.unwrap_or(Color::Cyan))
-                .add_modifier(Modifier::BOLD);
             let mut active_spans = vec![
                 Span::styled(ind, preview_styles.highlight),
-                Span::styled("  🚀 ", preview_styles.highlight),
-                Span::styled("1. ", sc_active_style),
-                Span::styled("Launch Application", preview_styles.highlight),
+                Span::styled("  🚀 Launch Application", preview_styles.highlight),
             ];
             let active_vis: usize = active_spans.iter().map(|s| s.content.chars().count()).sum();
             let pad_active = (p_avail_w as usize).saturating_sub(active_vis);
@@ -189,9 +183,7 @@ pub fn render_preview_pane(
             // Inactive item 2
             let normal_line = Line::from(vec![
                 Span::raw("  "),
-                Span::styled("  📁 ", preview_styles.text),
-                Span::styled("2. ", preview_styles.shortcut_key),
-                Span::styled("Browse Directory", preview_styles.text),
+                Span::styled("  📁 Browse Directory", preview_styles.text),
                 Span::styled("  »", preview_styles.accent),
             ]);
             buf.set_line(p_inner_x, content_start_y + 1, &normal_line, p_avail_w);
@@ -199,9 +191,7 @@ pub fn render_preview_pane(
             // Inactive item 3
             let normal_line2 = Line::from(vec![
                 Span::raw("  "),
-                Span::styled("  ⚙️  ", preview_styles.text),
-                Span::styled("3. ", preview_styles.shortcut_key),
-                Span::styled("System Configuration", preview_styles.text),
+                Span::styled("  ⚙️  System Configuration", preview_styles.text),
             ]);
             buf.set_line(p_inner_x, content_start_y + 2, &normal_line2, p_avail_w);
 
@@ -236,9 +226,7 @@ pub fn render_preview_pane(
             // Exit item
             let exit_line = Line::from(vec![
                 Span::raw("  "),
-                Span::styled("  ❌ ", preview_styles.text),
-                Span::styled("4. ", preview_styles.shortcut_key),
-                Span::styled("Exit to Terminal", preview_styles.text),
+                Span::styled("  ❌ Exit to Terminal", preview_styles.text),
             ]);
             buf.set_line(p_inner_x, content_start_y + 4, &exit_line, p_avail_w);
 
@@ -272,7 +260,7 @@ pub fn render_preview_pane(
                 }
 
                 let plugin_row1 = Line::from(vec![
-                    Span::styled(" ☁️  Weather: ", preview_styles.accent),
+                    Span::styled(" ☁️  Weather: ", preview_styles.plugin),
                     Span::styled("+59°F Overcast", preview_styles.plugin),
                     Span::styled("  │  Alienware: ", preview_styles.divider),
                     Span::styled("Online", preview_styles.plugin),
@@ -280,7 +268,7 @@ pub fn render_preview_pane(
                 buf.set_line(p_inner_x, plugin_start_y + 1, &plugin_row1, p_avail_w);
 
                 let plugin_row2 = Line::from(vec![
-                    Span::styled(" 🖥️  CPU: ", preview_styles.accent),
+                    Span::styled(" 🖥️  CPU: ", preview_styles.plugin),
                     Span::styled("12%", preview_styles.plugin),
                     Span::styled("  │  Mem: ", preview_styles.divider),
                     Span::styled("3.8G/16G", preview_styles.plugin),
@@ -291,7 +279,7 @@ pub fn render_preview_pane(
             } else if content_avail_h >= 6 {
                 let plugin_y = gt_y.saturating_sub(1);
                 let plugin_row = Line::from(vec![
-                    Span::styled(" ☁️  Weather: ", preview_styles.accent),
+                    Span::styled(" ☁️  Weather: ", preview_styles.plugin),
                     Span::styled("+59°F Overcast", preview_styles.plugin),
                     Span::styled("  │  Alienware: ", preview_styles.divider),
                     Span::styled("Online", preview_styles.plugin),

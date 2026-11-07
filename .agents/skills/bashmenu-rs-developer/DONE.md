@@ -639,6 +639,16 @@
 - [x] Added unit and integration tests in `crates/themeedit-cli/tests/themeedit_test.rs` (`test_default_wallpaper_dir_and_path_relativization`) verifying wallpaper directory resolution, file existence, path relativization, and `$BASHMENU_DIR` override.
 - [x] Verified all tests pass, clippy clean, and rustfmt clean.
 
+## Phase 22: Wallpaper Modal Setting Autofocus, Preview Panel Uniform Text Color, and Accent Highlight Correction
+- [x] Added `with_focus(BackgroundFocus)` builder and `focus(&self)` getter to `BackgroundConfigModal` in `crates/bashmenu-tui/src/modals/background_config.rs`.
+- [x] Updated `open_selected_token_picker` and `KeyCode::F(4) | KeyCode::Char('b')` in `crates/themeedit-cli/src/main.rs` to inspect the focused wallpaper token (`WallpaperImage`, `WallpaperOpacity`, `WallpaperScaling`, `WallpaperMode`, `WallpaperClustering`, `WallpaperQuantization`) and autofocus directly on that field when the modal opens.
+- [x] Removed artificial `"1. "`, `"2. "`, `"3. "`, `"4. "` number prefixes styled in `shortcut_key` from menu items in `crates/themeedit-cli/src/preview.rs`: menu item text is now rendered in uniform `preview_styles.text` (and active item in `preview_styles.highlight`), eliminating two-tone split text.
+- [x] Fixed `accent` color preview flash in `crates/themeedit-cli/src/lib.rs` (`get_token_preview_spans`): removed erroneous flashing of the plugins area; now precisely highlights the submenu chevron indicator glyph (`»`) on inactive submenu items.
+- [x] Fixed mock plugins row in `crates/themeedit-cli/src/preview.rs` to use `preview_styles.plugin` instead of `preview_styles.accent`.
+- [x] Added unit and integration tests in `crates/themeedit-cli/tests/themeedit_test.rs`: `test_wallpaper_modal_autofocus_on_selected_setting`, `test_preview_menu_items_uniform_text_color`, and updated `test_themeedit_token_preview_spans_and_flash`.
+- [x] Synchronized `tests/fixtures/bashmenu.mnu` with the latest screensaver configuration options in `bashmenu.mnu`.
+- [x] Verified all tests pass, clippy clean, and rustfmt clean.
+
 
 
 

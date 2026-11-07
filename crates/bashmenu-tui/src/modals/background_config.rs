@@ -158,6 +158,17 @@ impl BackgroundConfigModal {
         }
     }
 
+    /// Sets the initial focus control field for the modal dialog.
+    pub fn with_focus(mut self, focus: BackgroundFocus) -> Self {
+        self.focus = focus;
+        self
+    }
+
+    /// Returns the currently focused interactive control field.
+    pub fn focus(&self) -> BackgroundFocus {
+        self.focus
+    }
+
     /// Sets the wallpaper image file path input value.
     pub fn set_image_path(&mut self, path: &str) {
         self.image_input.set_text(path);

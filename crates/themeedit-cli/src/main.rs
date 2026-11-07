@@ -8,8 +8,8 @@ use anyhow::Result;
 use bashmenu_core::{ToastNotification, ToastSeverity};
 use bashmenu_tui::{
     install_panic_hook, AsciiGridModal, BackgroundConfigAction, BackgroundConfigModal,
-    ColorPickerModal, ConfirmModal, FilePickerModal, InputModal, ResolvedThemeStyles,
-    TerminalGuard, ToastRack, WallpaperCompositor,
+    BackgroundFocus, ColorPickerModal, ConfirmModal, FilePickerModal, InputModal,
+    ResolvedThemeStyles, TerminalGuard, ToastRack, WallpaperCompositor,
 };
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers, MouseButton, MouseEventKind};
@@ -1423,8 +1423,25 @@ fn main() -> Result<()> {
                                 }
                                 KeyCode::F(4) | KeyCode::Char('b') => {
                                     let wp_cfg = state.current_theme.wallpaper_config();
+                                    let focus = state
+                                        .current_selected_token()
+                                        .map(|t| match t.kind {
+                                            TokenKind::WallpaperImage => BackgroundFocus::Image,
+                                            TokenKind::WallpaperOpacity => BackgroundFocus::Opacity,
+                                            TokenKind::WallpaperScaling => BackgroundFocus::Scaling,
+                                            TokenKind::WallpaperMode => BackgroundFocus::Mode,
+                                            TokenKind::WallpaperClustering => {
+                                                BackgroundFocus::Clustering
+                                            }
+                                            TokenKind::WallpaperQuantization => {
+                                                BackgroundFocus::Quantization
+                                            }
+                                            _ => BackgroundFocus::Image,
+                                        })
+                                        .unwrap_or(BackgroundFocus::Image);
                                     active_modal = ActiveModal::BackgroundConfig(
-                                        BackgroundConfigModal::new(wp_cfg.as_ref()),
+                                        BackgroundConfigModal::new(wp_cfg.as_ref())
+                                            .with_focus(focus),
                                     );
                                 }
                                 KeyCode::Delete => {
@@ -1527,7 +1544,10 @@ fn main() -> Result<()> {
 /// Opens the appropriate interactive picker modal for the currently selected theme token
 /// (e.g., ColorGridModal for colors, AsciiGridModal for glyphs, or cycles toggle values).
 fn open_selected_token_picker(state: &mut ThemeEditorState, active_modal: &mut ActiveModal) {
-    let token = state.tokens[state.selected_idx].clone();
+    let token = state
+        .current_selected_token()
+        .cloned()
+        .unwrap_or_else(|| state.tokens[state.selected_idx].clone());
     match token.kind {
         TokenKind::Color(key) => {
             let initial_color = state.get_color_token_color(&key);
@@ -1546,8 +1566,18 @@ fn open_selected_token_picker(state: &mut ThemeEditorState, active_modal: &mut A
         | TokenKind::WallpaperClustering
         | TokenKind::WallpaperQuantization => {
             let wp_cfg = state.current_theme.wallpaper_config();
-            *active_modal =
-                ActiveModal::BackgroundConfig(BackgroundConfigModal::new(wp_cfg.as_ref()));
+            let focus = match token.kind {
+                TokenKind::WallpaperImage => BackgroundFocus::Image,
+                TokenKind::WallpaperOpacity => BackgroundFocus::Opacity,
+                TokenKind::WallpaperScaling => BackgroundFocus::Scaling,
+                TokenKind::WallpaperMode => BackgroundFocus::Mode,
+                TokenKind::WallpaperClustering => BackgroundFocus::Clustering,
+                TokenKind::WallpaperQuantization => BackgroundFocus::Quantization,
+                _ => BackgroundFocus::Image,
+            };
+            *active_modal = ActiveModal::BackgroundConfig(
+                BackgroundConfigModal::new(wp_cfg.as_ref()).with_focus(focus),
+            );
         }
         TokenKind::Border(key) => {
             *active_modal =
@@ -1715,50 +1745,20 @@ fn hit_test_preview(
                 if col >= p_inner_x && col < p_inner_x + 2 {
                     return Some(("indicator", row, p_inner_x, p_inner_x + 2));
                 }
-                if col >= p_inner_x + 7 && col < p_inner_x + 10 {
-                    return Some(("shortcut_key", row, p_inner_x + 7, p_inner_x + 10));
-                }
                 return Some(("highlight", row, p_inner_x, p_inner_x + p_avail_w));
             }
             if row == content_start_y + 1 {
-                // Item 2: Browse Directory
-                if col >= p_inner_x + 7 && col < p_inner_x + 10 {
-                    return Some(("shortcut_key", row, p_inner_x + 7, p_inner_x + 10));
+                // Item 2: Browse Directory »
+                if (col >= p_inner_x + 22 && col < p_inner_x + 26)
+                    || col >= right_area.x + right_area.width.saturating_sub(6)
+                {
+                    return Some(("accent", row, p_inner_x + 22, p_inner_x + 26));
                 }
-                if col >= right_area.x + right_area.width.saturating_sub(6) {
-                    return Some((
-                        "accent",
-                        row,
-                        right_area.x + right_area.width.saturating_sub(6),
-                        right_area.x + right_area.width - 1,
-                    ));
-                }
-                return Some((
-                    "text",
-                    row,
-                    p_inner_x + 10,
-                    right_area.x + right_area.width - 6,
-                ));
+                return Some(("text", row, p_inner_x, p_inner_x + p_avail_w));
             }
             if row == content_start_y + 2 {
-                // Item 3: Notes & Tasks [notes.yml]
-                if col >= p_inner_x + 7 && col < p_inner_x + 10 {
-                    return Some(("shortcut_key", row, p_inner_x + 7, p_inner_x + 10));
-                }
-                if col >= right_area.x + right_area.width.saturating_sub(18) {
-                    return Some((
-                        "gutter",
-                        row,
-                        right_area.x + right_area.width.saturating_sub(18),
-                        right_area.x + right_area.width - 1,
-                    ));
-                }
-                return Some((
-                    "text",
-                    row,
-                    p_inner_x + 10,
-                    right_area.x + right_area.width - 18,
-                ));
+                // Item 3: System Configuration
+                return Some(("text", row, p_inner_x, p_inner_x + p_avail_w));
             }
             if row == content_start_y + 3 {
                 // Divider row
@@ -1766,15 +1766,7 @@ fn hit_test_preview(
             }
             if row == content_start_y + 4 {
                 // Item 4: Exit
-                if col >= p_inner_x + 7 && col < p_inner_x + 10 {
-                    return Some(("shortcut_key", row, p_inner_x + 7, p_inner_x + 10));
-                }
-                return Some((
-                    "text",
-                    row,
-                    p_inner_x + 10,
-                    right_area.x + right_area.width - 2,
-                ));
+                return Some(("text", row, p_inner_x, p_inner_x + p_avail_w));
             }
             // Pseudo plugins
             if content_avail_h >= 6 && row >= plugin_start_y {

@@ -1560,43 +1560,23 @@ pub fn get_token_preview_spans(
             ));
         }
         TokenKind::Color(key) if key == "highlight" => {
-            spans.push((content_start_y + 1, p_inner_x, p_inner_x + p_avail_w));
+            spans.push((content_start_y, p_inner_x, p_inner_x + p_avail_w));
         }
         TokenKind::Color(key) if key == "text" => {
-            spans.push((
-                content_start_y,
-                p_inner_x + 6,
-                right_area.x + right_area.width.saturating_sub(2),
-            ));
-            spans.push((
-                content_start_y + 2,
-                p_inner_x + 6,
-                right_area.x + right_area.width.saturating_sub(18),
-            ));
-            spans.push((
-                content_start_y + 4,
-                p_inner_x + 6,
-                right_area.x + right_area.width.saturating_sub(2),
-            ));
+            spans.push((content_start_y + 1, p_inner_x + 2, p_inner_x + 22));
+            spans.push((content_start_y + 2, p_inner_x + 2, p_inner_x + 28));
+            spans.push((content_start_y + 4, p_inner_x + 2, p_inner_x + 24));
         }
         TokenKind::Color(key) if key == "accent" => {
-            if content_avail_h >= 8 {
-                spans.push((plugin_start_y + 1, p_inner_x, p_inner_x + p_avail_w));
-            }
-            spans.push((
-                content_start_y + 2,
-                right_area.x + right_area.width.saturating_sub(18),
-                right_area.x + right_area.width.saturating_sub(2),
-            ));
+            // Accent is the submenu chevron indicator glyph '»' on inactive submenu item 2
+            spans.push((content_start_y + 1, p_inner_x + 22, p_inner_x + 26));
         }
         TokenKind::Color(key) if key == "shortcut_key" => {
-            spans.push((content_start_y, p_inner_x + 7, p_inner_x + 10));
-            spans.push((content_start_y + 1, p_inner_x + 7, p_inner_x + 10));
-            spans.push((content_start_y + 2, p_inner_x + 7, p_inner_x + 10));
-            spans.push((content_start_y + 4, p_inner_x + 7, p_inner_x + 10));
+            // Shortcut keys in help gutter
+            spans.push((gt_y + 1, right_area.x + 2, sep_x));
         }
         TokenKind::Indicator => {
-            spans.push((content_start_y + 1, p_inner_x + 2, p_inner_x + 7));
+            spans.push((content_start_y, p_inner_x, p_inner_x + 2));
         }
         TokenKind::Color(key) if key == "divider" => {
             spans.push((content_start_y + 3, p_inner_x, p_inner_x + p_avail_w));
