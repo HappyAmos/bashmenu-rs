@@ -158,8 +158,14 @@ elif [ "$(id -u)" = "0" ]; then
 fi
 mkdir -p "$MAN_DIR"
 if [ -f "$SCRIPT_DIR/bashmenu.1" ]; then
+    rm -f "$MAN_DIR/bashmenu.1"
     cp -f "$SCRIPT_DIR/bashmenu.1" "$MAN_DIR/bashmenu.1"
-    echo "  [+] Installed manual page -> $MAN_DIR/bashmenu.1"
+    rm -f "$MAN_DIR/bm.1"
+    ln -sf "$MAN_DIR/bashmenu.1" "$MAN_DIR/bm.1"
+    echo "  [+] Installed manual page -> $MAN_DIR/bashmenu.1 (and alias $MAN_DIR/bm.1)"
+    if command -v mandb >/dev/null 2>&1; then
+        mandb -q -u 2>/dev/null || mandb -q "$HOME/.local/share/man" 2>/dev/null || true
+    fi
 fi
 
 # Verify PATH
@@ -177,6 +183,18 @@ case ":$PATH:" in
         echo "      Run 'export PATH=\"$BIN_DIR:\$PATH\"' or restart your terminal."
         ;;
 esac
+
+# Verify MANPATH if user has custom MANPATH set
+if [ -n "${MANPATH:-}" ]; then
+    case ":$MANPATH:" in
+        *":$HOME/.local/share/man:"*|*":$MAN_DIR:"*) ;;
+        *)
+            echo ""
+            echo "  [!] Notice: Custom MANPATH is set and does not include $HOME/.local/share/man."
+            echo "      Add '$HOME/.local/share/man' to your MANPATH to view 'man bashmenu'."
+            ;;
+    esac
+fi
 
 echo ""
 echo "==================================================================="

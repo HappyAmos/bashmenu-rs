@@ -57,10 +57,12 @@ for bin in bashmenu bm ymlcheck menuedit shortcutedit themeedit bashedit bmpager
 done
 
 echo "==> Removing manual page..."
-if [ -f "$MAN_DIR/bashmenu.1" ]; then
-    rm -f "$MAN_DIR/bashmenu.1"
-    echo "  [-] Removed $MAN_DIR/bashmenu.1"
-fi
+for manpage in "$MAN_DIR/bashmenu.1" "$MAN_DIR/bm.1"; do
+    if [ -f "$manpage" ] || [ -L "$manpage" ]; then
+        rm -f "$manpage"
+        echo "  [-] Removed $manpage"
+    fi
+done
 
 CONFIG_DIR="$HOME/.config/bashmenu"
 CACHE_DIR="$HOME/.cache/bashmenu"
