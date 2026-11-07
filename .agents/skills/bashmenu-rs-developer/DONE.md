@@ -477,6 +477,19 @@
   - Wired `BackgroundConfigModal` and `BackgroundBrowse` into `crates/themeedit-cli/src/main.rs`, bound to shortcut <kbd>b</kbd>, <kbd>F4</kbd>, and Enter on any wallpaper token.
   - Added comprehensive unit and integration tests in `crates/bashmenu-tui/tests/background_config_modal_test.rs`, `crates/bashmenu-tui/tests/wallpaper_test.rs`, and `crates/themeedit-cli/tests/themeedit_test.rs`.
   - Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass with zero warnings or errors.
+  - Committed and pushed to `origin/main` (commit `2a7a483`), verified remote GitHub Actions CI run `42226434198` passed with `'success'`.
+
+- [x] **Audit Parity Implementations (Inject Block, Message Modal, Root Elevation, Inactivity Timeout, Status Precedence):**
+  - **Status Gutter Precedence & Date/Time Retention**: Updated `menu_view.rs` to compute visible text lengths and prioritize status gutter allocation over help gutter, guaranteeing date/time stamps are never silently dropped in narrow terminals. Verified with `test_status_gutter_precedence_and_date_time_retention`.
+  - **Adaptive Polling & `settings.refresh_interval`**: Main event loop adaptively polls at 1s for second-precision placeholders (`{date_time_24}`, etc.) and throttles to `settings.refresh_interval` for minute-precision tokens.
+  - **`type: inject_block` Runtime Execution**: Implemented `ActiveModal::ConfirmInjectBlock` in `bashmenu-cli`. Interpolates template and target paths; prompts user with `ConfirmModal` to install/update `# CODEBLOCK:<id>:START ... # CODEBLOCK:<id>:END` with 0o755 script permissions or cleanly remove. Verified with `test_inject_block_marker_injection_and_removal_cycle`.
+  - **`type: message` Standalone Item**: Standalone top-level items with `type: message` / `popup` / `info` display `ActiveModal::Message` with interpolated title and message text.
+  - **`user_mode: "root"` Automatic Elevation**: Non-root users executing an item with `user_mode: "root"` have the command automatically prepended with `sudo `.
+  - **`settings.inactivity_timeout` Runtime Timer**: Main loop tracks key and mouse events via `Instant`, spawning `timeout.command` when idle duration reaches `timeout.milliseconds`. Verified with `test_inactivity_timeout_and_root_elevation_schema`.
+  - **Per-Item Editor Options**: Added `--show-whitespace` and `--tab-to-spaces <bool>` flags to `bashedit-cli`, passed by `bashmenu` when launching `type: editor` items. Verified with `test_bashedit_cli_whitespace_and_tab_flags`.
+  - **`ymlcheck` Option Type Parity**: Added `"toast"`, `"inject_block"`, and `"message"` to `VALID_OPTION_TYPES` in `ymlcheck-cli`, validated with unit tests.
+  - **Verification & CI**: Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass with zero warnings or errors. Pushed commit `c7fc9df` to `origin/main`, verified remote GitHub Actions CI run `42324278916` passed with `'success'`.
+
 
 
 

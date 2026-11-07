@@ -82,6 +82,12 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
     1. Update the Placeholders and Macros reference modal in `bashmenu-tui`.
     2. Update the manpage (`bashmenu.1`) and markdown guide (`bashmenu.md`).
     3. Ensure 6-tier variable interpolation (env, runtime, bashmenu config, system, theme, inline) functions correctly with nested placeholders.
+- **Runtime Directives & Execution Parity:**
+  - `type: inject_block`: Prompts user with `ConfirmModal` (`Yes` injects/updates `# CODEBLOCK:<id>:START` ... `# CODEBLOCK:<id>:END` with 0o755 script permissions; `No` cleanly uninstalls).
+  - `type: message` / `popup` / `info`: Opens `ActiveModal::Message` displaying interpolated content.
+  - `user_mode: "root"`: Prepend `sudo ` automatically when executed by non-root users (`libc::geteuid() != 0`).
+  - `settings.inactivity_timeout`: Tracks user idle time and spawns `command` when `milliseconds` elapses.
+  - Per-item editor options: `show_whitespace` and `tab_to_spaces` passed to `bashedit` via `--show-whitespace` and `--tab-to-spaces <bool>`.
 - **Editor Swap File Placement Invariant (`bashedit`):**
   - Built-in text editors must colocate temporary swap files (`.<filename>.swp`) directly in the exact directory of the file being edited.
   - Never store editor swap files in `/tmp` or user root; swap files must be cleanly deleted on save or exit, and detected on launch for crash recovery.
