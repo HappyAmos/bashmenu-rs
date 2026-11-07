@@ -66,18 +66,31 @@ impl ToggleModal {
         }
     }
 
+    /// Computes dialog dimensions and inner rect
+    fn compute_layout(&self, area: Rect) -> (Rect, Vec<String>) {
+        let max_w = 70_u16.min(area.width.saturating_sub(4));
+        let avail_w = max_w.saturating_sub(6) as usize;
+        let msg_lines = if avail_w > 0 && !self.message.trim().is_empty() {
+            super::input::wrap_prompt_text(&self.message, avail_w)
+        } else {
+            Vec::new()
+        };
+        let msg_count = msg_lines.len().max(1);
+        let max_h = area.height.saturating_sub(2);
+        let dialog_w = (self.message.len() as u16 + 12)
+            .min(max_w)
+            .max(20.min(max_w));
+        let dialog_h = ((msg_count + 5) as u16).min(max_h).max(7.min(max_h));
+        let inner = compute_modal_inner(area, dialog_w, dialog_h);
+        (inner, msg_lines)
+    }
+
     /// Handles immediate mouse click
     pub fn handle_mouse(&mut self, mouse: MouseEvent, area: Rect) -> Option<ToggleChoice> {
         if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
             let row = mouse.row;
             let col = mouse.column;
-
-            let dialog_w = (self.message.len() as u16 + 12).clamp(42, 70);
-            let inner_area = if area.width <= dialog_w {
-                area
-            } else {
-                compute_modal_inner(area, dialog_w, 8)
-            };
+            let (inner_area, _) = self.compute_layout(area);
 
             if is_close_button_clicked(inner_area, row, col) {
                 return Some(ToggleChoice::Cancel);

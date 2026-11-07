@@ -641,21 +641,68 @@ impl NoteEditorModal {
                     return NoteEditorAction::Cancel;
                 }
 
+                let footer_tokens = [
+                    "[Ctrl+S] Save",
+                    "|",
+                    "[Ctrl+C] Copy",
+                    "|",
+                    "[Ctrl+V] Paste",
+                    "|",
+                    "[ESC] Cancel",
+                ];
+                let max_footer_w = inner.width.saturating_sub(4) as usize;
+                let footer_lines = wrap_footer_tokens(&footer_tokens, max_footer_w);
+                let footer_h = footer_lines.len().max(1);
+                let footer_start_y = inner.y + inner.height.saturating_sub(1 + footer_h as u16);
+
+                if mouse.row >= footer_start_y && mouse.row < footer_start_y + footer_h as u16 {
+                    let f_idx = (mouse.row - footer_start_y) as usize;
+                    if f_idx < footer_lines.len() {
+                        let f_line = &footer_lines[f_idx];
+                        let footer_x =
+                            inner.x + (inner.width.saturating_sub(f_line.len() as u16) / 2);
+                        if mouse.column >= footer_x && mouse.column < footer_x + f_line.len() as u16
+                        {
+                            let rel_col = (mouse.column - footer_x) as usize;
+                            let line_str = f_line.as_str();
+                            if let Some(pos) = line_str.find("[Ctrl+S] Save") {
+                                if rel_col >= pos && rel_col < pos + 13 {
+                                    return NoteEditorAction::Save(self.lines.join("\n"));
+                                }
+                            }
+                            if let Some(pos) = line_str.find("[ESC] Cancel") {
+                                if rel_col >= pos && rel_col < pos + 12 {
+                                    return NoteEditorAction::Cancel;
+                                }
+                            }
+                            if let Some(pos) = line_str.find("[Ctrl+C] Copy") {
+                                if rel_col >= pos && rel_col < pos + 13 {
+                                    if let Some(text) = self.get_selected_text() {
+                                        crate::clipboard::set_clipboard_text(&text);
+                                    } else {
+                                        crate::clipboard::set_clipboard_text(
+                                            &self.lines.join("\n"),
+                                        );
+                                    }
+                                    return NoteEditorAction::None;
+                                }
+                            }
+                            if let Some(pos) = line_str.find("[Ctrl+V] Paste") {
+                                if rel_col >= pos && rel_col < pos + 14 {
+                                    if let Some(text) = crate::clipboard::get_clipboard_text() {
+                                        self.paste_text(&text);
+                                    }
+                                    return NoteEditorAction::None;
+                                }
+                            }
+                        }
+                    }
+                    return NoteEditorAction::None;
+                }
+
                 let sb_x = inner.x + inner.width.saturating_sub(1);
                 if mouse.column == sb_x {
                     let (vlines, _) = self.compute_visual_lines(self.last_inner_w);
-                    let footer_tokens = [
-                        "[Ctrl+S] Save",
-                        "|",
-                        "[Ctrl+C] Copy",
-                        "|",
-                        "[Ctrl+V] Paste",
-                        "|",
-                        "[ESC] Cancel",
-                    ];
-                    let max_footer_w = inner.width.saturating_sub(4) as usize;
-                    let footer_lines = wrap_footer_tokens(&footer_tokens, max_footer_w);
-                    let footer_h = footer_lines.len().max(1);
                     let content_h = inner.height.saturating_sub(1 + footer_h as u16 + 1) as usize;
                     let content_start_y = inner.y + 1;
                     let content_end_y = content_start_y + content_h as u16;

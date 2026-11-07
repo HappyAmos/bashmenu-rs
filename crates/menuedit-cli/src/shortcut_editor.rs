@@ -8,9 +8,10 @@ use bashmenu_core::{
     PLACEHOLDER_HELP_TEXT,
 };
 use bashmenu_tui::{
-    key_event_to_token, render_modal_frame, visible_text_len, wrap_prompt_text,
-    wrap_spread_help_gutter_layout, ConfirmChoice, ConfirmModal, FilePickerModal, HelpModal,
-    ResolvedThemeStyles, TerminalGuard, TextInput, ToastRack,
+    compute_modal_inner, is_close_button_clicked, key_event_to_token, render_modal_frame,
+    visible_text_len, wrap_prompt_text, wrap_spread_help_gutter_layout, ConfirmChoice,
+    ConfirmModal, FilePickerModal, HelpModal, ResolvedThemeStyles, TerminalGuard, TextInput,
+    ToastRack,
 };
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEventKind};
 use ratatui::buffer::Buffer;
@@ -331,6 +332,48 @@ impl KeyCaptureModal {
         None
     }
 
+    /// Handles mouse interaction for key capture modal.
+    pub fn handle_mouse(
+        &mut self,
+        mouse: crossterm::event::MouseEvent,
+        area: Rect,
+    ) -> Option<Option<String>> {
+        if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
+            let box_w = area.width.saturating_sub(8).clamp(46, 68);
+            let box_h = 13;
+            let inner = compute_modal_inner(area, box_w, box_h);
+            if is_close_button_clicked(inner, mouse.row, mouse.column) {
+                return Some(None);
+            }
+            let footer_y = inner.y + inner.height.saturating_sub(1);
+            if mouse.row == footer_y {
+                let avail_w = inner.width.saturating_sub(2) as usize;
+                let footer = "[ENTER] Accept Binding    [ESC] Cancel";
+                let fw = footer.len();
+                let footer_text: String = if fw <= avail_w {
+                    footer.to_string()
+                } else {
+                    let short_footer = "[ENTER] Accept  [ESC] Cancel";
+                    short_footer.chars().take(avail_w).collect()
+                };
+                let fx = inner.x + inner.width.saturating_sub(footer_text.len() as u16) / 2;
+                let mid = inner.x + inner.width / 2;
+                if mouse.column >= mid {
+                    return Some(None);
+                } else if mouse.column >= fx.min(inner.x + 2) {
+                    match validate_key_spec(&self.captured_key, self.is_leader_def) {
+                        Ok(valid) => return Some(Some(valid)),
+                        Err(err) => {
+                            self.error_msg = Some(err);
+                            return None;
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
     /// Renders the shortcut editor modal frame and input fields into `buf`.
     pub fn render(&self, area: Rect, styles: &ResolvedThemeStyles, buf: &mut Buffer) {
         let box_w = area.width.saturating_sub(8).clamp(46, 68);
@@ -433,6 +476,19 @@ pub struct LeaderSettingsModal {
     pub error_msg: Option<String>,
 }
 
+/// Action triggered from mouse interactions in the leader settings modal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LeaderSettingsAction {
+    /// No change / state updated.
+    None,
+    /// User confirmed settings via button or footer.
+    Save,
+    /// User dismissed or cancelled settings dialog.
+    Cancel,
+    /// User clicked capture key button.
+    CaptureKey,
+}
+
 impl LeaderSettingsModal {
     /// Constructs a new leader settings modal initialized with current `ShortcutsConfig`.
     pub fn new(cfg: &ShortcutsConfig) -> Self {
@@ -443,6 +499,86 @@ impl LeaderSettingsModal {
             focus_idx: 0,
             error_msg: None,
         }
+    }
+
+    /// Handles mouse interaction for leader settings modal.
+    pub fn handle_mouse(
+        &mut self,
+        mouse: crossterm::event::MouseEvent,
+        area: Rect,
+    ) -> LeaderSettingsAction {
+        if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
+            let box_w = area.width.saturating_sub(8).clamp(48, 68);
+            let box_h = 16;
+            let inner = compute_modal_inner(area, box_w, box_h);
+            if is_close_button_clicked(inner, mouse.row, mouse.column) {
+                return LeaderSettingsAction::Cancel;
+            }
+
+            let field_w = inner.width.saturating_sub(22).max(12);
+
+            // Row 1: Leader Key input
+            if mouse.row == inner.y + 1
+                && mouse.column >= inner.x + 19
+                && mouse.column < inner.x + 19 + field_w
+            {
+                self.focus_idx = 0;
+                return LeaderSettingsAction::None;
+            }
+
+            // Row 3: Capture Key Button
+            let cap_lbl = "[ Capture Key (Ctrl+K) ]";
+            if mouse.row == inner.y + 3
+                && mouse.column >= inner.x + 19
+                && mouse.column < inner.x + 19 + cap_lbl.len() as u16
+            {
+                self.focus_idx = 1;
+                return LeaderSettingsAction::CaptureKey;
+            }
+
+            // Row 5: Timeout input
+            if mouse.row == inner.y + 5
+                && mouse.column >= inner.x + 19
+                && mouse.column < inner.x + 19 + field_w
+            {
+                self.focus_idx = 2;
+                return LeaderSettingsAction::None;
+            }
+
+            // Row 7: Show hint checkbox
+            if mouse.row == inner.y + 7 {
+                self.focus_idx = 3;
+                self.show_hint = !self.show_hint;
+                return LeaderSettingsAction::None;
+            }
+
+            // btn_y: [ Save ] and [ Cancel ]
+            let btn_y = inner.y + inner.height.saturating_sub(3);
+            if mouse.row == btn_y {
+                let center_x = inner.x + inner.width / 2;
+                let save_x = center_x.saturating_sub(16).max(inner.x + 1);
+                let cancel_x = (center_x + 2).max(save_x + 15);
+                if mouse.column >= save_x && mouse.column < save_x + 14 {
+                    self.focus_idx = 4;
+                    return LeaderSettingsAction::Save;
+                } else if mouse.column >= cancel_x && mouse.column < cancel_x + 14 {
+                    self.focus_idx = 5;
+                    return LeaderSettingsAction::Cancel;
+                }
+            }
+
+            // Footer at inner.y + inner.height - 1
+            let f2_y = inner.y + inner.height.saturating_sub(1);
+            if mouse.row == f2_y {
+                let mid = inner.x + inner.width / 2;
+                if mouse.column >= mid {
+                    return LeaderSettingsAction::Cancel;
+                } else if mouse.column >= inner.x + 2 {
+                    return LeaderSettingsAction::Save;
+                }
+            }
+        }
+        LeaderSettingsAction::None
     }
 
     /// Renders the shortcut editor modal frame and input fields into `buf`.
@@ -564,6 +700,23 @@ impl LeaderSettingsModal {
             hint_style,
         );
     }
+}
+
+/// Action triggered from mouse interactions in the shortcut editor modal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ShortcutEditAction {
+    /// No change / state updated.
+    None,
+    /// User confirmed changes via Save button or footer.
+    Save,
+    /// User cancelled edits via Cancel button or close button or footer.
+    Cancel,
+    /// User clicked capture key button or footer hint.
+    CaptureKey,
+    /// User clicked browse script/file button.
+    BrowseScript,
+    /// User clicked macros / placeholders help hint.
+    ShowMacros,
 }
 
 /// Property editor modal for a single [`ShortcutEntry`].
@@ -769,6 +922,174 @@ impl ShortcutEditModal {
         }
 
         Ok(entry)
+    }
+
+    /// Handles mouse interaction for shortcut editor modal.
+    pub fn handle_mouse(
+        &mut self,
+        mouse: crossterm::event::MouseEvent,
+        area: Rect,
+    ) -> ShortcutEditAction {
+        if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
+            let box_w = area.width.saturating_sub(6).clamp(56, 76);
+            let box_h = area.height.saturating_sub(2).clamp(22, 26);
+            let inner = compute_modal_inner(area, box_w, box_h);
+            if is_close_button_clicked(inner, mouse.row, mouse.column) {
+                return ShortcutEditAction::Cancel;
+            }
+
+            let field_x = inner.x + 19;
+            let field_w = inner.width.saturating_sub(21).max(14);
+            let key_w = field_w.saturating_sub(18).max(8);
+            let tgt_w = field_w.saturating_sub(12).max(10);
+
+            let row = mouse.row;
+            let col = mouse.column;
+            let mut y = inner.y;
+
+            // 0: Description
+            if row == y {
+                self.focus_idx = 0;
+                return ShortcutEditAction::None;
+            }
+            y += 2;
+
+            // 1: Key Input + 2: Capture Key button
+            if row == y {
+                if col > field_x + key_w {
+                    self.focus_idx = 2;
+                    return ShortcutEditAction::CaptureKey;
+                } else if col >= field_x {
+                    self.focus_idx = 1;
+                    return ShortcutEditAction::None;
+                }
+            }
+            y += 2;
+
+            // 3: Use <leader> prefix toggle
+            if row == y {
+                self.focus_idx = 3;
+                self.use_leader = !self.use_leader;
+                return ShortcutEditAction::None;
+            }
+            y += 2;
+
+            // 4: Item Type selector
+            if row == y {
+                self.focus_idx = 4;
+                self.item_type_idx = (self.item_type_idx + 1) % SHORTCUT_TYPES.len();
+                return ShortcutEditAction::None;
+            }
+            y += 2;
+
+            // 5: Target Input + 6: Browse button
+            if row == y {
+                if col > field_x + tgt_w {
+                    self.focus_idx = 6;
+                    return ShortcutEditAction::BrowseScript;
+                } else if col >= field_x {
+                    self.focus_idx = 5;
+                    return ShortcutEditAction::None;
+                }
+            }
+            y += 2;
+
+            // 7: Execution Mode
+            if row == y {
+                self.focus_idx = 7;
+                self.execution_mode = match self.execution_mode {
+                    ExecutionMode::Console => ExecutionMode::Streaming,
+                    ExecutionMode::Streaming => ExecutionMode::Interactive,
+                    ExecutionMode::Interactive => ExecutionMode::Console,
+                };
+                return ShortcutEditAction::None;
+            }
+            y += 2;
+
+            // 8: Window Size %
+            if row == y {
+                self.focus_idx = 8;
+                return ShortcutEditAction::None;
+            }
+            y += 2;
+
+            // 9: Quiet, 10: Alt Buffer, 11: Enabled checkboxes
+            if row == y {
+                let q_lbl = if inner.width.saturating_sub(2) >= 54 {
+                    "[x] Quiet Mode"
+                } else {
+                    "[x] Quiet"
+                };
+                let alt_lbl = "[x] Alt Buffer";
+                let q_x = inner.x + 1;
+                let alt_x = q_x + q_lbl.len() as u16 + 2;
+                let en_x = alt_x + alt_lbl.len() as u16 + 2;
+                if col < alt_x {
+                    self.focus_idx = 9;
+                    self.quiet = !self.quiet;
+                } else if col < en_x {
+                    self.focus_idx = 10;
+                    self.alt_buffer = !self.alt_buffer;
+                } else {
+                    self.focus_idx = 11;
+                    self.enabled = !self.enabled;
+                }
+                return ShortcutEditAction::None;
+            }
+
+            // 12: Save, 13: Cancel
+            let btn_y = inner.y + inner.height.saturating_sub(3);
+            if row == btn_y {
+                let center_x = inner.x + inner.width / 2;
+                let save_x = center_x.saturating_sub(24).max(inner.x + 1);
+                let cancel_x = (center_x + 2).max(save_x + 24);
+                if col >= save_x && col < cancel_x {
+                    self.focus_idx = 12;
+                    return ShortcutEditAction::Save;
+                } else if col >= cancel_x {
+                    self.focus_idx = 13;
+                    return ShortcutEditAction::Cancel;
+                }
+            }
+
+            // Footer row 1: [F2] Capture Key | [Ctrl+P] Macros
+            let f1_y = inner.y + inner.height.saturating_sub(2);
+            if row == f1_y {
+                let avail_w = inner.width.saturating_sub(2) as usize;
+                let f_line1 = if avail_w >= 56 {
+                    "[Tab/Up/Down] Field | [F2] Capture Key | [Ctrl+P] Macros"
+                } else {
+                    "[Tab/Down] Field | [F2] Capture | [Ctrl+P] Macros"
+                };
+                let f1_clipped: String = f_line1.chars().take(avail_w).collect();
+                let fx1 = inner.x + inner.width.saturating_sub(f1_clipped.len() as u16) / 2;
+                if col >= fx1 && col < fx1 + f1_clipped.len() as u16 {
+                    let rel_col = (col - fx1) as usize;
+                    if let Some(pos) = f1_clipped.find("[Ctrl+P]") {
+                        if rel_col >= pos {
+                            return ShortcutEditAction::ShowMacros;
+                        }
+                    }
+                    if let Some(pos) = f1_clipped.find("[F2]") {
+                        if rel_col >= pos {
+                            return ShortcutEditAction::CaptureKey;
+                        }
+                    }
+                }
+            }
+
+            // Footer row 2: [Ctrl+S] Save | [Esc] Cancel
+            let f2_y = inner.y + inner.height.saturating_sub(1);
+            if row == f2_y {
+                let mid = inner.x + inner.width / 2;
+                if col >= mid {
+                    return ShortcutEditAction::Cancel;
+                } else if col >= inner.x + 2 {
+                    return ShortcutEditAction::Save;
+                }
+            }
+        }
+        ShortcutEditAction::None
     }
 
     /// Renders the shortcut editor modal frame and input fields into `buf`.
@@ -1253,21 +1574,24 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                 }
             }
             ActiveShortcutModal::CaptureStandalone(cap) => {
-                if let Event::Key(k) = ev {
-                    if let Some(res) = cap.handle_key(k) {
-                        if let Some(new_key) = res {
-                            if let Some(entry) = state.selected_entry_mut() {
-                                entry.key = new_key.clone();
-                                state.dirty = true;
-                                toast_rack.add(ToastNotification::new(
-                                    format!("Updated key binding to '{}'", new_key),
-                                    Some("Key Captured".to_string()),
-                                    2.5,
-                                ));
-                            }
+                let choice = match ev {
+                    Event::Key(k) => cap.handle_key(k),
+                    Event::Mouse(m) => cap.handle_mouse(m, area),
+                    _ => None,
+                };
+                if let Some(res) = choice {
+                    if let Some(new_key) = res {
+                        if let Some(entry) = state.selected_entry_mut() {
+                            entry.key = new_key.clone();
+                            state.dirty = true;
+                            toast_rack.add(ToastNotification::new(
+                                format!("Updated key binding to '{}'", new_key),
+                                Some("Key Captured".to_string()),
+                                2.5,
+                            ));
                         }
-                        active_modal = ActiveShortcutModal::None;
                     }
+                    active_modal = ActiveShortcutModal::None;
                 }
             }
             ActiveShortcutModal::LeaderSettings {
@@ -1275,14 +1599,62 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                 child_capture,
             } => {
                 if let Some(cap) = child_capture {
-                    if let Event::Key(k) = ev {
-                        if let Some(res) = cap.handle_key(k) {
-                            if let Some(new_ldr) = res {
-                                modal.key_input.set_text(&new_ldr);
-                                modal.error_msg = None;
-                            }
-                            *child_capture = None;
+                    let choice = match ev {
+                        Event::Key(k) => cap.handle_key(k),
+                        Event::Mouse(m) => cap.handle_mouse(m, area),
+                        _ => None,
+                    };
+                    if let Some(res) = choice {
+                        if let Some(new_ldr) = res {
+                            modal.key_input.set_text(&new_ldr);
+                            modal.error_msg = None;
                         }
+                        *child_capture = None;
+                    }
+                    continue;
+                }
+
+                if let Event::Mouse(m) = ev {
+                    match modal.handle_mouse(m, area) {
+                        LeaderSettingsAction::CaptureKey => {
+                            *child_capture = Some(KeyCaptureModal::new(
+                                &modal.key_input.as_string(),
+                                &modal.key_input.as_string(),
+                                true,
+                            ));
+                        }
+                        LeaderSettingsAction::Cancel => {
+                            active_modal = ActiveShortcutModal::None;
+                        }
+                        LeaderSettingsAction::Save => {
+                            match validate_key_spec(&modal.key_input.as_string(), true) {
+                                Ok(valid_ldr) => {
+                                    let timeout = modal
+                                        .timeout_input
+                                        .as_string()
+                                        .trim()
+                                        .parse::<u64>()
+                                        .unwrap_or(1500);
+                                    state.config.leader_key = valid_ldr.clone();
+                                    state.config.leader_timeout_ms = timeout;
+                                    state.config.show_leader_hint = modal.show_hint;
+                                    state.dirty = true;
+                                    toast_rack.add(ToastNotification::new(
+                                        format!(
+                                            "Leader key set to '{}' ({}ms)",
+                                            valid_ldr, timeout
+                                        ),
+                                        Some("Leader Settings Updated".to_string()),
+                                        2.5,
+                                    ));
+                                    active_modal = ActiveShortcutModal::None;
+                                }
+                                Err(err) => {
+                                    modal.error_msg = Some(err);
+                                }
+                            }
+                        }
+                        LeaderSettingsAction::None => {}
                     }
                     continue;
                 }
@@ -1402,13 +1774,66 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                     continue;
                 }
                 if let Some(cap) = child_capture {
-                    if let Event::Key(k) = ev {
-                        if let Some(res) = cap.handle_key(k) {
-                            if let Some(new_key) = res {
-                                modal.set_captured_key(&new_key);
-                            }
-                            *child_capture = None;
+                    let choice = match ev {
+                        Event::Key(k) => cap.handle_key(k),
+                        Event::Mouse(m) => cap.handle_mouse(m, area),
+                        _ => None,
+                    };
+                    if let Some(res) = choice {
+                        if let Some(new_key) = res {
+                            modal.set_captured_key(&new_key);
                         }
+                        *child_capture = None;
+                    }
+                    continue;
+                }
+
+                if let Event::Mouse(m) = ev {
+                    match modal.handle_mouse(m, area) {
+                        ShortcutEditAction::ShowMacros => {
+                            *child_help = Some(HelpModal::new(
+                                "BashMenu Placeholders & Macros",
+                                PLACEHOLDER_HELP_TEXT,
+                            ));
+                        }
+                        ShortcutEditAction::CaptureKey => {
+                            *child_capture = Some(KeyCaptureModal::new(
+                                &modal.composed_key(),
+                                &state.config.leader_key,
+                                false,
+                            ));
+                        }
+                        ShortcutEditAction::BrowseScript => {
+                            let start =
+                                std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+                            *child_picker = Some(FilePickerModal::new(
+                                "Select Target File or Script",
+                                &start,
+                                false,
+                            ));
+                        }
+                        ShortcutEditAction::Cancel => {
+                            if *is_new {
+                                state.delete_selected();
+                            }
+                            active_modal = ActiveShortcutModal::None;
+                        }
+                        ShortcutEditAction::Save => {
+                            let orig = state.selected_entry().cloned().unwrap_or_default();
+                            match modal.build_entry(&orig) {
+                                Ok(built) => {
+                                    if let Some(slot) = state.selected_entry_mut() {
+                                        *slot = built;
+                                        state.dirty = true;
+                                    }
+                                    active_modal = ActiveShortcutModal::None;
+                                }
+                                Err(err) => {
+                                    modal.error_msg = Some(err);
+                                }
+                            }
+                        }
+                        ShortcutEditAction::None => {}
                     }
                     continue;
                 }

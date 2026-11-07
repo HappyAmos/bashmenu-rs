@@ -270,13 +270,9 @@ impl FilePickerModal {
 
     /// Handles immediate mouse interaction
     pub fn handle_mouse(&mut self, mouse: MouseEvent, area: Rect) -> Option<Option<PathBuf>> {
-        let dialog_w = 60.min(area.width.saturating_sub(4));
-        let dialog_h = 18.min(area.height.saturating_sub(2));
-        let inner_area = if area.width <= dialog_w {
-            area
-        } else {
-            super::frame::compute_modal_inner(area, dialog_w, dialog_h)
-        };
+        let dialog_w = 70.min(area.width.saturating_sub(4));
+        let dialog_h = 22.min(area.height.saturating_sub(2));
+        let inner_area = super::frame::compute_modal_inner(area, dialog_w, dialog_h);
 
         if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
             let row = mouse.row;
@@ -296,26 +292,42 @@ impl FilePickerModal {
             } else if !self.creating_new {
                 let btn_y = inner_area.y + inner_area.height.saturating_sub(1);
                 if row == btn_y {
-                    let rel_x = col.saturating_sub(inner_area.x + 2);
+                    let rel_x = col.saturating_sub(inner_area.x + 2) as usize;
                     let hidden_tag = if self.show_hidden {
                         "[h] Hide Hidden"
                     } else {
                         "[h] Show Hidden"
                     };
-                    let hidden_start = 17;
-                    let hidden_end = hidden_start + hidden_tag.len() as u16;
-                    let new_start = hidden_end + 3;
-                    let new_end = new_start + 12;
-
-                    if rel_x >= hidden_start && rel_x < hidden_end {
-                        self.toggle_hidden();
-                    } else if self.allow_new && rel_x >= new_start && rel_x < new_end {
-                        self.creating_new = true;
-                        self.new_name_input.clear();
-                    } else if rel_x >= new_end {
-                        return Some(None);
-                    } else if rel_x < hidden_start {
-                        return self.activate_selected();
+                    let bottom_str = if self.allow_new {
+                        format!(
+                            "[Enter] Select   {}   [n] New File   [Esc] Cancel",
+                            hidden_tag
+                        )
+                    } else {
+                        format!("[Enter] Select   {}   [Esc] Cancel", hidden_tag)
+                    };
+                    if let Some(pos) = bottom_str.find("[Esc]") {
+                        if rel_x >= pos {
+                            return Some(None);
+                        }
+                    }
+                    if let Some(pos) = bottom_str.find("[n] New File") {
+                        if rel_x >= pos && rel_x < pos + 12 && self.allow_new {
+                            self.creating_new = true;
+                            self.new_name_input.clear();
+                            return None;
+                        }
+                    }
+                    if let Some(pos) = bottom_str.find(hidden_tag) {
+                        if rel_x >= pos && rel_x < pos + hidden_tag.len() {
+                            self.toggle_hidden();
+                            return None;
+                        }
+                    }
+                    if let Some(pos) = bottom_str.find("[Enter] Select") {
+                        if rel_x >= pos && rel_x < pos + 14 {
+                            return self.activate_selected();
+                        }
                     }
                 }
             }

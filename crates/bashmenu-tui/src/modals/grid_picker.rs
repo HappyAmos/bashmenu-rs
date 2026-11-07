@@ -96,6 +96,16 @@ impl ColorGridModal {
                 self.selected_code = code;
                 return Some(Some(code));
             }
+
+            let badge_y = inner.y + inner.height.saturating_sub(1);
+            if row == badge_y && col >= inner.x && col < inner.x + inner.width {
+                let rel_x = (col - inner.x) as usize;
+                if rel_x >= 36 {
+                    return Some(None);
+                } else if rel_x >= 18 {
+                    return Some(Some(self.selected_code));
+                }
+            }
         }
         None
     }
@@ -259,6 +269,16 @@ impl AsciiGridModal {
                 let code = cell_y * 16 + cell_x;
                 self.selected_code = code;
                 return Some(Some(cp437_to_char(code)));
+            }
+
+            let badge_y = inner.y + inner.height.saturating_sub(1);
+            if row == badge_y && col >= inner.x && col < inner.x + inner.width {
+                let rel_x = (col - inner.x) as usize;
+                if rel_x >= 36 {
+                    return Some(None);
+                } else if rel_x >= 18 {
+                    return Some(Some(cp437_to_char(self.selected_code)));
+                }
             }
         }
         None

@@ -90,13 +90,9 @@ impl ThemePickerModal {
 
     /// Handles mouse event
     pub fn handle_mouse(&mut self, mouse: MouseEvent, area: Rect) -> Option<Option<String>> {
-        let dialog_w = 40.min(area.width.saturating_sub(4));
-        let dialog_h = 16.min(area.height.saturating_sub(2));
-        let inner_area = if area.width <= dialog_w {
-            area
-        } else {
-            super::frame::compute_modal_inner(area, dialog_w, dialog_h)
-        };
+        let dialog_w = 46.min(area.width.saturating_sub(4));
+        let dialog_h = 16.min(area.height.saturating_sub(4)).max(8);
+        let inner_area = super::frame::compute_modal_inner(area, dialog_w, dialog_h);
 
         match mouse.kind {
             MouseEventKind::ScrollDown => {
@@ -115,12 +111,33 @@ impl ThemePickerModal {
                 if super::frame::is_close_button_clicked(inner_area, row, col) {
                     return Some(None);
                 }
-                if row > inner_area.y && row < inner_area.y + inner_area.height.saturating_sub(1) {
+                let footer_y = inner_area.y + inner_area.height.saturating_sub(1);
+                if row > inner_area.y && row < footer_y {
                     let clicked_row = (row - (inner_area.y + 1)) as usize;
                     let target_idx = self.scroll_offset + clicked_row;
                     if target_idx < self.themes.len() {
                         self.selected_idx = target_idx;
                         return Some(Some(self.themes[target_idx].clone()));
+                    }
+                } else if row == footer_y {
+                    let footer_text = " [Enter] Select  [Esc] Cancel ";
+                    let avail_footer_w = inner_area.width.saturating_sub(2) as usize;
+                    let clipped_footer: String = footer_text.chars().take(avail_footer_w).collect();
+                    let footer_x = (inner_area.x + inner_area.width)
+                        .saturating_sub(clipped_footer.len() as u16 + 1)
+                        .max(inner_area.x + 1);
+                    if col >= footer_x && col < footer_x + clipped_footer.len() as u16 {
+                        let rel_x = (col - footer_x) as usize;
+                        if let Some(pos) = clipped_footer.find("[Esc]") {
+                            if rel_x >= pos {
+                                return Some(None);
+                            }
+                        }
+                        if let Some(pos) = clipped_footer.find("[Enter]") {
+                            if rel_x >= pos && self.selected_idx < self.themes.len() {
+                                return Some(Some(self.themes[self.selected_idx].clone()));
+                            }
+                        }
                     }
                 }
                 None

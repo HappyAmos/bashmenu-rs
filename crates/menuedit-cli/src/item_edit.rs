@@ -1516,7 +1516,9 @@ impl ItemEditModal {
     /// Handles mouse events
     pub fn handle_mouse(&mut self, mouse: MouseEvent, area: Rect) -> ItemEditResult {
         if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
-            let inner = compute_modal_inner(area, 86, 32);
+            let dialog_w = 86.min(area.width.saturating_sub(4));
+            let dialog_h = 32.min(area.height.saturating_sub(2));
+            let inner = compute_modal_inner(area, dialog_w, dialog_h);
 
             if is_close_button_clicked(inner, mouse.row, mouse.column) {
                 return ItemEditResult::Cancel;

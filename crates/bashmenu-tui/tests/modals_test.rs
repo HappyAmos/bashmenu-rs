@@ -1,9 +1,10 @@
 use bashmenu_tui::{
     AsciiGridModal, ColorGridModal, ColorPickerModal, ColorPickerTab, ConfirmChoice, ConfirmModal,
-    FilePickerModal, InputModal, MessageModal, NoteEditorAction, NoteEditorModal, NoteViewerAction,
-    NoteViewerModal, RadioModal, ResolvedThemeStyles, ToggleChoice, ToggleModal,
+    FilePickerModal, HelpModal, InputModal, MessageModal, NoteEditorAction, NoteEditorModal,
+    NoteViewerAction, NoteViewerModal, RadioModal, ResolvedThemeStyles, StreamOutputAction,
+    StreamOutputModal, ThemePickerModal, ToggleChoice, ToggleModal,
 };
-use crossterm::event::KeyCode;
+use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use std::path::Path;
@@ -1715,5 +1716,224 @@ fn test_all_modals_render_within_frame_bounds() {
                 right_border_x, y
             );
         }
+    }
+}
+
+#[test]
+fn test_all_modals_close_button_and_footer_clickable() {
+    let styles = ResolvedThemeStyles::default();
+    let area = Rect::new(0, 0, 80, 24);
+
+    let click = |col: u16, row: u16| MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: col,
+        row,
+        modifiers: KeyModifiers::NONE,
+    };
+
+    // 1. ThemePickerModal
+    {
+        let mut modal = ThemePickerModal::new(
+            vec!["default".to_string(), "monochrome".to_string()],
+            "default",
+        );
+        let mut buf = Buffer::empty(area);
+        let inner = modal.render(area, &styles, &mut buf);
+
+        // Click top-right [X] close button
+        let res = modal.handle_mouse(click(inner.x + inner.width - 2, inner.y - 1), area);
+        assert_eq!(res, Some(None), "ThemePickerModal close [X] must cancel");
+
+        // Click footer [Esc] Cancel
+        let res = modal.handle_mouse(
+            click(inner.x + inner.width - 3, inner.y + inner.height - 1),
+            area,
+        );
+        assert_eq!(
+            res,
+            Some(None),
+            "ThemePickerModal footer Cancel must cancel"
+        );
+
+        // Click footer [Enter] Select
+        let res = modal.handle_mouse(
+            click(inner.x + inner.width - 18, inner.y + inner.height - 1),
+            area,
+        );
+        assert_eq!(
+            res,
+            Some(Some("default".to_string())),
+            "ThemePickerModal footer Select must select"
+        );
+    }
+
+    // 2. HelpModal
+    {
+        let mut modal = HelpModal::new("Help Title", "Help content body text");
+        let mut buf = Buffer::empty(area);
+        let inner = modal.render(area, &styles, &mut buf);
+
+        // Click top-right [X] close button
+        let res = modal.handle_mouse(click(inner.x + inner.width - 2, inner.y - 1), area);
+        assert!(res, "HelpModal close [X] must dismiss");
+
+        // Click footer help gutter
+        let res = modal.handle_mouse(click(inner.x + 10, inner.y + inner.height - 1), area);
+        assert!(res, "HelpModal footer click must dismiss");
+    }
+
+    // 3. StreamOutputModal
+    {
+        let mut modal = StreamOutputModal::new(
+            "Process Stream".to_string(),
+            "echo test".to_string(),
+            80,
+            false,
+        );
+        let mut buf = Buffer::empty(area);
+        modal.render(area, &styles, &mut buf);
+        let (w, h) = (
+            (area.width * 80 / 100).max(30),
+            (area.height * 80 / 100).max(10),
+        );
+        let inner = bashmenu_tui::compute_modal_inner(area, w, h);
+
+        // Click top-right [X] close button
+        let res = modal.handle_mouse(click(inner.x + inner.width - 2, inner.y - 1), area);
+        assert_eq!(res, StreamOutputAction::Close);
+
+        // Click status footer
+        let res = modal.handle_mouse(click(inner.x + 5, inner.y + inner.height - 1), area);
+        assert_eq!(res, StreamOutputAction::Close);
+    }
+
+    // 4. ConfirmModal
+    {
+        let mut modal = ConfirmModal::new("Confirm Dialog", "Do you wish to proceed?");
+        let mut buf = Buffer::empty(area);
+        let inner = modal.render(area, &styles, &mut buf);
+
+        // Click top-right [X] close button
+        let res = modal.handle_mouse(click(inner.x + inner.width - 2, inner.y - 1), area);
+        assert_eq!(res, Some(ConfirmChoice::Cancel));
+
+        let start_x = inner.x + inner.width.saturating_sub(34) / 2;
+        // Click [ Cancel ] button
+        let res = modal.handle_mouse(click(start_x + 25, inner.y + inner.height - 2), area);
+        assert_eq!(res, Some(ConfirmChoice::Cancel));
+
+        // Click [ Yes ] button
+        let res = modal.handle_mouse(click(start_x + 3, inner.y + inner.height - 2), area);
+        assert_eq!(res, Some(ConfirmChoice::Yes));
+    }
+
+    // 5. ToggleModal
+    {
+        let mut modal = ToggleModal::new("Toggle Setting", "Enable feature?");
+        let mut buf = Buffer::empty(area);
+        let inner = modal.render(area, &styles, &mut buf);
+
+        // Click top-right [X] close button
+        let res = modal.handle_mouse(click(inner.x + inner.width - 2, inner.y - 1), area);
+        assert_eq!(res, Some(ToggleChoice::Cancel));
+
+        // Click [ Cancel ] button
+        let res = modal.handle_mouse(
+            click(inner.x + inner.width - 4, inner.y + inner.height - 2),
+            area,
+        );
+        assert_eq!(res, Some(ToggleChoice::Cancel));
+    }
+
+    // 6. RadioModal
+    {
+        let mut modal = RadioModal::new(
+            "Options Selection",
+            "Choose mode:",
+            vec![("opt1".to_string(), "Option 1".to_string())],
+            "opt1",
+        );
+        let mut buf = Buffer::empty(area);
+        let inner = modal.render(area, &styles, &mut buf);
+
+        // Click top-right [X] close button
+        let res = modal.handle_mouse(click(inner.x + inner.width - 2, inner.y - 1), area);
+        assert_eq!(res, Some(None));
+
+        // Click Cancel button
+        let res = modal.handle_mouse(
+            click(inner.x + inner.width / 2 + 5, inner.y + inner.height - 2),
+            area,
+        );
+        assert_eq!(res, Some(None));
+    }
+
+    // 7. FilePickerModal
+    {
+        let mut modal = FilePickerModal::new("Select File", Path::new("."), false);
+        let mut buf = Buffer::empty(area);
+        let inner = modal.render(area, &styles, &mut buf);
+
+        // Click top-right [X] close button
+        let res = modal.handle_mouse(click(inner.x + inner.width - 2, inner.y - 1), area);
+        assert_eq!(res, Some(None));
+
+        // Click footer [Esc] Cancel
+        let res = modal.handle_mouse(
+            click(inner.x + inner.width - 5, inner.y + inner.height - 1),
+            area,
+        );
+        assert_eq!(res, Some(None));
+    }
+
+    // 8. ColorPickerModal
+    {
+        let mut modal = ColorPickerModal::new("Color Selector", ratatui::style::Color::Cyan);
+        let mut buf = Buffer::empty(area);
+        let (inner, _) = modal.render(area, &styles, &mut buf);
+
+        // Click top-right [X] close button
+        let res = modal.handle_mouse(click(inner.x + inner.width - 2, inner.y - 1), area);
+        assert_eq!(res, Some(None));
+
+        // Click footer Esc: Cancel
+        let res = modal.handle_mouse(
+            click(inner.x + inner.width - 4, inner.y + inner.height - 1),
+            area,
+        );
+        assert_eq!(res, Some(None));
+    }
+
+    // 9. ColorGridModal & AsciiGridModal
+    {
+        let mut c_modal = ColorGridModal::new("Select 256 Color", 42);
+        let mut buf = Buffer::empty(area);
+        let (inner, grid_start) = c_modal.render(area, &styles, &mut buf);
+
+        // Click top-right [X] close button
+        let res = c_modal.handle_mouse(click(inner.x + inner.width - 2, inner.y - 1), grid_start);
+        assert_eq!(res, Some(None));
+
+        // Click footer Esc: Cancel
+        let res = c_modal.handle_mouse(
+            click(inner.x + inner.width - 4, inner.y + inner.height - 1),
+            grid_start,
+        );
+        assert_eq!(res, Some(None));
+
+        let mut a_modal = AsciiGridModal::new("Select CP437 Glyph", 65);
+        let mut buf = Buffer::empty(area);
+        let (inner, grid_start) = a_modal.render(area, &styles, &mut buf);
+
+        // Click top-right [X] close button
+        let res = a_modal.handle_mouse(click(inner.x + inner.width - 2, inner.y - 1), grid_start);
+        assert_eq!(res, Some(None));
+
+        // Click footer Esc: Cancel
+        let res = a_modal.handle_mouse(
+            click(inner.x + inner.width - 4, inner.y + inner.height - 1),
+            grid_start,
+        );
+        assert_eq!(res, Some(None));
     }
 }

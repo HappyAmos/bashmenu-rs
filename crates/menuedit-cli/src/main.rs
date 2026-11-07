@@ -695,8 +695,8 @@ fn main() -> Result<()> {
                                     }
                                 }
                                 Event::Mouse(mouse) => {
-                                    let inner = compute_modal_inner(area, 60, 24);
-                                    let grid_start = (inner.x + 2, inner.y + 2);
+                                    let inner = compute_modal_inner(area, 56, 22);
+                                    let grid_start = (inner.x + 2, inner.y + 1);
                                     if let Some(opt_char) = m.handle_mouse(mouse, grid_start) {
                                         if opt_char.is_some() {
                                             let s = format!("{{ascii:{}}}", m.selected_code);
@@ -902,8 +902,8 @@ fn main() -> Result<()> {
                         }
                     }
                     Event::Mouse(m) => {
-                        let inner = compute_modal_inner(area, 60, 24);
-                        let grid_start = (inner.x + 2, inner.y + 2);
+                        let inner = compute_modal_inner(area, 56, 22);
+                        let grid_start = (inner.x + 2, inner.y + 1);
                         if modal.handle_mouse(m, grid_start).is_some() {
                             active_modal = ActiveModal::None;
                         }

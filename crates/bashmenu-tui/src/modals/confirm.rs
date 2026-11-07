@@ -102,18 +102,29 @@ impl ConfirmModal {
         }
     }
 
+    /// Computes dialog dimensions and inner rect
+    fn compute_layout(&self, area: Rect) -> (Rect, Vec<String>) {
+        let max_w = 70.min(area.width.saturating_sub(4));
+        let wrapped =
+            super::input::wrap_prompt_text(&self.message, max_w.saturating_sub(4) as usize);
+        let max_line_w = wrapped
+            .iter()
+            .map(|l| l.chars().count())
+            .max()
+            .unwrap_or(20);
+        let dialog_w = (max_line_w as u16 + 8).min(max_w).max(20.min(max_w));
+        let max_h = area.height.saturating_sub(2);
+        let dialog_h = (wrapped.len() as u16 + 5).min(max_h).max(8.min(max_h));
+        let inner = super::frame::compute_modal_inner(area, dialog_w, dialog_h);
+        (inner, wrapped)
+    }
+
     /// Handles immediate mouse click.
     pub fn handle_mouse(&mut self, mouse: MouseEvent, area: Rect) -> Option<ConfirmChoice> {
         if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
             let row = mouse.row;
             let col = mouse.column;
-
-            let dialog_w = (self.message.len() as u16 + 8).clamp(48, 70);
-            let inner_area = if area.width <= dialog_w {
-                area
-            } else {
-                super::frame::compute_modal_inner(area, dialog_w, 8)
-            };
+            let (inner_area, _) = self.compute_layout(area);
 
             if super::frame::is_close_button_clicked(inner_area, row, col) {
                 return Some(ConfirmChoice::Cancel);

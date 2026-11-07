@@ -1432,3 +1432,151 @@ fn test_shortcut_modals_text_does_not_exceed_window_width() {
         }
     }
 }
+
+#[test]
+fn test_menuedit_modals_close_button_and_footer_clickable() {
+    use bashmenu_core::{MenuItem, ShortcutEntry, ShortcutsConfig};
+    use bashmenu_tui::{compute_modal_inner, ResolvedThemeStyles};
+    use crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+    use menuedit_cli::shortcut_editor::{LeaderSettingsAction, ShortcutEditAction};
+    use menuedit_cli::{
+        ItemEditModal, ItemEditResult, ItemTypePickerModal, KeyCaptureModal, LeaderSettingsModal,
+        ShortcutEditModal,
+    };
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+
+    let styles = ResolvedThemeStyles::default();
+    let area = Rect::new(0, 0, 80, 24);
+
+    let click = |col: u16, row: u16| MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: col,
+        row,
+        modifiers: KeyModifiers::NONE,
+    };
+
+    // 1. ItemTypePickerModal
+    {
+        let mut modal = ItemTypePickerModal::new("command");
+        let mut buf = Buffer::empty(area);
+        let inner = modal.render(area, &styles, &mut buf);
+
+        // Click top-right [X] close button
+        let res = modal.handle_mouse(click(inner.x + inner.width - 2, inner.y - 1), area);
+        assert_eq!(res, Some(None));
+
+        // Click footer [Esc] Cancel
+        let res = modal.handle_mouse(
+            click(inner.x + inner.width - 4, inner.y + inner.height - 1),
+            area,
+        );
+        assert_eq!(res, Some(None));
+
+        // Click footer [Enter] Select
+        let res = modal.handle_mouse(
+            click(inner.x + inner.width - 18, inner.y + inner.height - 1),
+            area,
+        );
+        assert_eq!(res, Some(Some("command".to_string())));
+    }
+
+    // 2. KeyCaptureModal
+    {
+        let mut modal = KeyCaptureModal::new("Ctrl+Space", "Ctrl+Space", false);
+        let mut buf = Buffer::empty(area);
+        modal.render(area, &styles, &mut buf);
+        let box_w = area.width.saturating_sub(8).clamp(46, 68);
+        let inner = compute_modal_inner(area, box_w, 13);
+
+        // Click top-right [X] close button
+        let res = modal.handle_mouse(click(inner.x + inner.width - 2, inner.y - 1), area);
+        assert_eq!(res, Some(None));
+
+        // Click footer [ESC] Cancel
+        let res = modal.handle_mouse(
+            click(inner.x + inner.width - 5, inner.y + inner.height - 1),
+            area,
+        );
+        assert_eq!(res, Some(None));
+    }
+
+    // 3. LeaderSettingsModal
+    {
+        let cfg = ShortcutsConfig::default();
+        let mut modal = LeaderSettingsModal::new(&cfg);
+        let mut buf = Buffer::empty(area);
+        modal.render(area, &styles, &mut buf);
+        let box_w = area.width.saturating_sub(8).clamp(48, 68);
+        let inner = compute_modal_inner(area, box_w, 16);
+
+        // Click top-right [X] close button
+        let res = modal.handle_mouse(click(inner.x + inner.width - 2, inner.y - 1), area);
+        assert_eq!(res, LeaderSettingsAction::Cancel);
+
+        // Click footer [Esc] Cancel
+        let res = modal.handle_mouse(
+            click(inner.x + inner.width - 5, inner.y + inner.height - 1),
+            area,
+        );
+        assert_eq!(res, LeaderSettingsAction::Cancel);
+
+        // Click footer [Enter] Select
+        let res = modal.handle_mouse(click(inner.x + 10, inner.y + inner.height - 1), area);
+        assert_eq!(res, LeaderSettingsAction::Save);
+    }
+
+    // 4. ShortcutEditModal
+    {
+        let entry = ShortcutEntry {
+            key: "<leader> t".to_string(),
+            description: "Test shortcut".to_string(),
+            action: Some("echo hello".to_string()),
+            ..Default::default()
+        };
+        let mut modal = ShortcutEditModal::from_entry(&entry);
+        let mut buf = Buffer::empty(area);
+        modal.render(area, &styles, &mut buf);
+        let box_w = area.width.saturating_sub(6).clamp(56, 76);
+        let box_h = area.height.saturating_sub(2).clamp(22, 26);
+        let inner = compute_modal_inner(area, box_w, box_h);
+
+        // Click top-right [X] close button
+        let res = modal.handle_mouse(click(inner.x + inner.width - 2, inner.y - 1), area);
+        assert_eq!(res, ShortcutEditAction::Cancel);
+
+        // Click footer [Esc] Cancel
+        let res = modal.handle_mouse(
+            click(inner.x + inner.width - 5, inner.y + inner.height - 1),
+            area,
+        );
+        assert_eq!(res, ShortcutEditAction::Cancel);
+
+        // Click footer [Ctrl+S] Save
+        let res = modal.handle_mouse(click(inner.x + 10, inner.y + inner.height - 1), area);
+        assert_eq!(res, ShortcutEditAction::Save);
+    }
+
+    // 5. ItemEditModal
+    {
+        let item = MenuItem {
+            label: "Test Item".to_string(),
+            command: Some("echo test".to_string()),
+            ..Default::default()
+        };
+        let mut modal = ItemEditModal::new(&item);
+        let mut buf = Buffer::empty(area);
+        let inner = modal.render(area, &styles, &mut buf);
+
+        // Click top-right [X] close button
+        let res = modal.handle_mouse(click(inner.x + inner.width - 2, inner.y - 1), area);
+        assert_eq!(res, ItemEditResult::Cancel);
+
+        // Click footer Cancel (bottom-right)
+        let res = modal.handle_mouse(
+            click(inner.x + inner.width - 4, inner.y + inner.height - 1),
+            area,
+        );
+        assert_eq!(res, ItemEditResult::Cancel);
+    }
+}

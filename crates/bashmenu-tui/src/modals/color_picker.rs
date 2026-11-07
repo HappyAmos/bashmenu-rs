@@ -422,6 +422,40 @@ impl ColorPickerModal {
             }
         }
 
+        // 3. Status badge / footer interaction on bottom row
+        let badge_y = oy + inner_area.height.saturating_sub(1);
+        if row == badge_y && col >= ox && col < ox + inner_area.width {
+            let rel_x = (col - ox) as usize;
+            match self.tab {
+                ColorPickerTab::Palette256 => {
+                    if rel_x >= 48 {
+                        return Some(None);
+                    } else if rel_x >= 34 {
+                        self.tab = ColorPickerTab::TrueColorHsv;
+                        return None;
+                    } else if rel_x >= 18 {
+                        return Some(Some(self.current_color));
+                    }
+                }
+                ColorPickerTab::TrueColorHsv => {
+                    if rel_x >= 54 {
+                        self.tab = ColorPickerTab::HexInput;
+                        return None;
+                    } else if rel_x >= 38 {
+                        return Some(Some(self.current_color));
+                    }
+                }
+                ColorPickerTab::HexInput => {
+                    if rel_x >= 56 {
+                        self.tab = ColorPickerTab::Palette256;
+                        return None;
+                    } else if rel_x >= 40 {
+                        return Some(Some(self.current_color));
+                    }
+                }
+            }
+        }
+
         None
     }
 

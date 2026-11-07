@@ -1,7 +1,9 @@
 //! Modal selector for changing menu item types.
 
-use bashmenu_tui::{render_modal_frame, ResolvedThemeStyles};
-use crossterm::event::{KeyCode, MouseEvent, MouseEventKind};
+use bashmenu_tui::{
+    compute_modal_inner, is_close_button_clicked, render_modal_frame, ResolvedThemeStyles,
+};
+use crossterm::event::{KeyCode, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Modifier;
@@ -76,7 +78,11 @@ impl ItemTypePickerModal {
     }
 
     /// Handles mouse event
-    pub fn handle_mouse(&mut self, mouse: MouseEvent, _area: Rect) -> Option<Option<String>> {
+    pub fn handle_mouse(&mut self, mouse: MouseEvent, area: Rect) -> Option<Option<String>> {
+        let dialog_w = 64.min(area.width.saturating_sub(4));
+        let dialog_h = 18.min(area.height.saturating_sub(4));
+        let inner = compute_modal_inner(area, dialog_w, dialog_h);
+
         match mouse.kind {
             MouseEventKind::ScrollDown => {
                 if self.selected_idx + 1 < ITEM_TYPES.len() {
@@ -87,6 +93,45 @@ impl ItemTypePickerModal {
             MouseEventKind::ScrollUp => {
                 if self.selected_idx > 0 {
                     self.selected_idx -= 1;
+                }
+                None
+            }
+            MouseEventKind::Down(MouseButton::Left) => {
+                if is_close_button_clicked(inner, mouse.row, mouse.column) {
+                    return Some(None);
+                }
+                let content_h = inner.height.saturating_sub(2) as usize;
+                if mouse.row > inner.y && mouse.row < inner.y + 1 + content_h as u16 {
+                    let clicked_row = (mouse.row - (inner.y + 1)) as usize;
+                    let target_idx = self.scroll_offset + clicked_row;
+                    if target_idx < ITEM_TYPES.len() {
+                        self.selected_idx = target_idx;
+                        return Some(Some(ITEM_TYPES[target_idx].0.to_string()));
+                    }
+                }
+                let footer_y = inner.y + inner.height.saturating_sub(1);
+                if mouse.row == footer_y {
+                    let footer_text = " [Enter] Select  [Esc] Cancel ";
+                    let avail_footer_w = inner.width.saturating_sub(2) as usize;
+                    let clipped_footer: String = footer_text.chars().take(avail_footer_w).collect();
+                    let footer_x = (inner.x + inner.width)
+                        .saturating_sub(clipped_footer.len() as u16 + 1)
+                        .max(inner.x + 1);
+                    if mouse.column >= footer_x
+                        && mouse.column < footer_x + clipped_footer.len() as u16
+                    {
+                        let rel_x = (mouse.column - footer_x) as usize;
+                        if let Some(pos) = clipped_footer.find("[Esc]") {
+                            if rel_x >= pos {
+                                return Some(None);
+                            }
+                        }
+                        if let Some(pos) = clipped_footer.find("[Enter]") {
+                            if rel_x >= pos && self.selected_idx < ITEM_TYPES.len() {
+                                return Some(Some(ITEM_TYPES[self.selected_idx].0.to_string()));
+                            }
+                        }
+                    }
                 }
                 None
             }
@@ -132,6 +177,19 @@ impl ItemTypePickerModal {
                 .collect();
             buf.set_string(inner.x + 1, y, &truncated, row_style);
         }
+
+        // Footer
+        let footer_y = inner.y + inner.height.saturating_sub(1);
+        let footer_text = " [Enter] Select  [Esc] Cancel ";
+        let avail_footer_w = inner.width.saturating_sub(2) as usize;
+        let clipped_footer: String = footer_text.chars().take(avail_footer_w).collect();
+        let footer_x = (inner.x + inner.width).saturating_sub(clipped_footer.len() as u16 + 1);
+        buf.set_string(
+            footer_x.max(inner.x + 1),
+            footer_y,
+            &clipped_footer,
+            styles.gutter.add_modifier(Modifier::DIM),
+        );
 
         inner
     }

@@ -245,7 +245,12 @@ impl StreamOutputModal {
                 StreamOutputAction::None
             }
             MouseEventKind::Down(MouseButton::Left) => {
-                if is_close_button_clicked(inner, mouse.row, mouse.column) {
+                let footer_y = inner.y + inner.height.saturating_sub(1);
+                if is_close_button_clicked(inner, mouse.row, mouse.column)
+                    || (mouse.row == footer_y
+                        && mouse.column >= inner.x
+                        && mouse.column < inner.x + inner.width)
+                {
                     self.terminate();
                     StreamOutputAction::Close
                 } else {

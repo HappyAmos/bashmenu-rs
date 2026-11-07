@@ -130,26 +130,38 @@ impl RadioModal {
         }
     }
 
+    /// Computes dialog dimensions and inner rect
+    fn compute_layout(&self, area: Rect) -> (Rect, Vec<String>) {
+        let max_w = 64_u16.min(area.width.saturating_sub(4));
+        let avail_w = max_w.saturating_sub(6) as usize;
+        let msg_lines = if avail_w > 0 && !self.message.trim().is_empty() {
+            super::input::wrap_prompt_text(&self.message, avail_w)
+        } else {
+            Vec::new()
+        };
+        let msg_count = msg_lines.len().max(1);
+        let max_h = area.height.saturating_sub(2);
+        let dialog_w = max_w.max(20.min(max_w));
+        let dialog_h = ((msg_count + self.options.len() + 6) as u16)
+            .min(max_h)
+            .max(8.min(max_h));
+        let inner = compute_modal_inner(area, dialog_w, dialog_h);
+        (inner, msg_lines)
+    }
+
     /// Handles immediate mouse click
     pub fn handle_mouse(&mut self, mouse: MouseEvent, area: Rect) -> Option<Option<String>> {
         if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
             let row = mouse.row;
             let col = mouse.column;
-
-            let dialog_w = 64_u16;
-            let dialog_h = (self.options.len() as u16 + 7).clamp(8, 20);
-            let inner_area = if area.width <= dialog_w {
-                area
-            } else {
-                compute_modal_inner(area, dialog_w, dialog_h)
-            };
+            let (inner_area, msg_lines) = self.compute_layout(area);
 
             if is_close_button_clicked(inner_area, row, col) {
                 return Some(None);
             }
 
             // Check option clicks
-            let opt_start_y = inner_area.y + 3;
+            let opt_start_y = inner_area.y + 1 + msg_lines.len() as u16 + 1;
             for (idx, (val, _)) in self.options.iter().enumerate() {
                 let opt_y = opt_start_y + idx as u16;
                 if row == opt_y && col >= inner_area.x && col < inner_area.x + inner_area.width {

@@ -214,11 +214,7 @@ impl NoteViewerModal {
             MouseEventKind::Down(crossterm::event::MouseButton::Left) => {
                 let dialog_w = (area.width.saturating_sub(4)).min(78);
                 let dialog_h = (area.height.saturating_sub(4)).clamp(14, 28);
-                let inner = if area.width <= dialog_w {
-                    area
-                } else {
-                    super::frame::compute_modal_inner(area, dialog_w, dialog_h)
-                };
+                let inner = super::frame::compute_modal_inner(area, dialog_w, dialog_h);
                 if super::frame::is_close_button_clicked(inner, mouse.row, mouse.column) {
                     return NoteViewerAction::Close;
                 }

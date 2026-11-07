@@ -1470,8 +1470,8 @@ fn handle_active_modal(
             tab_idx,
             ..
         } => {
-            if let Event::Key(k) = ev {
-                match k.code {
+            match ev {
+                Event::Key(k) => match k.code {
                     KeyCode::Char('r') | KeyCode::Char('R') => {
                         let tab = &mut tabs[*tab_idx];
                         tab.lines = recovered_lines.clone();
@@ -1509,7 +1509,78 @@ fn handle_active_modal(
                         }
                     }
                     _ => return true,
+                },
+                Event::Mouse(m)
+                    if m.kind
+                        == crossterm::event::MouseEventKind::Down(
+                            crossterm::event::MouseButton::Left,
+                        ) =>
+                {
+                    let inner = bashmenu_tui::compute_modal_inner(area, 64, 10);
+                    if bashmenu_tui::is_close_button_clicked(inner, m.row, m.column) {
+                        tabs[*tab_idx].cleanup_swap();
+                        if tabs.len() == 1 {
+                            std::process::exit(0);
+                        } else {
+                            tabs.remove(*tab_idx);
+                            if *active_tab_idx >= tabs.len() {
+                                *active_tab_idx = tabs.len() - 1;
+                            }
+                            *active_modal = ActiveModal::None;
+                            return true;
+                        }
+                    }
+                    if m.row == inner.y + 4 {
+                        let rel_x = m.column.saturating_sub(inner.x + 2) as usize;
+                        let opts =
+                            "Press: [R]ecover edits  [D]elete swap  [O]pen read-only  [Q]uit";
+                        if let Some(pos) = opts.find("[R]") {
+                            if rel_x >= pos && rel_x < pos + 16 {
+                                let tab = &mut tabs[*tab_idx];
+                                tab.lines = recovered_lines.clone();
+                                tab.is_modified = true;
+                                tab.status_message =
+                                    format!("Recovered {} lines from swap", tab.lines.len());
+                                *active_modal = ActiveModal::None;
+                                return true;
+                            }
+                        }
+                        if let Some(pos) = opts.find("[D]") {
+                            if rel_x >= pos && rel_x < pos + 13 {
+                                let tab = &mut tabs[*tab_idx];
+                                remove_swap_file(&tab.swap_path);
+                                tab.status_message = "Deleted stale swap file".to_string();
+                                *active_modal = ActiveModal::None;
+                                return true;
+                            }
+                        }
+                        if let Some(pos) = opts.find("[O]") {
+                            if rel_x >= pos && rel_x < pos + 17 {
+                                let tab = &mut tabs[*tab_idx];
+                                tab.is_read_only = true;
+                                tab.status_message = "Opened in Read-Only mode".to_string();
+                                *active_modal = ActiveModal::None;
+                                return true;
+                            }
+                        }
+                        if let Some(pos) = opts.find("[Q]") {
+                            if rel_x >= pos {
+                                tabs[*tab_idx].cleanup_swap();
+                                if tabs.len() == 1 {
+                                    std::process::exit(0);
+                                } else {
+                                    tabs.remove(*tab_idx);
+                                    if *active_tab_idx >= tabs.len() {
+                                        *active_tab_idx = tabs.len() - 1;
+                                    }
+                                    *active_modal = ActiveModal::None;
+                                    return true;
+                                }
+                            }
+                        }
+                    }
                 }
+                _ => return true,
             }
             true
         }
