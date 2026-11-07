@@ -990,3 +990,32 @@ fn test_menu_selected_path_and_title_chain() {
     );
     assert_eq!(view.selected_item().unwrap().label, "Child Action");
 }
+
+#[test]
+fn test_status_gutter_precedence_and_date_time_retention() {
+    let schema = create_sample_menu();
+    // Status template typical in bashmenu: user, host, battery, date/time
+    let status_line = "andrew | thinkpad | 98% | 2026-11-06 20:10:00".to_string();
+    let mut view = MenuView::new(schema, ResolvedThemeStyles::default(), true, status_line);
+
+    let area = Rect::new(0, 0, 80, 24);
+    let mut buf = Buffer::empty(area);
+    view.render(area, &mut buf);
+
+    // Scan gutter rows (bottom rows above bottom border: 21, 22)
+    let mut found_date_time = false;
+    for y in 20..23 {
+        let mut row_str = String::new();
+        for x in 0..80 {
+            row_str.push(buf[(x, y)].symbol().chars().next().unwrap_or(' '));
+        }
+        if row_str.contains("2026-11-06") || row_str.contains("20:10:00") {
+            found_date_time = true;
+            break;
+        }
+    }
+    assert!(
+        found_date_time,
+        "Status gutter must retain date/time tokens rather than dropping them"
+    );
+}

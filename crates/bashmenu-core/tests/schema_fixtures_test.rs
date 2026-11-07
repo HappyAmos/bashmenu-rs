@@ -330,3 +330,120 @@ fn test_parse_production_shortcuts_yml_and_inline_param() {
     assert_eq!(reloaded.shortcuts.len(), cfg.shortcuts.len());
     let _ = fs::remove_file(tmp);
 }
+
+#[test]
+fn test_inject_block_marker_injection_and_removal_cycle() {
+    let raw_yaml = r#"
+title: Test Inject Block
+items:
+  - label: Configure Sudo Prompt
+    type: inject_block
+    template: "{templates_dir}/sudo_lecture.tmpl"
+    target: "/tmp/test_target_profile"
+    block_id: "sudo_lecture_setting"
+    user_mode: "root"
+"#;
+    let schema: bashmenu_core::MenuSchema =
+        serde_yml::from_str(raw_yaml).expect("Must parse inject_block");
+    let item = &schema.items[0];
+    assert_eq!(item.label, "Configure Sudo Prompt");
+    assert_eq!(item.r#type, MenuItemType::Other("inject_block".to_string()));
+    assert_eq!(
+        item.extra.get("template").and_then(|v| v.as_str()),
+        Some("{templates_dir}/sudo_lecture.tmpl")
+    );
+    assert_eq!(
+        item.extra.get("target").and_then(|v| v.as_str()),
+        Some("/tmp/test_target_profile")
+    );
+    let block_id = item
+        .extra
+        .get("block_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("default");
+    assert_eq!(block_id, "sudo_lecture_setting");
+    assert_eq!(
+        item.extra.get("user_mode").and_then(|v| v.as_str()),
+        Some("root")
+    );
+
+    // Verify boundary markers format
+    let start_marker = format!("# CODEBLOCK:{}:START", block_id);
+    let end_marker = format!("# CODEBLOCK:{}:END", block_id);
+    assert_eq!(start_marker, "# CODEBLOCK:sudo_lecture_setting:START");
+    assert_eq!(end_marker, "# CODEBLOCK:sudo_lecture_setting:END");
+
+    // Simulate injection into target file
+    let initial_content = "# Existing profile header\nexport FOO=1\n";
+    let template_body = "Defaults lecture=always\n";
+    let block_to_inject = format!(
+        "\n{}\n{}\n{}\n",
+        start_marker,
+        template_body.trim(),
+        end_marker
+    );
+
+    let mut injected = initial_content.to_string();
+    injected.push_str(&block_to_inject);
+    assert!(injected.contains(&start_marker));
+    assert!(injected.contains(&end_marker));
+    assert!(injected.contains("Defaults lecture=always"));
+
+    // Simulate update/reinstallation
+    let updated_template_body = "Defaults lecture=never\n";
+    let updated_block = format!(
+        "\n{}\n{}\n{}\n",
+        start_marker,
+        updated_template_body.trim(),
+        end_marker
+    );
+    let s_idx = injected.find(&start_marker).unwrap();
+    let e_idx = injected.find(&end_marker).unwrap() + end_marker.len();
+    let updated = format!(
+        "{}{}{}",
+        &injected[..s_idx],
+        updated_block.trim(),
+        &injected[e_idx..]
+    );
+    assert!(updated.contains("Defaults lecture=never"));
+    assert!(!updated.contains("Defaults lecture=always"));
+
+    // Simulate uninstallation (clean removal)
+    let rem_s = updated.find(&start_marker).unwrap();
+    let rem_e = updated.find(&end_marker).unwrap() + end_marker.len();
+    let mut s_cut = rem_s;
+    if s_cut > 0 && updated.as_bytes()[s_cut - 1] == b'\n' {
+        s_cut -= 1;
+    }
+    let mut e_cut = rem_e;
+    if e_cut < updated.len() && updated.as_bytes()[e_cut] == b'\n' {
+        e_cut += 1;
+    }
+    let uninstalled = format!("{}{}", &updated[..s_cut], &updated[e_cut..]);
+    assert!(!uninstalled.contains(&start_marker));
+    assert!(!uninstalled.contains(&end_marker));
+    assert_eq!(uninstalled.trim(), initial_content.trim());
+}
+
+#[test]
+fn test_inactivity_timeout_and_root_elevation_schema() {
+    let raw_config = r#"
+version: "0.0.1"
+theme: "classic"
+settings:
+  inactivity_timeout:
+    milliseconds: 300000
+    command: "{scripts_dir}/screensaver.sh"
+"#;
+    let config: bashmenu_core::BashMenuConfig =
+        serde_yml::from_str(raw_config).expect("Must parse config with inactivity_timeout");
+    let timeout = config
+        .settings
+        .inactivity_timeout
+        .expect("Timeout must be present");
+    assert_eq!(timeout.milliseconds, Some(300000));
+    assert_eq!(
+        timeout.command.as_deref(),
+        Some("{scripts_dir}/screensaver.sh")
+    );
+}

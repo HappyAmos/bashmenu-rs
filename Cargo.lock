@@ -110,6 +110,7 @@ dependencies = [
  "bashmenu-tui",
  "clap",
  "crossterm",
+ "libc",
  "ratatui",
  "serde_yml",
 ]

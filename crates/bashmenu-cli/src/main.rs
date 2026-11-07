@@ -2,17 +2,22 @@
 //!
 //! # Architecture & Event Loop
 //! The primary application loop in `bashmenu` coordinates between:
-//! 1. [`MenuView`]: Renders the menu item hierarchy, 4-column icon slots, status gutters,
-//!    and background wallpaper composites.
-//! 2. [`ActiveModal`]: A state machine managing modal popups (theme selectors, help dialogs,
-//!    confirm prompts, parameter inputs, markdown note viewers, and live streaming outputs).
-//! 3. [`ShortcutDispatcher`]: Evaluates global `<leader>` key chords (e.g. `<Ctrl+Space>`),
-//!    direct shortcuts, and renders the compact *which-key* overlay.
-//! 4. [`PluginEngine`]: Periodically runs background shell scripts without blocking the UI,
-//!    signaling the main thread over an MPSC channel on output arrival.
-//! 5. [`TerminalGuard`]: Safely suspends raw mode when running external shell commands
-//!    or launching companion tools (`bashedit`, `menuedit`, `themeedit`, `bmpager`).
-//! 6. [`ToastRack`]: Displays and auto-dismisses non-blocking bottom-right notifications.
+//! 1. [`MenuView`]: Renders the menu item hierarchy, 4-column icon slots,
+//!    status gutters, and background wallpaper composites.
+//! 2. [`ActiveModal`]: A state machine managing modal popups (theme
+//!    selectors, help dialogs, confirm prompts, parameter inputs, markdown
+//!    note viewers, and live streaming outputs).
+//! 3. [`ShortcutDispatcher`]: Evaluates global `<leader>` key chords
+//!    (e.g. `<Ctrl+Space>`), direct shortcuts, and renders the compact
+//!    *which-key* overlay.
+//! 4. [`PluginEngine`]: Periodically runs background shell scripts without
+//!    blocking the UI, signaling the main thread over an MPSC channel on
+//!    output arrival.
+//! 5. [`TerminalGuard`]: Safely suspends raw mode when running external
+//!    shell commands or launching companion tools (`bashedit`, `menuedit`,
+//!    `themeedit`, `bmpager`).
+//! 6. [`ToastRack`]: Displays and auto-dismisses non-blocking bottom-right
+//!    notifications.
 
 use anyhow::Result;
 use bashmenu_core::{
@@ -90,6 +95,23 @@ enum ActiveModal {
     ConfirmDeleteNote(String, String, ConfirmModal),
     /// Confirmation dialog before executing a menu item action.
     ConfirmItem(Box<bashmenu_core::MenuItem>, ConfirmModal),
+    /// Confirmation dialog for modular code block injection/removal.
+    ConfirmInjectBlock {
+        /// Confirmation dialog modal widget.
+        modal: ConfirmModal,
+        /// Absolute destination path of the target profile or script.
+        target_path: PathBuf,
+        /// Formatted code block with delimiters to inject.
+        block_to_inject: String,
+        /// Start delimiter string.
+        start_marker: String,
+        /// End delimiter string.
+        end_marker: String,
+        /// Unique block identifier.
+        block_id: String,
+        /// Whether the code block is already present in target file.
+        block_present: bool,
+    },
     /// Informational message popup dialog.
     Message(MessageModal),
     /// Toggle setting value selection dialog.
@@ -106,7 +128,8 @@ enum ActiveModal {
     StreamOutput(StreamOutputModal),
 }
 
-/// Resolves a configuration or asset file path, choosing between local directory or `~/.config/bashmenu/`.
+/// Resolves a configuration or asset file path, choosing between local
+/// directory or `~/.config/bashmenu/`.
 fn resolve_file_path(target: &Path, local: bool) -> PathBuf {
     if local {
         if target.is_absolute() {
@@ -119,8 +142,9 @@ fn resolve_file_path(target: &Path, local: bool) -> PathBuf {
     }
 }
 
-/// Discovers the path to companion tools (`menuedit`, `themeedit`, `bashedit`, `bmpager`)
-/// by inspecting target directories, `BASHMENU_DIR`, and `~/.local/bin`.
+/// Discovers the path to companion tools (`menuedit`, `themeedit`, `bashedit`,
+/// `bmpager`) by inspecting target directories, `BASHMENU_DIR`, and
+/// `~/.local/bin`.
 fn locate_tool(name: &str) -> PathBuf {
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
@@ -235,6 +259,7 @@ fn main() -> Result<()> {
     let mut pending_action: Option<MenuAction> = None;
     let mut last_plugin_check = Instant::now();
     let mut last_marquee_tick = Instant::now();
+    let mut last_interaction = Instant::now();
     let mut toast_rack = ToastRack::new();
 
     // 7. Interactive Event Loop
@@ -257,7 +282,30 @@ fn main() -> Result<()> {
         }
 
         // Periodic check to trigger expired plugins and refresh status gutter
-        if last_plugin_check.elapsed() >= Duration::from_secs(1) {
+        let refresh_sec = config
+            .settings
+            .refresh_interval
+            .as_ref()
+            .and_then(|v| v.as_u64())
+            .unwrap_or(1)
+            .max(1);
+        let has_seconds = config
+            .settings
+            .status_gutter
+            .as_deref()
+            .map(|s| {
+                s.contains("{date_time_24}")
+                    || s.contains("{date_time_12}")
+                    || s.contains("{utc_seconds}")
+            })
+            .unwrap_or(false);
+        let gutter_interval = if has_seconds {
+            Duration::from_secs(1)
+        } else {
+            Duration::from_secs(refresh_sec.min(5))
+        };
+
+        if last_plugin_check.elapsed() >= gutter_interval {
             plugin_engine.trigger_refresh(&config, false);
             if let Some(ref gutter_tmpl) = config.settings.status_gutter {
                 let mut ctx = MacroContext::new(&config);
@@ -332,6 +380,9 @@ fn main() -> Result<()> {
                     ActiveModal::ConfirmItem(_, modal) => {
                         modal.render(f.area(), &styles, f.buffer_mut());
                     }
+                    ActiveModal::ConfirmInjectBlock { modal, .. } => {
+                        modal.render(f.area(), &styles, f.buffer_mut());
+                    }
                     ActiveModal::Message(modal) => {
                         modal.render(f.area(), &styles, f.buffer_mut());
                     }
@@ -360,12 +411,35 @@ fn main() -> Result<()> {
             need_redraw = false;
         }
 
+        // Periodic check for inactivity timeout
+        if let Some(ref timeout) = config.settings.inactivity_timeout {
+            if let (Some(ms), Some(cmd_raw)) = (timeout.milliseconds, timeout.command.as_deref()) {
+                if ms > 0 && last_interaction.elapsed().as_millis() >= ms as u128 {
+                    last_interaction = Instant::now();
+                    let mut ctx = MacroContext::new(&config);
+                    ctx.window_width = size.width as usize;
+                    ctx.window_height = size.height as usize;
+                    let cmd = interpolate_placeholders(cmd_raw, &ctx);
+                    if !cmd.trim().is_empty() {
+                        let _ = guard.suspend_keep_alt(|| {
+                            let _ = Command::new("sh").arg("-c").arg(&cmd).status();
+                            Ok(())
+                        });
+                        need_redraw = true;
+                    }
+                }
+            }
+        }
+
         if pending_action.is_some() || event::poll(Duration::from_millis(50))? {
             let ev = if pending_action.is_some() {
                 Event::FocusGained
             } else {
                 event::read()?
             };
+            if matches!(ev, Event::Key(_) | Event::Mouse(_)) {
+                last_interaction = Instant::now();
+            }
             if let Event::Mouse(m) = &ev {
                 if m.kind == crossterm::event::MouseEventKind::Moved {
                     continue;
@@ -740,6 +814,155 @@ fn main() -> Result<()> {
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+                ActiveModal::ConfirmInjectBlock {
+                    modal,
+                    target_path,
+                    block_to_inject,
+                    start_marker,
+                    end_marker,
+                    block_id,
+                    block_present,
+                } => {
+                    let choice = match ev {
+                        Event::Key(key) => modal.handle_key(key.code),
+                        Event::Mouse(mouse) => modal.handle_mouse(mouse, area),
+                        _ => None,
+                    };
+                    if let Some(c) = choice {
+                        let target_path_clone = target_path.clone();
+                        let block_to_inject_clone = block_to_inject.clone();
+                        let start_marker_clone = start_marker.clone();
+                        let end_marker_clone = end_marker.clone();
+                        let block_id_clone = block_id.clone();
+                        let is_present = *block_present;
+                        active_modal = ActiveModal::None;
+                        match c {
+                            ConfirmChoice::Yes => {
+                                let target_content = if target_path_clone.exists() {
+                                    std::fs::read_to_string(&target_path_clone).unwrap_or_default()
+                                } else {
+                                    String::new()
+                                };
+
+                                let new_content = if is_present {
+                                    if let (Some(s_idx), Some(e_idx)) = (
+                                        target_content.find(start_marker_clone.as_str()),
+                                        target_content.find(end_marker_clone.as_str()),
+                                    ) {
+                                        let e_end = e_idx + end_marker_clone.len();
+                                        format!(
+                                            "{}{}{}",
+                                            &target_content[..s_idx],
+                                            block_to_inject_clone.trim(),
+                                            &target_content[e_end..]
+                                        )
+                                    } else {
+                                        target_content
+                                    }
+                                } else {
+                                    let mut s = target_content;
+                                    if !s.is_empty() && !s.ends_with('\n') {
+                                        s.push('\n');
+                                    }
+                                    s.push_str(block_to_inject_clone.as_str());
+                                    s
+                                };
+
+                                if let Some(parent) = target_path_clone.parent() {
+                                    let _ = std::fs::create_dir_all(parent);
+                                }
+                                match std::fs::write(&target_path_clone, new_content) {
+                                    Ok(_) => {
+                                        #[cfg(unix)]
+                                        if target_path_clone.extension().and_then(|e| e.to_str())
+                                            == Some("sh")
+                                            || target_path_clone
+                                                .to_string_lossy()
+                                                .contains("autoexec.sh")
+                                        {
+                                            use std::os::unix::fs::PermissionsExt;
+                                            let _ = std::fs::set_permissions(
+                                                &target_path_clone,
+                                                std::fs::Permissions::from_mode(0o755),
+                                            );
+                                        }
+                                        active_modal = ActiveModal::Message(MessageModal::new(
+                                            "Success",
+                                            format!(
+                                                "Code block '{}' installed in:\n{}",
+                                                block_id_clone,
+                                                target_path_clone.display()
+                                            ),
+                                        ));
+                                    }
+                                    Err(e) => {
+                                        active_modal = ActiveModal::Message(MessageModal::new(
+                                            "Write Error",
+                                            format!("Failed to write target file:\n{}", e),
+                                        ));
+                                    }
+                                }
+                            }
+                            ConfirmChoice::No => {
+                                if is_present {
+                                    let target_content = if target_path_clone.exists() {
+                                        std::fs::read_to_string(&target_path_clone)
+                                            .unwrap_or_default()
+                                    } else {
+                                        String::new()
+                                    };
+                                    if let (Some(s_idx), Some(e_idx)) = (
+                                        target_content.find(start_marker_clone.as_str()),
+                                        target_content.find(end_marker_clone.as_str()),
+                                    ) {
+                                        let e_end = e_idx + end_marker_clone.len();
+                                        let mut s_cut = s_idx;
+                                        if s_cut > 0
+                                            && target_content.as_bytes()[s_cut - 1] == b'\n'
+                                        {
+                                            s_cut -= 1;
+                                        }
+                                        let mut e_cut = e_end;
+                                        if e_cut < target_content.len()
+                                            && target_content.as_bytes()[e_cut] == b'\n'
+                                        {
+                                            e_cut += 1;
+                                        }
+                                        let new_content = format!(
+                                            "{}{}",
+                                            &target_content[..s_cut],
+                                            &target_content[e_cut..]
+                                        );
+                                        match std::fs::write(&target_path_clone, new_content) {
+                                            Ok(_) => {
+                                                active_modal =
+                                                    ActiveModal::Message(MessageModal::new(
+                                                        "Success",
+                                                        format!(
+                                                            "Code block '{}' removed from:\n{}",
+                                                            block_id_clone,
+                                                            target_path_clone.display()
+                                                        ),
+                                                    ));
+                                            }
+                                            Err(e) => {
+                                                active_modal =
+                                                    ActiveModal::Message(MessageModal::new(
+                                                        "Write Error",
+                                                        format!(
+                                                            "Failed to write target file:\n{}",
+                                                            e
+                                                        ),
+                                                    ));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            ConfirmChoice::Cancel => {}
                         }
                     }
                 }
@@ -1288,6 +1511,144 @@ fn main() -> Result<()> {
                                 let msg = interpolate_placeholders(raw_msg, &ctx);
                                 active_modal =
                                     ActiveModal::ConfirmItem(item, ConfirmModal::new(title, msg));
+                            } else if matches!(
+                                item.r#type,
+                                MenuItemType::Other(ref s)
+                                    if s == "message" || s == "popup" || s == "info"
+                            ) {
+                                let raw_title = item.title().unwrap_or("Message");
+                                let raw_msg = item
+                                    .message()
+                                    .or(item.prompt.as_deref())
+                                    .or(item.action.as_deref())
+                                    .or(item.command.as_deref())
+                                    .or(item.script.as_deref())
+                                    .unwrap_or_default();
+                                let title = interpolate_placeholders(raw_title, &ctx);
+                                let msg = interpolate_placeholders(raw_msg, &ctx);
+                                active_modal =
+                                    ActiveModal::Message(MessageModal::new(&title, &msg));
+                            } else if matches!(
+                                item.r#type,
+                                MenuItemType::Other(ref s) if s == "inject_block"
+                            ) {
+                                let target_raw = item
+                                    .extra
+                                    .get("target")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or_default();
+                                let template_raw = item
+                                    .extra
+                                    .get("template")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or_default();
+                                let block_id_raw = item
+                                    .extra
+                                    .get("block_id")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("default");
+                                let target_str = interpolate_placeholders(target_raw, &ctx);
+                                let template_str = interpolate_placeholders(template_raw, &ctx);
+                                let block_id = interpolate_placeholders(block_id_raw, &ctx);
+
+                                if target_str.is_empty() || template_str.is_empty() {
+                                    active_modal = ActiveModal::Message(MessageModal::new(
+                                        "Configuration Error",
+                                        "Both 'target' and 'template' paths must be specified.",
+                                    ));
+                                } else {
+                                    let target_path =
+                                        if let Some(stripped) = target_str.strip_prefix("~/") {
+                                            ctx.home_dir.join(stripped)
+                                        } else if target_str == "~" {
+                                            ctx.home_dir.clone()
+                                        } else {
+                                            PathBuf::from(&target_str)
+                                        };
+
+                                    let template_path =
+                                        if let Some(stripped) = template_str.strip_prefix("~/") {
+                                            ctx.home_dir.join(stripped)
+                                        } else if Path::new(&template_str).is_absolute() {
+                                            PathBuf::from(&template_str)
+                                        } else {
+                                            ctx.bashmenu_dir.join(&template_str)
+                                        };
+
+                                    if !template_path.exists() {
+                                        active_modal = ActiveModal::Message(MessageModal::new(
+                                            "Template Error",
+                                            format!(
+                                                "Template file not found:\n{}",
+                                                template_path.display()
+                                            ),
+                                        ));
+                                    } else {
+                                        match std::fs::read_to_string(&template_path) {
+                                            Ok(tmpl_content) => {
+                                                let interpolated =
+                                                    interpolate_placeholders(&tmpl_content, &ctx);
+                                                let start_marker =
+                                                    format!("# CODEBLOCK:{}:START", block_id);
+                                                let end_marker =
+                                                    format!("# CODEBLOCK:{}:END", block_id);
+                                                let block_to_inject = format!(
+                                                    "\n{}\n{}\n{}\n",
+                                                    start_marker,
+                                                    interpolated.trim(),
+                                                    end_marker
+                                                );
+
+                                                let target_content = if target_path.exists() {
+                                                    std::fs::read_to_string(&target_path)
+                                                        .unwrap_or_default()
+                                                } else {
+                                                    String::new()
+                                                };
+                                                let block_present = target_content
+                                                    .contains(&start_marker)
+                                                    && target_content.contains(&end_marker);
+
+                                                let (title, msg) = if block_present {
+                                                    (
+                                                        "Update or Uninstall Block",
+                                                        format!(
+                                                            "Code block '{}' is already present in:\n{}\n\n- Press YES to reinstall/update.\n- Press NO to uninstall/remove.\n- Press [C / ESC] Cancel to abort.",
+                                                            block_id,
+                                                            target_path.display()
+                                                        ),
+                                                    )
+                                                } else {
+                                                    (
+                                                        "Install Code Block",
+                                                        format!(
+                                                            "Would you like to inject code block '{}' into:\n{}?",
+                                                            block_id,
+                                                            target_path.display()
+                                                        ),
+                                                    )
+                                                };
+
+                                                active_modal = ActiveModal::ConfirmInjectBlock {
+                                                    modal: ConfirmModal::new(title, msg),
+                                                    target_path,
+                                                    block_to_inject,
+                                                    start_marker,
+                                                    end_marker,
+                                                    block_id,
+                                                    block_present,
+                                                };
+                                            }
+                                            Err(e) => {
+                                                active_modal =
+                                                    ActiveModal::Message(MessageModal::new(
+                                                        "Read Error",
+                                                        format!("Failed to read template:\n{}", e),
+                                                    ));
+                                            }
+                                        }
+                                    }
+                                }
                             } else if item.has_param_placeholder() {
                                 let raw_title = item.param_modal_title();
                                 let clean_title = if item.extra.contains_key("title") {
@@ -1343,6 +1704,18 @@ fn main() -> Result<()> {
                                     }
                                     if let Some(ts) = item.tabstop {
                                         cmd.arg("--tabstop").arg(ts.to_string());
+                                    }
+                                    if let Some(sw) =
+                                        item.extra.get("show_whitespace").and_then(|v| v.as_bool())
+                                    {
+                                        if sw {
+                                            cmd.arg("--show-whitespace");
+                                        }
+                                    }
+                                    if let Some(tts) =
+                                        item.extra.get("tab_to_spaces").and_then(|v| v.as_bool())
+                                    {
+                                        cmd.arg(format!("--tab-to-spaces={tts}"));
                                     }
                                     let _ = cmd.status();
                                     Ok(())
@@ -1454,6 +1827,24 @@ fn main() -> Result<()> {
                                         }
                                         let final_cmd = interpolate_placeholders(&clean_cmd, &ctx);
                                         if !final_cmd.trim().is_empty() {
+                                            let requires_root = item
+                                                .extra
+                                                .get("user_mode")
+                                                .and_then(|v| v.as_str())
+                                                == Some("root");
+                                            let is_root = unsafe { libc::geteuid() } == 0;
+                                            let effective_cmd = if requires_root && !is_root {
+                                                let trimmed = final_cmd.trim();
+                                                if trimmed.starts_with("sudo ")
+                                                    || trimmed.starts_with("doas ")
+                                                {
+                                                    final_cmd
+                                                } else {
+                                                    format!("sudo {}", final_cmd)
+                                                }
+                                            } else {
+                                                final_cmd
+                                            };
                                             let mode = item.execution_mode();
                                             match mode {
                                                 ExecutionMode::Streaming
@@ -1466,7 +1857,7 @@ fn main() -> Result<()> {
                                                         .unwrap_or_else(|| clean_cmd.clone());
                                                     let mut modal = StreamOutputModal::new(
                                                         title,
-                                                        final_cmd,
+                                                        effective_cmd,
                                                         item.window_percent(),
                                                         is_interactive,
                                                     );
@@ -1487,12 +1878,12 @@ fn main() -> Result<()> {
                                                         if !is_quiet {
                                                             println!(
                                                                 "\n--- Running Command: {} ---\n",
-                                                                final_cmd
+                                                                effective_cmd
                                                             );
                                                         }
                                                         let _ = Command::new("/bin/bash")
                                                             .arg("-c")
-                                                            .arg(&final_cmd)
+                                                            .arg(&effective_cmd)
                                                             .status();
                                                         if !is_quiet {
                                                             println!("\n--------------------------------------------------");

@@ -1286,6 +1286,9 @@ impl MenuView {
 
 /// Calculates balanced gutter dimensions `(left_w, right_w, sep_x)`
 /// given the full window width `w` and active status tokens.
+///
+/// Status gutter takes precedence over the help gutter to ensure that all
+/// status tokens (user, battery, host, date/time) remain visible.
 fn calculate_gutter_dimensions(w: usize, status_tokens: &[&str]) -> (usize, usize, usize) {
     let avail_both = (w.saturating_sub(11)).max(4);
     if status_tokens.is_empty() {
@@ -1294,14 +1297,42 @@ fn calculate_gutter_dimensions(w: usize, status_tokens: &[&str]) -> (usize, usiz
         let sep_x = (left_gutter_w + 5).min(w.saturating_sub(2));
         (left_gutter_w, right_gutter_w, sep_x)
     } else {
-        let max_tok_w = status_tokens
-            .iter()
-            .map(|s| visible_text_len(s))
-            .max()
-            .unwrap_or(0);
-        let total_tok_w: usize = status_tokens.iter().map(|s| visible_text_len(s)).sum();
-        let min_status_req = (total_tok_w / 2).max(max_tok_w) + status_tokens.len() * 2;
-        let right_gutter_w = (avail_both / 2).min(min_status_req.max(20));
+        let token_lens: Vec<usize> = status_tokens.iter().map(|s| visible_text_len(s)).collect();
+        let total_tok_w: usize = token_lens.iter().sum();
+        let sep_count = status_tokens.len().saturating_sub(1);
+        let single_line_w = total_tok_w + sep_count * 3;
+
+        // Calculate minimum width required to wrap tokens across 2 lines without dropping any
+        let two_line_w = if status_tokens.len() > 1 {
+            let mut best_split_w = usize::MAX;
+            for split in 1..status_tokens.len() {
+                let l1_w: usize = token_lens[..split].iter().sum::<usize>() + (split - 1) * 3;
+                let l2_w: usize = token_lens[split..].iter().sum::<usize>()
+                    + (status_tokens.len() - split - 1) * 3;
+                let max_l = l1_w.max(l2_w);
+                if max_l < best_split_w {
+                    best_split_w = max_l;
+                }
+            }
+            best_split_w
+        } else {
+            single_line_w
+        };
+
+        // Status gutter takes precedence: allocate enough space to comfortably display
+        // all status tokens (either 2 lines or single line), while preserving a minimal
+        // help gutter (e.g. at least 24 cols if available).
+        let min_help_w = 24.min(avail_both / 3);
+        let max_status_w = avail_both.saturating_sub(min_help_w);
+
+        // Target status width: preferred 2-line width with padding (+2), bounded by max_status_w
+        let status_needed = (two_line_w + 2).max(20);
+        let right_gutter_w = if single_line_w <= avail_both / 2 {
+            single_line_w.max(20).min(max_status_w)
+        } else {
+            status_needed.min(max_status_w)
+        };
+
         let left_gutter_w = avail_both.saturating_sub(right_gutter_w);
         let sep_x = (left_gutter_w + 5).min(w.saturating_sub(2));
         (left_gutter_w, right_gutter_w, sep_x)
@@ -1323,10 +1354,21 @@ fn wrap_gutter_tokens(tokens: &[&str], max_w: usize, max_lines: usize) -> Vec<St
     }
 
     if max_lines == 2 && cleaned.len() > 1 {
-        let mid = cleaned.len().div_ceil(2);
-        let l1 = cleaned[..mid].join(" | ");
-        let l2 = cleaned[mid..].join(" | ");
-        if l1.chars().count() <= max_w && l2.chars().count() <= max_w {
+        // Find best split minimizing max visible width of the two lines
+        let mut best_split = 1;
+        let mut best_w = usize::MAX;
+        for split in 1..cleaned.len() {
+            let l1 = cleaned[..split].join(" | ");
+            let l2 = cleaned[split..].join(" | ");
+            let max_len = visible_text_len(&l1).max(visible_text_len(&l2));
+            if max_len < best_w {
+                best_w = max_len;
+                best_split = split;
+            }
+        }
+        let l1 = cleaned[..best_split].join(" | ");
+        let l2 = cleaned[best_split..].join(" | ");
+        if visible_text_len(&l1) <= max_w && visible_text_len(&l2) <= max_w {
             return vec![l1, l2];
         }
     }
@@ -1334,30 +1376,25 @@ fn wrap_gutter_tokens(tokens: &[&str], max_w: usize, max_lines: usize) -> Vec<St
     let mut lines = Vec::new();
     let mut current_line = String::new();
 
-    for token in cleaned {
+    for token in &cleaned {
         if current_line.is_empty() {
             current_line.push_str(token);
         } else {
-            let candidate_len = current_line.chars().count() + 3 + token.chars().count();
-            if candidate_len <= max_w {
+            let candidate_len = visible_text_len(&current_line) + 3 + visible_text_len(token);
+            let remaining_lines = max_lines.saturating_sub(lines.len() + 1);
+
+            // If on the last line, pack all remaining tokens without dropping any
+            if remaining_lines == 0 || candidate_len <= max_w {
                 current_line.push_str(" | ");
                 current_line.push_str(token);
             } else {
                 lines.push(std::mem::take(&mut current_line));
-                if lines.len() == max_lines {
-                    break;
-                }
                 current_line.push_str(token);
             }
         }
     }
     if !current_line.is_empty() && lines.len() < max_lines {
         lines.push(current_line);
-    }
-    for line in &mut lines {
-        if line.chars().count() > max_w {
-            *line = line.chars().take(max_w).collect();
-        }
     }
     lines
 }

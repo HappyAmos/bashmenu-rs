@@ -452,3 +452,58 @@ fn main() {
         process::exit(1);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_valid_option_types_contains_toast_and_inject_block() {
+        assert!(
+            VALID_OPTION_TYPES.contains(&"toast"),
+            "VALID_OPTION_TYPES must contain toast"
+        );
+        assert!(
+            VALID_OPTION_TYPES.contains(&"inject_block"),
+            "VALID_OPTION_TYPES must contain inject_block"
+        );
+        assert!(
+            VALID_OPTION_TYPES.contains(&"message"),
+            "VALID_OPTION_TYPES must contain message"
+        );
+    }
+
+    #[test]
+    fn test_validate_menu_schema_with_toast_and_inject_block() {
+        let raw_yaml = r#"
+title: Test Menu
+items:
+  - label: Show Toast
+    type: toast
+    message: "Operation completed successfully"
+  - label: Setup Environment
+    type: inject_block
+    template: "{templates_dir}/env.tmpl"
+    target: "~/.bashrc"
+    block_id: "my_env"
+"#;
+        let menu: bashmenu_core::MenuSchema =
+            serde_yml::from_str(raw_yaml).expect("Must parse test menu");
+        let valid_types: std::collections::HashSet<&str> =
+            VALID_OPTION_TYPES.iter().copied().collect();
+        let mut errors = Vec::new();
+
+        for (idx, item) in menu.items.iter().enumerate() {
+            if let bashmenu_core::MenuItemType::Other(ref s) = item.r#type {
+                if !valid_types.contains(s.as_str()) {
+                    errors.push(format!("Unknown option type: {s} at index {idx}"));
+                }
+            }
+        }
+        assert!(
+            errors.is_empty(),
+            "Validation must pass without unknown option type errors: {:?}",
+            errors
+        );
+    }
+}

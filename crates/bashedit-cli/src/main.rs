@@ -1,4 +1,5 @@
-//! Full-screen terminal text editor with tab support, colocated swap files, and crash recovery.
+//! Full-screen terminal text editor with tab support, colocated swap files,
+//! and crash recovery.
 
 use anyhow::Result;
 use bashedit_cli::{
@@ -44,6 +45,14 @@ struct Cli {
     #[arg(long, default_value = "4")]
     tabstop: usize,
 
+    /// Display visible glyphs for space and tab characters
+    #[arg(long)]
+    show_whitespace: bool,
+
+    /// Convert tab keypresses to spaces instead of raw tab characters
+    #[arg(long, default_value = "true", action = clap::ArgAction::Set)]
+    tab_to_spaces: bool,
+
     /// Initial line number to jump to
     #[arg(short, long, default_value = "1")]
     line: usize,
@@ -57,7 +66,8 @@ struct Cli {
     local: bool,
 }
 
-/// Action identifiers triggered by keyboard shortcuts or clicking in the footer help gutter.
+/// Action identifiers triggered by keyboard shortcuts or clicking in
+/// the footer help gutter.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum FooterAction {
     /// Open full editor help and manual
@@ -126,7 +136,8 @@ enum ActiveModal {
         /// Confirm dialog modal state
         modal: ConfirmModal,
     },
-    /// Confirmation dialog before exiting editor with unsaved modifications across any tabs.
+    /// Confirmation dialog before exiting editor with unsaved modifications
+    /// across any tabs.
     ConfirmExit(ConfirmModal),
     /// File picker modal for Save As target path selection.
     SaveAs(FilePickerModal),
@@ -146,7 +157,8 @@ enum ActiveModal {
     ViewColors(ColorGridModal),
 }
 
-/// Locates a companion executable (`bmpager`, `bashmenu`, etc.) across search paths.
+/// Locates a companion executable (`bmpager`, `bashmenu`, etc.) across
+/// standard search paths.
 fn locate_tool(name: &str) -> PathBuf {
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
@@ -171,7 +183,8 @@ fn locate_tool(name: &str) -> PathBuf {
     PathBuf::from(name)
 }
 
-/// Spawns `bmpager` in markdown mode via `TerminalGuard::suspend_keep_alt` to preview document.
+/// Spawns `bmpager` in markdown mode via `TerminalGuard::suspend_keep_alt`
+/// to preview document.
 fn launch_markdown_preview(guard: &mut TerminalGuard, tab: &EditorBuffer) {
     let pager_bin = locate_tool("bmpager");
     let temp_dir = std::env::temp_dir();
@@ -190,7 +203,8 @@ fn launch_markdown_preview(guard: &mut TerminalGuard, tab: &EditorBuffer) {
     }
 }
 
-/// Expands a leading `~/` prefix in a filesystem path to the user's home directory.
+/// Expands a leading `~/` prefix in a filesystem path to the user's home
+/// directory.
 fn resolve_path_tilde(path: &Path) -> PathBuf {
     if let Some(stripped) = path.to_str().and_then(|s| s.strip_prefix("~/")) {
         if let Ok(home) = std::env::var("HOME") {
@@ -203,7 +217,8 @@ fn resolve_path_tilde(path: &Path) -> PathBuf {
     }
 }
 
-/// Constructs a file picker modal configured for 'Save As' destination selection.
+/// Constructs a file picker modal configured for 'Save As' destination
+/// selection.
 fn make_save_as_modal(tab: &EditorBuffer) -> FilePickerModal {
     let home_dir = std::env::var("HOME")
         .map(PathBuf::from)
@@ -280,7 +295,8 @@ fn main() -> Result<()> {
 
     let mut active_tab_idx = 0;
     let mut show_line_numbers = true;
-    let mut show_whitespace = false;
+    let mut show_whitespace = cli.show_whitespace;
+    let tab_to_spaces = cli.tab_to_spaces;
     let mut shared_cutbuffer: Vec<String> = Vec::new();
 
     let mut active_modal = if let Some((header, lines, tab_idx)) = pending_recovery {
@@ -1047,8 +1063,12 @@ fn main() -> Result<()> {
                         KeyCode::Delete => active_tab.delete_char(),
                         KeyCode::Enter => active_tab.insert_newline(),
                         KeyCode::Tab => {
-                            for _ in 0..cli.tabstop {
-                                active_tab.insert_char(' ');
+                            if tab_to_spaces {
+                                for _ in 0..cli.tabstop {
+                                    active_tab.insert_char(' ');
+                                }
+                            } else {
+                                active_tab.insert_char('\t');
                             }
                         }
                         KeyCode::Char(ch) => {
@@ -1398,7 +1418,8 @@ fn render_modal(
     }
 }
 
-/// Dispatches a transient toast notification reflecting save file success or failure.
+/// Dispatches a transient toast notification reflecting save file
+/// success or failure.
 fn show_save_toast(toast_rack: &mut ToastRack, res: Result<()>, tab: &EditorBuffer) {
     let name = tab
         .file_path

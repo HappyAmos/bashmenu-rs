@@ -1,4 +1,5 @@
-//! Integration tests for BashEdit text buffer, swap file lifecycle, and recovery invariants.
+//! Integration tests for BashEdit text buffer, swap file lifecycle, and
+//! recovery invariants.
 
 use bashedit_cli::{
     compute_file_sha256, get_swap_path, is_pid_running, read_swap_file, remove_swap_file,
@@ -394,4 +395,17 @@ fn test_editor_buffer_shift_directional_selection() {
     assert_eq!(buf.lines.len(), 1);
     assert_eq!(buf.lines[0], " 2: def");
     assert!(!buf.mark_active);
+}
+
+#[test]
+fn test_bashedit_cli_whitespace_and_tab_flags() {
+    let bin = env!("CARGO_BIN_EXE_bashedit");
+    let output = std::process::Command::new(bin)
+        .arg("--help")
+        .output()
+        .expect("bashedit --help must run");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("--show-whitespace"));
+    assert!(stdout.contains("--tab-to-spaces"));
 }
