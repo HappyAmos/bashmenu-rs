@@ -508,6 +508,9 @@ fn main() -> Result<()> {
                 }
             }
             need_redraw = true;
+            let prev_levels = menu_view.menu_level_titles();
+            let prev_scroll = menu_view.current_scroll_offset();
+            let prev_in_modal = !matches!(active_modal, ActiveModal::None);
 
             match &mut active_modal {
                 ActiveModal::Help(modal) => {
@@ -2276,6 +2279,19 @@ fn main() -> Result<()> {
                         MenuAction::None => {}
                     }
                 }
+            }
+
+            let curr_levels = menu_view.menu_level_titles();
+            let curr_scroll = menu_view.current_scroll_offset();
+            let curr_in_modal = !matches!(active_modal, ActiveModal::None);
+
+            let page_changed = prev_levels != curr_levels
+                || (curr_scroll as isize - prev_scroll as isize).abs() > 1;
+            let modal_changed = prev_in_modal != curr_in_modal;
+
+            if page_changed || modal_changed {
+                pending_transition = true;
+                need_redraw = true;
             }
         }
     }

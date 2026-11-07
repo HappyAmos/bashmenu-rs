@@ -439,6 +439,12 @@ Available badges include:
 Status refresh frequency is automatically set to 1.0s if second-precision tokens are present, or 5.0s if minute-precision or static badges are used. Users can explicitly configure
 .I settings.refresh_interval
 in seconds (e.g. 1.0) or milliseconds (e.g. 1000) to override this default.
+Visual screen transition effects are configured via
+.I settings.transition
+(fade, curtain, instant, none).
+Direct Linux framebuffer hardware graphics on /dev/fb0 are configured via
+.I settings.framebuffer
+(auto, true, false).
 .SS Menu Structure (bashmenu.mnu)
 The menu is defined as a hierarchical YAML options list. Options can utilize the
 following configuration keys:
@@ -458,8 +464,8 @@ Shell command, script, editor file, or notebook YAML notes path ({notebooks_dir}
 .B template, target, block_id
 Path, destination, and unique tag for dynamic templates (inject_block).
 .TP
-.B quiet, stream, interactive, external, user_mode
-Execution privilege and console behavior flags.
+.B quiet, stream, interactive, external, user_mode, transition
+Execution privilege, console behavior, and visual screen transition flags.
 .TP
 .B key, picker, start_dir, masked
 Dot-notation settings key and visual configuration chooser flags.
@@ -494,7 +500,7 @@ Opens file in built-in Nano-style editor.
 .TP
 .B notebook
 Opens dynamic notes collection menu from YAML file ({notebooks_dir}/notes.yml).
-Supports interactive task-list checkboxes, Markdown/BBCode modal viewers, full TextArea editor modals with smart list auto-formatting, ghost text, shared cross-interface clipboard ([C]/Ctrl+C/Ctrl+V), and help gutter note creation ([N]).
+Supports interactive task-list checkboxes, Markdown/BBCode modal viewers, full TextArea editor modals with smart list auto-formatting, ghost text, shared cross-interface clipboard ([C]/Ctrl+C/Ctrl+V), help gutter note creation ([N]), atomic swap file crash recovery (.<stem>.note.<slug>.swp), and interactive 3-way merge conflict resolution ([Merge], [Overwrite], [Reload], [Save As]).
 .TP
 .B confirm
 Launches Yes/No confirmation dialog box.
@@ -747,6 +753,9 @@ non-visible whitespace character color in the text editor).
 .PP
 .B Formatting Rule for Editor Compatibility:
 Theme definitions maintain compact single-line flow-style bracket lists (e.g. title: [201, -1]). This enables bashedit.py's --display-theme-colors feature to accurately parse inline bracketed color values and render live color swatch previews.
+.PP
+.B Color Fallback Resolution Tiers:
+The engine automatically queries terminal capabilities and gracefully degrades through four color tiers: TrueColor (24-bit / 16.7M colors, active under COLORTERM=truecolor or 24bit), 256-color palette (xterm 0-255 indices), 16-color ANSI palette (standard virtual terminals TERM=linux), and 8-color basic ANSI palette. Themes define explicit 256, 16, and 8 color blocks to guarantee high contrast across all environments.
 .PP
 .B Window Border & Divider Customization (window: and divider:):
 Themes can optionally customize outer window frame border characters using a

@@ -372,6 +372,45 @@ impl MenuView {
         chain
     }
 
+    /// Returns the titles of all active menu tiers on the navigation stack.
+    pub fn menu_level_titles(&self) -> Vec<String> {
+        self.stack.iter().map(|l| l.title.clone()).collect()
+    }
+
+    /// Returns the number of levels currently on the navigation stack.
+    pub fn stack_depth(&self) -> usize {
+        self.stack.len()
+    }
+
+    /// Returns the vertical scroll row offset for the active menu level.
+    pub fn current_scroll_offset(&self) -> usize {
+        self.current_level().scroll_offset
+    }
+
+    /// Advances the item selection down by a page increment.
+    pub fn page_down(&mut self, page_size: usize) {
+        let level = self.current_level_mut();
+        if level.items.is_empty() {
+            return;
+        }
+        let target = (level.selected_idx + page_size).min(level.items.len() - 1);
+        level.selected_idx = target;
+        self.ensure_selectable();
+        self.marquee_tracker.reset();
+    }
+
+    /// Moves the item selection up by a page increment.
+    pub fn page_up(&mut self, page_size: usize) {
+        let level = self.current_level_mut();
+        if level.items.is_empty() {
+            return;
+        }
+        let target = level.selected_idx.saturating_sub(page_size);
+        level.selected_idx = target;
+        self.ensure_selectable();
+        self.marquee_tracker.reset();
+    }
+
     /// Returns an immutable reference to the active top menu level on the navigation stack.
     fn current_level(&self) -> &MenuLevel {
         self.stack.last().expect("Menu stack must not be empty")
@@ -484,6 +523,14 @@ impl MenuView {
                     self.ensure_selectable();
                 }
                 self.marquee_tracker.reset();
+                MenuAction::None
+            }
+            KeyCode::PageDown => {
+                self.page_down(10);
+                MenuAction::None
+            }
+            KeyCode::PageUp => {
+                self.page_up(10);
                 MenuAction::None
             }
             KeyCode::Enter => self.activate_selected(),

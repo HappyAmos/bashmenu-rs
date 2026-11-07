@@ -55,6 +55,7 @@ HA Bash Menu is comprised of modular scripts and configuration files:
 | `bashedit` | Built-in text editor engine with swap file recovery. |
 | `menuedit` | Interactive TUI visual editor for `bashmenu.mnu` (run via `F4`). |
 | `themeedit` | Interactive TUI visual theme creator and palette editor (run via `F8`). |
+| `shortcutedit` | Interactive TUI keyboard shortcuts editor for `shortcuts.yml` (run via `F9`). |
 | `bmpager` | Interactive full-screen terminal text & Markdown pager (`bmpager --markdown`). |
 | `cheat` | Fast CLI Markdown cheatsheet search engine and viewer. |
 | `bashmenu.yml` | YAML user settings configuration store. |
@@ -123,7 +124,9 @@ Used as dynamic templates for code generation, settings, or block injections:
 | Keybinding | Action |
 | :--- | :--- |
 | `UP` / `DOWN`, `k` / `j` | Navigate highlighted selection row. |
+| `PageUp` / `PageDown` | Scroll selection up / down by a page increment (10 items). |
 | `0` - `9`, `a` - `z` | Direct option shortcut hotkey jump. |
+| `Ctrl+Space` | Leader key chord prefix (opens which-key shortcut palette overlay). |
 | `ENTER` | Execute selected item action. |
 | `F1` | View Markdown user manual (`bashmenu.md`) via `bmpager --markdown`. |
 | `F2` | Open Theme selector dialog. |
@@ -427,6 +430,57 @@ The main menu dynamically calculates its status refresh interval to balance real
   ```
   *(Note: Background plugins configured under `settings.plugins.<name>` control their own individual polling frequencies via their `sleep:` setting in milliseconds, e.g. `sleep: 10000`.)*
 
+#### Visual Screen Transitions (`settings.transition`):
+HA Bash Menu features hardware-synchronized visual transitions rendered
+between screens, submenus, paging jumps, modal dialogs, and external application
+switches.
+
+```yaml
+settings:
+  transition: fade   # Options: fade, curtain, instant, none
+```
+
+| Transition Effect | Description |
+| :--- | :--- |
+| `fade` | Smooth ramp-down and ramp-up luminance reduction over 120ms with DEC Mode 2026 synchronized updates. |
+| `curtain` | High-contrast horizontal curtain wipe expanding symmetrically outward from the screen center. |
+| `instant` / `none` | Instantaneous frame swaps without intermediate animation frames. |
+
+Visual transitions are automatically triggered:
+- On initial startup launch.
+- Between menu levels / submenus (entering submenus or returning via Back/Esc).
+- On page jumps (`PageUp` / `PageDown`).
+- Between application switches (`bashmenu` ↔ `themeedit`, `shortcutedit`, `menuedit`, `bashedit`, `bmpager`, console commands, and shell scripts).
+- During modal dialog opening and dismissal.
+
+*Disabling Transitions for Specific Commands:* Any command or script menu item
+can disable transitions by specifying `transition: false` in `bashmenu.mnu`:
+```yaml
+- Fast Diagnostic:
+    type: command
+    action: "fast_check.sh"
+    transition: false
+```
+
+#### Linux Framebuffer Graphics Device (`settings.framebuffer`):
+For bare Linux Virtual Consoles (`/dev/tty1`-`/dev/tty6`, `TERM=linux`, or
+`console`), HA Bash Menu includes a direct Linux framebuffer driver that renders
+TrueColor 32-bit (ARGB/XRGB/BGRA) and 16-bit (RGB565) graphics directly to
+`/dev/fb0` via kernel `ioctl` (`FBIOGET_VSCREENINFO`, `FBIOGET_FSCREENINFO`)
+and video RAM memory mapping (`mmap`), without requiring X11, Wayland, or
+external emulators.
+
+```yaml
+settings:
+  framebuffer: auto   # Options: auto, true, false
+```
+
+| Value | Behavior |
+| :--- | :--- |
+| `auto` | Automatically enables framebuffer graphics when running on Linux VT (`TERM=linux` / `console`) with accessible `/dev/fb0`. |
+| `true` | Enforces direct framebuffer rendering. |
+| `false` | Disables framebuffer rendering and uses terminal character cells only. |
+
 ### 4.2 Menu Structure (`bashmenu.mnu`)
 The menu structure is defined as a hierarchical list of dictionaries under
 a main `options` list. Each option dictionary supports several attributes:
@@ -456,6 +510,7 @@ a main `options` list. Each option dictionary supports several attributes:
 | `on_yes` | Nested action executed when "Yes" is selected. |
 | `on_no` | Nested action executed when "No" is selected. |
 | `message` | Body text prompt string for toggle or confirmation popups. |
+| `transition` | `true`\|`false` (enables or disables visual transition when executing item; defaults to `true`). |
 
 ### 4.3 Color Themes Specification (`bashmenu.themes`)
 Color themes configure the visual palette for the main menu, visual menu editor, text editor, and modal screens. Themes are defined under top-level theme names (`dracula`, `nord`, `cyberpunk`, `gruvbox`, `qbasic`, `pacman`, `industry`, `matrix`, `monochrome`, `synthwave`, `amber_crt`, `hotdog_stand`) for `256`, `16`, and `8` color modes using single-line compact lists `[fg, bg]`.
@@ -484,6 +539,25 @@ Color themes configure the visual palette for the main menu, visual menu editor,
 | `window_close_button` | Close 'x' button in window title bars and modal dialogs. |
 
 *Formatting Rule for Editor Compatibility:* Theme definitions maintain compact single-line flow-style bracket lists (e.g., `title: [201, -1]`). This enables `bashedit.py`'s `--display-theme-colors` feature to accurately parse inline bracketed color values and render live color swatch previews.
+
+#### Color Mode Hierarchy & Adaptive Fallback:
+HA Bash Menu automatically detects terminal color capabilities and gracefully
+degrades across four display tiers:
+
+1. **TrueColor (24-bit / 16.7M Colors):** Active when `COLORTERM=truecolor` or
+   `COLORTERM=24bit` is present, rendering wallpaper images, smooth gradient
+   transitions, and TrueColor theme swatches.
+2. **256-Color Mode:** Active on standard modern terminals (`xterm-256color`,
+   `tmux-256color`). Reads the theme's `256:` section using xterm palette indices
+   `0`-`255`.
+3. **16-Color Mode (Standard ANSI):** Active on 16-color terminals and standard
+   Linux Virtual Consoles (`TERM=linux`, `console`). Maps elements directly to
+   the theme's `16:` palette.
+4. **8-Color Mode (Basic ANSI):** Minimum fallback tier for serial consoles and
+   restricted environments, utilizing the theme's `8:` palette.
+
+All built-in themes provide explicit `256`, `16`, and `8` color blocks, ensuring
+optimal contrast and full legibility without external remapping tools.
 
 #### Window Border & Divider Customization (`window:` and `divider:`)
 Themes can optionally override the outer window frame border characters using
@@ -682,10 +756,12 @@ pngquant --nofs 24 --speed 1 --ext -clean.png input.png
 | `script` | Launches an external executable script | `action`, `external` |
 | `config` | Prompts user to edit setting value | `key`, `picker`, `start_dir` |
 | `toggle` | Interactive True/False/Cancel modal | `key`, `message`, `title` |
+| `radio` | Select single setting value from radio button list modal | `key`, `options`, `title`, `message` |
 | `editor` | Opens file inside built-in text editor | `action`, `show_whitespace` |
 | `notebook` | Opens dynamic notes collection menu from YAML file | `file`, `icon` |
 | `confirm` | Triggers a Yes/No confirmation dialog | `message`, `on_yes`, `on_no` |
 | `message` | Displays an informational pop-up dialog | `message`, `title` |
+| `toast` | Displays a non-blocking floating toast notification | `message`, `seconds`, `title` |
 | `python` | Dispatches internal Python utility function | `action` |
 | `inject_block` | Installs/removes modular code segments | `template`, `target`, `block_id` |
 | `theme_selector`| Launches list of registered themes | *(automatic)* |
@@ -746,6 +822,21 @@ Notes formatted in Markdown support interactive GFM task-list checkboxes (`- [ ]
 * **Auto-Formatting on Enter:** When editing notes in `NoteEditorModalScreen`, pressing `Enter` automatically continues checkboxes (`- [ ]`), unordered bullets (`- `, `* `, `+ `), numbered lists (`1. ` -> `2. `), and blockquotes (`> `). Pressing `Enter` on an empty marker clears the marker (smart de-escalation).
 * **Faint Ghost Text & Tab Completion:** When starting a checkbox marker (e.g., typing `- [ `), faint ghost text appears suggesting `] ` which can be completed by pressing `Tab`.
 * **Unified Cutbuffer & Clipboard:** Notes and the built-in text editor (`bashedit.py`) share a unified clipboard subsystem utilizing platform tools (`wl-copy`/`wl-paste`, `xclip`, `xsel`, `pbcopy`/`pbpaste`, `termux`) with seamless fallback to `~/.cache/bashmenu/cutbuffer.txt` on headless systems.
+
+#### Swap File Recovery & 3-Way Merge Conflict Resolution
+To prevent data loss from terminal crashes, system reboots, or concurrent edits, the notebook editor maintains per-note swap files stored in the same directory as the notebook:
+```text
+.<notebook_stem>.note.<note_slug>.swp
+```
+Each swap file records the editing process PID, timestamp, the base snapshot of the note when editing began, and the modified buffer.
+
+When opening a note that has an existing swap file, or when external changes to the notebook YAML file are detected, the system presents an interactive conflict resolution modal:
+* **`[Merge]` (3-Way Non-Conflicting Merge):** Automatically performs a line-level 3-way merge (`merge_lines_3way`) between the original base snapshot, external on-disk changes, and uncommitted swap buffer modifications, preserving non-conflicting edits from both sources.
+* **`[Overwrite]`:** Forces saving the local swap buffer to disk, superseding external changes.
+* **`[Reload]`:** Discards the uncommitted swap file and reloads the current on-disk version.
+* **`[Save As]`:** Prompts for a distinct path to save the recovered swap buffer safely without altering the notebook file.
+
+Upon normal exit after saving or explicit discarding, swap files are deleted automatically.
 
 ### 5.2 Toast Notifications (`type: toast`)
 Menu items can trigger non-blocking, self-dismissing toast notifications rendered in the bottom corner of the active screen:
@@ -1014,6 +1105,7 @@ HA Bash Menu incorporates an environment detection engine in `bashmenu.sh` enabl
 - **Universal Shebangs:** All `.py` and `.sh` files leverage `#!/usr/bin/env` for maximum portability.
 - **Cross-Platform Package Wrappers:** By routing operations through wrappers like `scripts/system_update.sh`, the engine automatically translates dependency installs to the correct local package manager (`apt`, `dnf`, `pacman`, `pkg`, or `brew`), and smartly adds or omits `sudo` depending on whether it is running in standard Linux, macOS, WSL, or containerized user-spaces like Termux.
 - **Graceful Degradation:** Features dependent on low-level system daemon frameworks (e.g., `kmscon` or `systemd-resolved` DNS modification) check for Termux/WSL and fail gracefully, rather than crashing with environment errors.
+- **Direct Linux Framebuffer Support (`/dev/fb0`):** When executed on raw Linux Virtual Consoles (`/dev/tty1`-`/dev/tty6`, `TERM=linux`, or `console`), HA Bash Menu can directly access the Linux framebuffer device without external emulators (such as `fbterm` or `kmscon`). By directly querying variable and fixed screen info (`FBIOGET_VSCREENINFO`, `FBIOGET_FSCREENINFO` ioctls) and memory mapping (`mmap`) the video buffer, the engine renders TrueColor 32-bit (ARGB/XRGB/BGRA) and 16-bit (RGB565) background graphics directly on minimal netbooks and embedded Linux devices. In accordance with project architecture invariants, direct framebuffer rendering is completely self-contained within native Rust crate modules and requires zero external tool installations.
 
 ### 7.4 Background Footer Plugins Architecture & Creation Guide
 

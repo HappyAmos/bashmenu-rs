@@ -1,9 +1,10 @@
 # BashMenu-RS Architecture & Design Blueprint
 
 ## 1. Overview & System Goals
-BashMenu-RS is a zero-dependency, compiled terminal menu system and companion developer tool suite implemented in **Rust + Bash scripting** using **Ratatui** and **Crossterm**. It is designed around four core tenets:
+BashMenu-RS is a zero-dependency, compiled terminal menu system and companion developer tool suite implemented in **Rust + Bash scripting** using **Ratatui** and **Crossterm**. It is designed around five core tenets:
 - **Instantaneous Startup & Zero Latency**: Sub-10ms cold start times, double-buffered cell diffing, and immediate `MouseDown` activation without perceptible delay.
-- **Terminal Safety & Robustness**: Global panic recovery hooks (`std::panic::set_hook`), RAII terminal raw mode restoration (`TerminalGuard`), and DEC Mode 2026 synchronized output prevents flickering and terminal corruption.
+- **Terminal Safety & Robustness**: Global panic recovery hooks (`std::panic::set_hook`), RAII terminal raw mode restoration (`TerminalGuard`), and DEC Mode 2026 synchronized output preventing flickering and terminal corruption.
+- **Self-Contained Implementation Invariant**: 100% self-contained across all capabilities (transitions, framebuffer, downsampling, note merging) without relying on external window managers, emulators (`kmscon`, `fbterm`), or shell utilities.
 - **Modular Workspace Architecture**: A strictly decoupled Cargo workspace separating serialization models, reusable Ratatui UI components, and standalone CLI utilities.
 - **Extensible Configuration Hierarchy**: Macro expansion, customizable palettes, pluggable background tasks, notebook markdown management, and leader-based keyboard chording.
 
@@ -26,13 +27,14 @@ bashmenu-rs/
 │   └── fixtures/                 # Golden production YAML fixtures (yml, mnu, themes, shortcuts)
 └── crates/
     ├── bashmenu-core/            # Shared data models, Serde loaders, macro & plugin engines, notebooks
-    ├── bashmenu-tui/             # Reusable Ratatui widgets, custom borders, drop shadows, modals, wallpaper
+    ├── bashmenu-tui/             # Reusable Ratatui widgets, custom borders, modals, wallpaper, transitions, fb
     ├── bashmenu-cli/             # Main interactive application executable (bashmenu / bm)
     ├── ymlcheck-cli/             # YAML schema validator and configuration linter (ymlcheck)
     ├── menuedit-cli/             # Visual menu tree editor (menuedit) & shortcut editor (shortcutedit)
     ├── themeedit-cli/            # Visual theme & palette editor with split preview (themeedit)
     ├── bashedit-cli/             # Terminal text editor with colocated swap files (bashedit)
-    └── bmpager-cli/              # Native terminal pager with CommonMark & OSC 8 links (bmpager)
+    ├── bmpager-cli/              # Native terminal pager with CommonMark & OSC 8 links (bmpager)
+    └── cheat-cli/                # Interactive cheatsheet lookup and Markdown viewer (cheat)
 ```
 
 ---
@@ -40,11 +42,11 @@ bashmenu-rs/
 ## 3. Subsystem Specifications
 
 ### 3.1 Data Models & Serialization (`bashmenu-core`)
-- **`config.rs`**: Loads, modifies, and serializes `bashmenu.yml` (`BashMenuConfig`). Always preserves the top-level `CONFIG_HEADER` documentation comments via `save_config()`.
-- **`menu.rs`**: Custom Serde deserializer mapping list-of-maps menu schemas into strongly-typed `MenuItem` vectors while retaining label-as-key YAML syntax. Supports nested submenus, commands, scripts, file editors, notebooks, toast popups, and confirmation dialogs.
+- **`config.rs`**: Loads, modifies, and serializes `bashmenu.yml` (`BashMenuConfig`). Always preserves the top-level `CONFIG_HEADER` documentation comments via `save_config()`. Supports `settings.transition` ("fade", "curtain", "instant", "none") and `settings.framebuffer` ("auto", "true", "false").
+- **`menu.rs`**: Custom Serde deserializer mapping list-of-maps menu schemas into strongly-typed `MenuItem` vectors while retaining label-as-key YAML syntax. Supports nested submenus, commands, scripts, file editors, notebooks, toast popups, and confirmation dialogs. Provides `MenuItem::transition_enabled()` to allow individual items to opt out via `transition: false`.
 - **`theme.rs`**: Multi-tier theme models supporting 256 colors, TrueColor RGB hex, 16-color ANSI fallbacks, marquee configuration, CP437 ASCII translations, and custom box-drawing borders.
 - **`shortcuts.rs`**: Parses and serializes `shortcuts.yml` (`ShortcutsConfig`, `ShortcutEntry`). Enforces key normalization (`normalize_key_spec`), chord validation, and header comment preservation (`SHORTCUTS_HEADER`).
-- **`notebook.rs`**: Parses YAML notebooks (`Notebook`, `NotebookNote`) with markdown formatting, multi-line notes, and CRUD state management.
+- **`notebook.rs`**: Parses YAML notebooks (`Notebook`, `NotebookNote`) with markdown formatting, multi-line notes, and CRUD state management. Handles swap files (`.<stem>.note.<slug>.swp`) and non-conflicting 3-way line merges (`merge_note_content`) with conflict markers.
 
 ### 3.2 Macro & Glyph Interpolation Engine (`bashmenu-core`)
 - **6-Tier Recursive Evaluation**:
@@ -62,21 +64,24 @@ bashmenu-rs/
 - **Modal Component Library**:
   - `ConfirmModal`: 3-button (Yes/No/Cancel) confirmation dialog.
   - `MessageModal`: Informational alerts and multi-line message dialogs.
-  - `InputModal`: Single-line text input prompt with cursor navigation and word-wrapped prompts.
+  - `InputModal`: Single-line text input prompt with cursor navigation, reversed cursor modifier, and word-wrapped prompts.
   - `FilePickerModal`: Directory tree and file system browser with sorting and dynamic filtering.
   - `ColorGridModal`: 16×16 2D palette picker for 256-color terminals.
   - `AsciiGridModal`: 16×16 2D grid for CP437 characters 0..=255.
   - `NoteViewerModal` & `NoteEditorModal`: Rich markdown note inspection and full-featured text editing with word wrapping, selection, and clipboard support.
+  - `NoteConflictModal`: Interactive conflict resolution modal offering `[ Merge ]`, `[ Overwrite Disk ]`, `[ Reload Disk ]`, `[ Save As Copy ]`, and `[ Cancel ]`.
   - `RadioModal` & `ToggleModal`: Single-select radio lists and boolean settings toggles.
   - `StreamOutputModal`: Live streaming command output viewer with percentage-based viewport sizing.
 - **Modal Text Clamping & Word Wrapping Invariant**:
   - Text inside popup modals MUST NEVER exceed visible window width. Prompts, error messages, and status lines are word-wrapped via `wrap_prompt_text()` or clamped to available inner columns.
-- **Wallpaper Compositor**:
-  - `WallpaperCompositor` renders TrueColor half-block (`▀`) backgrounds with dynamic brightness dimming and cell caching.
-- **Non-Blocking Toast System**:
-  - `ToastRack` manages dockable notifications in the bottom-right corner with auto-dismiss timers and mouse click dismissal.
-- **Leader Shortcuts & Which-Key Overlay**:
-  - `ShortcutDispatcher` handles global `<leader>` chording (e.g. `<Ctrl+Space>`), timeout expiration, and renders the `WhichKeyPopup` overlay.
+- **Wallpaper Compositor (`wallpaper.rs`)**:
+  - `WallpaperCompositor` renders TrueColor half-block (`▀`) and quarter-block quadrant (`QUADRANT_GLYPHS`) backgrounds with aspect scaling (cover, fit, stretch, center, tile), brightness dimming, color clustering, quantization, and caching.
+- **Direct Linux Framebuffer Engine (`framebuffer.rs`)**:
+  - Self-contained `/dev/fb0` hardware rendering using Linux `ioctl(FBIOGET_VSCREENINFO)` / `ioctl(FBIOGET_FSCREENINFO)` and `mmap` for direct TrueColor and 16-bit RGB video RAM blitting on minimal Linux VT consoles.
+- **Visual Screen Transitions (`transition.rs` & `terminal.rs`)**:
+  - Synchronized DEC Mode 2026 transitions (`TransitionEffect::Fade`, `TransitionEffect::Curtain`, `TransitionEffect::Instant`, `TransitionEffect::None`) executed via `draw_with_transition` and `draw_with_transition_out`. Occurs on application launch, menu page/submenu navigation, notebook changes, paging, modal dialogs, and application switches.
+- **Adaptive Color Depth Fallback (`style.rs`)**:
+  - Native `ColorTier` detection (`Color8`, `Color16`, `Color256`, `TrueColor`) inspecting `BASHMENU_COLOR_TIER`, `COLORTERM`, and `TERM`. Automatically maps TrueColor/256 palettes down to ANSI 16 and standard 8 colors using Euclidean RGB distance calculations when running on minimal consoles (`TERM=linux`).
 
 ### 3.4 Background Plugin Engine (`bashmenu-core`)
 - **Thread-Safe Asynchronous Runner**:
@@ -90,12 +95,13 @@ bashmenu-rs/
   - Menu items always have 100% priority over plugins; plugin rows automatically shrink or drop to 0 if viewport height is constrained.
 
 ### 3.5 Standalone & Companion CLI Tools
-- **`bashmenu` (`bm`)**: Primary interactive menu system with submenu stacks, dynamic plugin rendering, screen savers, and child process suspension.
+- **`bashmenu` (`bm`)**: Primary interactive menu system with submenu stacks, dynamic plugin rendering, visual transitions, screensavers, and child process suspension.
 - **`menuedit`**: Visual menu hierarchy tree editor with submenu dive/return, add/edit/delete/move actions, and type mutation.
 - **`shortcutedit` (`menuedit --shortcuts`)**: Split-screen keyboard shortcuts editor with chord capture (`KeyCaptureModal`), leader configuration, and execution mode selection.
-- **`themeedit`**: Visual theme & palette editor with split-screen live preview, 2D color/ASCII pickers, and `<Ctrl+S>` direct disk save.
-- **`bashedit`**: Full-screen terminal text editor utilizing `ropey` rope buffers, colocated `.<filename>.swp` swap files, crash recovery prompts, and universal clipboard support.
+- **`themeedit`**: Visual theme & palette editor with split-screen live preview, 2D color/ASCII pickers, wallpaper background configuration modal with cursor inversion, and `<Ctrl+S>` direct disk save.
+- **`bashedit`**: Full-screen terminal text editor utilizing rope buffers, colocated `.<filename>.swp` swap files, crash recovery prompts, and universal clipboard support.
 - **`bmpager`**: Standalone native terminal pager with CommonMark markdown parsing, fenced code block framing, OSC 8 clickable hyperlinks, search navigation, and vim-like keybindings.
+- **`cheat`**: High-performance interactive CLI Markdown cheatsheet search engine and viewer with syntax highlighting and instant query filtering.
 - **`ymlcheck`**: Standalone YAML schema validator and linter for `bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, and `shortcuts.yml`.
 
 ---

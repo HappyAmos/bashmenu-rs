@@ -1019,3 +1019,39 @@ fn test_status_gutter_precedence_and_date_time_retention() {
         "Status gutter must retain date/time tokens rather than dropping them"
     );
 }
+
+#[test]
+fn test_menu_level_titles_and_paging() {
+    let schema = create_sample_menu();
+    let mut view = MenuView::new(
+        schema,
+        ResolvedThemeStyles::default(),
+        true,
+        "Status".to_string(),
+    );
+
+    assert_eq!(view.menu_level_titles(), vec!["Test Menu".to_string()]);
+    assert_eq!(view.stack_depth(), 1);
+
+    // Navigate to Submenu Test (index 3) and enter it
+    view.handle_key(KeyCode::Down);
+    assert_eq!(view.selected_index(), 3);
+    view.handle_key(KeyCode::Enter);
+
+    assert_eq!(
+        view.menu_level_titles(),
+        vec!["Test Menu".to_string(), "Sub Title".to_string()]
+    );
+    assert_eq!(view.stack_depth(), 2);
+
+    // Return back to parent menu
+    view.handle_key(KeyCode::Esc);
+    assert_eq!(view.menu_level_titles(), vec!["Test Menu".to_string()]);
+    assert_eq!(view.stack_depth(), 1);
+
+    // Paging
+    view.handle_key(KeyCode::PageDown);
+    assert_eq!(view.selected_index(), 4);
+    view.handle_key(KeyCode::PageUp);
+    assert_eq!(view.selected_index(), 1);
+}
