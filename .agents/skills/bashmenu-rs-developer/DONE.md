@@ -528,6 +528,18 @@
   - Added unit test `test_wrap_prompt_text_bounds_and_unicode` and integration test `test_all_modals_render_within_frame_bounds` in `crates/bashmenu-tui/tests/modals_test.rs` asserting zero right-border spillage across various viewports.
   - Verified 100% test pass rate across entire workspace with `cargo test --workspace`, zero warnings in `cargo clippy --workspace --all-targets -- -D warnings`, clean `cargo fmt --all --check`, and clean `shellcheck *.sh scripts/*.sh`.
 
+- **Audit and Fix Modal Close Buttons and Help Gutters (Item #2)**:
+  - Fixed dimension mismatches and `inner = if area.width <= dialog_w { area }` discrepancies across `crates/bashmenu-tui/src/modals/theme_picker.rs`, `help.rs`, `confirm.rs`, `toggle.rs`, `radio.rs`, `file_picker.rs`, `note_viewer.rs`, and `stream_output.rs` so `is_close_button_clicked` and footer coordinates match rendered frames on all terminal viewports.
+  - Added click handling for footer help gutter action tokens (`[ESC/ENTER]: Close`, `[Ctrl+S] Save`, `[Ctrl+C] Copy`, `[Ctrl+V] Paste`, `[Esc] Cancel`, `[Enter] Select`) in `help.rs`, `note_editor.rs`, `theme_picker.rs`, `file_picker.rs`, `color_picker.rs`, `grid_picker.rs`, and `stream_output.rs`.
+  - Added full mouse click support for `ItemTypePickerModal` in `crates/menuedit-cli/src/type_picker.rs` (handling `[X]`, list item clicks, and footer `[Enter] Select` / `[Esc] Cancel`).
+  - Added full mouse click support in `crates/menuedit-cli/src/shortcut_editor.rs` for `KeyCaptureModal` (`[X]`, `[ENTER] Accept`, `[ESC] Cancel`), `LeaderSettingsModal` (`[X]`, buttons, checkboxes, inputs, footer), and `ShortcutEditModal` (`[X]`, buttons, checkboxes, inputs, footer).
+  - Aligned modal dimensions in `crates/menuedit-cli/src/item_edit.rs` and `main.rs` (`AsciiGridModal` grid origin alignment).
+  - Added mouse click support in `crates/bashedit-cli/src/main.rs` for `SwapRecovery` modal close button `[X]` and option actions.
+  - Added comprehensive test suites `test_all_modals_close_button_and_footer_clickable` in `crates/bashmenu-tui/tests/modals_test.rs` and `test_menuedit_modals_close_button_and_footer_clickable` in `crates/menuedit-cli/tests/menuedit_test.rs`.
+  - Rebuilt and reinstalled release binaries via `cargo build --release --workspace && ./install.sh`.
+  - Pushed commit `74c4f62` and verified GitHub Actions CI run `42381487336` passed with `'success'`.
+
+
 
 
 
