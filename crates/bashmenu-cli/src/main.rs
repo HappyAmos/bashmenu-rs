@@ -29,11 +29,12 @@ use bashmenu_core::{
     PluginEngine, ShortcutsConfig, ToastNotification,
 };
 use bashmenu_tui::{
-    install_panic_hook, ConfirmChoice, ConfirmModal, FilePickerModal, HelpModal, InputModal,
-    MenuAction, MenuView, MessageModal, NoteConflictChoice, NoteConflictModal, NoteEditorAction,
-    NoteEditorModal, NoteViewerAction, NoteViewerModal, RadioModal, ResolvedThemeStyles,
-    ShortcutDispatchResult, ShortcutDispatcher, StreamOutputAction, StreamOutputModal,
-    TerminalGuard, ThemePickerModal, ToastRack, ToggleChoice, ToggleModal, TransitionEffect,
+    install_panic_hook, is_framebuffer_available, ConfirmChoice, ConfirmModal, FilePickerModal,
+    FramebufferDevice, HelpModal, InputModal, MenuAction, MenuView, MessageModal,
+    NoteConflictChoice, NoteConflictModal, NoteEditorAction, NoteEditorModal, NoteViewerAction,
+    NoteViewerModal, RadioModal, ResolvedThemeStyles, ShortcutDispatchResult, ShortcutDispatcher,
+    StreamOutputAction, StreamOutputModal, TerminalGuard, ThemePickerModal, ToastRack,
+    ToggleChoice, ToggleModal, TransitionEffect,
 };
 use clap::Parser;
 use crossterm::event::{self, Event};
@@ -254,7 +255,7 @@ fn main() -> Result<()> {
     let mut menu_view =
         MenuView::new(menu, styles.clone(), use_nerd, status_gutter).with_config(config.clone());
     let initial_wallpaper = config.resolve_wallpaper(active_theme);
-    menu_view.set_wallpaper(initial_wallpaper);
+    menu_view.set_wallpaper(initial_wallpaper.clone());
     if let Some(show) = config.settings.show_menu_shortcuts {
         menu_view.set_show_shortcuts(show);
     }
@@ -265,9 +266,31 @@ fn main() -> Result<()> {
     let mut last_interaction = Instant::now();
     let mut toast_rack = ToastRack::new();
 
+    // Direct Linux Framebuffer (/dev/fb0) setup (Option 2)
+    let fb_mode = config.settings.framebuffer.as_deref().unwrap_or("auto");
+    let mut fb_device = if fb_mode == "true"
+        || (fb_mode == "auto"
+            && is_framebuffer_available()
+            && std::env::var("TERM")
+                .map(|t| t == "linux" || t == "console")
+                .unwrap_or(false))
+    {
+        FramebufferDevice::open()
+    } else {
+        None
+    };
+
+    if let (Some(ref mut fb), Some(ref wp)) = (&mut fb_device, &initial_wallpaper) {
+        if let Some(ref img_path_str) = wp.image {
+            if let Some(p) = bashmenu_tui::wallpaper::resolve_wallpaper_path(img_path_str) {
+                fb.blit_file(&p);
+            }
+        }
+    }
+
     // 7. Interactive Event Loop
     let mut need_redraw = true;
-    let mut pending_transition = false;
+    let mut pending_transition = true;
     loop {
         let size = guard.terminal_mut().size()?;
         let area = ratatui::layout::Rect::new(0, 0, size.width, size.height);
@@ -441,6 +464,12 @@ fn main() -> Result<()> {
                     ctx.window_height = size.height as usize;
                     let cmd = interpolate_placeholders(cmd_raw, &ctx);
                     if !cmd.trim().is_empty() {
+                        let eff = TransitionEffect::parse(config.settings.transition.as_deref());
+                        if eff != TransitionEffect::None && eff != TransitionEffect::Instant {
+                            let _ = guard.draw_with_transition_out(eff, |f| {
+                                menu_view.render(f.area(), f.buffer_mut());
+                            });
+                        }
                         let _ = guard.suspend_keep_alt(|| {
                             let _ = Command::new("sh").arg("-c").arg(&cmd).status();
                             Ok(())
@@ -612,6 +641,14 @@ fn main() -> Result<()> {
 
                             if fs::write(&temp_file, &modal.content).is_ok() {
                                 let original_content = modal.content.clone();
+                                let eff =
+                                    TransitionEffect::parse(config.settings.transition.as_deref());
+                                if eff != TransitionEffect::None && eff != TransitionEffect::Instant
+                                {
+                                    let _ = guard.draw_with_transition_out(eff, |f| {
+                                        menu_view.render(f.area(), f.buffer_mut());
+                                    });
+                                }
                                 let _ = guard.suspend(|| {
                                     let mut cmd = Command::new(&editor_bin);
                                     cmd.arg(&temp_file);
@@ -1403,6 +1440,14 @@ fn main() -> Result<()> {
                             };
                             if doc_path.exists() {
                                 let pager_bin = locate_tool("bmpager");
+                                let eff =
+                                    TransitionEffect::parse(config.settings.transition.as_deref());
+                                if eff != TransitionEffect::None && eff != TransitionEffect::Instant
+                                {
+                                    let _ = guard.draw_with_transition_out(eff, |f| {
+                                        menu_view.render(f.area(), f.buffer_mut());
+                                    });
+                                }
                                 let _ = guard.suspend_keep_alt(|| {
                                     let _ = Command::new(&pager_bin)
                                         .arg("--markdown")
@@ -1428,6 +1473,13 @@ fn main() -> Result<()> {
                         }
                         MenuAction::LaunchEditor => {
                             let editor_bin = locate_tool("bashedit");
+                            let eff =
+                                TransitionEffect::parse(config.settings.transition.as_deref());
+                            if eff != TransitionEffect::None && eff != TransitionEffect::Instant {
+                                let _ = guard.draw_with_transition_out(eff, |f| {
+                                    menu_view.render(f.area(), f.buffer_mut());
+                                });
+                            }
                             let _ = guard.suspend_keep_alt(|| {
                                 let _ = Command::new(&editor_bin).status();
                                 Ok(())
@@ -1445,6 +1497,13 @@ fn main() -> Result<()> {
                                 .join(",");
                             let sel_title = menu_view.selected_item().map(|it| it.label.clone());
                             let title_chain = menu_view.active_title_chain().join(" > ");
+                            let eff =
+                                TransitionEffect::parse(config.settings.transition.as_deref());
+                            if eff != TransitionEffect::None && eff != TransitionEffect::Instant {
+                                let _ = guard.draw_with_transition_out(eff, |f| {
+                                    menu_view.render(f.area(), f.buffer_mut());
+                                });
+                            }
                             let _ = guard.suspend_keep_alt(|| {
                                 let mut cmd = Command::new(&menuedit_bin);
                                 cmd.arg("-f").arg(&menu_path);
@@ -1544,6 +1603,13 @@ fn main() -> Result<()> {
                         }
                         MenuAction::LaunchThemeEditor => {
                             let themeedit_bin = locate_tool("themeedit");
+                            let eff =
+                                TransitionEffect::parse(config.settings.transition.as_deref());
+                            if eff != TransitionEffect::None && eff != TransitionEffect::Instant {
+                                let _ = guard.draw_with_transition_out(eff, |f| {
+                                    menu_view.render(f.area(), f.buffer_mut());
+                                });
+                            }
                             let _ = guard.suspend_keep_alt(|| {
                                 let _ = Command::new(&themeedit_bin)
                                     .arg("-f")
@@ -1559,6 +1625,13 @@ fn main() -> Result<()> {
                         MenuAction::LaunchShortcutEditor => {
                             let shortcutedit_bin = locate_tool("shortcutedit");
                             let menuedit_bin = locate_tool("menuedit");
+                            let eff =
+                                TransitionEffect::parse(config.settings.transition.as_deref());
+                            if eff != TransitionEffect::None && eff != TransitionEffect::Instant {
+                                let _ = guard.draw_with_transition_out(eff, |f| {
+                                    menu_view.render(f.area(), f.buffer_mut());
+                                });
+                            }
                             let _ = guard.suspend_keep_alt(|| {
                                 let status = Command::new(&shortcutedit_bin)
                                     .arg("-f")
@@ -1917,6 +1990,19 @@ fn main() -> Result<()> {
                                     .unwrap_or_default();
                                 let target = interpolate_placeholders(target_raw, &ctx);
                                 let editor_bin = locate_tool("bashedit");
+                                let trans_enabled = item.transition_enabled();
+                                if trans_enabled {
+                                    let eff = TransitionEffect::parse(
+                                        config.settings.transition.as_deref(),
+                                    );
+                                    if eff != TransitionEffect::None
+                                        && eff != TransitionEffect::Instant
+                                    {
+                                        let _ = guard.draw_with_transition_out(eff, |f| {
+                                            menu_view.render(f.area(), f.buffer_mut());
+                                        });
+                                    }
+                                }
                                 let _ = guard.suspend_keep_alt(|| {
                                     let mut cmd = Command::new(&editor_bin);
                                     let trimmed = target.trim();
@@ -1941,7 +2027,9 @@ fn main() -> Result<()> {
                                     let _ = cmd.status();
                                     Ok(())
                                 });
-                                pending_transition = true;
+                                if trans_enabled {
+                                    pending_transition = true;
+                                }
                                 pending_action = Some(MenuAction::Reload);
                             } else {
                                 let action_str = item.action.as_deref().unwrap_or_default();
@@ -1952,6 +2040,19 @@ fn main() -> Result<()> {
                                     || command_str == "action_theme_editor"
                                 {
                                     let themeedit_bin = locate_tool("themeedit");
+                                    let trans_enabled = item.transition_enabled();
+                                    if trans_enabled {
+                                        let eff = TransitionEffect::parse(
+                                            config.settings.transition.as_deref(),
+                                        );
+                                        if eff != TransitionEffect::None
+                                            && eff != TransitionEffect::Instant
+                                        {
+                                            let _ = guard.draw_with_transition_out(eff, |f| {
+                                                menu_view.render(f.area(), f.buffer_mut());
+                                            });
+                                        }
+                                    }
                                     let _ = guard.suspend_keep_alt(|| {
                                         let _ = Command::new(&themeedit_bin)
                                             .arg("-f")
@@ -1961,7 +2062,9 @@ fn main() -> Result<()> {
                                             .status();
                                         Ok(())
                                     });
-                                    pending_transition = true;
+                                    if trans_enabled {
+                                        pending_transition = true;
+                                    }
                                     pending_action = Some(MenuAction::Reload);
                                 } else if action_str == "menuedit"
                                     || action_str == "menuedit.py"
@@ -1978,6 +2081,19 @@ fn main() -> Result<()> {
                                     let sel_title =
                                         menu_view.selected_item().map(|it| it.label.clone());
                                     let title_chain = menu_view.active_title_chain().join(" > ");
+                                    let trans_enabled = item.transition_enabled();
+                                    if trans_enabled {
+                                        let eff = TransitionEffect::parse(
+                                            config.settings.transition.as_deref(),
+                                        );
+                                        if eff != TransitionEffect::None
+                                            && eff != TransitionEffect::Instant
+                                        {
+                                            let _ = guard.draw_with_transition_out(eff, |f| {
+                                                menu_view.render(f.area(), f.buffer_mut());
+                                            });
+                                        }
+                                    }
                                     let _ = guard.suspend_keep_alt(|| {
                                         let mut cmd = Command::new(&menuedit_bin);
                                         cmd.arg("-f").arg(&menu_path);
@@ -2092,6 +2208,25 @@ fn main() -> Result<()> {
                                                 ExecutionMode::Console => {
                                                     let is_quiet = item.quiet.unwrap_or(false);
                                                     let use_alt = item.alt_buffer.unwrap_or(true);
+                                                    let trans_enabled = item.transition_enabled();
+                                                    if trans_enabled {
+                                                        let eff = TransitionEffect::parse(
+                                                            config.settings.transition.as_deref(),
+                                                        );
+                                                        if eff != TransitionEffect::None
+                                                            && eff != TransitionEffect::Instant
+                                                        {
+                                                            let _ = guard.draw_with_transition_out(
+                                                                eff,
+                                                                |f| {
+                                                                    menu_view.render(
+                                                                        f.area(),
+                                                                        f.buffer_mut(),
+                                                                    );
+                                                                },
+                                                            );
+                                                        }
+                                                    }
                                                     let run_console = || -> std::io::Result<()> {
                                                         if use_alt {
                                                             let mut stdout = std::io::stdout();
@@ -2124,7 +2259,9 @@ fn main() -> Result<()> {
                                                     } else {
                                                         let _ = guard.suspend(run_console);
                                                     }
-                                                    pending_transition = true;
+                                                    if trans_enabled {
+                                                        pending_transition = true;
+                                                    }
                                                     need_redraw = true;
                                                 }
                                             }

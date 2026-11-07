@@ -147,6 +147,76 @@ impl TerminalGuard {
         }
     }
 
+    /// Draws a transition-out sequence (ramp-down/curtain close) before
+    /// switching to an external application or process.
+    pub fn draw_with_transition_out<F>(
+        &mut self,
+        effect: TransitionEffect,
+        mut render_callback: F,
+    ) -> io::Result<()>
+    where
+        F: FnMut(&mut Frame<'_>),
+    {
+        match effect {
+            TransitionEffect::None | TransitionEffect::Instant => Ok(()),
+            TransitionEffect::Fade => {
+                let size = self.terminal.size()?;
+                for step in (0..=2).rev() {
+                    let factor = (step as f32) / 3.0;
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
+                    let _ = self.terminal.draw(|f| {
+                        render_callback(f);
+                        let buf = f.buffer_mut();
+                        for y in 0..size.height {
+                            for x in 0..size.width {
+                                let cell = &mut buf[(x, y)];
+                                cell.fg = dim_color(cell.fg, factor);
+                                cell.bg = dim_color(cell.bg, factor);
+                                if step == 0 {
+                                    cell.set_char(' ');
+                                    cell.modifier = Modifier::empty();
+                                }
+                            }
+                        }
+                    });
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
+                    let _ = self.terminal.backend_mut().flush();
+                    std::thread::sleep(Duration::from_millis(20));
+                }
+                Ok(())
+            }
+            TransitionEffect::Curtain => {
+                let size = self.terminal.size()?;
+                for step in (0..=2).rev() {
+                    let fraction = (step as f32) / 3.0;
+                    let visible_width = ((size.width as f32) * fraction).round() as u16;
+                    let left_bound = (size.width.saturating_sub(visible_width)) / 2;
+                    let right_bound = left_bound + visible_width;
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
+                    let _ = self.terminal.draw(|f| {
+                        render_callback(f);
+                        let buf = f.buffer_mut();
+                        for y in 0..size.height {
+                            for x in 0..size.width {
+                                if step == 0 || x < left_bound || x >= right_bound {
+                                    let cell = &mut buf[(x, y)];
+                                    cell.set_char(' ');
+                                    cell.set_fg(Color::Reset);
+                                    cell.set_bg(Color::Reset);
+                                    cell.modifier = Modifier::empty();
+                                }
+                            }
+                        }
+                    });
+                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
+                    let _ = self.terminal.backend_mut().flush();
+                    std::thread::sleep(Duration::from_millis(20));
+                }
+                Ok(())
+            }
+        }
+    }
+
     /// Discards any buffered or stale terminal input events from queue.
     ///
     /// This prevents pending keystrokes or mouse events accumulated during

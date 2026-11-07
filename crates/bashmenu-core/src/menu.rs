@@ -526,6 +526,20 @@ impl MenuItem {
         false
     }
 
+    /// Whether visual transitions should occur when switching to or from
+    /// this item. Defaults to `true` unless `transition: false` is configured.
+    pub fn transition_enabled(&self) -> bool {
+        match self.extra.get("transition") {
+            Some(serde_yml::Value::Bool(b)) => *b,
+            Some(serde_yml::Value::String(s)) => !matches!(
+                s.trim().to_ascii_lowercase().as_str(),
+                "false" | "0" | "no" | "off" | "none"
+            ),
+            Some(serde_yml::Value::Number(n)) => n.as_i64().unwrap_or(1) != 0,
+            _ => true,
+        }
+    }
+
     /// Window percentage for floating dialogs (Streaming or Interactive mode)
     pub fn window_percent(&self) -> u16 {
         self.extra
@@ -967,5 +981,30 @@ mod tests {
             let sub = dev_shortcuts.submenu.as_ref().unwrap();
             assert!(!sub.items.is_empty());
         }
+    }
+
+    #[test]
+    fn test_menu_item_transition_enabled() {
+        let item_default = MenuItem::default();
+        assert!(item_default.transition_enabled());
+
+        let mut item_disabled = MenuItem::default();
+        item_disabled
+            .extra
+            .insert("transition".to_string(), serde_yml::Value::Bool(false));
+        assert!(!item_disabled.transition_enabled());
+
+        let mut item_str_off = MenuItem::default();
+        item_str_off.extra.insert(
+            "transition".to_string(),
+            serde_yml::Value::String("off".to_string()),
+        );
+        assert!(!item_str_off.transition_enabled());
+
+        let mut item_enabled = MenuItem::default();
+        item_enabled
+            .extra
+            .insert("transition".to_string(), serde_yml::Value::Bool(true));
+        assert!(item_enabled.transition_enabled());
     }
 }

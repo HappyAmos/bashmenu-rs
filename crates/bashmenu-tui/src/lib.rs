@@ -4,6 +4,7 @@ pub mod ansi;
 pub mod bbcode;
 pub mod borders;
 pub mod clipboard;
+pub mod framebuffer;
 pub mod gutter;
 pub mod marquee;
 pub mod menu_view;
@@ -23,6 +24,9 @@ pub use bbcode::{
 };
 pub use borders::ResolvedWindowBorders;
 pub use clipboard::{base64_encode, get_clipboard_text, set_clipboard_text};
+pub use framebuffer::{
+    format_pixel_16, format_pixel_32, is_framebuffer_available, FramebufferDevice,
+};
 pub use gutter::{
     format_spread_gutter_line, parse_help_tokens, spread_gutter_line_layout,
     wrap_spread_help_gutter, wrap_spread_help_gutter_layout,

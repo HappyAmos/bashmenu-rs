@@ -647,6 +647,23 @@ items:
                       interactive: true
                       quiet: false
                       alt_buffer: true
+                  - Linux Framebuffer Support [{settings.framebuffer}]:
+                      type: radio
+                      key: settings.framebuffer
+                      title: Linux Framebuffer Support [{settings.framebuffer}]
+                      prompt: 'Configure direct Linux framebuffer (/dev/fb0) rendering:'
+                      options:
+                        - label: Auto (Detect /dev/fb0 on Linux console)
+                          value: auto
+                        - label: Enabled (Force direct framebuffer rendering)
+                          value: 'true'
+                        - label: Disabled (Standard terminal TUI rendering)
+                          value: 'false'
+                      icon: '{nf::#f2db}'
+                      action: settings.framebuffer
+                      interactive: true
+                      quiet: false
+                      alt_buffer: true
                   - Configure Status Gutter [{settings.status_gutter}]:
                       type: config
                       key: settings.status_gutter

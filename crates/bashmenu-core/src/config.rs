@@ -102,6 +102,10 @@ pub struct Settings {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transition: Option<String>,
 
+    /// Direct Linux framebuffer (/dev/fb0) rendering ("auto", "true", "false")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub framebuffer: Option<String>,
+
     /// Additional arbitrary user-defined settings preserved across saves
     #[serde(flatten)]
     pub extra: HashMap<String, serde_yml::Value>,
@@ -298,6 +302,13 @@ impl BashMenuConfig {
             "settings.transition" => {
                 self.settings.transition = match &value {
                     serde_yml::Value::String(s) => Some(s.clone()),
+                    _ => None,
+                };
+            }
+            "settings.framebuffer" => {
+                self.settings.framebuffer = match &value {
+                    serde_yml::Value::String(s) => Some(s.clone()),
+                    serde_yml::Value::Bool(b) => Some(b.to_string()),
                     _ => None,
                 };
             }
