@@ -565,16 +565,16 @@ pub fn resolve_shortcuts_path(local_override: bool) -> PathBuf {
     if local_override && filename.exists() {
         return filename.to_path_buf();
     }
+    let user_cfg = get_user_config_dir();
+    let user_path = user_cfg.join(filename);
+    if user_path.exists() {
+        return user_path;
+    }
     if let Ok(bm_dir) = std::env::var("BASHMENU_DIR") {
         let p = PathBuf::from(bm_dir).join(filename);
         if p.exists() {
             return p;
         }
-    }
-    let user_cfg = get_user_config_dir();
-    let user_path = user_cfg.join(filename);
-    if user_path.exists() {
-        return user_path;
     }
     if filename.exists() {
         return filename.to_path_buf();

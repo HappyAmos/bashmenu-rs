@@ -55,12 +55,12 @@ use std::time::{Duration, Instant};
 )]
 struct Cli {
     /// Path to menu definition file
-    #[arg(short, long, default_value = "bashmenu.mnu")]
-    menu: PathBuf,
+    #[arg(short, long)]
+    menu: Option<PathBuf>,
 
     /// Path to configuration file
-    #[arg(short, long, default_value = "bashmenu.yml")]
-    config: PathBuf,
+    #[arg(short, long)]
+    config: Option<PathBuf>,
 
     /// Override active theme
     #[arg(short, long)]
@@ -215,22 +215,54 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     // 2. Load Configuration and Menus
-    let config_path = resolve_file_path(&cli.config, cli.local);
+    let config_path = if let Some(ref cp) = cli.config {
+        resolve_file_path(cp, cli.local)
+    } else if cli.local {
+        PathBuf::from("./bashmenu.yml")
+    } else {
+        bashmenu_core::get_user_config_dir().join("bashmenu.yml")
+    };
     let mut config = if config_path.exists() {
         load_config(&config_path).unwrap_or_default()
     } else {
-        BashMenuConfig::default()
+        let vanilla_cfg = bashmenu_core::resolve_app_path("bashmenu.yml");
+        if vanilla_cfg.exists() && vanilla_cfg != config_path {
+            if let Ok(c) = load_config(&vanilla_cfg) {
+                let _ = bashmenu_core::save_config(&config_path, &c);
+                c
+            } else {
+                BashMenuConfig::default()
+            }
+        } else {
+            BashMenuConfig::default()
+        }
     };
 
     if let Some(t) = cli.theme {
         config.theme = t;
     }
 
-    let menu_path = resolve_file_path(&cli.menu, cli.local);
+    let menu_path = if let Some(ref mp) = cli.menu {
+        resolve_file_path(mp, cli.local)
+    } else if cli.local {
+        PathBuf::from("./bashmenu.mnu")
+    } else {
+        bashmenu_core::get_user_config_dir().join("bashmenu.mnu")
+    };
     let menu = if menu_path.exists() {
         load_menu(&menu_path).unwrap_or_default()
     } else {
-        MenuSchema::default()
+        let vanilla_menu = bashmenu_core::resolve_app_path("bashmenu.mnu");
+        if vanilla_menu.exists() && vanilla_menu != menu_path {
+            if let Ok(m) = load_menu(&vanilla_menu) {
+                let _ = bashmenu_core::save_menu(&menu_path, &m);
+                m
+            } else {
+                MenuSchema::default()
+            }
+        } else {
+            MenuSchema::default()
+        }
     };
 
     let shortcuts_path = if let Some(ref sp) = cli.shortcuts {
@@ -246,7 +278,16 @@ fn main() -> Result<()> {
     let mut shortcut_dispatcher = ShortcutDispatcher::new(shortcuts_cfg);
 
     // 3. Load Themes
-    let themes_path = resolve_file_path(Path::new("bashmenu.themes"), cli.local);
+    let themes_path = if cli.local {
+        PathBuf::from("./bashmenu.themes")
+    } else {
+        let user_themes = bashmenu_core::get_user_config_dir().join("bashmenu.themes");
+        if user_themes.exists() {
+            user_themes
+        } else {
+            resolve_file_path(Path::new("bashmenu.themes"), false)
+        }
+    };
     let mut themes = if themes_path.exists() {
         load_themes(&themes_path).unwrap_or_default()
     } else {

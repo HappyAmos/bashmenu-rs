@@ -8,6 +8,15 @@
 
 set -e
 
+UPDATE_MENU=false
+for arg in "$@"; do
+    case "$arg" in
+        --update-menu|--reset-menu)
+            UPDATE_MENU=true
+            ;;
+    esac
+done
+
 # Canonical script directory
 SCRIPT_DIR="$(cd -P "$(dirname "$0")" 2>/dev/null && pwd)"
 
@@ -115,11 +124,31 @@ mkdir -p "$CONFIG_DIR"
 for cfg in bashmenu.yml bashmenu.mnu bashmenu.themes shortcuts.yml cheat.yml; do
     fixture="$SCRIPT_DIR/tests/fixtures/$cfg"
     dest="$CONFIG_DIR/$cfg"
-    if [ ! -f "$dest" ] && [ -f "$fixture" ]; then
+    if [ "$cfg" = "bashmenu.mnu" ] && [ "$UPDATE_MENU" = "true" ] && [ -f "$fixture" ]; then
+        if [ -f "$dest" ]; then
+            cp -f "$dest" "$dest.bak"
+            echo "  [+] Backed up existing menu -> $dest.bak"
+        fi
+        cp -f "$fixture" "$dest"
+        echo "  [+] Updated user menu with latest vanilla template: $dest"
+    elif [ ! -f "$dest" ] && [ -f "$fixture" ]; then
         cp "$fixture" "$dest"
         echo "  [+] Initialized user config: $dest"
+    elif [ "$cfg" = "bashmenu.mnu" ] && [ -f "$dest" ]; then
+        echo "  [*] Preserving existing user menu: $dest"
+        echo "      (Run './install.sh --update-menu' to update to latest vanilla layout with .bak backup)"
     fi
 done
+
+# Install vanilla templates into user config directory for easy reference/diff
+mkdir -p "$CONFIG_DIR/templates"
+for cfg in bashmenu.yml bashmenu.mnu bashmenu.themes shortcuts.yml cheat.yml; do
+    fixture="$SCRIPT_DIR/tests/fixtures/$cfg"
+    if [ -f "$fixture" ]; then
+        cp -f "$fixture" "$CONFIG_DIR/templates/$cfg.vanilla"
+    fi
+done
+echo "  [+] Installed default vanilla templates -> $CONFIG_DIR/templates/"
 
 # Symlink assets and scripts into user config directory if present
 if [ -d "$SCRIPT_DIR/assets" ]; then

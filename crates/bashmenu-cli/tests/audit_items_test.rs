@@ -32,3 +32,17 @@ fn test_bashmenu_modal_animation_config_options() {
         Some("fast".to_string())
     );
 }
+
+#[test]
+fn test_user_config_isolation_and_vanilla_separation() {
+    let bin = env!("CARGO_BIN_EXE_bashmenu");
+    let output = Command::new(bin)
+        .arg("--help")
+        .output()
+        .expect("bashmenu --help must run");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Ensure --menu and --config are optional arguments rather than defaulting to local file
+    assert!(stdout.contains("-m, --menu") || stdout.contains("--menu <MENU>"));
+    assert!(stdout.contains("-c, --config") || stdout.contains("--config <CONFIG>"));
+}

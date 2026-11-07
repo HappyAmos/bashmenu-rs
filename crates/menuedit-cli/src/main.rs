@@ -85,8 +85,8 @@ struct FooterHitRegion {
 )]
 struct Cli {
     /// Path to menu definition file
-    #[arg(short, long, default_value = "bashmenu.mnu")]
-    file: PathBuf,
+    #[arg(short, long)]
+    file: Option<PathBuf>,
 
     /// Load and save menu files in current working directory
     #[arg(long)]
@@ -188,18 +188,29 @@ fn main() -> Result<()> {
 
     let cli = Cli::parse();
     if cli.shortcuts {
-        let sp = if cli.file != Path::new("bashmenu.mnu") {
-            resolve_menu_path(&cli.file, cli.local)
+        let sp = if let Some(ref f) = cli.file {
+            resolve_menu_path(f, cli.local)
         } else {
             bashmenu_core::resolve_shortcuts_path(cli.local)
         };
         return menuedit_cli::run_shortcut_editor(sp);
     }
-    let menu_path = resolve_menu_path(&cli.file, cli.local);
+    let menu_path = if let Some(ref f) = cli.file {
+        resolve_menu_path(f, cli.local)
+    } else if cli.local {
+        PathBuf::from("./bashmenu.mnu")
+    } else {
+        bashmenu_core::get_user_config_dir().join("bashmenu.mnu")
+    };
     let mut menu = if menu_path.exists() {
         load_menu(&menu_path).unwrap_or_default()
     } else {
-        MenuSchema::default()
+        let vanilla_menu = bashmenu_core::resolve_app_path("bashmenu.mnu");
+        if vanilla_menu.exists() && vanilla_menu != menu_path {
+            load_menu(&vanilla_menu).unwrap_or_default()
+        } else {
+            MenuSchema::default()
+        }
     };
 
     let cfg_path = resolve_menu_path(Path::new("bashmenu.yml"), cli.local);

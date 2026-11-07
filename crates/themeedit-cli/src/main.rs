@@ -35,8 +35,8 @@ use themeedit_cli::{
 )]
 struct Cli {
     /// Path to theme definition file
-    #[arg(short, long, default_value = "bashmenu.themes")]
-    file: PathBuf,
+    #[arg(short, long)]
+    file: Option<PathBuf>,
 
     /// Name of specific theme to edit
     #[arg(short, long)]
@@ -92,7 +92,18 @@ fn main() -> Result<()> {
     install_panic_hook();
 
     let cli = Cli::parse();
-    let themes_path = resolve_themes_path(&cli.file, cli.local);
+    let themes_path = if let Some(ref f) = cli.file {
+        resolve_themes_path(f, cli.local)
+    } else if cli.local {
+        PathBuf::from("./bashmenu.themes")
+    } else {
+        let user_themes = bashmenu_core::get_user_config_dir().join("bashmenu.themes");
+        if user_themes.exists() {
+            user_themes
+        } else {
+            resolve_themes_path(Path::new("bashmenu.themes"), false)
+        }
+    };
     let mut state = ThemeEditorState::new(themes_path, cli.theme);
 
     let mut guard = TerminalGuard::init()?;
