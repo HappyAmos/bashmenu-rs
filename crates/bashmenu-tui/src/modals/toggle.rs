@@ -68,6 +68,20 @@ impl ToggleModal {
 
     /// Computes dialog dimensions and inner rect
     fn compute_layout(&self, area: Rect) -> (Rect, Vec<String>) {
+        let (dialog_w, dialog_h) = self.dialog_dimensions(area);
+        let inner = compute_modal_inner(area, dialog_w, dialog_h);
+        let max_w = 70_u16.min(area.width.saturating_sub(4));
+        let avail_w = max_w.saturating_sub(6) as usize;
+        let msg_lines = if avail_w > 0 && !self.message.trim().is_empty() {
+            super::input::wrap_prompt_text(&self.message, avail_w)
+        } else {
+            Vec::new()
+        };
+        (inner, msg_lines)
+    }
+
+    /// Returns the target dialog dimensions for this modal.
+    pub fn dialog_dimensions(&self, area: Rect) -> (u16, u16) {
         let max_w = 70_u16.min(area.width.saturating_sub(4));
         let avail_w = max_w.saturating_sub(6) as usize;
         let msg_lines = if avail_w > 0 && !self.message.trim().is_empty() {
@@ -81,8 +95,7 @@ impl ToggleModal {
             .min(max_w)
             .max(20.min(max_w));
         let dialog_h = ((msg_count + 5) as u16).min(max_h).max(7.min(max_h));
-        let inner = compute_modal_inner(area, dialog_w, dialog_h);
-        (inner, msg_lines)
+        (dialog_w, dialog_h)
     }
 
     /// Handles immediate mouse click

@@ -65,6 +65,13 @@ impl HelpModal {
         }
     }
 
+    /// Returns the target dialog dimensions for this modal.
+    pub fn dialog_dimensions(&self, area: Rect) -> (u16, u16) {
+        let dialog_w = ((area.width as f32 * 0.90) as u16).clamp(30, 100);
+        let dialog_h = ((area.height as f32 * 0.80) as u16).clamp(10, 40);
+        (dialog_w, dialog_h)
+    }
+
     /// Handles mouse event
     pub fn handle_mouse(&mut self, mouse: MouseEvent, area: Rect) -> bool {
         match mouse.kind {

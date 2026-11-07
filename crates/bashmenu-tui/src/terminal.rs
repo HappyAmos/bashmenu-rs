@@ -7,12 +7,17 @@ use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
 use ratatui::backend::CrosstermBackend;
+use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier};
 use ratatui::{Frame, Terminal};
 use std::io::{self, BufWriter, Stdout, Write};
 use std::time::Duration;
 
-use crate::transition::{dim_color, TransitionEffect, TransitionSpeed, BAYER_4X4};
+use crate::modals::render_animated_modal_frame;
+use crate::style::ResolvedThemeStyles;
+use crate::transition::{
+    dim_color, interpolate_zoom_rect, TransitionEffect, TransitionSpeed, BAYER_4X4,
+};
 
 /// RAII guard managing terminal state (raw mode, alternate screen, mouse).
 pub struct TerminalGuard {
@@ -827,6 +832,82 @@ impl TerminalGuard {
         self.request_clear();
 
         result
+    }
+
+    /// Executes a snappy modal zoom grow animation expanding from `anchor`
+    /// to `target_rect` over the provided background.
+    pub fn animate_modal_grow<F>(
+        &mut self,
+        anchor: (u16, u16),
+        target_rect: Rect,
+        styles: &ResolvedThemeStyles,
+        speed: TransitionSpeed,
+        mut render_background: F,
+    ) -> io::Result<()>
+    where
+        F: FnMut(&mut Frame<'_>),
+    {
+        let size = self.terminal.size()?;
+        if size.width == 0 || size.height == 0 || target_rect.width == 0 || target_rect.height == 0
+        {
+            return Ok(());
+        }
+
+        let viewport = Rect::new(0, 0, size.width, size.height);
+        let delay = speed.step_delay_out();
+        let factors = [0.25_f32, 0.50_f32, 0.75_f32];
+
+        for factor in factors {
+            let intermediate_rect = interpolate_zoom_rect(anchor, target_rect, factor, viewport);
+            let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
+            let _ = self.terminal.draw(|f| {
+                render_background(f);
+                render_animated_modal_frame(viewport, intermediate_rect, styles, f.buffer_mut());
+            });
+            let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
+            let _ = self.terminal.backend_mut().flush();
+            std::thread::sleep(delay);
+        }
+
+        Ok(())
+    }
+
+    /// Executes a snappy modal zoom shrink animation collapsing from
+    /// `source_rect` back to `anchor` over the provided background.
+    pub fn animate_modal_shrink<F>(
+        &mut self,
+        anchor: (u16, u16),
+        source_rect: Rect,
+        styles: &ResolvedThemeStyles,
+        speed: TransitionSpeed,
+        mut render_background: F,
+    ) -> io::Result<()>
+    where
+        F: FnMut(&mut Frame<'_>),
+    {
+        let size = self.terminal.size()?;
+        if size.width == 0 || size.height == 0 || source_rect.width == 0 || source_rect.height == 0
+        {
+            return Ok(());
+        }
+
+        let viewport = Rect::new(0, 0, size.width, size.height);
+        let delay = speed.step_delay_out();
+        let factors = [0.70_f32, 0.40_f32, 0.15_f32];
+
+        for factor in factors {
+            let intermediate_rect = interpolate_zoom_rect(anchor, source_rect, factor, viewport);
+            let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
+            let _ = self.terminal.draw(|f| {
+                render_background(f);
+                render_animated_modal_frame(viewport, intermediate_rect, styles, f.buffer_mut());
+            });
+            let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
+            let _ = self.terminal.backend_mut().flush();
+            std::thread::sleep(delay);
+        }
+
+        Ok(())
     }
 }
 

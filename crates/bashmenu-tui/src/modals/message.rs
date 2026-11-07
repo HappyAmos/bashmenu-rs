@@ -38,6 +38,22 @@ impl MessageModal {
         mouse.kind == MouseEventKind::Down(MouseButton::Left)
     }
 
+    /// Returns the target dialog dimensions for this modal.
+    pub fn dialog_dimensions(&self, area: Rect) -> (u16, u16) {
+        let max_w = 64.min(area.width.saturating_sub(4));
+        let wrapped =
+            super::input::wrap_prompt_text(&self.message, max_w.saturating_sub(4) as usize);
+        let max_line_w = wrapped
+            .iter()
+            .map(|l| l.chars().count())
+            .max()
+            .unwrap_or(20);
+        let dialog_w = (max_line_w as u16 + 8).min(max_w).max(20.min(max_w));
+        let max_h = area.height.saturating_sub(2);
+        let dialog_h = (wrapped.len() as u16 + 5).min(max_h).max(8.min(max_h));
+        (dialog_w, dialog_h)
+    }
+
     /// Renders message modal
     pub fn render(&self, area: Rect, styles: &ResolvedThemeStyles, buf: &mut Buffer) -> Rect {
         let max_w = 64.min(area.width.saturating_sub(4));

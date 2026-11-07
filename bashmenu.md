@@ -432,8 +432,7 @@ The main menu dynamically calculates its status refresh interval to balance real
 
 #### Visual Screen Transitions & Speed (`settings.transition` & `settings.transition_speed`):
 HA Bash Menu features hardware-synchronized visual transitions rendered
-between screens, submenus, paging jumps, modal dialogs, and external application
-switches.
+between screens, submenus, paging jumps, and external application switches.
 
 ```yaml
 settings:
@@ -469,7 +468,22 @@ Visual transitions are automatically triggered:
 - Between menu levels / submenus (entering submenus or returning via Back/Esc).
 - On page jumps (`PageUp` / `PageDown`).
 - Between application switches (`bashmenu` ↔ `themeedit`, `shortcutedit`, `menuedit`, `bashedit`, `bmpager`, console commands, and shell scripts).
-- During modal dialog opening and dismissal.
+
+#### Modal Popup Zoom Animations (`settings.modal_animation` & `settings.modal_animation_speed`):
+Popup modal dialogs (help, theme picker, note viewer, note editor, prompts, confirmations) utilize dedicated lightweight zoom animations that rapidly grow from the initiating menu item row (or screen center for function key shortcuts) when opened, and shrink back to that launch anchor when dismissed, eliminating full-screen transition disruptions.
+
+```yaml
+settings:
+  modal_animation: zoom          # Options: zoom, none (default: zoom)
+  modal_animation_speed: fast    # Options: fast, normal, slow, or milliseconds (default: fast)
+```
+
+| Modal Animation Style | Description |
+| :--- | :--- |
+| `zoom` (Default) | Snappy animated growth from launch anchor into dialog frame, and shrink back on dismissal. |
+| `none` | Immediate instant popup frame draw and dismissal without animation. |
+
+If `modal_animation_speed` is omitted from `bashmenu.yml`, it falls back to `settings.transition_speed` (or `fast`).
 
 *Disabling Transitions for Specific Commands:* Any command or script menu item
 can disable transitions by specifying `transition: false` in `bashmenu.mnu`:

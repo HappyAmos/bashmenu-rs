@@ -1,8 +1,9 @@
 use bashmenu_tui::{
-    dim_color, format_pixel_16, format_pixel_32, is_framebuffer_available, TransitionEffect,
-    TransitionSpeed,
+    compute_modal_rect, dim_color, format_pixel_16, format_pixel_32, interpolate_zoom_rect,
+    is_framebuffer_available, ModalAnimation, TransitionEffect, TransitionSpeed,
 };
 use image::RgbImage;
+use ratatui::layout::Rect;
 use ratatui::style::Color;
 
 #[test]
@@ -119,6 +120,50 @@ fn test_framebuffer_blit_rgb_buffer() {
     let mut buf16 = vec![0u8; 4 * 4 * 2];
     bashmenu_tui::framebuffer::blit_rgb_to_buffer(&img, &mut buf16, 4, 4, 8, 16, 11, 5, 0);
     assert_eq!(buf16.len(), 32);
+}
+
+#[test]
+fn test_modal_animation_parsing_and_interpolation() {
+    assert_eq!(ModalAnimation::parse(Some("zoom")), ModalAnimation::Zoom);
+    assert_eq!(ModalAnimation::parse(Some("grow")), ModalAnimation::Zoom);
+    assert_eq!(ModalAnimation::parse(Some("shrink")), ModalAnimation::Zoom);
+    assert_eq!(ModalAnimation::parse(Some("none")), ModalAnimation::None);
+    assert_eq!(ModalAnimation::parse(Some("off")), ModalAnimation::None);
+    assert_eq!(
+        ModalAnimation::parse(Some("disabled")),
+        ModalAnimation::None
+    );
+    assert_eq!(ModalAnimation::parse(Some("0")), ModalAnimation::None);
+    assert_eq!(ModalAnimation::parse(None), ModalAnimation::Zoom);
+
+    let viewport = Rect::new(0, 0, 80, 24);
+    let target = Rect::new(20, 6, 40, 12);
+    let anchor = (40, 10);
+
+    let r_start = interpolate_zoom_rect(anchor, target, 0.0, viewport);
+    assert!(r_start.width <= 6);
+    assert!(r_start.height <= 3);
+
+    let r_mid = interpolate_zoom_rect(anchor, target, 0.5, viewport);
+    assert!(r_mid.width > r_start.width);
+    assert!(r_mid.height > r_start.height);
+    assert!(r_mid.width < target.width);
+    assert!(r_mid.height < target.height);
+
+    let r_end = interpolate_zoom_rect(anchor, target, 1.0, viewport);
+    assert_eq!(r_end, target);
+}
+
+#[test]
+fn test_compute_modal_rect() {
+    let area = Rect::new(0, 0, 80, 24);
+    let rect = compute_modal_rect(area, 40, 10);
+    assert_eq!(rect.width, 40);
+    assert_eq!(rect.height, 10);
+    // Centered horizontally: (80 - 42) / 2 = 19
+    assert_eq!(rect.x, 19);
+    // Centered vertically: (24 - 11) / 2 = 6
+    assert_eq!(rect.y, 6);
 }
 
 #[test]

@@ -88,6 +88,13 @@ impl ThemePickerModal {
         }
     }
 
+    /// Returns the target dialog dimensions for this modal.
+    pub fn dialog_dimensions(&self, area: Rect) -> (u16, u16) {
+        let dialog_w = 46.min(area.width.saturating_sub(4));
+        let dialog_h = 16.min(area.height.saturating_sub(4)).max(8);
+        (dialog_w, dialog_h)
+    }
+
     /// Handles mouse event
     pub fn handle_mouse(&mut self, mouse: MouseEvent, area: Rect) -> Option<Option<String>> {
         let dialog_w = 46.min(area.width.saturating_sub(4));

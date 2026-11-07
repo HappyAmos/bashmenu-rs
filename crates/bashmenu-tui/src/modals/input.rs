@@ -324,6 +324,12 @@ impl InputModal {
         (dialog_w, dialog_h, prompt_lines)
     }
 
+    /// Returns the target dialog dimensions for this modal.
+    pub fn dialog_dimensions(&self, area: Rect) -> (u16, u16) {
+        let (w, h, _) = self.compute_layout(area);
+        (w, h)
+    }
+
     /// Handles mouse clicks on OK or Cancel buttons, or clicking into the input field
     pub fn handle_mouse(&mut self, mouse: MouseEvent, area: Rect) -> Option<Option<String>> {
         if mouse.kind == MouseEventKind::Down(MouseButton::Left) {

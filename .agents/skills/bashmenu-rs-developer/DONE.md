@@ -539,6 +539,19 @@
   - Rebuilt and reinstalled release binaries via `cargo build --release --workspace && ./install.sh`.
   - Pushed commit `74c4f62` and verified GitHub Actions CI run `42381487336` passed with `'success'`.
 
+- **Eliminate Full Screen Transitions for Modals & Implement Modal Zoom Animations (Item #3)**:
+  - Decoupled full screen transitions (`settings.transition`) from modal popups in `crates/bashmenu-cli/src/main.rs`: removed `modal_changed` from triggering `pending_transition`, and removed `draw_with_transition_out` from `MenuAction::ThemeSelector`. Full-screen transitions now apply strictly to screen navigation, submenu changes, paging, and external application launches/returns.
+  - Implemented dedicated modal zoom animations in `crates/bashmenu-tui/src/terminal.rs`:
+    - `animate_modal_grow`: interpolates expanding dialog frames outward from the initiating launch point (`(anchor_x, anchor_y)`) to the full modal rectangle over synchronized DEC Mode 2026 frames.
+    - `animate_modal_shrink`: interpolates contracting dialog frames in reverse from the modal rectangle down to the launch anchor.
+    - Anchor resolution: menu-activated modals anchor to the initiating menu item's row screen coordinates via `menu_view.selected_item_anchor(area)`; function key and leader shortcuts anchor symmetrically to the screen center.
+  - Added `settings.modal_animation` (`zoom` [default], `none`) and `settings.modal_animation_speed` (`fast` [default], `normal`, `slow`, or ms) to `BashMenuConfig` schema in `crates/bashmenu-core/src/config.rs`, with seamless fallback to `transition_speed`.
+  - Added interactive radio configuration options for modal animation effect and speed under "Transitions & Effects" in `bashmenu.mnu` and `tests/fixtures/bashmenu.mnu`.
+  - Standardized `dialog_dimensions` across all modal types in `crates/bashmenu-tui/src/modals/`.
+  - Added unit and integration tests in `crates/bashmenu-tui/tests/transition_test.rs` and `crates/bashmenu-cli/tests/audit_items_test.rs`.
+  - Updated documentation in `bashmenu.md`, `bashmenu.1`, and `.agents/rules/invariants.md`.
+  - Rebuilt release binaries and installed via `cargo build --release --workspace && ./install.sh`.
+
 
 
 

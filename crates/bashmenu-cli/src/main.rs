@@ -30,7 +30,7 @@ use bashmenu_core::{
 };
 use bashmenu_tui::{
     install_panic_hook, is_framebuffer_available, ConfirmChoice, ConfirmModal, FilePickerModal,
-    FramebufferDevice, HelpModal, InputModal, MenuAction, MenuView, MessageModal,
+    FramebufferDevice, HelpModal, InputModal, MenuAction, MenuView, MessageModal, ModalAnimation,
     NoteConflictChoice, NoteConflictModal, NoteEditorAction, NoteEditorModal, NoteViewerAction,
     NoteViewerModal, RadioModal, ResolvedThemeStyles, ShortcutDispatchResult, ShortcutDispatcher,
     StreamOutputAction, StreamOutputModal, TerminalGuard, ThemePickerModal, ToastRack,
@@ -130,6 +130,34 @@ enum ActiveModal {
     StreamOutput(StreamOutputModal),
     /// Concurrent editing conflict resolution modal.
     NoteConflict(NoteConflictModal),
+}
+
+impl ActiveModal {
+    /// Calculates the outer frame rectangle for this modal if one is active.
+    fn dialog_rect(&self, area: ratatui::layout::Rect) -> Option<ratatui::layout::Rect> {
+        let (w, h) = match self {
+            ActiveModal::None => return None,
+            ActiveModal::Help(m) => m.dialog_dimensions(area),
+            ActiveModal::ThemePicker(m) => m.dialog_dimensions(area),
+            ActiveModal::Input(m)
+            | ActiveModal::NewNoteTitle(_, m)
+            | ActiveModal::RenameNoteTitle(_, _, m)
+            | ActiveModal::ConfigInput(_, m)
+            | ActiveModal::ParamInput(_, m) => m.dialog_dimensions(area),
+            ActiveModal::NoteViewer(m) => m.dialog_dimensions(area),
+            ActiveModal::NoteEditor(m) => m.dialog_dimensions(area),
+            ActiveModal::ConfirmDeleteNote(_, _, m)
+            | ActiveModal::ConfirmItem(_, m)
+            | ActiveModal::ConfirmInjectBlock { modal: m, .. } => m.dialog_dimensions(area),
+            ActiveModal::Message(m) => m.dialog_dimensions(area),
+            ActiveModal::Toggle(_, m) => m.dialog_dimensions(area),
+            ActiveModal::Radio(_, m) => m.dialog_dimensions(area),
+            ActiveModal::ItemFilePicker(_, _, m) => m.dialog_dimensions(area),
+            ActiveModal::StreamOutput(m) => m.dialog_dimensions(area),
+            ActiveModal::NoteConflict(m) => m.dialog_dimensions(area),
+        };
+        Some(bashmenu_tui::compute_modal_rect(area, w, h))
+    }
 }
 
 /// Resolves a configuration or asset file path, choosing between local
@@ -291,10 +319,22 @@ fn main() -> Result<()> {
     // 7. Interactive Event Loop
     let mut need_redraw = true;
     let mut pending_transition = true;
+    let mut modal_anchor: (u16, u16) = (0, 0);
+    let mut pending_modal_grow = false;
     loop {
         let size = guard.terminal_mut().size()?;
         let area = ratatui::layout::Rect::new(0, 0, size.width, size.height);
         let trans_speed = TransitionSpeed::parse(config.settings.transition_speed.as_deref());
+        let modal_speed_str = config
+            .settings
+            .modal_animation_speed
+            .as_deref()
+            .or(config.settings.transition_speed.as_deref())
+            .unwrap_or("fast");
+        let modal_speed = TransitionSpeed::parse(Some(modal_speed_str));
+        let modal_anim = ModalAnimation::parse(config.settings.modal_animation.as_deref());
+        let modal_anim_enabled =
+            modal_anim == ModalAnimation::Zoom && modal_speed != TransitionSpeed::Custom(0);
 
         // Drain plugin background updates
         let mut plugins_updated = false;
@@ -381,6 +421,23 @@ fn main() -> Result<()> {
             } else {
                 TransitionEffect::None
             };
+
+            let modal_grow_rect = if pending_modal_grow && modal_anim_enabled {
+                active_modal.dialog_rect(area)
+            } else {
+                None
+            };
+
+            if let Some(target_rect) = modal_grow_rect {
+                pending_modal_grow = false;
+                let _ = guard.animate_modal_grow(
+                    modal_anchor,
+                    target_rect,
+                    &styles,
+                    modal_speed,
+                    |f| menu_view.render(f.area(), f.buffer_mut()),
+                );
+            }
 
             let render_fn = |f: &mut ratatui::Frame<'_>| {
                 menu_view.render(f.area(), f.buffer_mut());
@@ -512,6 +569,28 @@ fn main() -> Result<()> {
             let prev_levels = menu_view.menu_level_titles();
             let prev_scroll = menu_view.current_scroll_offset();
             let prev_in_modal = !matches!(active_modal, ActiveModal::None);
+            let prev_modal_rect = active_modal.dialog_rect(area);
+
+            if !prev_in_modal {
+                match ev {
+                    Event::Key(key) => {
+                        if key.code == KeyCode::F(1) || key.code == KeyCode::F(2) {
+                            modal_anchor = (area.x + area.width / 2, area.y + area.height / 2);
+                        } else {
+                            modal_anchor = menu_view.selected_item_anchor(area);
+                        }
+                    }
+                    Event::Mouse(mouse) => {
+                        let gutter_border_y = area.y + area.height.saturating_sub(4);
+                        if mouse.row >= gutter_border_y {
+                            modal_anchor = (area.x + area.width / 2, area.y + area.height / 2);
+                        } else {
+                            modal_anchor = menu_view.selected_item_anchor(area);
+                        }
+                    }
+                    _ => {}
+                }
+            }
 
             match &mut active_modal {
                 ActiveModal::Help(modal) => {
@@ -1520,13 +1599,6 @@ fn main() -> Result<()> {
                             }
                         }
                         MenuAction::ThemeSelector => {
-                            let eff =
-                                TransitionEffect::parse(config.settings.transition.as_deref());
-                            if eff != TransitionEffect::None && eff != TransitionEffect::Instant {
-                                let _ = guard.draw_with_transition_out(eff, trans_speed, |f| {
-                                    menu_view.render(f.area(), f.buffer_mut());
-                                });
-                            }
                             let theme_names: Vec<String> = themes.keys().cloned().collect();
                             active_modal = ActiveModal::ThemePicker(ThemePickerModal::new(
                                 theme_names,
@@ -2372,10 +2444,29 @@ fn main() -> Result<()> {
 
             let page_changed = prev_levels != curr_levels
                 || (curr_scroll as isize - prev_scroll as isize).abs() > 1;
-            let modal_changed = prev_in_modal != curr_in_modal;
 
-            if page_changed || modal_changed {
+            if page_changed {
                 pending_transition = true;
+                need_redraw = true;
+            }
+
+            if prev_in_modal && !curr_in_modal {
+                if let Some(source_rect) = prev_modal_rect {
+                    if modal_anim_enabled {
+                        let _ = guard.animate_modal_shrink(
+                            modal_anchor,
+                            source_rect,
+                            &styles,
+                            modal_speed,
+                            |f| menu_view.render(f.area(), f.buffer_mut()),
+                        );
+                    }
+                }
+                need_redraw = true;
+            }
+
+            if !prev_in_modal && curr_in_modal {
+                pending_modal_grow = true;
                 need_redraw = true;
             }
         }

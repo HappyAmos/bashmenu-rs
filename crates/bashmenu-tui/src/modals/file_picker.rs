@@ -268,6 +268,13 @@ impl FilePickerModal {
         self.handle_key_with_modifiers(code, crossterm::event::KeyModifiers::NONE)
     }
 
+    /// Returns the target dialog dimensions for this modal.
+    pub fn dialog_dimensions(&self, area: Rect) -> (u16, u16) {
+        let dialog_w = 70.min(area.width.saturating_sub(4));
+        let dialog_h = 22.min(area.height.saturating_sub(2));
+        (dialog_w, dialog_h)
+    }
+
     /// Handles immediate mouse interaction
     pub fn handle_mouse(&mut self, mouse: MouseEvent, area: Rect) -> Option<Option<PathBuf>> {
         let dialog_w = 70.min(area.width.saturating_sub(4));

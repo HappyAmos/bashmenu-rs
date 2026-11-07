@@ -58,4 +58,6 @@ settings:
   pager_editor: vim
   transition: fade
   transition_speed: normal
+  modal_animation: zoom
+  modal_animation_speed: fast
   framebuffer: auto

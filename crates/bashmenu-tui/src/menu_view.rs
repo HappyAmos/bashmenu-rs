@@ -337,6 +337,48 @@ impl MenuView {
         self.current_level().selected_idx
     }
 
+    /// Returns the screen center coordinate of the currently selected menu item
+    /// row, or viewport center if no items exist or area is invalid.
+    pub fn selected_item_anchor(&self, area: Rect) -> (u16, u16) {
+        if area.width < 10 || area.height < 5 {
+            return (area.x + area.width / 2, area.y + area.height / 2);
+        }
+        let level = self.current_level();
+        let selected = level.selected_idx;
+        let offset = level.scroll_offset;
+
+        let content_start_y = area.y + 2;
+        let status_tokens: Vec<&str> = if self.status_gutter.is_empty() {
+            Vec::new()
+        } else {
+            self.status_gutter
+                .split('|')
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .collect()
+        };
+        let (left_gutter_w, right_gutter_w, _) =
+            calculate_gutter_dimensions(area.width as usize, &status_tokens);
+        let help_raw = self.get_help_raw();
+        let help_tokens: Vec<&str> = help_raw
+            .split('|')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .collect();
+        let help_lines = wrap_spread_help_gutter(&help_tokens, left_gutter_w, 2);
+        let status_lines = wrap_gutter_tokens(&status_tokens, right_gutter_w, 2);
+        let gutter_rows = (help_lines.len().max(status_lines.len())).clamp(1, 2);
+        let gutter_border_y = area.y + area.height.saturating_sub(2 + gutter_rows as u16);
+
+        let row_y = content_start_y + (selected.saturating_sub(offset)) as u16;
+        let anchor_y = row_y
+            .min(gutter_border_y.saturating_sub(1))
+            .max(content_start_y);
+        let anchor_x = area.x + area.width / 2;
+
+        (anchor_x, anchor_y)
+    }
+
     /// Returns the currently selected MenuItem in the active level
     pub fn selected_item(&self) -> Option<&MenuItem> {
         let level = self.current_level();

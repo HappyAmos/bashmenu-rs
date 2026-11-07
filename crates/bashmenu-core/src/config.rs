@@ -106,6 +106,14 @@ pub struct Settings {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transition_speed: Option<String>,
 
+    /// Modal popup animation effect ("zoom", "none")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub modal_animation: Option<String>,
+
+    /// Modal popup animation speed ("fast", "normal", "slow", or milliseconds)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub modal_animation_speed: Option<String>,
+
     /// Direct Linux framebuffer (/dev/fb0) rendering ("auto", "true", "false")
     #[serde(skip_serializing_if = "Option::is_none")]
     pub framebuffer: Option<String>,
@@ -311,6 +319,20 @@ impl BashMenuConfig {
             }
             "settings.transition_speed" => {
                 self.settings.transition_speed = match &value {
+                    serde_yml::Value::String(s) => Some(s.clone()),
+                    serde_yml::Value::Number(n) => Some(n.to_string()),
+                    _ => None,
+                };
+            }
+            "settings.modal_animation" => {
+                self.settings.modal_animation = match &value {
+                    serde_yml::Value::String(s) => Some(s.clone()),
+                    serde_yml::Value::Bool(b) => Some(if *b { "zoom" } else { "none" }.to_string()),
+                    _ => None,
+                };
+            }
+            "settings.modal_animation_speed" => {
+                self.settings.modal_animation_speed = match &value {
                     serde_yml::Value::String(s) => Some(s.clone()),
                     serde_yml::Value::Number(n) => Some(n.to_string()),
                     _ => None,

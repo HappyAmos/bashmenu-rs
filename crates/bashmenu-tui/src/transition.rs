@@ -68,6 +68,59 @@ pub enum TransitionSpeed {
     Custom(u64),
 }
 
+/// Modal popup animation effect styles.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ModalAnimation {
+    /// Fast zoom grow on open, and shrink back to launch point on dismiss.
+    #[default]
+    Zoom,
+    /// Standard immediate popup without animation.
+    None,
+}
+
+impl ModalAnimation {
+    /// Parses modal animation effect from configuration string.
+    pub fn parse(s: Option<&str>) -> Self {
+        match s.map(|v| v.trim().to_ascii_lowercase()).as_deref() {
+            Some("none") | Some("disabled") | Some("off") | Some("false") | Some("0")
+            | Some("instant") => Self::None,
+            Some("zoom") | Some("shrink") | Some("grow") | Some("scale") => Self::Zoom,
+            _ => Self::Zoom,
+        }
+    }
+}
+
+/// Interpolates an intermediate rectangle between an anchor and target.
+pub fn interpolate_zoom_rect(
+    anchor: (u16, u16),
+    target: ratatui::layout::Rect,
+    factor: f32,
+    viewport: ratatui::layout::Rect,
+) -> ratatui::layout::Rect {
+    let f = factor.clamp(0.0, 1.0);
+    let ax = anchor.0 as f32;
+    let ay = anchor.1 as f32;
+    let tx = target.x as f32 + target.width as f32 / 2.0;
+    let ty = target.y as f32 + target.height as f32 / 2.0;
+
+    let cx = ax + (tx - ax) * f;
+    let cy = ay + (ty - ay) * f;
+
+    let min_w = 6.0_f32.min(target.width as f32);
+    let min_h = 3.0_f32.min(target.height as f32);
+
+    let w = (min_w + (target.width as f32 - min_w) * f).round() as u16;
+    let h = (min_h + (target.height as f32 - min_h) * f).round() as u16;
+
+    let x = (cx - (w as f32) / 2.0).round().max(viewport.x as f32) as u16;
+    let y = (cy - (h as f32) / 2.0).round().max(viewport.y as f32) as u16;
+
+    let max_w = viewport.width.saturating_sub(x.saturating_sub(viewport.x));
+    let max_h = viewport.height.saturating_sub(y.saturating_sub(viewport.y));
+
+    ratatui::layout::Rect::new(x, y, w.min(max_w), h.min(max_h))
+}
+
 impl TransitionSpeed {
     /// Parses transition speed ("fast", "normal", "slow", or milliseconds).
     pub fn parse(s: Option<&str>) -> Self {

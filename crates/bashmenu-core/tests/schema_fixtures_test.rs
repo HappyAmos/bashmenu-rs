@@ -38,6 +38,13 @@ fn test_parse_production_bashmenu_yml() {
         config.settings.scripts_dir,
         Some("{bashmenu_dir}/scripts".to_string())
     );
+    assert_eq!(config.settings.transition, Some("fade".to_string()));
+    assert_eq!(config.settings.transition_speed, Some("normal".to_string()));
+    assert_eq!(config.settings.modal_animation, Some("zoom".to_string()));
+    assert_eq!(
+        config.settings.modal_animation_speed,
+        Some("fast".to_string())
+    );
 
     // Verify roundtrip save preserves the header
     let tmp = std::env::temp_dir().join("test_bashmenu_roundtrip.yml");

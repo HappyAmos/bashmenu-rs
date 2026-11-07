@@ -34,13 +34,13 @@ pub use gutter::{
 pub use marquee::{format_marquee_spacer, get_marquee_slice, MarqueeTracker};
 pub use menu_view::{MenuAction, MenuView};
 pub use modals::{
-    compute_modal_inner, is_close_button_clicked, render_modal_frame, wrap_prompt_text,
-    AsciiGridModal, BackgroundConfigAction, BackgroundConfigModal, BackgroundFocus, ColorGridModal,
-    ColorPickerModal, ColorPickerTab, ConfirmChoice, ConfirmModal, FilePickerModal, HelpModal,
-    InputModal, MessageModal, NoteConflictChoice, NoteConflictModal, NoteEditorAction,
-    NoteEditorModal, NoteViewerAction, NoteViewerModal, RadioModal, StreamOutputAction,
-    StreamOutputModal, StreamOutputMsg, ThemePickerModal, ToggleChoice, ToggleModal, MODE_OPTIONS,
-    SCALING_OPTIONS,
+    compute_modal_inner, compute_modal_rect, is_close_button_clicked, render_animated_modal_frame,
+    render_modal_frame, wrap_prompt_text, AsciiGridModal, BackgroundConfigAction,
+    BackgroundConfigModal, BackgroundFocus, ColorGridModal, ColorPickerModal, ColorPickerTab,
+    ConfirmChoice, ConfirmModal, FilePickerModal, HelpModal, InputModal, MessageModal,
+    NoteConflictChoice, NoteConflictModal, NoteEditorAction, NoteEditorModal, NoteViewerAction,
+    NoteViewerModal, RadioModal, StreamOutputAction, StreamOutputModal, StreamOutputMsg,
+    ThemePickerModal, ToggleChoice, ToggleModal, MODE_OPTIONS, SCALING_OPTIONS,
 };
 pub use shortcuts_overlay::{key_event_to_token, ShortcutDispatchResult, ShortcutDispatcher};
 pub use style::{
@@ -51,7 +51,9 @@ pub use style::{
 pub use terminal::TerminalGuard;
 pub use text_input::TextInput;
 pub use toast::{ActiveToast, ToastRack};
-pub use transition::{dim_color, TransitionEffect, TransitionSpeed};
+pub use transition::{
+    dim_color, interpolate_zoom_rect, ModalAnimation, TransitionEffect, TransitionSpeed,
+};
 pub use wallpaper::{
     color_to_rgb, composite_buffer, derive_palette_from_image, downsample_color_value_to_16,
     downsample_color_value_to_8, downsample_palette_to_16, downsample_palette_to_8,

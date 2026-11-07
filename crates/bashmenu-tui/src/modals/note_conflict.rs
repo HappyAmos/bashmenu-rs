@@ -127,6 +127,13 @@ editing it.\nChoose how to resolve this concurrent change:"
 
     /// Computes inner bounds and layout for modal frame and button hits.
     fn compute_layout(&self, area: Rect) -> (Rect, u16, u16) {
+        let (dialog_w, dialog_h) = self.dialog_dimensions(area);
+        let inner = super::frame::compute_modal_inner(area, dialog_w, dialog_h);
+        (inner, dialog_w, dialog_h)
+    }
+
+    /// Returns the target dialog dimensions for this modal.
+    pub fn dialog_dimensions(&self, area: Rect) -> (u16, u16) {
         let max_w = area.width.saturating_sub(4);
         let dialog_w = 74.min(max_w).max(20.min(max_w));
         let avail_w = dialog_w.saturating_sub(6) as usize;
@@ -138,8 +145,7 @@ editing it.\nChoose how to resolve this concurrent change:"
         let msg_lines = wrapped.len().max(1);
         let max_h = area.height.saturating_sub(2);
         let dialog_h = ((msg_lines + 5) as u16).min(max_h).max(8.min(max_h));
-        let inner = super::frame::compute_modal_inner(area, dialog_w, dialog_h);
-        (inner, dialog_w, dialog_h)
+        (dialog_w, dialog_h)
     }
 
     /// Handles mouse interaction.

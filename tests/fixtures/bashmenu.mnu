@@ -678,6 +678,38 @@ items:
                       interactive: true
                       quiet: false
                       alt_buffer: true
+                  - Modal Animation Effect [{settings.modal_animation}]:
+                      type: radio
+                      key: settings.modal_animation
+                      title: Modal Animation Effect [{settings.modal_animation}]
+                      prompt: 'Select animation style for popup modal dialogs:'
+                      options:
+                        - label: Zoom (Animated grow from launch point and shrink on close)
+                          value: zoom
+                        - label: None (Instant popup open and close)
+                          value: none
+                      icon: '{nf::#f065}'
+                      action: settings.modal_animation
+                      interactive: true
+                      quiet: false
+                      alt_buffer: true
+                  - Modal Animation Speed [{settings.modal_animation_speed}]:
+                      type: radio
+                      key: settings.modal_animation_speed
+                      title: Modal Animation Speed [{settings.modal_animation_speed}]
+                      prompt: 'Select animation speed for popup modal dialogs:'
+                      options:
+                        - label: Fast (~36ms, snappy 12ms/step)
+                          value: fast
+                        - label: Normal (~60ms, smooth 20ms/step)
+                          value: normal
+                        - label: Slow (~120ms, deliberate 40ms/step)
+                          value: slow
+                      icon: '{nf::#f0e7}'
+                      action: settings.modal_animation_speed
+                      interactive: true
+                      quiet: false
+                      alt_buffer: true
                   - Linux Framebuffer Support [{settings.framebuffer}]:
                       type: radio
                       key: settings.framebuffer

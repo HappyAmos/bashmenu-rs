@@ -262,7 +262,7 @@ impl StreamOutputModal {
     }
 
     /// Calculates dialog dimensions based on screen area and configured window percentage
-    fn calculate_dialog_dimensions(&self, area: Rect) -> (u16, u16) {
+    pub fn calculate_dialog_dimensions(&self, area: Rect) -> (u16, u16) {
         let pct = self.window_percent as u32;
         let w = ((area.width as u32 * pct) / 100)
             .max(30)
@@ -271,6 +271,11 @@ impl StreamOutputModal {
             .max(10)
             .min(area.height.saturating_sub(2) as u32) as u16;
         (w, h)
+    }
+
+    /// Returns the target dialog dimensions for this modal.
+    pub fn dialog_dimensions(&self, area: Rect) -> (u16, u16) {
+        self.calculate_dialog_dimensions(area)
     }
 
     /// Renders the streaming modal output dialog into `buf`

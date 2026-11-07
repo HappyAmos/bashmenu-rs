@@ -191,6 +191,13 @@ impl NoteViewerModal {
         }
     }
 
+    /// Returns the target dialog dimensions for this modal.
+    pub fn dialog_dimensions(&self, area: Rect) -> (u16, u16) {
+        let dialog_w = (area.width.saturating_sub(4)).min(78);
+        let dialog_h = (area.height.saturating_sub(4)).clamp(14, 28);
+        (dialog_w, dialog_h)
+    }
+
     /// Handles mouse events
     pub fn handle_mouse(&mut self, mouse: MouseEvent, area: Rect) -> NoteViewerAction {
         match mouse.kind {
