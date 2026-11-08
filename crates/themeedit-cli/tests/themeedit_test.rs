@@ -932,9 +932,9 @@ fn test_create_theme_with_base_monochrome() {
     assert!(state.is_modified);
     assert!(state.themes.contains_key("mono_theme"));
 
-    // Verify monochrome palette defaults: text=255, highlight=0 on 255
+    // Verify monochrome palette defaults: text=255, highlight=0 on 255 (background bar=255)
     assert_eq!(state.get_color_token_u8("text"), 255);
-    assert_eq!(state.get_color_token_u8("highlight"), 0);
+    assert_eq!(state.get_color_token_u8("highlight"), 255);
     assert_eq!(state.get_color_token_u8("border"), 250);
 
     let _ = fs::remove_dir_all(&tmp_dir);
@@ -1561,6 +1561,59 @@ fn test_preview_menu_items_uniform_text_color() {
             styles.text.fg.unwrap(),
             "Character at offset {} must have uniform text color",
             offset
+        );
+    }
+}
+
+#[test]
+fn test_themeedit_highlighter_sets_margin_to_margin_background_bar() {
+    use bashmenu_tui::ResolvedThemeStyles;
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::style::Color;
+    use themeedit_cli::{render_preview_pane, PreviewMode};
+
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(fixture_path, Some("dracula".to_string()));
+
+    // 1. Initial highlight color represents the background bar, not the text foreground
+    let init_hl = state.get_color_token_color("highlight");
+    let init_styles = ResolvedThemeStyles::from_theme(&state.current_theme, true);
+    assert_eq!(Some(init_hl), init_styles.highlight.bg);
+
+    // 2. Set highlight to color 201 (bright pink/magenta bar)
+    state.set_color_token_value("highlight", Color::Indexed(201));
+    assert_eq!(state.get_color_token_u8("highlight"), 201);
+
+    // 3. Resolved style must have background bar = 201 and contrasting foreground != 201
+    let updated_styles = ResolvedThemeStyles::from_theme(&state.current_theme, true);
+    assert_eq!(updated_styles.highlight.bg, Some(Color::Indexed(201)));
+    assert_ne!(updated_styles.highlight.fg, Some(Color::Indexed(201)));
+
+    // 4. In preview pane, the highlight bar must span margin-to-margin across the entire width
+    let area = Rect::new(0, 0, 60, 20);
+    let mut buf = Buffer::empty(area);
+    let mut compositor = None;
+
+    render_preview_pane(
+        area,
+        &mut buf,
+        PreviewMode::Menu,
+        &updated_styles,
+        &mut compositor,
+    );
+
+    let p_inner_x = area.x + 2;
+    let p_avail_w = area.width.saturating_sub(4);
+    let content_start_y = area.y + 2;
+
+    for x in p_inner_x..(p_inner_x + p_avail_w) {
+        let cell = &buf[(x, content_start_y)];
+        assert_eq!(
+            cell.bg,
+            Color::Indexed(201),
+            "Cell at col {} on active menu item row must have highlight bar background color",
+            x
         );
     }
 }

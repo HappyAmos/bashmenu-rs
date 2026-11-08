@@ -180,6 +180,13 @@ pub fn render_preview_pane(
                 p_avail_w,
             );
 
+            // Ensure unbroken margin-to-margin highlight bar across all cells
+            if let Some(bg) = preview_styles.highlight.bg {
+                for x in p_inner_x..(p_inner_x + p_avail_w) {
+                    buf[(x, content_start_y)].bg = bg;
+                }
+            }
+
             // Inactive item 2
             let normal_line = Line::from(vec![
                 Span::raw("  "),
@@ -557,7 +564,15 @@ pub fn render_preview_pane(
                     t_y += 1;
                 }
                 if t_y < max_y {
-                    buf.set_string(t_x, t_y, "  │ └─• [CMD] Terminal", preview_styles.highlight);
+                    let tree_text = "  │ └─• [CMD] Terminal";
+                    let w = (tree_rect.width.saturating_sub(2)) as usize;
+                    let padded = format!("{:<width$}", tree_text, width = w);
+                    buf.set_string(t_x, t_y, &padded, preview_styles.highlight);
+                    if let Some(bg) = preview_styles.highlight.bg {
+                        for x in t_x..(t_x + w as u16) {
+                            buf[(x, t_y)].bg = bg;
+                        }
+                    }
                     t_y += 1;
                 }
                 if t_y < max_y {

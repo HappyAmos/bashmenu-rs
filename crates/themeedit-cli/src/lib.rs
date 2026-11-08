@@ -560,6 +560,19 @@ impl ThemeEditorState {
                 if let Some(c_map) = &self.current_theme.colors_256 {
                     if let Some(val) = c_map.get(key) {
                         if let Some(seq) = val.as_sequence() {
+                            if key == "highlight" {
+                                if let Some(bg_val) = seq.get(1) {
+                                    if let Some(bg) = bg_val.as_i64() {
+                                        if bg >= 0 {
+                                            return format!("Color {}", bg);
+                                        }
+                                    } else if let Some(s) = bg_val.as_str() {
+                                        if s != "-1" {
+                                            return s.to_string();
+                                        }
+                                    }
+                                }
+                            }
                             if let Some(fg) = seq.first().and_then(|v| v.as_i64()) {
                                 return format!("Color {}", fg);
                             } else if let Some(s) = seq.first().and_then(|v| v.as_str()) {
@@ -730,6 +743,48 @@ impl ThemeEditorState {
             };
             if key == "background" {
                 c_map.insert(key.to_string(), val.clone());
+            } else if key == "highlight" {
+                let (r, g, b) = bashmenu_tui::color_to_rgb(color);
+                let lum = (r as u32 * 299 + g as u32 * 587 + b as u32 * 114) / 1000;
+                let existing_fg = c_map
+                    .get("highlight")
+                    .and_then(|v| v.as_sequence())
+                    .and_then(|seq| seq.first())
+                    .cloned();
+                let fg_val = if let Some(efg) = existing_fg {
+                    if let Some(efg_color) = bashmenu_tui::parse_color_value(&efg) {
+                        if efg_color != Color::Reset {
+                            let (fr, fg_g, fb) = bashmenu_tui::color_to_rgb(efg_color);
+                            let f_lum =
+                                (fr as u32 * 299 + fg_g as u32 * 587 + fb as u32 * 114) / 1000;
+                            if (f_lum as i32 - lum as i32).abs() >= 60 {
+                                efg
+                            } else if lum > 128 {
+                                serde_yml::Value::Number(16.into())
+                            } else {
+                                serde_yml::Value::Number(255.into())
+                            }
+                        } else if lum > 128 {
+                            serde_yml::Value::Number(16.into())
+                        } else {
+                            serde_yml::Value::Number(255.into())
+                        }
+                    } else if lum > 128 {
+                        serde_yml::Value::Number(16.into())
+                    } else {
+                        serde_yml::Value::Number(255.into())
+                    }
+                } else if lum > 128 {
+                    serde_yml::Value::Number(16.into())
+                } else {
+                    serde_yml::Value::Number(255.into())
+                };
+
+                let pair = serde_yml::Value::Sequence(vec![fg_val, val.clone()]);
+                c_map.insert(key.to_string(), pair.clone());
+                if c_map.contains_key("selection") {
+                    c_map.insert("selection".to_string(), pair);
+                }
             } else {
                 c_map.insert(
                     key.to_string(),
@@ -745,6 +800,19 @@ impl ThemeEditorState {
                 let val_16 = bashmenu_tui::downsample_color_value_to_16(&val);
                 if key == "background" {
                     c16.insert(key.to_string(), val_16);
+                } else if key == "highlight" {
+                    let (r, g, b) = bashmenu_tui::color_to_rgb(color);
+                    let lum = (r as u32 * 299 + g as u32 * 587 + b as u32 * 114) / 1000;
+                    let fg_16 = if lum > 128 {
+                        serde_yml::Value::String("COLOR_BLACK".to_string())
+                    } else {
+                        serde_yml::Value::String("COLOR_WHITE".to_string())
+                    };
+                    let pair_16 = serde_yml::Value::Sequence(vec![fg_16, val_16]);
+                    c16.insert(key.to_string(), pair_16.clone());
+                    if c16.contains_key("selection") {
+                        c16.insert("selection".to_string(), pair_16);
+                    }
                 } else {
                     c16.insert(
                         key.to_string(),
@@ -761,6 +829,19 @@ impl ThemeEditorState {
                 let val_8 = bashmenu_tui::downsample_color_value_to_8(&val);
                 if key == "background" {
                     c8.insert(key.to_string(), val_8);
+                } else if key == "highlight" {
+                    let (r, g, b) = bashmenu_tui::color_to_rgb(color);
+                    let lum = (r as u32 * 299 + g as u32 * 587 + b as u32 * 114) / 1000;
+                    let fg_8 = if lum > 128 {
+                        serde_yml::Value::String("COLOR_BLACK".to_string())
+                    } else {
+                        serde_yml::Value::String("COLOR_WHITE".to_string())
+                    };
+                    let pair_8 = serde_yml::Value::Sequence(vec![fg_8, val_8]);
+                    c8.insert(key.to_string(), pair_8.clone());
+                    if c8.contains_key("selection") {
+                        c8.insert("selection".to_string(), pair_8);
+                    }
                 } else {
                     c8.insert(
                         key.to_string(),
@@ -783,6 +864,24 @@ impl ThemeEditorState {
 
     /// Retrieves the current Ratatui Color for a palette token key.
     pub fn get_color_token_color(&self, key: &str) -> Color {
+        if key == "highlight" {
+            if let Some(c_map) = &self.current_theme.colors_256 {
+                if let Some(val) = c_map.get(key) {
+                    if let Some(seq) = val.as_sequence() {
+                        if let Some(bg_val) = seq.get(1) {
+                            if let Some(c) = bashmenu_tui::parse_color_value(bg_val) {
+                                if c != Color::Reset {
+                                    return c;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            let styles = ResolvedThemeStyles::from_theme(&self.current_theme, true);
+            return styles.highlight.bg.unwrap_or(Color::Cyan);
+        }
+
         if let Some(c_map) = &self.current_theme.colors_256 {
             if let Some(val) = c_map.get(key) {
                 if let Some(c) = bashmenu_tui::parse_color_value(val) {
@@ -909,6 +1008,10 @@ impl ThemeEditorState {
 
     /// Retrieves the current 8-bit color index for a palette token key.
     pub fn get_color_token_u8(&self, key: &str) -> u8 {
+        if key == "highlight" {
+            let c = self.get_color_token_color(key);
+            return color_to_u8(c);
+        }
         if let Some(c_map) = &self.current_theme.colors_256 {
             if let Some(val) = c_map.get(key) {
                 if let Some(seq) = val.as_sequence() {
