@@ -1112,6 +1112,14 @@ impl ItemEditModal {
         }
     }
 
+    /// Sets focus to the specified control if present in the active controls list.
+    pub fn set_focus(&mut self, target: FocusControl) {
+        let list = self.focus_controls();
+        if let Some(pos) = list.iter().position(|c| *c == target) {
+            self.active_control_idx = pos;
+        }
+    }
+
     /// Mutates the active item schema type, re-initializing form inputs and valid controls.
     pub fn apply_type_change(&mut self, new_type: &str) {
         self.current_type = new_type.to_string();
@@ -1364,45 +1372,15 @@ impl ItemEditModal {
                 }
                 _ => {}
             },
-            FocusControl::AltBufferChk => {
+            FocusControl::AltBufferChk
+            | FocusControl::QuietChk
+            | FocusControl::NoFormattingChk
+            | FocusControl::MaskedChk
+            | FocusControl::RefreshChk
+            | FocusControl::ShowWhitespaceChk
+            | FocusControl::ExternalChk => {
                 if matches!(code, KeyCode::Char(' ') | KeyCode::Enter) {
-                    self.alt_buffer = !self.alt_buffer;
-                    return ItemEditResult::Continue;
-                }
-            }
-            FocusControl::QuietChk => {
-                if matches!(code, KeyCode::Char(' ') | KeyCode::Enter) {
-                    self.quiet = !self.quiet;
-                    return ItemEditResult::Continue;
-                }
-            }
-            FocusControl::NoFormattingChk => {
-                if matches!(code, KeyCode::Char(' ') | KeyCode::Enter) {
-                    self.no_formatting = !self.no_formatting;
-                    return ItemEditResult::Continue;
-                }
-            }
-            FocusControl::MaskedChk => {
-                if matches!(code, KeyCode::Char(' ') | KeyCode::Enter) {
-                    self.masked = !self.masked;
-                    return ItemEditResult::Continue;
-                }
-            }
-            FocusControl::RefreshChk => {
-                if matches!(code, KeyCode::Char(' ') | KeyCode::Enter) {
-                    self.refresh = !self.refresh;
-                    return ItemEditResult::Continue;
-                }
-            }
-            FocusControl::ShowWhitespaceChk => {
-                if matches!(code, KeyCode::Char(' ') | KeyCode::Enter) {
-                    self.show_whitespace = !self.show_whitespace;
-                    return ItemEditResult::Continue;
-                }
-            }
-            FocusControl::ExternalChk => {
-                if matches!(code, KeyCode::Char(' ') | KeyCode::Enter) {
-                    self.external = !self.external;
+                    self.toggle_checkbox(ctrl);
                     return ItemEditResult::Continue;
                 }
             }
@@ -1486,7 +1464,39 @@ impl ItemEditModal {
         }
 
         // Text input editing
-        let input_ref = match ctrl {
+        if let Some(inp) = self.get_text_input_mut(ctrl) {
+            if inp.handle_key_with_modifiers(code, modifiers) {
+                return ItemEditResult::Continue;
+            }
+        }
+
+        ItemEditResult::Continue
+    }
+
+    /// Returns an immutable reference to the text input associated with `ctrl`.
+    pub fn get_text_input(&self, ctrl: FocusControl) -> Option<&TextInput> {
+        match ctrl {
+            FocusControl::CharInput => Some(&self.char_input),
+            FocusControl::LengthInput => Some(&self.length_input),
+            FocusControl::TitleInput => Some(&self.title_input),
+            FocusControl::IconInput => Some(&self.icon_input),
+            FocusControl::ActionInput => Some(&self.action_input),
+            FocusControl::PromptInput => Some(&self.prompt_input),
+            FocusControl::OnYesInput => Some(&self.on_yes_input),
+            FocusControl::OnNoInput => Some(&self.on_no_input),
+            FocusControl::TemplateInput => Some(&self.template_input),
+            FocusControl::TargetInput => Some(&self.target_input),
+            FocusControl::BlockIdInput => Some(&self.block_id_input),
+            FocusControl::StartDirInput => Some(&self.start_dir_input),
+            FocusControl::TabstopInput => Some(&self.tabstop_input),
+            FocusControl::WindowPercentInput => Some(&self.window_percent_input),
+            _ => None,
+        }
+    }
+
+    /// Returns a mutable reference to the text input associated with `ctrl`.
+    pub fn get_text_input_mut(&mut self, ctrl: FocusControl) -> Option<&mut TextInput> {
+        match ctrl {
             FocusControl::CharInput => Some(&mut self.char_input),
             FocusControl::LengthInput => Some(&mut self.length_input),
             FocusControl::TitleInput => Some(&mut self.title_input),
@@ -1502,31 +1512,64 @@ impl ItemEditModal {
             FocusControl::TabstopInput => Some(&mut self.tabstop_input),
             FocusControl::WindowPercentInput => Some(&mut self.window_percent_input),
             _ => None,
-        };
-
-        if let Some(inp) = input_ref {
-            if inp.handle_key_with_modifiers(code, modifiers) {
-                return ItemEditResult::Continue;
-            }
         }
+    }
 
-        ItemEditResult::Continue
+    /// Toggles the boolean state of the checkbox control corresponding to `ctrl`.
+    pub fn toggle_checkbox(&mut self, ctrl: FocusControl) {
+        match ctrl {
+            FocusControl::AltBufferChk => self.alt_buffer = !self.alt_buffer,
+            FocusControl::QuietChk => self.quiet = !self.quiet,
+            FocusControl::NoFormattingChk => self.no_formatting = !self.no_formatting,
+            FocusControl::MaskedChk => self.masked = !self.masked,
+            FocusControl::RefreshChk => self.refresh = !self.refresh,
+            FocusControl::ShowWhitespaceChk => self.show_whitespace = !self.show_whitespace,
+            FocusControl::ExternalChk => self.external = !self.external,
+            _ => {}
+        }
+    }
+
+    /// Dispatches file browse action for browse button controls.
+    pub fn trigger_browse_for_btn(&self, btn_ctrl: FocusControl) -> ItemEditResult {
+        match btn_ctrl {
+            FocusControl::ActionBrowseBtn => ItemEditResult::Browse(BrowseTarget::Action),
+            FocusControl::OnYesBrowseBtn => ItemEditResult::Browse(BrowseTarget::OnYes),
+            FocusControl::OnNoBrowseBtn => ItemEditResult::Browse(BrowseTarget::OnNo),
+            FocusControl::TemplateBrowseBtn => ItemEditResult::Browse(BrowseTarget::Template),
+            FocusControl::TargetBrowseBtn => ItemEditResult::Browse(BrowseTarget::Target),
+            FocusControl::StartDirBrowseBtn => ItemEditResult::Browse(BrowseTarget::StartDir),
+            _ => ItemEditResult::Continue,
+        }
     }
 
     /// Handles mouse events
     pub fn handle_mouse(&mut self, mouse: MouseEvent, area: Rect) -> ItemEditResult {
-        if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
+        let is_left_down = mouse.kind == MouseEventKind::Down(MouseButton::Left);
+        let is_left_drag = matches!(mouse.kind, MouseEventKind::Drag(MouseButton::Left));
+
+        if is_left_down || is_left_drag {
             let dialog_w = 86.min(area.width.saturating_sub(4));
             let dialog_h = 32.min(area.height.saturating_sub(2));
             let inner = compute_modal_inner(area, dialog_w, dialog_h);
 
-            if is_close_button_clicked(inner, mouse.row, mouse.column) {
+            if is_left_down && is_close_button_clicked(inner, mouse.row, mouse.column) {
                 return ItemEditResult::Cancel;
             }
 
-            // Click inside buttons row (near bottom)
+            // Click [Change Type] button at top right
+            let type_btn_text = " [Change Type (CTRL+T)] ";
+            let type_btn_x = (inner.x + inner.width).saturating_sub(type_btn_text.len() as u16 + 2);
+            if is_left_down
+                && mouse.row == inner.y
+                && mouse.column >= type_btn_x
+                && mouse.column < type_btn_x + type_btn_text.len() as u16
+            {
+                return ItemEditResult::ChangeType;
+            }
+
+            // Click inside buttons row (Save / Cancel near bottom)
             let btn_y = inner.y + inner.height.saturating_sub(4);
-            if mouse.row == btn_y {
+            if is_left_down && mouse.row == btn_y {
                 let mid_x = inner.x + inner.width / 2;
                 if mouse.column >= inner.x + 4 && mouse.column < mid_x {
                     return ItemEditResult::Save(Box::new(self.build_updated_item()));
@@ -1538,7 +1581,7 @@ impl ItemEditModal {
             // Click footer shortcuts
             let footer_y1 = inner.y + inner.height.saturating_sub(2);
             let footer_y2 = inner.y + inner.height.saturating_sub(1);
-            if mouse.row == footer_y1 {
+            if is_left_down && mouse.row == footer_y1 {
                 let w = inner.width / 4;
                 if mouse.column < inner.x + w {
                     return ItemEditResult::ShowHelp;
@@ -1549,7 +1592,7 @@ impl ItemEditModal {
                 } else {
                     return ItemEditResult::ShowAscii;
                 }
-            } else if mouse.row == footer_y2 {
+            } else if is_left_down && mouse.row == footer_y2 {
                 let w = inner.width / 3;
                 if mouse.column < inner.x + w {
                     return ItemEditResult::ShowGlyphs;
@@ -1557,6 +1600,127 @@ impl ItemEditModal {
                     return ItemEditResult::ShowPlaceholders;
                 } else {
                     return ItemEditResult::Cancel;
+                }
+            }
+
+            // Click inside form rows viewport
+            let form_start_y = inner.y + 2;
+            let footer_rows = 4;
+            let form_h = inner.height.saturating_sub(footer_rows + 2) as usize;
+            if mouse.row >= form_start_y && mouse.row < form_start_y + form_h as u16 {
+                let clicked_row = (mouse.row - form_start_y) as usize;
+                let form_lines = self.build_form_lines(inner.width);
+                let line_idx = self.scroll_offset + clicked_row;
+                if line_idx < form_lines.len() {
+                    let avail_w = inner.width.saturating_sub(4) as usize;
+                    match &form_lines[line_idx] {
+                        FormRow::Input {
+                            ctrl,
+                            scroll_offset,
+                            ..
+                        } => {
+                            self.set_focus(*ctrl);
+                            let field_x = inner.x + 3;
+                            let field_w = avail_w.saturating_sub(4);
+                            if mouse.column >= field_x {
+                                let rel_col = (mouse.column - field_x) as usize;
+                                let clicked_char = *scroll_offset + rel_col.min(field_w);
+                                let is_shift = mouse
+                                    .modifiers
+                                    .contains(crossterm::event::KeyModifiers::SHIFT);
+                                if let Some(inp) = self.get_text_input_mut(*ctrl) {
+                                    if is_left_drag {
+                                        if inp.selection_anchor.is_none() {
+                                            inp.selection_anchor = Some(inp.cursor);
+                                        }
+                                        inp.cursor = clicked_char.min(inp.chars.len());
+                                    } else {
+                                        inp.handle_mouse_click(clicked_char, is_shift);
+                                    }
+                                    inp.ensure_cursor_visible(field_w);
+                                }
+                            }
+                        }
+                        FormRow::InputWithBrowse {
+                            input_ctrl,
+                            btn_ctrl,
+                            scroll_offset,
+                            ..
+                        } => {
+                            let browse_btn = " [Browse] ";
+                            let inp_w = avail_w.saturating_sub(browse_btn.len() + 4);
+                            let field_x = inner.x + 3;
+                            let btn_x = inner.x + 2 + inp_w as u16 + 2;
+                            if is_left_down
+                                && mouse.column >= btn_x
+                                && mouse.column < btn_x + browse_btn.len() as u16
+                            {
+                                self.set_focus(*btn_ctrl);
+                                return self.trigger_browse_for_btn(*btn_ctrl);
+                            } else if mouse.column >= field_x
+                                && mouse.column < field_x + inp_w as u16
+                            {
+                                self.set_focus(*input_ctrl);
+                                let rel_col = (mouse.column - field_x) as usize;
+                                let clicked_char = *scroll_offset + rel_col.min(inp_w);
+                                let is_shift = mouse
+                                    .modifiers
+                                    .contains(crossterm::event::KeyModifiers::SHIFT);
+                                if let Some(inp) = self.get_text_input_mut(*input_ctrl) {
+                                    if is_left_drag {
+                                        if inp.selection_anchor.is_none() {
+                                            inp.selection_anchor = Some(inp.cursor);
+                                        }
+                                        inp.cursor = clicked_char.min(inp.chars.len());
+                                    } else {
+                                        inp.handle_mouse_click(clicked_char, is_shift);
+                                    }
+                                    inp.ensure_cursor_visible(inp_w);
+                                }
+                            }
+                        }
+                        FormRow::Checkbox { ctrl, .. } => {
+                            if is_left_down {
+                                self.set_focus(*ctrl);
+                                self.toggle_checkbox(*ctrl);
+                            }
+                        }
+                        FormRow::ExecMode { mode, .. } => {
+                            if is_left_down {
+                                self.set_focus(FocusControl::ExecModeSelector);
+                                self.exec_mode = *mode;
+                            }
+                        }
+                        FormRow::MultiLineInputRow {
+                            ctrl, line_index, ..
+                        } => {
+                            self.set_focus(*ctrl);
+                            let field_x = inner.x + 3;
+                            let rel_col = mouse.column.saturating_sub(field_x) as usize;
+                            if *ctrl == FocusControl::RadioOptionsInput {
+                                let ml = &mut self.radio_options_input;
+                                if *line_index < ml.lines.len() {
+                                    ml.cursor_row = *line_index;
+                                    let line_len = ml.lines[*line_index].len();
+                                    let target_col = rel_col.min(line_len);
+                                    if mouse
+                                        .modifiers
+                                        .contains(crossterm::event::KeyModifiers::SHIFT)
+                                        || is_left_drag
+                                    {
+                                        if ml.selection_anchor.is_none() {
+                                            ml.selection_anchor =
+                                                Some((*line_index, ml.cursor_col));
+                                        }
+                                    } else {
+                                        ml.selection_anchor = None;
+                                    }
+                                    ml.cursor_col = target_col;
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
                 }
             }
         } else if mouse.kind == MouseEventKind::ScrollDown {
@@ -1871,56 +2035,10 @@ impl ItemEditModal {
         item
     }
 
-    /// Renders the property editor modal with live previews and scrollable form.
-    pub fn render(&self, area: Rect, styles: &ResolvedThemeStyles, buf: &mut Buffer) -> Rect {
-        let dialog_w = 86.min(area.width.saturating_sub(4));
-        let dialog_h = 32.min(area.height.saturating_sub(2));
-
-        let title_header = format!(" Edit Properties [{}] ", self.current_type.to_uppercase());
-        let inner = render_modal_frame(area, dialog_w, dialog_h, &title_header, styles, buf);
-
-        if inner.width < 30 || inner.height < 10 {
-            return inner;
-        }
-
-        let cur_ctrl = self.current_control();
-
-        // 1. Top Type Header Row
-        let type_row_y = inner.y;
-        let is_type_btn_active = cur_ctrl == FocusControl::ChangeTypeBtn;
-        let type_str = format!(" Item Type: {:<36}", self.get_type_display_str());
-        buf.set_string(
-            inner.x + 1,
-            type_row_y,
-            &type_str,
-            styles.text.add_modifier(Modifier::BOLD),
-        );
-
-        let type_btn_text = " [Change Type (CTRL+T)] ";
-        let type_btn_x = (inner.x + inner.width).saturating_sub(type_btn_text.len() as u16 + 2);
-        let type_btn_style = if is_type_btn_active {
-            styles.highlight.add_modifier(Modifier::BOLD)
-        } else {
-            styles.accent.add_modifier(Modifier::BOLD)
-        };
-        buf.set_string(type_btn_x, type_row_y, type_btn_text, type_btn_style);
-
-        // Divider under type header
-        let div_line = "─".repeat(inner.width.saturating_sub(2) as usize);
-        buf.set_string(
-            inner.x + 1,
-            inner.y + 1,
-            &div_line,
-            Style::default().fg(styles.border),
-        );
-
-        // 2. Scrollable Viewport bounds
-        let form_start_y = inner.y + 2;
-        let footer_rows = 4; // 1 buttons row + 1 blank + 2 footer lines
-        let form_h = inner.height.saturating_sub(footer_rows + 2) as usize;
-
-        // Build virtual form lines: (label, input_text_or_display, is_active, is_button, is_checkbox)
+    /// Builds virtual form rows for display and hit detection.
+    pub fn build_form_lines(&self, inner_width: u16) -> Vec<FormRow> {
         let mut form_lines: Vec<FormRow> = Vec::new();
+        let cur_ctrl = self.current_control();
 
         if self.is_divider() {
             form_lines.push(FormRow::Label("Repeating Character (char):"));
@@ -1929,6 +2047,7 @@ impl ItemEditModal {
                 text: self.char_input.as_string(),
                 cursor: self.char_input.cursor,
                 selection: self.char_input.selection_range(),
+                scroll_offset: self.char_input.scroll_offset,
             });
             form_lines.push(FormRow::Label("Length Directive (length):"));
             form_lines.push(FormRow::Input {
@@ -1936,10 +2055,11 @@ impl ItemEditModal {
                 text: self.length_input.as_string(),
                 cursor: self.length_input.cursor,
                 selection: self.length_input.selection_range(),
+                scroll_offset: self.length_input.scroll_offset,
             });
             form_lines.push(FormRow::Label("Preview:"));
             // Live divider preview
-            let preview_len = (inner.width.saturating_sub(6) as usize).min(60);
+            let preview_len = (inner_width.saturating_sub(6) as usize).min(60);
             let mut exp_c = self.char_input.as_string();
             if exp_c.is_empty() {
                 exp_c = "─".to_string();
@@ -1966,6 +2086,7 @@ impl ItemEditModal {
                 text: self.title_input.as_string(),
                 cursor: self.title_input.cursor,
                 selection: self.title_input.selection_range(),
+                scroll_offset: self.title_input.scroll_offset,
             });
 
             form_lines.push(FormRow::Label("Icon / Glyph ({nf:<char>:<hex>:<emoji>}):"));
@@ -1974,6 +2095,7 @@ impl ItemEditModal {
                 text: self.icon_input.as_string(),
                 cursor: self.icon_input.cursor,
                 selection: self.icon_input.selection_range(),
+                scroll_offset: self.icon_input.scroll_offset,
             });
 
             if self.is_confirm() {
@@ -1983,6 +2105,7 @@ impl ItemEditModal {
                     text: self.prompt_input.as_string(),
                     cursor: self.prompt_input.cursor,
                     selection: self.prompt_input.selection_range(),
+                    scroll_offset: self.prompt_input.scroll_offset,
                 });
 
                 form_lines.push(FormRow::Label("On Yes Action (on_yes):"));
@@ -1992,6 +2115,7 @@ impl ItemEditModal {
                     cursor: self.on_yes_input.cursor,
                     selection: self.on_yes_input.selection_range(),
                     btn_ctrl: FocusControl::OnYesBrowseBtn,
+                    scroll_offset: self.on_yes_input.scroll_offset,
                 });
 
                 form_lines.push(FormRow::Label("On No Action (on_no):"));
@@ -2001,6 +2125,7 @@ impl ItemEditModal {
                     cursor: self.on_no_input.cursor,
                     selection: self.on_no_input.selection_range(),
                     btn_ctrl: FocusControl::OnNoBrowseBtn,
+                    scroll_offset: self.on_no_input.scroll_offset,
                 });
             } else if self.shows_action() {
                 form_lines.push(FormRow::Label(self.get_action_label_text()));
@@ -2011,6 +2136,7 @@ impl ItemEditModal {
                         cursor: self.action_input.cursor,
                         selection: self.action_input.selection_range(),
                         btn_ctrl: FocusControl::ActionBrowseBtn,
+                        scroll_offset: self.action_input.scroll_offset,
                     });
                 } else {
                     form_lines.push(FormRow::Input {
@@ -2018,6 +2144,7 @@ impl ItemEditModal {
                         text: self.action_input.as_string(),
                         cursor: self.action_input.cursor,
                         selection: self.action_input.selection_range(),
+                        scroll_offset: self.action_input.scroll_offset,
                     });
                 }
 
@@ -2035,6 +2162,7 @@ impl ItemEditModal {
                         text: self.prompt_input.as_string(),
                         cursor: self.prompt_input.cursor,
                         selection: self.prompt_input.selection_range(),
+                        scroll_offset: self.prompt_input.scroll_offset,
                     });
                 }
             } else if self.shows_prompt() {
@@ -2044,6 +2172,7 @@ impl ItemEditModal {
                     text: self.prompt_input.as_string(),
                     cursor: self.prompt_input.cursor,
                     selection: self.prompt_input.selection_range(),
+                    scroll_offset: self.prompt_input.scroll_offset,
                 });
             }
 
@@ -2091,6 +2220,7 @@ impl ItemEditModal {
 
                     form_lines.push(FormRow::MultiLineInputRow {
                         ctrl: FocusControl::RadioOptionsInput,
+                        line_index: actual_line_idx,
                         text,
                         cursor,
                         selection: line_sel,
@@ -2109,6 +2239,7 @@ impl ItemEditModal {
                     cursor: self.template_input.cursor,
                     selection: self.template_input.selection_range(),
                     btn_ctrl: FocusControl::TemplateBrowseBtn,
+                    scroll_offset: self.template_input.scroll_offset,
                 });
 
                 form_lines.push(FormRow::Label("Target Path (inject_block):"));
@@ -2118,6 +2249,7 @@ impl ItemEditModal {
                     cursor: self.target_input.cursor,
                     selection: self.target_input.selection_range(),
                     btn_ctrl: FocusControl::TargetBrowseBtn,
+                    scroll_offset: self.target_input.scroll_offset,
                 });
 
                 form_lines.push(FormRow::Label("Block ID (inject_block):"));
@@ -2126,6 +2258,7 @@ impl ItemEditModal {
                     text: self.block_id_input.as_string(),
                     cursor: self.block_id_input.cursor,
                     selection: self.block_id_input.selection_range(),
+                    scroll_offset: self.block_id_input.scroll_offset,
                 });
             }
 
@@ -2139,6 +2272,7 @@ impl ItemEditModal {
                     cursor: self.start_dir_input.cursor,
                     selection: self.start_dir_input.selection_range(),
                     btn_ctrl: FocusControl::StartDirBrowseBtn,
+                    scroll_offset: self.start_dir_input.scroll_offset,
                 });
             }
 
@@ -2149,6 +2283,7 @@ impl ItemEditModal {
                     text: self.tabstop_input.as_string(),
                     cursor: self.tabstop_input.cursor,
                     selection: self.tabstop_input.selection_range(),
+                    scroll_offset: self.tabstop_input.scroll_offset,
                 });
             }
 
@@ -2166,6 +2301,7 @@ impl ItemEditModal {
                         text: self.window_percent_input.as_string(),
                         cursor: self.window_percent_input.cursor,
                         selection: self.window_percent_input.selection_range(),
+                        scroll_offset: self.window_percent_input.scroll_offset,
                     });
                 }
 
@@ -2231,10 +2367,63 @@ impl ItemEditModal {
             preview_item.icon = if icon.is_empty() { None } else { Some(icon) };
             let preview_str = render_item_preview_line(
                 &preview_item,
-                (inner.width.saturating_sub(6) as usize).min(60),
+                (inner_width.saturating_sub(6) as usize).min(60),
             );
             form_lines.push(FormRow::PreviewBox(preview_str));
         }
+
+        form_lines
+    }
+
+    /// Renders the property editor modal with live previews and scrollable form.
+    pub fn render(&mut self, area: Rect, styles: &ResolvedThemeStyles, buf: &mut Buffer) -> Rect {
+        let dialog_w = 86.min(area.width.saturating_sub(4));
+        let dialog_h = 32.min(area.height.saturating_sub(2));
+
+        let title_header = format!(" Edit Properties [{}] ", self.current_type.to_uppercase());
+        let inner = render_modal_frame(area, dialog_w, dialog_h, &title_header, styles, buf);
+
+        if inner.width < 30 || inner.height < 10 {
+            return inner;
+        }
+
+        let cur_ctrl = self.current_control();
+
+        // 1. Top Type Header Row
+        let type_row_y = inner.y;
+        let is_type_btn_active = cur_ctrl == FocusControl::ChangeTypeBtn;
+        let type_str = format!(" Item Type: {:<36}", self.get_type_display_str());
+        buf.set_string(
+            inner.x + 1,
+            type_row_y,
+            &type_str,
+            styles.text.add_modifier(Modifier::BOLD),
+        );
+
+        let type_btn_text = " [Change Type (CTRL+T)] ";
+        let type_btn_x = (inner.x + inner.width).saturating_sub(type_btn_text.len() as u16 + 2);
+        let type_btn_style = if is_type_btn_active {
+            styles.highlight.add_modifier(Modifier::BOLD)
+        } else {
+            styles.accent.add_modifier(Modifier::BOLD)
+        };
+        buf.set_string(type_btn_x, type_row_y, type_btn_text, type_btn_style);
+
+        // Divider under type header
+        let div_line = "─".repeat(inner.width.saturating_sub(2) as usize);
+        buf.set_string(
+            inner.x + 1,
+            inner.y + 1,
+            &div_line,
+            Style::default().fg(styles.border),
+        );
+
+        // 2. Scrollable Viewport bounds
+        let form_start_y = inner.y + 2;
+        let footer_rows = 4; // 1 buttons row + 1 blank + 2 footer lines
+        let form_h = inner.height.saturating_sub(footer_rows + 2) as usize;
+
+        let form_lines = self.build_form_lines(inner.width);
 
         // Adjust scroll offset to keep active control in view
         let active_row_idx = form_lines.iter().position(|r| r.has_ctrl(cur_ctrl));
@@ -2249,11 +2438,54 @@ impl ItemEditModal {
         if scroll >= form_lines.len() {
             scroll = form_lines.len().saturating_sub(form_h);
         }
+        self.scroll_offset = scroll;
+
+        // Ensure active text input cursor is horizontally visible
+        let avail_w = inner.width.saturating_sub(4) as usize;
+        let field_w = avail_w.saturating_sub(4);
+        let browse_btn = " [Browse] ";
+        let inp_w = avail_w.saturating_sub(browse_btn.len() + 4);
+        let shows_action_browse = self.shows_action_browse();
+        if let Some(inp) = self.get_text_input_mut(cur_ctrl) {
+            let w = if matches!(
+                cur_ctrl,
+                FocusControl::ActionInput
+                    | FocusControl::OnYesInput
+                    | FocusControl::OnNoInput
+                    | FocusControl::TemplateInput
+                    | FocusControl::TargetInput
+                    | FocusControl::StartDirInput
+            ) && shows_action_browse
+            {
+                inp_w
+            } else {
+                field_w
+            };
+            inp.ensure_cursor_visible(w);
+        }
 
         // Render visible form rows
         for (i, row) in form_lines.iter().skip(scroll).take(form_h).enumerate() {
             let y = form_start_y + i as u16;
             row.render(inner, y, cur_ctrl, styles, buf);
+        }
+
+        // Form viewport scroll indicators
+        if scroll > 0 {
+            buf.set_string(
+                inner.x + inner.width.saturating_sub(3),
+                form_start_y,
+                "▲",
+                styles.accent.add_modifier(Modifier::BOLD),
+            );
+        }
+        if scroll + form_h < form_lines.len() {
+            buf.set_string(
+                inner.x + inner.width.saturating_sub(3),
+                form_start_y + form_h as u16 - 1,
+                "▼",
+                styles.accent.add_modifier(Modifier::BOLD),
+            );
         }
 
         // 3. Action Buttons Row (Save / Cancel)
@@ -2323,7 +2555,7 @@ impl ItemEditModal {
 }
 
 /// Helper enum for form rows within the modal viewport
-enum FormRow {
+pub enum FormRow {
     /// Static section heading or descriptor label
     Label(&'static str),
     /// Single-line text input field
@@ -2332,10 +2564,12 @@ enum FormRow {
         text: String,
         cursor: usize,
         selection: Option<(usize, usize)>,
+        scroll_offset: usize,
     },
     /// Visual line row inside a multi-line text input buffer
     MultiLineInputRow {
         ctrl: FocusControl,
+        line_index: usize,
         text: String,
         cursor: Option<usize>,
         selection: Option<(usize, usize)>,
@@ -2350,6 +2584,7 @@ enum FormRow {
         cursor: usize,
         selection: Option<(usize, usize)>,
         btn_ctrl: FocusControl,
+        scroll_offset: usize,
     },
     /// Execution mode radio button or toggle
     ExecMode { mode: usize, is_active: bool },
@@ -2409,6 +2644,7 @@ impl FormRow {
                 text,
                 cursor,
                 selection,
+                scroll_offset,
             } => {
                 let is_active = *ctrl == active_ctrl;
                 let box_style = if is_active {
@@ -2417,36 +2653,60 @@ impl FormRow {
                     Style::default().fg(Color::White).bg(Color::DarkGray)
                 };
                 let field_w = avail_w.saturating_sub(4);
-                let clipped_text: String = text.chars().take(field_w).collect();
-                let display = format!(" {:<width$} ", clipped_text, width = field_w);
-                buf.set_string(inner.x + 2, y, &display, box_style);
+                let char_count = text.chars().count();
+                let safe_cursor = (*cursor).min(char_count);
+                let scroll = if is_active {
+                    if safe_cursor < *scroll_offset {
+                        safe_cursor
+                    } else if safe_cursor >= *scroll_offset + field_w && field_w > 0 {
+                        safe_cursor.saturating_sub(field_w) + 1
+                    } else {
+                        *scroll_offset
+                    }
+                } else {
+                    0
+                };
+
+                let vis_chars: Vec<char> = text.chars().skip(scroll).take(field_w).collect();
+                let mut display_chars = vis_chars;
+                while display_chars.len() < field_w {
+                    display_chars.push(' ');
+                }
+                let display_str: String = display_chars.into_iter().collect();
+                let full_display = format!(" {} ", display_str);
+                buf.set_string(inner.x + 2, y, &full_display, box_style);
 
                 if is_active {
                     if let Some((start, end)) = selection {
-                        let text_len = text.chars().count();
-                        let s = (*start).min(text_len);
-                        let e = (*end).min(text_len);
+                        let s = (*start).min(char_count);
+                        let e = (*end).min(char_count);
                         for idx in s..e {
-                            let cur_x = inner.x + 3 + idx as u16;
-                            if cur_x < inner.x + inner.width - 2 {
-                                buf[(cur_x, y)].set_style(
-                                    Style::default()
-                                        .fg(Color::Black)
-                                        .bg(Color::White)
-                                        .add_modifier(Modifier::REVERSED),
-                                );
+                            if idx >= scroll && idx < scroll + field_w {
+                                let rel = idx - scroll;
+                                let cur_x = inner.x + 3 + rel as u16;
+                                if cur_x < inner.x + inner.width - 2 {
+                                    buf[(cur_x, y)].set_style(
+                                        Style::default()
+                                            .fg(Color::Black)
+                                            .bg(Color::White)
+                                            .add_modifier(Modifier::REVERSED),
+                                    );
+                                }
                             }
                         }
                     }
 
-                    let cur_x = inner.x + 3 + *cursor as u16;
-                    if cur_x < inner.x + inner.width - 2 {
-                        buf[(cur_x, y)].set_style(
-                            Style::default()
-                                .fg(Color::Black)
-                                .bg(Color::White)
-                                .add_modifier(Modifier::REVERSED),
-                        );
+                    if safe_cursor >= scroll && safe_cursor < scroll + field_w {
+                        let rel = safe_cursor - scroll;
+                        let cur_x = inner.x + 3 + rel as u16;
+                        if cur_x < inner.x + inner.width - 2 {
+                            buf[(cur_x, y)].set_style(
+                                Style::default()
+                                    .fg(Color::Black)
+                                    .bg(Color::White)
+                                    .add_modifier(Modifier::REVERSED),
+                            );
+                        }
                     }
                 }
             }
@@ -2469,10 +2729,29 @@ impl FormRow {
                 };
 
                 let content_w = avail_w.saturating_sub(4);
-                let mut chars: Vec<char> = text.chars().collect();
-                if chars.len() > content_w {
-                    chars.truncate(content_w);
-                }
+                let chars_vec: Vec<char> = text.chars().collect();
+                let char_count = chars_vec.len();
+
+                let scroll_col = if line_active {
+                    if let Some(col) = cursor {
+                        let c = (*col).min(char_count);
+                        if c >= content_w && content_w > 0 {
+                            c.saturating_sub(content_w) + 1
+                        } else {
+                            0
+                        }
+                    } else {
+                        0
+                    }
+                } else {
+                    0
+                };
+
+                let mut chars: Vec<char> = chars_vec
+                    .into_iter()
+                    .skip(scroll_col)
+                    .take(content_w)
+                    .collect();
                 while chars.len() < content_w {
                     chars.push(' ');
                 }
@@ -2495,10 +2774,31 @@ impl FormRow {
 
                 if is_ctrl_active {
                     if let Some((start, end)) = selection {
-                        let s = (*start).min(content_w);
-                        let e = (*end).min(content_w);
+                        let s = (*start).min(char_count);
+                        let e = (*end).min(char_count);
                         for idx in s..e {
-                            let cur_x = inner.x + 3 + idx as u16;
+                            if idx >= scroll_col && idx < scroll_col + content_w {
+                                let rel = idx - scroll_col;
+                                let cur_x = inner.x + 3 + rel as u16;
+                                if cur_x < inner.x + 2 + content_w as u16 + 1 {
+                                    buf[(cur_x, y)].set_style(
+                                        Style::default()
+                                            .fg(Color::Black)
+                                            .bg(Color::White)
+                                            .add_modifier(Modifier::REVERSED),
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if line_active {
+                    if let Some(col) = cursor {
+                        let c = (*col).min(char_count);
+                        if c >= scroll_col && c < scroll_col + content_w {
+                            let rel = c - scroll_col;
+                            let cur_x = inner.x + 3 + rel as u16;
                             if cur_x < inner.x + 2 + content_w as u16 + 1 {
                                 buf[(cur_x, y)].set_style(
                                     Style::default()
@@ -2510,20 +2810,6 @@ impl FormRow {
                         }
                     }
                 }
-
-                if line_active {
-                    if let Some(col) = cursor {
-                        let cur_x = inner.x + 3 + *col as u16;
-                        if cur_x < inner.x + 2 + content_w as u16 + 1 {
-                            buf[(cur_x, y)].set_style(
-                                Style::default()
-                                    .fg(Color::Black)
-                                    .bg(Color::White)
-                                    .add_modifier(Modifier::REVERSED),
-                            );
-                        }
-                    }
-                }
             }
             FormRow::InputWithBrowse {
                 input_ctrl,
@@ -2531,6 +2817,7 @@ impl FormRow {
                 cursor,
                 selection,
                 btn_ctrl,
+                scroll_offset,
             } => {
                 let is_inp_active = *input_ctrl == active_ctrl;
                 let is_btn_active = *btn_ctrl == active_ctrl;
@@ -2543,36 +2830,61 @@ impl FormRow {
                 } else {
                     Style::default().fg(Color::White).bg(Color::DarkGray)
                 };
-                let clipped_text: String = text.chars().take(inp_w).collect();
-                let display = format!(" {:<width$} ", clipped_text, width = inp_w);
-                buf.set_string(inner.x + 2, y, &display, inp_style);
+
+                let char_count = text.chars().count();
+                let safe_cursor = (*cursor).min(char_count);
+                let scroll = if is_inp_active {
+                    if safe_cursor < *scroll_offset {
+                        safe_cursor
+                    } else if safe_cursor >= *scroll_offset + inp_w && inp_w > 0 {
+                        safe_cursor.saturating_sub(inp_w) + 1
+                    } else {
+                        *scroll_offset
+                    }
+                } else {
+                    0
+                };
+
+                let vis_chars: Vec<char> = text.chars().skip(scroll).take(inp_w).collect();
+                let mut display_chars = vis_chars;
+                while display_chars.len() < inp_w {
+                    display_chars.push(' ');
+                }
+                let display_str: String = display_chars.into_iter().collect();
+                let full_display = format!(" {} ", display_str);
+                buf.set_string(inner.x + 2, y, &full_display, inp_style);
 
                 if is_inp_active {
                     if let Some((start, end)) = selection {
-                        let text_len = text.chars().count();
-                        let s = (*start).min(text_len);
-                        let e = (*end).min(text_len);
+                        let s = (*start).min(char_count);
+                        let e = (*end).min(char_count);
                         for idx in s..e {
-                            let cur_x = inner.x + 3 + idx as u16;
-                            if cur_x < inner.x + 2 + inp_w as u16 + 2 {
-                                buf[(cur_x, y)].set_style(
-                                    Style::default()
-                                        .fg(Color::Black)
-                                        .bg(Color::White)
-                                        .add_modifier(Modifier::REVERSED),
-                                );
+                            if idx >= scroll && idx < scroll + inp_w {
+                                let rel = idx - scroll;
+                                let cur_x = inner.x + 3 + rel as u16;
+                                if cur_x < inner.x + 2 + inp_w as u16 + 2 {
+                                    buf[(cur_x, y)].set_style(
+                                        Style::default()
+                                            .fg(Color::Black)
+                                            .bg(Color::White)
+                                            .add_modifier(Modifier::REVERSED),
+                                    );
+                                }
                             }
                         }
                     }
 
-                    let cur_x = inner.x + 3 + *cursor as u16;
-                    if cur_x < inner.x + 2 + inp_w as u16 + 2 {
-                        buf[(cur_x, y)].set_style(
-                            Style::default()
-                                .fg(Color::Black)
-                                .bg(Color::White)
-                                .add_modifier(Modifier::REVERSED),
-                        );
+                    if safe_cursor >= scroll && safe_cursor < scroll + inp_w {
+                        let rel = safe_cursor - scroll;
+                        let cur_x = inner.x + 3 + rel as u16;
+                        if cur_x < inner.x + 2 + inp_w as u16 + 2 {
+                            buf[(cur_x, y)].set_style(
+                                Style::default()
+                                    .fg(Color::Black)
+                                    .bg(Color::White)
+                                    .add_modifier(Modifier::REVERSED),
+                            );
+                        }
                     }
                 }
 

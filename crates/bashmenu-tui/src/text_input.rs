@@ -11,6 +11,8 @@ pub struct TextInput {
     pub cursor: usize,
     /// Selection anchor point when selecting text via Shift+Arrows or Ctrl+A
     pub selection_anchor: Option<usize>,
+    /// Horizontal scroll offset for rendering within constrained viewport
+    pub scroll_offset: usize,
 }
 
 impl TextInput {
@@ -22,6 +24,7 @@ impl TextInput {
             chars,
             cursor,
             selection_anchor: None,
+            scroll_offset: 0,
         }
     }
 
@@ -35,6 +38,7 @@ impl TextInput {
         self.chars = s.chars().collect();
         self.cursor = self.chars.len();
         self.selection_anchor = None;
+        self.scroll_offset = 0;
     }
 
     /// Returns `true` if the input contains zero characters.
@@ -81,6 +85,51 @@ impl TextInput {
         } else {
             false
         }
+    }
+
+    /// Ensures that the cursor is visible within a visible viewport width of `w` characters.
+    /// Updates and returns the horizontal scroll offset.
+    pub fn ensure_cursor_visible(&mut self, w: usize) -> usize {
+        if w == 0 {
+            self.scroll_offset = 0;
+            return 0;
+        }
+        let safe_cursor = self.cursor.min(self.chars.len());
+        if safe_cursor < self.scroll_offset {
+            self.scroll_offset = safe_cursor;
+        } else if safe_cursor >= self.scroll_offset + w {
+            self.scroll_offset = safe_cursor.saturating_sub(w) + 1;
+        }
+        self.scroll_offset
+    }
+
+    /// Computes the scroll offset needed to display the cursor within width `w` without mutating state.
+    pub fn scroll_for_width(&self, w: usize) -> usize {
+        if w == 0 {
+            return 0;
+        }
+        let safe_cursor = self.cursor.min(self.chars.len());
+        if safe_cursor < self.scroll_offset {
+            safe_cursor
+        } else if safe_cursor >= self.scroll_offset + w {
+            safe_cursor.saturating_sub(w) + 1
+        } else {
+            self.scroll_offset
+        }
+    }
+
+    /// Handles positioning the cursor from a mouse click at `clicked_col` character index.
+    /// If `is_shift` is true, anchors the selection at the previous cursor position.
+    pub fn handle_mouse_click(&mut self, clicked_col: usize, is_shift: bool) {
+        let target = clicked_col.min(self.chars.len());
+        if is_shift {
+            if self.selection_anchor.is_none() {
+                self.selection_anchor = Some(self.cursor);
+            }
+        } else {
+            self.selection_anchor = None;
+        }
+        self.cursor = target;
     }
 
     /// Processes keyboard events with active modifier flags (Shift, Ctrl, Alt).
@@ -221,6 +270,7 @@ impl TextInput {
             }
             KeyCode::Home => {
                 self.cursor = 0;
+                self.scroll_offset = 0;
                 true
             }
             KeyCode::End => {

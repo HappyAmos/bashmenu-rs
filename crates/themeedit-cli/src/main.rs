@@ -224,34 +224,32 @@ fn main() -> Result<()> {
                     Style::default().fg(Color::Cyan)
                 };
                 let inner_w = (input_box_w.saturating_sub(4)) as usize;
-                let display_text = if name_str.len() > inner_w {
-                    &name_str[..inner_w]
-                } else {
-                    &name_str
-                };
-                let padded = format!("[ {:<width$} ]", display_text, width = inner_w);
+                let chars: Vec<char> = name_str.chars().collect();
+                let scroll = state.name_input.scroll_for_width(inner_w);
+                let vis_chars: String = chars.iter().skip(scroll).take(inner_w).collect();
+                let padded = format!("[ {:<width$} ]", vis_chars, width = inner_w);
                 buf.set_string(input_box_x, left_area.y, &padded, box_style);
 
                 if is_editing_name {
                     let sel_range = state.name_input.selection_range();
                     let text_start_x = input_box_x + 2;
-                    for (c_idx, ch) in display_text.chars().enumerate() {
+                    let rel_cursor = state.name_input.cursor.saturating_sub(scroll);
+                    for (c_idx, ch) in vis_chars.chars().enumerate() {
                         let cx = text_start_x + c_idx as u16;
+                        let global_idx = scroll + c_idx;
                         let mut char_style = box_style;
                         if let Some((s_start, s_end)) = sel_range {
-                            if c_idx >= s_start && c_idx < s_end {
+                            if global_idx >= s_start && global_idx < s_end {
                                 char_style = char_style.add_modifier(Modifier::REVERSED);
                             }
                         }
-                        if c_idx == state.name_input.cursor {
+                        if global_idx == state.name_input.cursor {
                             char_style = char_style.add_modifier(Modifier::REVERSED);
                         }
                         buf.set_string(cx, left_area.y, ch.to_string(), char_style);
                     }
-                    let cursor_col = text_start_x + state.name_input.cursor as u16;
-                    if state.name_input.cursor >= display_text.chars().count()
-                        && cursor_col < input_box_x + input_box_w.saturating_sub(1)
-                    {
+                    if state.name_input.cursor >= chars.len() && rel_cursor < inner_w {
+                        let cursor_col = text_start_x + rel_cursor as u16;
                         if let Some(cell) = buf.cell_mut((cursor_col, left_area.y)) {
                             cell.set_char(' ');
                             cell.modifier |= Modifier::REVERSED;
@@ -905,11 +903,16 @@ fn main() -> Result<()> {
                                     is_editing_name = true;
                                     let theme_label_len = 7_u16;
                                     let input_box_x = left_area.x + theme_label_len;
+                                    let input_box_w =
+                                        (left_area.width.saturating_sub(theme_label_len)).max(8);
+                                    let inner_w = (input_box_w.saturating_sub(4)) as usize;
+                                    let scroll = state.name_input.scroll_for_width(inner_w);
                                     let click_inner =
                                         m.column.saturating_sub(input_box_x + 2) as usize;
                                     state.name_input.cursor =
-                                        click_inner.min(state.name_input.len());
+                                        (scroll + click_inner).min(state.name_input.len());
                                     state.name_input.clear_selection();
+                                    state.name_input.ensure_cursor_visible(inner_w);
                                     continue;
                                 }
 

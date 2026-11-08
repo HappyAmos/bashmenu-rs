@@ -710,11 +710,7 @@ fn render_text_input_field(
 
     let chars: Vec<char> = raw_text.chars().collect();
     let cursor = input.cursor.min(chars.len());
-    let scroll = if cursor >= width {
-        cursor - width + 1
-    } else {
-        0
-    };
+    let scroll = input.scroll_for_width(width);
 
     let vis_chars: Vec<char> = chars.iter().skip(scroll).take(width).copied().collect();
     let relative_cursor = cursor.saturating_sub(scroll);

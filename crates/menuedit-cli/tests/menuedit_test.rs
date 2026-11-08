@@ -1580,3 +1580,205 @@ fn test_menuedit_modals_close_button_and_footer_clickable() {
         assert_eq!(res, ItemEditResult::Cancel);
     }
 }
+
+#[test]
+fn test_item_type_picker_modal_scrolling_and_all_items() {
+    use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+    use menuedit_cli::type_picker::{ItemTypePickerModal, ITEM_TYPES};
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+
+    // Verify all 16 items exist and {divider} is present at the end
+    assert_eq!(ITEM_TYPES.len(), 16);
+    assert_eq!(ITEM_TYPES.last().unwrap().0, "{divider}");
+
+    let mut picker = ItemTypePickerModal::new("command");
+    // Initially selected item should match "command" (index 1)
+    assert_eq!(picker.selected_idx, 1);
+
+    // End key moves to the last item ({divider})
+    let act = picker.handle_key(KeyCode::End);
+    assert_eq!(act, None);
+    assert_eq!(picker.selected_idx, 15);
+    assert_eq!(ITEM_TYPES[picker.selected_idx].0, "{divider}");
+
+    // Home key moves to first item (submenu)
+    let act = picker.handle_key(KeyCode::Home);
+    assert_eq!(act, None);
+    assert_eq!(picker.selected_idx, 0);
+    assert_eq!(ITEM_TYPES[picker.selected_idx].0, "submenu");
+
+    // PageDown moves down by 5
+    let act = picker.handle_key(KeyCode::PageDown);
+    assert_eq!(act, None);
+    assert_eq!(picker.selected_idx, 5);
+
+    // PageUp moves up by 5
+    let act = picker.handle_key(KeyCode::PageUp);
+    assert_eq!(act, None);
+    assert_eq!(picker.selected_idx, 0);
+
+    // Test mouse scrolling
+    let area = Rect::new(0, 0, 80, 24);
+    let scroll_down = MouseEvent {
+        kind: MouseEventKind::ScrollDown,
+        column: 40,
+        row: 12,
+        modifiers: KeyModifiers::NONE,
+    };
+    picker.handle_mouse(scroll_down, area);
+    assert!(picker.scroll_offset > 0);
+
+    let scroll_up = MouseEvent {
+        kind: MouseEventKind::ScrollUp,
+        column: 40,
+        row: 12,
+        modifiers: KeyModifiers::NONE,
+    };
+    picker.handle_mouse(scroll_up, area);
+
+    // Test rendering on standard area
+    let theme = bashmenu_core::Theme::default();
+    let styles = bashmenu_tui::ResolvedThemeStyles::from_theme(&theme, true);
+    let mut buf = Buffer::empty(area);
+    picker.render(area, &styles, &mut buf);
+
+    // Test clicking a specific item row
+    let inner_x = (area.width.saturating_sub(44)) / 2;
+    let dialog_h = (ITEM_TYPES.len() as u16 + 4).min(area.height.saturating_sub(2));
+    let inner_y = (area.height.saturating_sub(dialog_h)) / 2;
+    // Click on row 3 (which corresponds to script when scroll_offset is 0)
+    picker.scroll_offset = 0;
+    let click_row3 = MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: inner_x + 5,
+        row: inner_y + 1 + 2,
+        modifiers: KeyModifiers::NONE,
+    };
+    let act = picker.handle_mouse(click_row3, area);
+    assert_eq!(act, Some(Some(ITEM_TYPES[2].0.to_string())));
+}
+
+#[test]
+fn test_item_edit_modal_horizontal_scrolling_and_mouse_interactions() {
+    use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+    use menuedit_cli::{FocusControl, ItemEditModal, ItemEditResult, TextInput};
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+
+    // 1. TextInput horizontal scrolling verification
+    let mut ti =
+        TextInput::new("This is a very long text string that exceeds normal terminal input width");
+    let visible_w = 20;
+    ti.cursor = 0;
+    ti.scroll_offset = 0;
+    assert_eq!(ti.ensure_cursor_visible(visible_w), 0);
+
+    // Move cursor towards the end
+    ti.cursor = 50;
+    let scroll = ti.ensure_cursor_visible(visible_w);
+    assert_eq!(scroll, 50 - visible_w + 1);
+    assert_eq!(ti.scroll_offset, 31);
+
+    // Home key resets cursor and scroll
+    ti.handle_key(KeyCode::Home);
+    assert_eq!(ti.cursor, 0);
+    assert_eq!(ti.scroll_offset, 0);
+
+    // End key moves cursor to the end and scrolls
+    ti.handle_key(KeyCode::End);
+    assert_eq!(ti.cursor, ti.len());
+    let scroll_end = ti.ensure_cursor_visible(visible_w);
+    assert!(scroll_end > 0);
+
+    // 2. ItemEditModal mouse selection & checkbox toggle
+    let item = bashmenu_core::MenuItem {
+        label: "Long Action Item".to_string(),
+        command: Some("/usr/local/bin/very_long_path_to_some_script_that_needs_to_be_executed_with_arguments.sh --option=value".to_string()),
+        r#type: bashmenu_core::MenuItemType::Command,
+        ..Default::default()
+    };
+    let mut modal = ItemEditModal::new(&item);
+    let area = Rect::new(0, 0, 80, 28);
+    let theme = bashmenu_core::Theme::default();
+    let styles = bashmenu_tui::ResolvedThemeStyles::from_theme(&theme, true);
+    let mut buf = Buffer::empty(area);
+
+    let inner = modal.render(area, &styles, &mut buf);
+
+    // Checkbox toggling via mouse click
+    // Quiet checkbox is initially false
+    assert!(!modal.quiet);
+    // Find Quiet checkbox in form rows
+    let form_rows = modal.build_form_lines(inner.width.saturating_sub(4));
+    let quiet_pos = form_rows.iter().position(|r| {
+        matches!(
+            r,
+            menuedit_cli::item_edit::FormRow::Checkbox {
+                ctrl: FocusControl::QuietChk,
+                ..
+            }
+        )
+    });
+    assert!(quiet_pos.is_some());
+    let quiet_row = quiet_pos.unwrap();
+    let form_start_y = inner.y + 2;
+    let click_quiet = MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: inner.x + 4,
+        row: form_start_y + quiet_row as u16,
+        modifiers: KeyModifiers::NONE,
+    };
+    modal.handle_mouse(click_quiet, area);
+    assert!(
+        modal.quiet,
+        "Quiet checkbox must toggle to true on mouse click"
+    );
+
+    // Click [Change Type] header button
+    let type_btn_text = " [Change Type (CTRL+T)] ";
+    let change_type_x = (inner.x + inner.width).saturating_sub(type_btn_text.len() as u16 + 2) + 2;
+    let change_type_y = inner.y;
+    let click_change_type = MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: change_type_x,
+        row: change_type_y,
+        modifiers: KeyModifiers::NONE,
+    };
+    let res = modal.handle_mouse(click_change_type, area);
+    assert_eq!(res, ItemEditResult::ChangeType);
+
+    // Focus input and place cursor via mouse click
+    let title_pos = form_rows
+        .iter()
+        .position(|r| {
+            matches!(
+                r,
+                menuedit_cli::item_edit::FormRow::Input {
+                    ctrl: FocusControl::TitleInput,
+                    ..
+                }
+            )
+        })
+        .unwrap();
+    let click_title = MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: inner.x + 6,
+        row: form_start_y + title_pos as u16,
+        modifiers: KeyModifiers::NONE,
+    };
+    modal.handle_mouse(click_title, area);
+    assert_eq!(modal.current_control(), FocusControl::TitleInput);
+    assert_eq!(modal.title_input.cursor, 3); // inner.x + 3 is start of field, inner.x + 6 is char 3
+
+    // Mouse scroll wheel changes scroll_offset
+    let old_scroll = modal.scroll_offset;
+    let mouse_scroll = MouseEvent {
+        kind: MouseEventKind::ScrollDown,
+        column: inner.x + 10,
+        row: inner.y + 10,
+        modifiers: KeyModifiers::NONE,
+    };
+    modal.handle_mouse(mouse_scroll, area);
+    assert_eq!(modal.scroll_offset, old_scroll + 2);
+}

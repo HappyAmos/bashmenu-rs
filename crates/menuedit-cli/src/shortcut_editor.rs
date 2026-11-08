@@ -533,6 +533,14 @@ impl LeaderSettingsModal {
                 && mouse.column < inner.x + 19 + field_w
             {
                 self.focus_idx = 0;
+                let rel_col = (mouse.column - (inner.x + 19)) as usize;
+                let is_shift = mouse
+                    .modifiers
+                    .contains(crossterm::event::KeyModifiers::SHIFT);
+                let scroll = self.key_input.scroll_for_width(field_w as usize);
+                self.key_input
+                    .handle_mouse_click(scroll + rel_col.min(field_w as usize), is_shift);
+                self.key_input.ensure_cursor_visible(field_w as usize);
                 return LeaderSettingsAction::None;
             }
 
@@ -552,6 +560,14 @@ impl LeaderSettingsModal {
                 && mouse.column < inner.x + 19 + field_w
             {
                 self.focus_idx = 2;
+                let rel_col = (mouse.column - (inner.x + 19)) as usize;
+                let is_shift = mouse
+                    .modifiers
+                    .contains(crossterm::event::KeyModifiers::SHIFT);
+                let scroll = self.timeout_input.scroll_for_width(field_w as usize);
+                self.timeout_input
+                    .handle_mouse_click(scroll + rel_col.min(field_w as usize), is_shift);
+                self.timeout_input.ensure_cursor_visible(field_w as usize);
                 return LeaderSettingsAction::None;
             }
 
@@ -960,6 +976,16 @@ impl ShortcutEditModal {
             // 0: Description
             if row == y {
                 self.focus_idx = 0;
+                if col >= field_x && col < field_x + field_w as u16 {
+                    let rel_col = (col - field_x) as usize;
+                    let is_shift = mouse
+                        .modifiers
+                        .contains(crossterm::event::KeyModifiers::SHIFT);
+                    let scroll = self.description.scroll_for_width(field_w as usize);
+                    self.description
+                        .handle_mouse_click(scroll + rel_col.min(field_w as usize), is_shift);
+                    self.description.ensure_cursor_visible(field_w as usize);
+                }
                 return ShortcutEditAction::None;
             }
             y += 2;
@@ -971,6 +997,14 @@ impl ShortcutEditModal {
                     return ShortcutEditAction::CaptureKey;
                 } else if col >= field_x {
                     self.focus_idx = 1;
+                    let rel_col = (col - field_x) as usize;
+                    let is_shift = mouse
+                        .modifiers
+                        .contains(crossterm::event::KeyModifiers::SHIFT);
+                    let scroll = self.key_input.scroll_for_width(key_w as usize);
+                    self.key_input
+                        .handle_mouse_click(scroll + rel_col.min(key_w as usize), is_shift);
+                    self.key_input.ensure_cursor_visible(key_w as usize);
                     return ShortcutEditAction::None;
                 }
             }
@@ -999,6 +1033,14 @@ impl ShortcutEditModal {
                     return ShortcutEditAction::BrowseScript;
                 } else if col >= field_x {
                     self.focus_idx = 5;
+                    let rel_col = (col - field_x) as usize;
+                    let is_shift = mouse
+                        .modifiers
+                        .contains(crossterm::event::KeyModifiers::SHIFT);
+                    let scroll = self.target_input.scroll_for_width(tgt_w as usize);
+                    self.target_input
+                        .handle_mouse_click(scroll + rel_col.min(tgt_w as usize), is_shift);
+                    self.target_input.ensure_cursor_visible(tgt_w as usize);
                     return ShortcutEditAction::None;
                 }
             }
@@ -1019,6 +1061,17 @@ impl ShortcutEditModal {
             // 8: Window Size %
             if row == y {
                 self.focus_idx = 8;
+                let pct_w = 6;
+                if col >= field_x && col < field_x + pct_w as u16 {
+                    let rel_col = (col - field_x) as usize;
+                    let is_shift = mouse
+                        .modifiers
+                        .contains(crossterm::event::KeyModifiers::SHIFT);
+                    let scroll = self.window_percent.scroll_for_width(pct_w);
+                    self.window_percent
+                        .handle_mouse_click(scroll + rel_col.min(pct_w), is_shift);
+                    self.window_percent.ensure_cursor_visible(pct_w);
+                }
                 return ShortcutEditAction::None;
             }
             y += 2;
@@ -2508,7 +2561,7 @@ fn draw_input(
         .bg(styles.background)
         .add_modifier(Modifier::UNDERLINED);
     let w = rect.width as usize;
-    let start = input.cursor.saturating_sub(w.saturating_sub(1));
+    let start = input.scroll_for_width(w);
     let sel = input.selection_range();
     for col in 0..w {
         let idx = start + col;

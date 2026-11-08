@@ -42,11 +42,18 @@ impl ItemTypePickerModal {
     pub fn new(current_type: &str) -> Self {
         let selected_idx = ITEM_TYPES
             .iter()
-            .position(|(t, _)| *t == current_type)
+            .position(|(t, _)| {
+                *t == current_type || (*t == "{divider}" && current_type == "divider")
+            })
             .unwrap_or(0);
+        let scroll_offset = if selected_idx >= 12 {
+            selected_idx.saturating_sub(6)
+        } else {
+            0
+        };
         Self {
             selected_idx,
-            scroll_offset: 0,
+            scroll_offset,
         }
     }
 
@@ -73,6 +80,26 @@ impl ItemTypePickerModal {
                 }
                 None
             }
+            KeyCode::Home => {
+                self.selected_idx = 0;
+                self.scroll_offset = 0;
+                None
+            }
+            KeyCode::End => {
+                self.selected_idx = ITEM_TYPES.len().saturating_sub(1);
+                None
+            }
+            KeyCode::PageUp => {
+                self.selected_idx = self.selected_idx.saturating_sub(5);
+                if self.selected_idx < self.scroll_offset {
+                    self.scroll_offset = self.selected_idx;
+                }
+                None
+            }
+            KeyCode::PageDown => {
+                self.selected_idx = (self.selected_idx + 5).min(ITEM_TYPES.len().saturating_sub(1));
+                None
+            }
             _ => None,
         }
     }
@@ -80,7 +107,7 @@ impl ItemTypePickerModal {
     /// Handles mouse event
     pub fn handle_mouse(&mut self, mouse: MouseEvent, area: Rect) -> Option<Option<String>> {
         let dialog_w = 64.min(area.width.saturating_sub(4));
-        let dialog_h = 18.min(area.height.saturating_sub(4));
+        let dialog_h = (ITEM_TYPES.len() as u16 + 4).min(area.height.saturating_sub(2));
         let inner = compute_modal_inner(area, dialog_w, dialog_h);
 
         match mouse.kind {
@@ -88,12 +115,16 @@ impl ItemTypePickerModal {
                 if self.selected_idx + 1 < ITEM_TYPES.len() {
                     self.selected_idx += 1;
                 }
+                if self.scroll_offset + 1 < ITEM_TYPES.len() {
+                    self.scroll_offset += 1;
+                }
                 None
             }
             MouseEventKind::ScrollUp => {
                 if self.selected_idx > 0 {
                     self.selected_idx -= 1;
                 }
+                self.scroll_offset = self.scroll_offset.saturating_sub(1);
                 None
             }
             MouseEventKind::Down(MouseButton::Left) => {
@@ -140,9 +171,9 @@ impl ItemTypePickerModal {
     }
 
     /// Renders the type picker modal
-    pub fn render(&self, area: Rect, styles: &ResolvedThemeStyles, buf: &mut Buffer) -> Rect {
+    pub fn render(&mut self, area: Rect, styles: &ResolvedThemeStyles, buf: &mut Buffer) -> Rect {
         let dialog_w = 64.min(area.width.saturating_sub(4));
-        let dialog_h = 18.min(area.height.saturating_sub(4));
+        let dialog_h = (ITEM_TYPES.len() as u16 + 4).min(area.height.saturating_sub(2));
 
         let inner = render_modal_frame(
             area,
@@ -154,6 +185,16 @@ impl ItemTypePickerModal {
         );
 
         let content_h = inner.height.saturating_sub(2) as usize;
+
+        // Ensure scroll_offset keeps selected_idx visible
+        if self.selected_idx < self.scroll_offset {
+            self.scroll_offset = self.selected_idx;
+        } else if self.selected_idx >= self.scroll_offset + content_h && content_h > 0 {
+            self.scroll_offset = self.selected_idx.saturating_sub(content_h - 1);
+        }
+        if self.scroll_offset + content_h > ITEM_TYPES.len() {
+            self.scroll_offset = ITEM_TYPES.len().saturating_sub(content_h);
+        }
 
         for (i, (type_id, desc)) in ITEM_TYPES
             .iter()
@@ -173,9 +214,27 @@ impl ItemTypePickerModal {
             let line_str = format!(" {:<14} - {} ", type_id, desc);
             let truncated: String = line_str
                 .chars()
-                .take(inner.width.saturating_sub(2) as usize)
+                .take(inner.width.saturating_sub(3) as usize)
                 .collect();
             buf.set_string(inner.x + 1, y, &truncated, row_style);
+        }
+
+        // Scroll indicators when items overflow content area
+        if self.scroll_offset > 0 {
+            buf.set_string(
+                inner.x + inner.width.saturating_sub(3),
+                inner.y + 1,
+                "▲",
+                styles.accent.add_modifier(Modifier::BOLD),
+            );
+        }
+        if self.scroll_offset + content_h < ITEM_TYPES.len() {
+            buf.set_string(
+                inner.x + inner.width.saturating_sub(3),
+                inner.y + content_h as u16,
+                "▼",
+                styles.accent.add_modifier(Modifier::BOLD),
+            );
         }
 
         // Footer
