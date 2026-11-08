@@ -21,6 +21,14 @@ shortcuts:
   execution_mode: console
   quiet: true
   alt_buffer: false
+- key: <leader> k
+  description: KCChase Screensaver
+  type: command
+  action: kcchase
+  command: kcchase
+  execution_mode: console
+  quiet: true
+  alt_buffer: true
 - key: <leader> g
   description: Git Status Summary
   type: command

@@ -7,12 +7,9 @@
 version: '0.0.1'
 theme: black-eyed-susans
 user:
-  localip: '[b]{localip}[/b]'
-  example_filepath: '{bashmenu_dir}'
-  antigravity: cd {dir_picker} && agy -c
-  example_string: A string of text
-  postal_code: 49079
   example_boolean: true
+  example_string: A string of text
+  example_filepath: '{bashmenu_dir}'
 settings:
   cache_dir: '{home}/.cache/bashmenu'
   check_for_updates: false
@@ -23,13 +20,13 @@ settings:
   help_gutter_delay: 2.0
   tab_to_spaces: true
   tabstop: 4
-  show_menu_shortcuts: true
+  show_menu_shortcuts: false
   use_nerd_fonts: true
   nerd_font_width: auto
   status_gutter: '| Theme: {theme} | {user} | Battery: {battery} ({battery_stat}) | {user.localip} | [b]{date_time_24_short}[/b]'
   inactivity_timeout:
     milliseconds: 300000
-    command: cmatrix -s
+    command:
   refresh_interval: 10
   pager_editor: vim
   plugins:
@@ -56,7 +53,7 @@ settings:
       standalone: true
       pretext: '{divider}'
       posttext: '{divider}'
-  transition: fade
+  transition: blinds
   transition_speed: normal
   modal_animation: zoom
   modal_animation_speed: fast
