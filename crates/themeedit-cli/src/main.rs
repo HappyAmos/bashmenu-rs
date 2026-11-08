@@ -70,6 +70,8 @@ enum ActiveModal {
     ColorPicker(String, ColorPickerModal),
     /// ASCII symbol picker grid dialog.
     AsciiPicker(String, AsciiGridModal),
+    /// Selection indicator configuration dialog.
+    IndicatorInput(InputModal),
     /// "Save As" theme name input dialog.
     SaveAs(InputModal),
     /// "New Theme" name input dialog.
@@ -418,6 +420,9 @@ fn main() -> Result<()> {
                         let (_, origin) = modal.render(area, &preview_styles, buf);
                         last_grid_origin = origin;
                     }
+                    ActiveModal::IndicatorInput(modal) => {
+                        modal.render(area, &preview_styles, buf);
+                    }
                     ActiveModal::SaveAs(modal) => {
                         modal.render(area, &preview_styles, buf);
                     }
@@ -555,6 +560,43 @@ fn main() -> Result<()> {
                                 } else {
                                     state.set_border_token(key, ch);
                                 }
+                            }
+                            active_modal = ActiveModal::None;
+                        }
+                    }
+                    _ => {}
+                },
+                ActiveModal::IndicatorInput(modal) => match ev {
+                    Event::Key(k) => {
+                        if let Some(res) = modal.handle_key_with_modifiers(k.code, k.modifiers) {
+                            if let Some(val) = res {
+                                state.set_indicator(val);
+                                toast_rack.add(ToastNotification {
+                                    title: Some("Theme Editor".to_string()),
+                                    message: format!(
+                                        "Indicator set to '{}'",
+                                        state.current_theme.indicator.as_deref().unwrap_or("> ")
+                                    ),
+                                    severity: ToastSeverity::Information,
+                                    timeout_secs: 2.0,
+                                });
+                            }
+                            active_modal = ActiveModal::None;
+                        }
+                    }
+                    Event::Mouse(m) => {
+                        if let Some(res) = modal.handle_mouse(m, area) {
+                            if let Some(val) = res {
+                                state.set_indicator(val);
+                                toast_rack.add(ToastNotification {
+                                    title: Some("Theme Editor".to_string()),
+                                    message: format!(
+                                        "Indicator set to '{}'",
+                                        state.current_theme.indicator.as_deref().unwrap_or("> ")
+                                    ),
+                                    severity: ToastSeverity::Information,
+                                    timeout_secs: 2.0,
+                                });
                             }
                             active_modal = ActiveModal::None;
                         }
@@ -1464,6 +1506,17 @@ fn main() -> Result<()> {
                                             severity: ToastSeverity::Information,
                                             timeout_secs: 2.0,
                                         });
+                                    } else if matches!(
+                                        state.tokens[state.selected_idx].kind,
+                                        TokenKind::Indicator
+                                    ) {
+                                        state.set_indicator("> ".to_string());
+                                        toast_rack.add(ToastNotification {
+                                            title: Some("Theme Editor".to_string()),
+                                            message: "Indicator reset to default '> '".to_string(),
+                                            severity: ToastSeverity::Information,
+                                            timeout_secs: 2.0,
+                                        });
                                     } else {
                                         active_modal =
                                             ActiveModal::ConfirmDelete(ConfirmModal::new(
@@ -1597,13 +1650,12 @@ fn open_selected_token_picker(state: &mut ThemeEditorState, active_modal: &mut A
                 ActiveModal::AsciiPicker(key, AsciiGridModal::new("Pick CP437 Border Char", 196));
         }
         TokenKind::Indicator => {
-            state.current_theme.indicator = match state.current_theme.indicator.as_deref() {
-                Some("> ") => Some("▶ ".to_string()),
-                Some("▶ ") => Some("{ascii:240}".to_string()),
-                Some("{ascii:240}") => Some("• ".to_string()),
-                _ => Some("> ".to_string()),
-            };
-            state.is_modified = true;
+            let current_val = state.current_theme.indicator.as_deref().unwrap_or("> ");
+            *active_modal = ActiveModal::IndicatorInput(InputModal::new(
+                "Configure Indicator",
+                "Enter indicator symbol (e.g. '> ', '▶ ', '{ascii:240}', '{nf:...}'):",
+                current_val,
+            ));
         }
         TokenKind::DividerChar => {
             *active_modal = ActiveModal::AsciiPicker(

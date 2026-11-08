@@ -814,3 +814,17 @@
   - Added `test_menuedit_footer_border_overflow_repro` in `crates/menuedit-cli/tests/menuedit_test.rs` checking all window widths from 40 to 200, explicitly asserting that right window border `│` remains intact and `"Exitxi"` is never present on any row.
   - Updated assertions in `test_menuedit_footer_spread_and_position` and `test_editor_legend_row_spread` to use `gutter_text_width`.
   - Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass with zero warnings or errors.
+
+## Phase 31: Theme Editor Indicator Configuration Token under Theme Category
+- [x] Theme Indicator Token Relocation and Configuration:
+  - Relocated `Indicator` token from below the color tokens into the global `Theme:` category in `crates/themeedit-cli/src/lib.rs`.
+  - Moved `Background Color` from `Theme:` category into `Colors:` alongside `Title Color`.
+  - Extended `select_token_by_key` to match `"indicator"`, `"selection_indicator"`, and `"cursor_indicator"`.
+  - Implemented `ThemeEditorState::set_indicator(&mut self, indicator: String)` to configure `current_theme.indicator`, mark `is_modified = true`, and display a status message.
+  - Enhanced `get_token_value_display` for `TokenKind::Indicator` to resolve glyphs with `bashmenu_core::resolve_glyph(raw, true)`, presenting both resolved glyphs and raw macros (e.g., `'≡' ({ascii:240})` or `'' ({nf:@::})`).
+  - Added interactive `InputModal` for indicator customization in `crates/themeedit-cli/src/main.rs` (`ActiveModal::IndicatorInput`), accepting raw strings, Unicode characters, ASCII macros (`{ascii:NNN}`), and Nerd Font macros (`{nf:...}`).
+  - Added `KeyCode::Delete` handling on `TokenKind::Indicator` to reset the indicator to default `"> "`.
+  - Updated `get_token_preview_spans` for `TokenKind::Indicator` using `preview_styles.indicator_symbol.width().max(2) as u16` to accurately match indicator length.
+- [x] Unit & Integration Tests:
+  - Added `test_theme_indicator_token_configuration_and_persistence` in `crates/themeedit-cli/tests/themeedit_test.rs` validating category placement under `Theme:`, keyboard selection, Unicode character configuration, CP437 ASCII macro expansion, Nerd Font macro handling, save/load roundtripping to `.themes` file, and preview span dimensions.
+  - Verified zero formatting issues (`cargo fmt --all --check`), zero Clippy warnings (`cargo clippy --workspace --all-targets -- -D warnings`), and 100% test pass across workspace (`cargo test --workspace`).

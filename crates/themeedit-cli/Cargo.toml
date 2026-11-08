@@ -18,3 +18,4 @@ crossterm = { workspace = true }
 clap = { workspace = true }
 anyhow = { workspace = true }
 serde_yml = { workspace = true }
+unicode-width = { workspace = true }

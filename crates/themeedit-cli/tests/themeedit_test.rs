@@ -241,7 +241,7 @@ fn test_themeedit_t_connectors_and_click_selection() {
     assert_eq!(state.tokens[state.selected_idx].label, "Divider Color");
 
     assert!(state.select_token_by_key("indicator"));
-    assert_eq!(state.tokens[state.selected_idx].label, "Cursor Indicator");
+    assert_eq!(state.tokens[state.selected_idx].label, "Indicator");
 
     // Verify new divider and marquee tokens
     assert!(state.select_token_by_key("divider_char"));
@@ -328,7 +328,7 @@ fn test_themeedit_qbasic_ascii_indicator_and_divider() {
     let ind_token = state
         .tokens
         .iter()
-        .find(|t| t.label == "Cursor Indicator")
+        .find(|t| t.label == "Indicator")
         .unwrap();
     let ind_display = state.get_token_value_display(ind_token);
     assert!(
@@ -1917,4 +1917,90 @@ fn test_preview_faux_plugin_uniform_color_and_shortcuts() {
         spans[3],
         (content_start_y + 4, p_inner_x + 6, p_inner_x + 9)
     );
+}
+
+#[test]
+fn test_theme_indicator_token_configuration_and_persistence() {
+    use bashmenu_tui::ResolvedThemeStyles;
+    use ratatui::layout::Rect;
+    use themeedit_cli::{get_token_preview_spans, PreviewMode, TokenCategory, TokenKind};
+
+    let tmp_dir = std::env::temp_dir().join(format!("theme_ind_test_{}", std::process::id()));
+    let _ = fs::create_dir_all(&tmp_dir);
+    let tmp_file = tmp_dir.join("bashmenu.themes");
+
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    fs::copy(&fixture_path, &tmp_file).unwrap();
+
+    let mut state = ThemeEditorState::new(tmp_file.clone(), Some("dracula".to_string()));
+
+    // 1. Verify Indicator token is categorized under Theme:
+    let ind_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Indicator")
+        .cloned()
+        .expect("Indicator token must exist");
+    assert_eq!(ind_token.category(), TokenCategory::Theme);
+    assert_eq!(ind_token.kind, TokenKind::Indicator);
+
+    // 2. Initial display for dracula theme (contains Nerd Font macro)
+    let display_before = state.get_token_value_display(&ind_token);
+    assert!(display_before.contains("{nf:@:"));
+
+    // 3. Select token by key
+    assert!(state.select_token_by_key("indicator"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Indicator");
+    assert!(state.select_token_by_key("selection_indicator"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Indicator");
+
+    // 4. Update to custom Unicode indicator
+    state.set_indicator("▶ ".to_string());
+    assert!(state.is_modified);
+    assert_eq!(state.current_theme.indicator.as_deref(), Some("▶ "));
+    let display_after = state.get_token_value_display(&ind_token);
+    assert_eq!(display_after, "'▶ '");
+
+    // 5. Update to ASCII code macro and check resolved display
+    state.set_indicator("{ascii:240}".to_string());
+    let display_ascii = state.get_token_value_display(&ind_token);
+    assert!(
+        display_ascii.contains('≡'),
+        "Expected display to contain resolved '≡', got: {}",
+        display_ascii
+    );
+    assert!(
+        display_ascii.contains("{ascii:240}"),
+        "Expected display to contain raw macro, got: {}",
+        display_ascii
+    );
+
+    // 6. Update to Nerd Font macro
+    state.set_indicator("{nf:@::}".to_string());
+    let display_nf = state.get_token_value_display(&ind_token);
+    assert!(
+        display_nf.contains("{nf:@::}"),
+        "Expected display to contain raw Nerd Font macro, got: {}",
+        display_nf
+    );
+
+    // 7. Save and roundtrip persistence
+    state.set_indicator("➜ ".to_string());
+    state.save_to_disk().unwrap();
+
+    let reloaded = ThemeEditorState::new(tmp_file, Some("dracula".to_string()));
+    assert_eq!(reloaded.current_theme.indicator.as_deref(), Some("➜ "));
+
+    // 8. Preview spans match indicator width
+    let area = Rect::new(0, 0, 80, 25);
+    let styles = ResolvedThemeStyles::from_theme(&reloaded.current_theme, true);
+    let ind_token = reloaded
+        .tokens
+        .iter()
+        .find(|t| t.label == "Indicator")
+        .unwrap();
+    let spans = get_token_preview_spans(ind_token, area, PreviewMode::Menu, &styles);
+    assert_eq!(spans.len(), 1);
+    assert_eq!(spans[0].0, area.y + 2); // content_start_y
+    assert_eq!(spans[0].1, area.x + 2); // p_inner_x
 }

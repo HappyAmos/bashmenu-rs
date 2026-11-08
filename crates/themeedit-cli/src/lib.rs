@@ -15,6 +15,7 @@ use ratatui::layout::Rect;
 use ratatui::style::Color;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use unicode_width::UnicodeWidthStr;
 
 /// Category grouping for theme attributes in the editor sidebar tree.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -275,10 +276,10 @@ impl ThemeEditorState {
             .unwrap_or_else(Self::create_default_theme);
 
         let tokens = vec![
-            // Background & Wallpaper
+            // Theme Attributes: Indicator, Wallpaper, Divider, Marquee
             TokenItem {
-                label: "Background Color".to_string(),
-                kind: TokenKind::Color("background".to_string()),
+                label: "Indicator".to_string(),
+                kind: TokenKind::Indicator,
             },
             TokenItem {
                 label: "Wallpaper Image".to_string(),
@@ -304,7 +305,29 @@ impl ThemeEditorState {
                 label: "Wallpaper Quantization".to_string(),
                 kind: TokenKind::WallpaperQuantization,
             },
+            // Divider
+            TokenItem {
+                label: "Divider Character".to_string(),
+                kind: TokenKind::DividerChar,
+            },
+            TokenItem {
+                label: "Divider Width Mode".to_string(),
+                kind: TokenKind::DividerLength,
+            },
+            // Marquee
+            TokenItem {
+                label: "Marquee Character".to_string(),
+                kind: TokenKind::MarqueeChar,
+            },
+            TokenItem {
+                label: "Marquee Gap Count".to_string(),
+                kind: TokenKind::MarqueeGap,
+            },
             // Colors
+            TokenItem {
+                label: "Background Color".to_string(),
+                kind: TokenKind::Color("background".to_string()),
+            },
             TokenItem {
                 label: "Title Color".to_string(),
                 kind: TokenKind::Color("title".to_string()),
@@ -360,29 +383,6 @@ impl ThemeEditorState {
             TokenItem {
                 label: "Scrollbar Color".to_string(),
                 kind: TokenKind::Color("scrollbar".to_string()),
-            },
-            // Indicator
-            TokenItem {
-                label: "Cursor Indicator".to_string(),
-                kind: TokenKind::Indicator,
-            },
-            // Divider
-            TokenItem {
-                label: "Divider Character".to_string(),
-                kind: TokenKind::DividerChar,
-            },
-            TokenItem {
-                label: "Divider Width Mode".to_string(),
-                kind: TokenKind::DividerLength,
-            },
-            // Marquee
-            TokenItem {
-                label: "Marquee Character".to_string(),
-                kind: TokenKind::MarqueeChar,
-            },
-            TokenItem {
-                label: "Marquee Gap Count".to_string(),
-                kind: TokenKind::MarqueeGap,
             },
             // Borders
             TokenItem {
@@ -677,9 +677,9 @@ impl ThemeEditorState {
             }
             TokenKind::Indicator => {
                 let raw = self.current_theme.indicator.as_deref().unwrap_or("> ");
-                let parsed = bashmenu_core::parse_ascii_val(raw);
-                if parsed != raw {
-                    format!("'{}' ({})", parsed, raw)
+                let resolved = bashmenu_core::resolve_glyph(raw, true);
+                if resolved != raw {
+                    format!("'{}' ({})", resolved, raw)
                 } else {
                     format!("'{}'", raw)
                 }
@@ -1232,6 +1232,18 @@ impl ThemeEditorState {
         }
     }
 
+    /// Updates the selection indicator string (e.g., `"> "`, `"▶ "`, `"{ascii:240}"`, `"{nf:...}"`).
+    pub fn set_indicator(&mut self, indicator: String) {
+        let val = if indicator.is_empty() {
+            "> ".to_string()
+        } else {
+            indicator
+        };
+        self.current_theme.indicator = Some(val.clone());
+        self.is_modified = true;
+        self.status_message = format!("Updated indicator symbol to '{}'", val);
+    }
+
     /// Updates the character glyph used for divider rules.
     pub fn set_divider_char(&mut self, ch: char) {
         if self.current_theme.divider.is_none() {
@@ -1605,7 +1617,9 @@ impl ThemeEditorState {
             .position(|t| match &t.kind {
                 TokenKind::Color(k) => k == key,
                 TokenKind::Border(k) => k == key,
-                TokenKind::Indicator => key == "indicator",
+                TokenKind::Indicator => {
+                    key == "indicator" || key == "selection_indicator" || key == "cursor_indicator"
+                }
                 TokenKind::DividerChar => key == "divider_char",
                 TokenKind::DividerLength => key == "divider_length",
                 TokenKind::MarqueeChar => key == "marquee_char",
@@ -1683,7 +1697,7 @@ pub fn get_token_preview_spans(
     token: &TokenItem,
     right_area: Rect,
     _mode: PreviewMode,
-    _preview_styles: &ResolvedThemeStyles,
+    preview_styles: &ResolvedThemeStyles,
 ) -> Vec<(u16, u16, u16)> {
     let mut spans = Vec::new();
     if right_area.width < 6 || right_area.height < 6 {
@@ -1836,7 +1850,8 @@ pub fn get_token_preview_spans(
             spans.push((content_start_y + 4, p_inner_x + 6, p_inner_x + 9));
         }
         TokenKind::Indicator => {
-            spans.push((content_start_y, p_inner_x, p_inner_x + 2));
+            let ind_w = preview_styles.indicator_symbol.width().max(2) as u16;
+            spans.push((content_start_y, p_inner_x, p_inner_x + ind_w));
         }
         TokenKind::Color(key) if key == "divider" => {
             spans.push((content_start_y + 3, p_inner_x, p_inner_x + p_avail_w));
