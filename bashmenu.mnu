@@ -254,6 +254,54 @@ items:
           type: back
           icon: '{nf::#f048}'
       - '{divider}': null
+- Media:
+    type: submenu
+    icon: '{nf::#f52c}'
+    interactive: true
+    quiet: false
+    alt_buffer: true
+    tabstop: 4
+    submenu:
+      title: New submenu
+      items:
+      - Play VT Animation File [{curl -s http://artscene.textfiles.com/vt100/movglobe.vt | pv -q -L 2000}]:
+          type: command
+          icon: '{nf::#f52c}'
+          command: curl -s {param} | pv -q -L 2000
+          action: curl -s {param} | pv -q -L 2000
+          prompt: 'URL Of VT File:'
+          interactive: true
+          quiet: false
+          alt_buffer: true
+          tabstop: 4
+          refresh: false
+          exec_mode: console
+          stream: false
+          masked: false
+          show_whitespace: false
+          no_formatting: false
+          external: false
+      - Back To Main Menu:
+          type: back
+          interactive: true
+          quiet: false
+          alt_buffer: true
+          tabstop: 4
+          masked: false
+          no_formatting: false
+          exec_mode: console
+          stream: false
+          refresh: false
+          show_whitespace: false
+          external: false
+      - '{divider}': null
+    stream: false
+    refresh: false
+    masked: false
+    exec_mode: console
+    show_whitespace: false
+    external: false
+    no_formatting: false
 - Network Utilities:
     type: submenu
     icon: '{nf::#ef09:}'
@@ -273,8 +321,8 @@ items:
           type: config
           icon: '{nf::#f11ab}'
           prompt: 'Enter Hostname or IP Address:'
-          key: settings.ping_target
           title: Edit Ping Target
+          key: settings.ping_target
       - IP Information:
           type: script
           icon: '{nf::#F0A5F:}'
@@ -296,8 +344,8 @@ items:
             type: message
             title: Task Cancelled
             message: Ping request was cancelled by user.
-          title: Confirm Ping Task
           message: Start pinging target host {settings.ping_target}?
+          title: Confirm Ping Task
       - Show Configured DNS [getdns.py]:
           type: script
           icon: '{nf::#f01d6}'
@@ -373,13 +421,13 @@ items:
                 alt_buffer: true
                 tabstop: 4
                 exec_mode: console
+                masked: false
+                show_whitespace: false
                 no_formatting: false
                 refresh: false
-                show_whitespace: false
-                external: false
                 key: app.settings.inactivity_timeout.milliseconds
+                external: false
                 stream: false
-                masked: false
             - Edit Screensaver Program [{app.settings.inactivity_timeout.command}]:
                 type: config
                 action: app.settings.inactivity_timeout.command
@@ -387,14 +435,14 @@ items:
                 quiet: false
                 alt_buffer: true
                 tabstop: 4
-                masked: false
                 exec_mode: console
-                show_whitespace: false
-                stream: false
-                no_formatting: false
+                masked: false
                 external: false
-                key: app.settings.inactivity_timeout.command
+                stream: false
                 refresh: false
+                no_formatting: false
+                key: app.settings.inactivity_timeout.command
+                show_whitespace: false
             - Edit Scripts [{scripts_dir}]:
                 type: editor
                 icon: '{nf::#eae9}'
@@ -428,15 +476,24 @@ items:
             - Enable Automatic Updates (git pull) [{settings.check_for_updates}]:
                 type: toggle
                 icon: '{nf::#ea77}'
-                key: settings.check_for_updates
                 message: Enable automatic updates?
                 title: Toggle Auto Update
+                key: settings.check_for_updates
             - Enable Nerd Fonts [{settings.use_nerd_fonts}]:
                 type: toggle
                 icon: '{nf::#f031}'
                 title: Toggle Nerd Fonts
-                message: Enable colorful menu emojis and Nerd Fonts?
                 key: settings.use_nerd_fonts
+                message: Enable colorful menu emojis and Nerd Fonts?
+            - Help Gutter Hover Delay [[{app.settings.help_gutter_delay}] seconds]:
+                type: config
+                icon: '{nf::#f05a}'
+                prompt: 'Seconds of stationary mouse hover to expand help gutter (0 to disable delay):'
+                interactive: true
+                quiet: false
+                alt_buffer: true
+                key: app.settings.help_gutter_delay
+                title: Configure Help Gutter Hover Delay
             - Nerd Font Display Width [{settings.nerd_font_width}]:
                 type: config
                 icon: '{nf::#f07e}'
@@ -447,14 +504,14 @@ items:
                 type: toggle
                 icon: '{nf::#ec3c}'
                 prompt: 'Convert TAB key to spaces? (true/false):'
-                title: Configure Tab Mode
                 key: settings.tab_to_spaces
+                title: Configure Tab Mode
             - Editor Tabstop Distance [{settings.tabstop}]:
                 type: config
                 icon: '{nf::#ee10}'
                 prompt: 'Enter tabstop distance (spaces per TAB press):'
-                title: Configure Tabstop Distance
                 key: settings.tabstop
+                title: Configure Tabstop Distance
             - Pager Text Editor [{settings.pager_editor}]:
                 type: radio
                 icon: '{nf::#f044}'
@@ -463,7 +520,6 @@ items:
                 interactive: true
                 quiet: false
                 alt_buffer: true
-                title: Pager Text Editor [{settings.pager_editor}]
                 key: settings.pager_editor
                 options:
                 - label: Default System Editor ($EDITOR)
@@ -472,6 +528,7 @@ items:
                   value: builtin
                 - label: Vim
                   value: vim
+                title: Pager Text Editor [{settings.pager_editor}]
             - Menu Transition Effect [{settings.transition}]:
                 type: radio
                 icon: '{nf::#f0d0}'
@@ -480,6 +537,7 @@ items:
                 interactive: true
                 quiet: false
                 alt_buffer: true
+                key: settings.transition
                 title: Return Transition Effect [{settings.transition}]
                 options:
                 - label: Instant (Synchronized DEC Mode 2026 buffered redraw)
@@ -504,7 +562,6 @@ items:
                   value: wipedown
                 - label: None (Standard immediate redraw)
                   value: none
-                key: settings.transition
             - Menu Transition Speed [{settings.transition_speed}]:
                 type: radio
                 icon: '{nf::#f0e7}'
@@ -513,6 +570,7 @@ items:
                 interactive: true
                 quiet: false
                 alt_buffer: true
+                title: Screen Transition Speed [{settings.transition_speed}]
                 key: settings.transition_speed
                 options:
                 - label: Fast (~60-75ms, snappy 15ms/step)
@@ -521,7 +579,6 @@ items:
                   value: normal
                 - label: Slow (Deliberate, ~200-250ms, 50ms/step)
                   value: slow
-                title: Screen Transition Speed [{settings.transition_speed}]
             - Modal Animation Effect [{settings.modal_animation}]:
                 type: radio
                 icon: '{nf::#f065}'
@@ -530,12 +587,12 @@ items:
                 interactive: true
                 quiet: false
                 alt_buffer: true
+                title: Modal Animation Effect [{settings.modal_animation}]
                 options:
                 - label: Zoom (Animated grow from launch point and shrink on close)
                   value: zoom
                 - label: None (Instant popup open and close)
                   value: none
-                title: Modal Animation Effect [{settings.modal_animation}]
                 key: settings.modal_animation
             - Modal Animation Speed [{settings.modal_animation_speed}]:
                 type: radio
@@ -562,6 +619,8 @@ items:
                 interactive: true
                 quiet: false
                 alt_buffer: true
+                key: settings.framebuffer
+                title: Linux Framebuffer Support [{settings.framebuffer}]
                 options:
                 - label: Auto (Detect /dev/fb0 on Linux console)
                   value: auto
@@ -569,14 +628,12 @@ items:
                   value: 'true'
                 - label: Disabled (Standard terminal TUI rendering)
                   value: 'false'
-                key: settings.framebuffer
-                title: Linux Framebuffer Support [{settings.framebuffer}]
             - Configure Status Gutter [{settings.status_gutter}]:
                 type: config
                 icon: '{nf::#ebf3}'
                 prompt: 'Enter status gutter format. Available options: {user}, {battery}, {date}, {date_time_24}, {date_time_24_short}, {date_time_12}, {date_time_12_short}, {host}, {user-mode}, {version}, {utc_seconds}'
-                title: Configure Status Gutter
                 key: settings.status_gutter
+                title: Configure Status Gutter
             - Status Gutter Refresh Rate [[{app.settings.refresh_interval}] seconds]:
                 type: config
                 icon: '{nf:@:#f1452}'
@@ -592,17 +649,8 @@ items:
                 interactive: true
                 quiet: false
                 alt_buffer: true
-                key: app.settings.toast_timeout
                 title: Configure Toast Message Timeout
-            - Help Gutter Hover Delay [[{app.settings.help_gutter_delay}] seconds]:
-                type: config
-                icon: '{nf::#f05a}'
-                prompt: 'Seconds of stationary mouse hover to expand help gutter (0 to disable delay):'
-                interactive: true
-                quiet: false
-                alt_buffer: true
-                key: app.settings.help_gutter_delay
-                title: Configure Help Gutter Hover Delay
+                key: app.settings.toast_timeout
             - '{divider}': null
             - Back to Options & Settings:
                 type: back
@@ -626,13 +674,13 @@ items:
           quiet: true
           alt_buffer: true
           tabstop: 4
-          no_formatting: false
           exec_mode: console
-          refresh: false
-          masked: false
           external: false
-          show_whitespace: false
           stream: false
+          no_formatting: false
+          masked: false
+          show_whitespace: false
+          refresh: false
       - Update Grub:
           type: command
           icon: '{nf::#f11e7}'
@@ -641,14 +689,14 @@ items:
           interactive: false
           quiet: true
           tabstop: 4
-          window_percent: 65
-          external: false
-          exec_mode: streaming
-          no_formatting: false
-          refresh: false
           show_whitespace: false
+          no_formatting: false
           masked: false
+          window_percent: 65
+          refresh: false
+          external: false
           stream: true
+          exec_mode: streaming
       - Edit .bash_aliases [{bash_aliases}]:
           type: editor
           icon: '{nf::#f11e7}'
@@ -750,10 +798,10 @@ items:
           prompt: 'Enter your postal code/zip code:'
           interactive: false
           quiet: true
-          picker: none
           stream: true
           key: user.postal_code
           title: Weather Location [{user.postal_code}]
+          picker: none
       - Weather -> 3 Day [curl wttr.in/{user.postal_code}]:
           type: command
           icon: '{nf::#eef0:}'
