@@ -744,3 +744,22 @@
 - [x] Unit & Integration Tests (`crates/themeedit-cli/tests/themeedit_test.rs`):
   - Added `test_themeedit_highlight_text_token_configuration` verifying token existence, initial foreground retrieval, alias selection, color update to index 46, YAML palette sequence update (`[46, 201]`), style resolution (`fg == 46`, `bg == 201`), and preview flashing spans.
 - [x] Remote CI Run: `42436916241` passed completely with zero warnings or failures.
+
+## Phase 27: Missing Supported Color Theme Tokens (Title, Window Close Button, Footer)
+- [x] Commit `17047b6`: Added all remaining supported Color Theme Tokens (`title`, `window_close_button`, and `footer`) to the Theme Editor token tree and UI.
+- [x] Token Tree Registration & Palette Support (`crates/themeedit-cli/src/lib.rs`):
+  - Added `Title Color` (`title`), `Footer Color` (`footer`), and `Window Close Button` (`window_close_button`) tokens under `TokenCategory::Colors`.
+  - Updated `create_default_theme()` to include initial color pairs for `title`, `footer`, and `window_close_button`.
+  - Updated `get_color_token_color()` and `get_color_token_u8()` to resolve `title` and `footer` via active theme styles and palette mappings.
+  - Updated `get_token_value_display()` to fall back to resolved active theme styles for all color tokens when not explicitly defined in 256-color map.
+  - Added aliases in `select_token_by_key()`: `header` -> `title`, `bottom_bar` -> `footer`, and `close_button`/`close_btn`/`close` -> `window_close_button`.
+  - Added preview flash spans in `get_token_preview_spans()` for `footer` (bottom border row) and `window_close_button` (top-right `[X]` button).
+- [x] Interactive Preview & Modal Picker (`crates/themeedit-cli/src/main.rs`):
+  - Configured custom picker modal titles in `open_selected_token_picker()`: `"Pick Title Color"`, `"Pick Footer Color"`, and `"Pick Window Close Button Color"`.
+  - Updated `hit_test_preview()`:
+    - In `PreviewMode::Menu`, clicking `[X]` at top-right selects `window_close_button`.
+    - In `PreviewMode::Modals`, clicking dialog title selects `title` and clicking `[X]` selects `window_close_button`.
+    - In `PreviewMode::MenuEditor`, clicking footer row selects `footer`.
+- [x] Unit & Integration Tests (`crates/themeedit-cli/tests/themeedit_test.rs`):
+  - Added `test_themeedit_title_window_close_button_footer_tokens` verifying token existence, alias selection, color retrieval, value updates in `colors_256`, preview flash spans, and default theme generation.
+- [x] Remote CI Run: `42437847593` passed completely with zero warnings or failures.
