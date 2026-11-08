@@ -306,6 +306,10 @@ impl ThemeEditorState {
             },
             // Colors
             TokenItem {
+                label: "Title Color".to_string(),
+                kind: TokenKind::Color("title".to_string()),
+            },
+            TokenItem {
                 label: "Text Color".to_string(),
                 kind: TokenKind::Color("text".to_string()),
             },
@@ -344,6 +348,14 @@ impl ThemeEditorState {
             TokenItem {
                 label: "Gutter Color".to_string(),
                 kind: TokenKind::Color("gutter".to_string()),
+            },
+            TokenItem {
+                label: "Footer Color".to_string(),
+                kind: TokenKind::Color("footer".to_string()),
+            },
+            TokenItem {
+                label: "Window Close Button".to_string(),
+                kind: TokenKind::Color("window_close_button".to_string()),
             },
             TokenItem {
                 label: "Scrollbar Color".to_string(),
@@ -496,6 +508,13 @@ impl ThemeEditorState {
 
         let mut colors = HashMap::new();
         colors.insert(
+            "title".to_string(),
+            serde_yml::Value::Sequence(vec![
+                serde_yml::Value::Number(201.into()),
+                serde_yml::Value::Number((-1).into()),
+            ]),
+        );
+        colors.insert(
             "text".to_string(),
             serde_yml::Value::Sequence(vec![
                 serde_yml::Value::Number(255.into()),
@@ -548,6 +567,20 @@ impl ThemeEditorState {
             "plugin".to_string(),
             serde_yml::Value::Sequence(vec![
                 serde_yml::Value::Number(212.into()),
+                serde_yml::Value::Number((-1).into()),
+            ]),
+        );
+        colors.insert(
+            "footer".to_string(),
+            serde_yml::Value::Sequence(vec![
+                serde_yml::Value::Number(61.into()),
+                serde_yml::Value::Number((-1).into()),
+            ]),
+        );
+        colors.insert(
+            "window_close_button".to_string(),
+            serde_yml::Value::Sequence(vec![
+                serde_yml::Value::Number(203.into()),
                 serde_yml::Value::Number((-1).into()),
             ]),
         );
@@ -608,6 +641,10 @@ impl ThemeEditorState {
                     if let Some(fg) = styles.highlight.fg {
                         return format!("Color {}", color_to_u8(fg));
                     }
+                }
+                let col = self.get_color_token_color(key);
+                if col != Color::Reset {
+                    return format!("Color {}", color_to_u8(col));
                 }
                 "Default".to_string()
             }
@@ -996,6 +1033,7 @@ impl ThemeEditorState {
         let styles = ResolvedThemeStyles::from_theme(&self.current_theme, true);
         match key {
             "background" => styles.background,
+            "title" => styles.title.fg.unwrap_or(Color::White),
             "text" => styles.text.fg.unwrap_or(Color::White),
             "highlight" => styles.highlight.bg.unwrap_or(Color::Cyan),
             "border" => styles.border,
@@ -1005,6 +1043,7 @@ impl ThemeEditorState {
             "help_text" => styles.help_text.fg.unwrap_or(Color::Cyan),
             "plugin" => styles.plugin.fg.unwrap_or(Color::Cyan),
             "gutter" => styles.gutter.fg.unwrap_or(Color::DarkGray),
+            "footer" => styles.footer.fg.unwrap_or(Color::DarkGray),
             "window_close_button" => styles.window_close_button.fg.unwrap_or(Color::Red),
             "scrollbar" => styles.scrollbar.fg.unwrap_or(Color::Cyan),
             "toast_info" => styles.toast_info,
@@ -1138,6 +1177,7 @@ impl ThemeEditorState {
         let styles = ResolvedThemeStyles::from_theme(&self.current_theme, true);
         match key {
             "background" => color_to_u8(styles.background),
+            "title" => styles.title.fg.map(color_to_u8).unwrap_or(255),
             "text" => styles.text.fg.map(color_to_u8).unwrap_or(255),
             "highlight" => styles.highlight.bg.map(color_to_u8).unwrap_or(255),
             "border" => color_to_u8(styles.border),
@@ -1147,6 +1187,7 @@ impl ThemeEditorState {
             "help_text" => styles.help_text.fg.map(color_to_u8).unwrap_or(255),
             "plugin" => styles.plugin.fg.map(color_to_u8).unwrap_or(255),
             "gutter" => styles.gutter.fg.map(color_to_u8).unwrap_or(255),
+            "footer" => styles.footer.fg.map(color_to_u8).unwrap_or(255),
             "window_close_button" => styles
                 .window_close_button
                 .fg
@@ -1592,6 +1633,10 @@ impl ThemeEditorState {
                                 && (key == "highlight_fg" || key == "highlight_foreground"))
                             || (k == "background"
                                 && (key == "bg" || key == "bg_color" || key == "background_color"))
+                            || (k == "window_close_button"
+                                && (key == "close_button" || key == "close_btn" || key == "close"))
+                            || (k == "title" && key == "header")
+                            || (k == "footer" && key == "bottom_bar")
                     }
                     TokenKind::Border(k) => {
                         (k == "top_tee" && key == "gutter_top_tee")
@@ -1823,6 +1868,17 @@ pub fn get_token_preview_spans(
                 sep_x + 1,
                 right_area.x + right_area.width.saturating_sub(2),
             ));
+        }
+        TokenKind::Color(key) if key == "footer" => {
+            spans.push((
+                bot_y,
+                right_area.x + 1,
+                right_area.x + right_area.width.saturating_sub(1),
+            ));
+        }
+        TokenKind::Color(key) if key == "window_close_button" => {
+            let close_x = right_area.x + right_area.width.saturating_sub(4);
+            spans.push((right_area.y, close_x, close_x + 3));
         }
         TokenKind::Color(key) if key == "scrollbar" => {
             let top_sb = (right_area.y + 3).min(bot_y);

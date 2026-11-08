@@ -1560,6 +1560,12 @@ fn open_selected_token_picker(state: &mut ThemeEditorState, active_modal: &mut A
                 "Pick Highlight Text Color"
             } else if key == "highlight" {
                 "Pick Highlight Bar Color"
+            } else if key == "title" {
+                "Pick Title Color"
+            } else if key == "window_close_button" {
+                "Pick Window Close Button Color"
+            } else if key == "footer" {
+                "Pick Footer Color"
             } else {
                 "Pick Theme Color"
             };
@@ -1651,6 +1657,10 @@ fn hit_test_preview(
         PreviewMode::Menu => {
             // 1. Top border
             if row == right_area.y {
+                let close_x = right_area.x + right_area.width.saturating_sub(4);
+                if col >= close_x && col < close_x + 3 {
+                    return Some(("window_close_button", row, close_x, close_x + 3));
+                }
                 if col == right_area.x {
                     return Some(("border_top_left", row, col, col + 1));
                 }
@@ -1805,6 +1815,13 @@ fn hit_test_preview(
 
             if col >= mod_x && col < mod_x + mod_w && row >= mod_y && row < mod_y + mod_h {
                 if row == mod_y {
+                    let close_x = mod_x + mod_w.saturating_sub(4);
+                    if col >= close_x && col < close_x + 3 {
+                        return Some(("window_close_button", row, close_x, close_x + 3));
+                    }
+                    if col >= mod_x + 2 && col < mod_x + 27 {
+                        return Some(("title", row, mod_x + 2, mod_x + 27));
+                    }
                     if col == mod_x {
                         return Some(("border_top_left", row, col, col + 1));
                     }
@@ -1911,9 +1928,9 @@ fn hit_test_preview(
             let tree_rect = Rect::new(p_inner_x, panels_y, left_w, panels_h);
             let insp_rect = Rect::new(p_inner_x + left_w, panels_y, right_w, panels_h);
 
-            // Bottom border and help gutter
+            // Bottom border and footer help gutter
             if row == footer_y {
-                return Some(("gutter", row, p_inner_x, p_inner_x + p_avail_w));
+                return Some(("footer", row, p_inner_x, p_inner_x + p_avail_w));
             }
             if row == bot_y {
                 return Some((

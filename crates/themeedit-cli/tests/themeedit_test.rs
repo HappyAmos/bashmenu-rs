@@ -1697,3 +1697,123 @@ fn test_themeedit_highlight_text_token_configuration() {
     assert_eq!(sx1, right_area.x + 4);
     assert_eq!(sx2, right_area.x + 26);
 }
+
+#[test]
+fn test_themeedit_title_window_close_button_footer_tokens() {
+    use bashmenu_tui::ResolvedThemeStyles;
+    use ratatui::layout::Rect;
+    use ratatui::style::Color;
+    use themeedit_cli::{get_token_preview_spans, PreviewMode, ThemeEditorState, TokenKind};
+
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(fixture_path, Some("dracula".to_string()));
+
+    // 1. Verify Title, Window Close Button, and Footer exist in tokens
+    let title_tok = state
+        .tokens
+        .iter()
+        .find(|t| matches!(&t.kind, TokenKind::Color(k) if k == "title"))
+        .cloned()
+        .expect("Title Color token must exist in tokens");
+    assert_eq!(title_tok.label, "Title Color");
+
+    let close_tok = state
+        .tokens
+        .iter()
+        .find(|t| matches!(&t.kind, TokenKind::Color(k) if k == "window_close_button"))
+        .cloned()
+        .expect("Window Close Button token must exist in tokens");
+    assert_eq!(close_tok.label, "Window Close Button");
+
+    let footer_tok = state
+        .tokens
+        .iter()
+        .find(|t| matches!(&t.kind, TokenKind::Color(k) if k == "footer"))
+        .cloned()
+        .expect("Footer Color token must exist in tokens");
+    assert_eq!(footer_tok.label, "Footer Color");
+
+    // 2. Selection by exact key and aliases
+    assert!(state.select_token_by_key("title"));
+    assert_eq!(
+        state.current_selected_token().map(|t| &t.kind),
+        Some(&TokenKind::Color("title".to_string()))
+    );
+    assert!(state.select_token_by_key("header"));
+    assert_eq!(
+        state.current_selected_token().map(|t| &t.kind),
+        Some(&TokenKind::Color("title".to_string()))
+    );
+
+    assert!(state.select_token_by_key("window_close_button"));
+    assert_eq!(
+        state.current_selected_token().map(|t| &t.kind),
+        Some(&TokenKind::Color("window_close_button".to_string()))
+    );
+    assert!(state.select_token_by_key("close_btn"));
+    assert_eq!(
+        state.current_selected_token().map(|t| &t.kind),
+        Some(&TokenKind::Color("window_close_button".to_string()))
+    );
+
+    assert!(state.select_token_by_key("footer"));
+    assert_eq!(
+        state.current_selected_token().map(|t| &t.kind),
+        Some(&TokenKind::Color("footer".to_string()))
+    );
+    assert!(state.select_token_by_key("bottom_bar"));
+    assert_eq!(
+        state.current_selected_token().map(|t| &t.kind),
+        Some(&TokenKind::Color("footer".to_string()))
+    );
+
+    // 3. Color retrieval & display
+    assert_eq!(state.get_color_token_color("title"), Color::Indexed(201));
+    assert_eq!(state.get_color_token_u8("title"), 201);
+    assert_eq!(state.get_token_value_display(&title_tok), "Color 201");
+
+    assert_eq!(
+        state.get_color_token_color("window_close_button"),
+        Color::Indexed(203)
+    );
+    assert_eq!(state.get_color_token_u8("window_close_button"), 203);
+    assert_eq!(state.get_token_value_display(&close_tok), "Color 203");
+
+    assert_eq!(state.get_color_token_color("footer"), Color::Indexed(61));
+    assert_eq!(state.get_color_token_u8("footer"), 61);
+    assert_eq!(state.get_token_value_display(&footer_tok), "Color 61");
+
+    // 4. Update values and verify persistence in palette
+    state.set_color_token_value("title", Color::Indexed(190));
+    assert_eq!(state.get_color_token_u8("title"), 190);
+
+    state.set_color_token_value("window_close_button", Color::Indexed(196));
+    assert_eq!(state.get_color_token_u8("window_close_button"), 196);
+
+    state.set_color_token_value("footer", Color::Indexed(82));
+    assert_eq!(state.get_color_token_u8("footer"), 82);
+
+    // 5. Preview spans
+    let right_area = Rect::new(0, 0, 80, 24);
+    let styles = ResolvedThemeStyles::from_theme(&state.current_theme, true);
+
+    let title_spans = get_token_preview_spans(&title_tok, right_area, PreviewMode::Menu, &styles);
+    assert!(!title_spans.is_empty());
+    assert_eq!(title_spans[0].0, right_area.y);
+
+    let close_spans = get_token_preview_spans(&close_tok, right_area, PreviewMode::Menu, &styles);
+    assert!(!close_spans.is_empty());
+    assert_eq!(close_spans[0].0, right_area.y);
+    assert_eq!(close_spans[0].1, right_area.x + 76);
+
+    let footer_spans = get_token_preview_spans(&footer_tok, right_area, PreviewMode::Menu, &styles);
+    assert!(!footer_spans.is_empty());
+    assert_eq!(footer_spans[0].0, right_area.y + right_area.height - 1);
+
+    // 6. Verify create_default_theme includes title, window_close_button, and footer
+    let def_theme = ThemeEditorState::create_default_theme();
+    let def_c256 = def_theme.colors_256.as_ref().unwrap();
+    assert!(def_c256.contains_key("title"));
+    assert!(def_c256.contains_key("window_close_button"));
+    assert!(def_c256.contains_key("footer"));
+}
