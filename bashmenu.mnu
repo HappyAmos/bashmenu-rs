@@ -185,6 +185,19 @@ items:
           action: '{scripts_dir}/install_games.sh'
           interactive: true
           external: true
+      - Install KCChase and CMatrix Terminal Screensavers:
+          type: command
+          interactive: true
+          quiet: false
+          alt_buffer: true
+          tabstop: 4
+          exec_mode: console
+          stream: false
+          external: false
+          masked: false
+          show_whitespace: false
+          no_formatting: false
+          refresh: false
       - Install Nerd Fonts [curl https://raw.githubusercontent.com/officialrajdeepsingh/nerd-fonts-installer/main/install.sh]:
           type: command
           icon: '{nf::#eb54:}'
@@ -240,10 +253,10 @@ items:
                 tabstop: 4
                 no_formatting: false
                 refresh: false
-                stream: false
-                show_whitespace: false
                 masked: false
+                stream: false
                 exec_mode: console
+                show_whitespace: false
                 external: true
             - Google.com:
                 type: script
@@ -292,12 +305,12 @@ items:
           quiet: false
           alt_buffer: true
           tabstop: 4
-          stream: false
-          show_whitespace: false
-          refresh: false
-          external: false
           no_formatting: false
           masked: false
+          stream: false
+          show_whitespace: false
+          external: false
+          refresh: false
           exec_mode: console
       - '{divider}': null
       - Back To Main Menu:
@@ -306,21 +319,21 @@ items:
           quiet: false
           alt_buffer: true
           tabstop: 4
-          exec_mode: console
-          stream: false
-          no_formatting: false
           refresh: false
           show_whitespace: false
           masked: false
           external: false
+          exec_mode: console
+          stream: false
+          no_formatting: false
       - '{divider}': null
     refresh: false
     show_whitespace: false
     exec_mode: console
-    external: false
-    masked: false
-    no_formatting: false
     stream: false
+    masked: false
+    external: false
+    no_formatting: false
 - Network Utilities:
     type: submenu
     icon: '{nf::#ef09:}'
@@ -340,8 +353,8 @@ items:
           type: config
           icon: '{nf::#f11ab}'
           prompt: 'Enter Hostname or IP Address:'
-          key: settings.ping_target
           title: Edit Ping Target
+          key: settings.ping_target
       - IP Information:
           type: script
           icon: '{nf::#F0A5F:}'
@@ -363,8 +376,8 @@ items:
             type: message
             title: Task Cancelled
             message: Ping request was cancelled by user.
-          title: Confirm Ping Task
           message: Start pinging target host {settings.ping_target}?
+          title: Confirm Ping Task
       - Show Configured DNS [getdns.py]:
           type: script
           icon: '{nf::#f01d6}'
@@ -440,14 +453,14 @@ items:
                 quiet: false
                 alt_buffer: true
                 tabstop: 4
-                key: app.settings.inactivity_timeout.milliseconds
-                external: false
                 refresh: false
-                no_formatting: false
-                exec_mode: console
                 show_whitespace: false
                 stream: false
+                key: app.settings.inactivity_timeout.milliseconds
+                external: false
                 masked: false
+                exec_mode: console
+                no_formatting: false
             - Edit Screensaver Program [{app.settings.inactivity_timeout.command}]:
                 type: config
                 icon: '{nf::#f093a}'
@@ -456,14 +469,14 @@ items:
                 quiet: false
                 alt_buffer: true
                 tabstop: 4
-                no_formatting: false
-                external: false
-                key: app.settings.inactivity_timeout.command
-                masked: false
-                stream: false
                 refresh: false
+                external: false
                 exec_mode: console
                 show_whitespace: false
+                stream: false
+                key: app.settings.inactivity_timeout.command
+                no_formatting: false
+                masked: false
             - Edit Scripts [{scripts_dir}]:
                 type: editor
                 icon: '{nf::#eae9}'
@@ -497,8 +510,8 @@ items:
             - Enable Automatic Updates (git pull) [{settings.check_for_updates}]:
                 type: toggle
                 icon: '{nf::#ea77}'
-                title: Toggle Auto Update
                 key: settings.check_for_updates
+                title: Toggle Auto Update
                 message: Enable automatic updates?
             - Enable Nerd Fonts [{settings.use_nerd_fonts}]:
                 type: toggle
@@ -541,8 +554,6 @@ items:
                 interactive: true
                 quiet: false
                 alt_buffer: true
-                title: Pager Text Editor [{settings.pager_editor}]
-                key: settings.pager_editor
                 options:
                 - label: Default System Editor ($EDITOR)
                   value: default
@@ -550,6 +561,8 @@ items:
                   value: builtin
                 - label: Vim
                   value: vim
+                title: Pager Text Editor [{settings.pager_editor}]
+                key: settings.pager_editor
             - Menu Transition Effect [{settings.transition}]:
                 type: radio
                 icon: '{nf::#f0d0}'
@@ -598,8 +611,8 @@ items:
                   value: normal
                 - label: Slow (Deliberate, ~200-250ms, 50ms/step)
                   value: slow
-                title: Screen Transition Speed [{settings.transition_speed}]
                 key: settings.transition_speed
+                title: Screen Transition Speed [{settings.transition_speed}]
             - Modal Animation Effect [{settings.modal_animation}]:
                 type: radio
                 icon: '{nf::#f065}'
@@ -608,13 +621,13 @@ items:
                 interactive: true
                 quiet: false
                 alt_buffer: true
+                title: Modal Animation Effect [{settings.modal_animation}]
+                key: settings.modal_animation
                 options:
                 - label: Zoom (Animated grow from launch point and shrink on close)
                   value: zoom
                 - label: None (Instant popup open and close)
                   value: none
-                title: Modal Animation Effect [{settings.modal_animation}]
-                key: settings.modal_animation
             - Modal Animation Speed [{settings.modal_animation_speed}]:
                 type: radio
                 icon: '{nf::#f0e7}'
@@ -623,6 +636,7 @@ items:
                 interactive: true
                 quiet: false
                 alt_buffer: true
+                key: settings.modal_animation_speed
                 options:
                 - label: Fast (~36ms, snappy 12ms/step)
                   value: fast
@@ -631,7 +645,6 @@ items:
                 - label: Slow (~120ms, deliberate 40ms/step)
                   value: slow
                 title: Modal Animation Speed [{settings.modal_animation_speed}]
-                key: settings.modal_animation_speed
             - Linux Framebuffer Support [{settings.framebuffer}]:
                 type: radio
                 icon: '{nf::#f2db}'
@@ -647,14 +660,14 @@ items:
                   value: 'true'
                 - label: Disabled (Standard terminal TUI rendering)
                   value: 'false'
-                title: Linux Framebuffer Support [{settings.framebuffer}]
                 key: settings.framebuffer
+                title: Linux Framebuffer Support [{settings.framebuffer}]
             - Configure Status Gutter [{settings.status_gutter}]:
                 type: config
                 icon: '{nf::#ebf3}'
                 prompt: 'Enter status gutter format. Available options: {user}, {battery}, {date}, {date_time_24}, {date_time_24_short}, {date_time_12}, {date_time_12_short}, {host}, {user-mode}, {version}, {utc_seconds}'
-                title: Configure Status Gutter
                 key: settings.status_gutter
+                title: Configure Status Gutter
             - Status Gutter Refresh Rate [[{app.settings.refresh_interval}] seconds]:
                 type: config
                 icon: '{nf:@:#f1452}'
@@ -695,13 +708,13 @@ items:
           quiet: true
           alt_buffer: true
           tabstop: 4
-          external: false
-          masked: false
-          show_whitespace: false
           exec_mode: console
-          refresh: false
+          masked: false
           stream: false
+          external: false
+          refresh: false
           no_formatting: false
+          show_whitespace: false
       - Update Grub:
           type: command
           icon: '{nf::#f11e7}'
@@ -710,14 +723,14 @@ items:
           interactive: false
           quiet: true
           tabstop: 4
-          stream: true
-          masked: false
           refresh: false
-          external: false
-          window_percent: 65
+          show_whitespace: false
           no_formatting: false
           exec_mode: streaming
-          show_whitespace: false
+          window_percent: 65
+          external: false
+          stream: true
+          masked: false
       - Edit .bash_aliases [{bash_aliases}]:
           type: editor
           icon: '{nf::#f11e7}'
@@ -819,9 +832,9 @@ items:
           prompt: 'Enter your postal code/zip code:'
           interactive: false
           quiet: true
-          stream: true
           picker: none
           title: Weather Location [{user.postal_code}]
+          stream: true
           key: user.postal_code
       - Weather -> 3 Day [curl wttr.in/{user.postal_code}]:
           type: command
@@ -853,10 +866,10 @@ items:
     alt_buffer: true
     tabstop: 4
     no_formatting: false
-    exec_mode: console
     external: false
-    refresh: false
+    exec_mode: console
     stream: false
+    refresh: false
     masked: false
     show_whitespace: false
 - Exit Menu:
