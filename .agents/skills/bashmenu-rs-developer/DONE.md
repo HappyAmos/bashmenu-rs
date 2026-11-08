@@ -795,3 +795,22 @@
   - Added `test_preview_faux_plugin_uniform_color_and_shortcuts` to `crates/themeedit-cli/tests/themeedit_test.rs` validating uniform plugin text foregrounds, preview shortcut key rendering, and token preview spans.
   - Updated `test_preview_menu_items_uniform_text_color` to account for shortcut key positioning and verify shortcut key foreground styling.
   - Workspace tests passing (`cargo test --workspace`), clippy clean (`-D warnings`), and fmt clean (`cargo fmt --all --check`).
+
+## Phase 30: Menuedit Bottom-Right Corner Footer "xi" Border Overflow Fix
+- [x] Root Cause Identified:
+  - In `crates/bashmenu-tui/src/gutter.rs`, `spread_gutter_line_layout` and `wrap_spread_help_gutter_layout` previously called `visible_text_len(item)` from `crate::bbcode`.
+  - In `crates/bashmenu-tui/src/bbcode.rs`, `visible_text_len` invokes `strip_bbcode(text).width()`. BBCode formatting recognizes `[s]` as a tag for strikethrough text and strips it.
+  - When `menuedit` rendered its second footer row containing `[s] Save`, `visible_text_len("[s] Save")` stripped `[s]`, returning 5 instead of 8.
+  - This 3-character undercount caused `min_line_len` to be 3 columns too short, allocating 3 extra space characters to line gaps and making the formatted line 3 columns longer than `avail_w`.
+  - Furthermore, `ranges` calculated column positions using the undercounted width, shifting all subsequent tokens (`[ESC/q] Exit`) 3 columns to the left in `ranges`.
+  - As a result, when `line_str` was printed to the buffer, `[ESC/q] Exit` extended past the inner boundary and overwrote the right window border with `xi`. When individual token highlights were printed at the shifted `ranges` position, the un-overwritten tail of `[ESC/q] Exit` from `line_str` remained visible as `Exitxi`.
+- [x] Core Fix Implemented:
+  - Created `gutter_text_width(s: &str) -> usize` using `unicode_width::UnicodeWidthStr::width` and `truncate_gutter_text(text: &str, max_w: usize) -> String` using character widths in `crates/bashmenu-tui/src/gutter.rs`.
+  - Replaced all calls to `visible_text_len` and `truncate_to_width` across `gutter.rs` with `gutter_text_width` and `truncate_gutter_text`.
+  - In `spread_gutter_line_layout`, clamped token ranges to `max_w` and skipped ranges beyond `max_w` when line length exceeds bounds.
+  - Added defense-in-depth clamping in `crates/menuedit-cli/src/main.rs`: `line_str` is clamped to `avail_w`, and token labels are truncated if they extend beyond `inner_x + avail_w`, guaranteeing footer text can never overwrite the right window border.
+- [x] Tests & Verification:
+  - Added `test_wrap_spread_help_gutter_bbcode_conflict_brackets` in `crates/bashmenu-tui/src/gutter.rs` ensuring shortcut brackets like `[s] Save`, `[b] Back`, `[i] Info`, `[u] Undo` are never stripped or miscalculated.
+  - Added `test_menuedit_footer_border_overflow_repro` in `crates/menuedit-cli/tests/menuedit_test.rs` checking all window widths from 40 to 200, explicitly asserting that right window border `│` remains intact and `"Exitxi"` is never present on any row.
+  - Updated assertions in `test_menuedit_footer_spread_and_position` and `test_editor_legend_row_spread` to use `gutter_text_width`.
+  - Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass with zero warnings or errors.

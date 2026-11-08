@@ -5,8 +5,32 @@
 //! 2. Help text treats the pipe character `|` as a word boundary for wrapping.
 //! 3. Text is spread evenly across lines with centered pipe delimiters.
 
-use crate::bbcode::{truncate_to_width, visible_text_len};
 use std::time::{Duration, Instant};
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+
+/// Measures visual display column width of gutter text.
+#[inline]
+pub fn gutter_text_width(s: &str) -> usize {
+    s.width()
+}
+
+/// Truncates a string to at most `max_w` display columns.
+pub fn truncate_gutter_text(text: &str, max_w: usize) -> String {
+    if max_w == 0 {
+        return String::new();
+    }
+    let mut out = String::new();
+    let mut cur_w = 0;
+    for c in text.chars() {
+        let cw = c.width().unwrap_or(0);
+        if cur_w + cw > max_w {
+            break;
+        }
+        out.push(c);
+        cur_w += cw;
+    }
+    out
+}
 
 /// Parses help text or tokens separated by '|' into cleaned item strings.
 /// Treats '|' as an atomic word / delimiter boundary.
@@ -35,17 +59,17 @@ pub fn spread_gutter_line_layout(items: &[&str], max_w: usize) -> (String, Vec<(
         return (String::new(), Vec::new());
     }
     if items.len() == 1 {
-        let text = if visible_text_len(items[0]) > max_w {
-            truncate_to_width(items[0], max_w)
+        let text = if gutter_text_width(items[0]) > max_w {
+            truncate_gutter_text(items[0], max_w)
         } else {
             items[0].to_string()
         };
-        let len = visible_text_len(&text);
+        let len = gutter_text_width(&text);
         return (text, vec![(0, len)]);
     }
 
     let num_gaps = items.len() - 1;
-    let item_lens: Vec<usize> = items.iter().map(|s| visible_text_len(s)).collect();
+    let item_lens: Vec<usize> = items.iter().map(|s| gutter_text_width(s)).collect();
     let tot_item_len: usize = item_lens.iter().sum();
     let min_line_len = tot_item_len + num_gaps * 3; // 3 chars per gap: " | "
 
@@ -55,8 +79,12 @@ pub fn spread_gutter_line_layout(items: &[&str], max_w: usize) -> (String, Vec<(
         let mut ranges = Vec::new();
         let mut cur_col = 0;
         for (i, &it) in items.iter().enumerate() {
-            let it_len = visible_text_len(it);
-            ranges.push((cur_col, cur_col + it_len));
+            let it_len = gutter_text_width(it);
+            if cur_col >= max_w {
+                break;
+            }
+            let end_col = (cur_col + it_len).min(max_w);
+            ranges.push((cur_col, end_col));
             line.push_str(it);
             cur_col += it_len;
             if i < num_gaps {
@@ -64,8 +92,8 @@ pub fn spread_gutter_line_layout(items: &[&str], max_w: usize) -> (String, Vec<(
                 cur_col += 3;
             }
         }
-        if visible_text_len(&line) > max_w {
-            line = truncate_to_width(&line, max_w);
+        if gutter_text_width(&line) > max_w {
+            line = truncate_gutter_text(&line, max_w);
         }
         return (line, ranges);
     }
@@ -79,7 +107,7 @@ pub fn spread_gutter_line_layout(items: &[&str], max_w: usize) -> (String, Vec<(
     let mut cur_col = 0;
 
     for (i, &it) in items.iter().enumerate() {
-        let it_len = visible_text_len(it);
+        let it_len = gutter_text_width(it);
         ranges.push((cur_col, cur_col + it_len));
         line.push_str(it);
         cur_col += it_len;
@@ -132,7 +160,7 @@ pub fn wrap_spread_help_gutter_layout(
     let cleaned_refs: Vec<&str> = cleaned.iter().map(|s| s.as_str()).collect();
 
     // 1. Check if all items fit on 1 line
-    let total_item_len: usize = cleaned_refs.iter().map(|s| visible_text_len(s)).sum();
+    let total_item_len: usize = cleaned_refs.iter().map(|s| gutter_text_width(s)).sum();
     let min_1_line_len = total_item_len + cleaned_refs.len().saturating_sub(1) * 3;
 
     if min_1_line_len <= max_w || max_lines == 1 {
@@ -143,9 +171,9 @@ pub fn wrap_spread_help_gutter_layout(
             let mut cur_len = 0;
             for &item in &cleaned_refs {
                 let needed = if fit.is_empty() {
-                    visible_text_len(item)
+                    gutter_text_width(item)
                 } else {
-                    3 + visible_text_len(item)
+                    3 + gutter_text_width(item)
                 };
                 if cur_len + needed <= max_w {
                     fit.push(item);
@@ -178,9 +206,9 @@ pub fn wrap_spread_help_gutter_layout(
         let l1 = &cleaned_refs[..k];
         let l2 = &cleaned_refs[k..];
 
-        let l1_len: usize = l1.iter().map(|s| visible_text_len(s)).sum::<usize>()
+        let l1_len: usize = l1.iter().map(|s| gutter_text_width(s)).sum::<usize>()
             + (l1.len().saturating_sub(1) * 3);
-        let l2_len: usize = l2.iter().map(|s| visible_text_len(s)).sum::<usize>()
+        let l2_len: usize = l2.iter().map(|s| gutter_text_width(s)).sum::<usize>()
             + (l2.len().saturating_sub(1) * 3);
 
         if l1_len <= max_w && l2_len <= max_w {
@@ -222,11 +250,11 @@ pub fn wrap_spread_help_gutter_layout(
                 let l2 = &cleaned_refs[k1..k2];
                 let l3 = &cleaned_refs[k2..];
 
-                let l1_len: usize = l1.iter().map(|s| visible_text_len(s)).sum::<usize>()
+                let l1_len: usize = l1.iter().map(|s| gutter_text_width(s)).sum::<usize>()
                     + (l1.len().saturating_sub(1) * 3);
-                let l2_len: usize = l2.iter().map(|s| visible_text_len(s)).sum::<usize>()
+                let l2_len: usize = l2.iter().map(|s| gutter_text_width(s)).sum::<usize>()
                     + (l2.len().saturating_sub(1) * 3);
-                let l3_len: usize = l3.iter().map(|s| visible_text_len(s)).sum::<usize>()
+                let l3_len: usize = l3.iter().map(|s| gutter_text_width(s)).sum::<usize>()
                     + (l3.len().saturating_sub(1) * 3);
 
                 if l1_len <= max_w && l2_len <= max_w && l3_len <= max_w {
@@ -281,9 +309,9 @@ pub fn wrap_spread_help_gutter_layout(
         while !remaining.is_empty() {
             let it = remaining[0];
             let needed = if cur_line_items.is_empty() {
-                visible_text_len(it)
+                gutter_text_width(it)
             } else {
-                3 + visible_text_len(it)
+                3 + gutter_text_width(it)
             };
             if cur_len + needed <= max_w {
                 cur_line_items.push(it);
@@ -492,7 +520,7 @@ mod tests {
         let items = ["F1 Help", "F2 Themes", "ESC Exit"];
         let max_w = 40;
         let line = format_spread_gutter_line(&items, max_w);
-        assert_eq!(visible_text_len(&line), max_w);
+        assert_eq!(gutter_text_width(&line), max_w);
         assert!(line.starts_with("F1 Help"));
         assert!(line.ends_with("ESC Exit"));
         assert!(line.contains(" | "));
@@ -503,7 +531,7 @@ mod tests {
         let items = ["A", "B", "C"];
         let max_w = 15;
         let (line, ranges) = spread_gutter_line_layout(&items, max_w);
-        assert_eq!(visible_text_len(&line), max_w);
+        assert_eq!(gutter_text_width(&line), max_w);
         assert_eq!(ranges.len(), 3);
         assert_eq!(ranges[0], (0, 1)); // "A"
         assert_eq!(ranges[2].1, max_w); // "C" ends at max_w
@@ -515,7 +543,7 @@ mod tests {
         let max_w = 80;
         let lines = wrap_spread_help_gutter(&items, max_w, 2);
         assert_eq!(lines.len(), 1, "Should fit on 1 line when max_w is ample");
-        assert_eq!(visible_text_len(&lines[0]), max_w);
+        assert_eq!(gutter_text_width(&lines[0]), max_w);
     }
 
     #[test]
@@ -536,8 +564,30 @@ mod tests {
         let max_w = 70;
         let lines = wrap_spread_help_gutter(&items, max_w, 2);
         assert_eq!(lines.len(), 2, "Should wrap across 2 lines");
-        assert_eq!(visible_text_len(&lines[0]), max_w);
-        assert_eq!(visible_text_len(&lines[1]), max_w);
+        assert_eq!(gutter_text_width(&lines[0]), max_w);
+        assert_eq!(gutter_text_width(&lines[1]), max_w);
+    }
+
+    #[test]
+    fn test_wrap_spread_help_gutter_bbcode_conflict_brackets() {
+        // [s] Save and [b] Back must NOT be stripped as BBCode tags strike or bold
+        let items = [
+            "[s] Save",
+            "[b] Back",
+            "[i] Info",
+            "[u] Undo",
+            "[ESC/q] Exit",
+        ];
+        let max_w = 60;
+        let (line, ranges) = spread_gutter_line_layout(&items, max_w);
+        assert_eq!(gutter_text_width(&line), max_w);
+        assert_eq!(ranges.len(), 5);
+        assert!(line.contains("[s] Save"));
+        assert!(line.contains("[b] Back"));
+        assert!(line.contains("[i] Info"));
+        assert!(line.contains("[u] Undo"));
+        assert!(line.ends_with("[ESC/q] Exit"));
+        assert_eq!(ranges[4].1, max_w);
     }
 
     #[test]

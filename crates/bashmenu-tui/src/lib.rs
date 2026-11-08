@@ -28,9 +28,9 @@ pub use framebuffer::{
     format_pixel_16, format_pixel_32, is_framebuffer_available, FramebufferDevice,
 };
 pub use gutter::{
-    format_spread_gutter_line, has_hidden_gutter_text, parse_help_tokens,
-    spread_gutter_line_layout, wrap_spread_help_gutter, wrap_spread_help_gutter_layout,
-    HelpGutterHover,
+    format_spread_gutter_line, gutter_text_width, has_hidden_gutter_text, parse_help_tokens,
+    spread_gutter_line_layout, truncate_gutter_text, wrap_spread_help_gutter,
+    wrap_spread_help_gutter_layout, HelpGutterHover,
 };
 pub use marquee::{format_marquee_spacer, get_marquee_slice, MarqueeTracker};
 pub use menu_view::{MenuAction, MenuView};

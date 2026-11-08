@@ -311,8 +311,8 @@ fn test_editor_legend_row_spread() {
     let (line_r1, ranges_r1) = bashmenu_tui::spread_gutter_line_layout(&items_r1, avail_w);
     let (line_r2, ranges_r2) = bashmenu_tui::spread_gutter_line_layout(&items_r2, avail_w);
 
-    assert_eq!(bashmenu_tui::visible_text_len(&line_r1), avail_w);
-    assert_eq!(bashmenu_tui::visible_text_len(&line_r2), avail_w);
+    assert_eq!(bashmenu_tui::gutter_text_width(&line_r1), avail_w);
+    assert_eq!(bashmenu_tui::gutter_text_width(&line_r2), avail_w);
 
     assert_eq!(ranges_r1.len(), 8);
     assert_eq!(ranges_r2.len(), 8);

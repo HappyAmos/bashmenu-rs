@@ -706,8 +706,8 @@ fn test_menuedit_footer_spread_and_position() {
     let (line_r1, ranges_r1) = bashmenu_tui::spread_gutter_line_layout(&items_r1, avail_w);
     let (line_r2, ranges_r2) = bashmenu_tui::spread_gutter_line_layout(&items_r2, avail_w);
 
-    assert_eq!(bashmenu_tui::visible_text_len(&line_r1), avail_w);
-    assert_eq!(bashmenu_tui::visible_text_len(&line_r2), avail_w);
+    assert_eq!(bashmenu_tui::gutter_text_width(&line_r1), avail_w);
+    assert_eq!(bashmenu_tui::gutter_text_width(&line_r2), avail_w);
 
     assert_eq!(ranges_r1.len(), 8);
     assert_eq!(ranges_r2.len(), 8);
@@ -1781,4 +1781,108 @@ fn test_item_edit_modal_horizontal_scrolling_and_mouse_interactions() {
     };
     modal.handle_mouse(mouse_scroll, area);
     assert_eq!(modal.scroll_offset, old_scroll + 2);
+}
+
+#[test]
+fn test_menuedit_footer_border_overflow_repro() {
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::style::{Color, Style};
+    use ratatui::widgets::{Block, Borders, Widget};
+
+    let items_all: [&str; 16] = [
+        "[F1] Help",
+        "[F2] Toggle All",
+        "[F3] ASCII",
+        "[F4] Glyphs",
+        "[F5] Placeholders",
+        "[a] Add",
+        "[e/ENTER] Edit",
+        "[t] Type",
+        "[SPACE] Toggle",
+        "[d] Delete",
+        "[m] Move Dn",
+        "[M] Move Up",
+        "[>] Indent",
+        "[<] Outdent",
+        "[s] Save",
+        "[ESC/q] Exit",
+    ];
+
+    for width in 40..200 {
+        let area = Rect::new(0, 0, width, 25);
+        let mut buf = Buffer::empty(area);
+        let root_block = Block::default().borders(Borders::ALL);
+        root_block.render(area, &mut buf);
+
+        let inner_x = area.x + 2;
+        let avail_w = area.width.saturating_sub(4);
+        let footer_rows: usize = 2;
+
+        let gutter_layouts =
+            bashmenu_tui::wrap_spread_help_gutter_layout(&items_all, avail_w as usize, footer_rows);
+
+        for (r_idx, (line_str, ranges)) in gutter_layouts.into_iter().enumerate() {
+            let row_y = (area.y + area.height).saturating_sub(1 + (footer_rows - r_idx) as u16);
+            let clipped_line = if line_str.len() > avail_w as usize {
+                line_str.chars().take(avail_w as usize).collect::<String>()
+            } else {
+                line_str
+            };
+            buf.set_string(
+                inner_x,
+                row_y,
+                &clipped_line,
+                Style::default().fg(Color::DarkGray),
+            );
+            for (tok_label, start, end) in ranges {
+                let screen_start = inner_x + start as u16;
+                let screen_end = inner_x + end as u16;
+                if screen_start < inner_x + avail_w {
+                    let max_tok_w = (inner_x + avail_w - screen_start) as usize;
+                    let display_tok = if tok_label.chars().count() > max_tok_w {
+                        tok_label.chars().take(max_tok_w).collect::<String>()
+                    } else {
+                        tok_label.to_string()
+                    };
+                    buf.set_string(
+                        screen_start,
+                        row_y,
+                        &display_tok,
+                        Style::default().fg(Color::Cyan),
+                    );
+                    let _ = screen_end;
+                }
+            }
+        }
+
+        let mut failures = Vec::new();
+        // Explicitly assert that no row contains corrupted token tail like "Exitxi"
+        // and that the right border at (area.x + area.width - 1, row_y) is intact
+        for r_idx in 0..footer_rows {
+            let row_y = (area.y + area.height).saturating_sub(1 + (footer_rows - r_idx) as u16);
+            let row_str: String = (0..area.width).map(|x| buf[(x, row_y)].symbol()).collect();
+            assert!(
+                !row_str.contains("Exitxi"),
+                "Width {}: row {} contains corrupted 'Exitxi'! Row:\n{}",
+                width,
+                row_y,
+                row_str
+            );
+
+            let border_sym = buf[(area.x + area.width - 1, row_y)].symbol();
+            if border_sym != "│" {
+                failures.push(format!(
+                    "Width {}: border corrupted at row {}! Symbol was '{}', expected '│'. Row content:\n'{}'",
+                    width, row_y, border_sym, row_str
+                ));
+            }
+        }
+        if !failures.is_empty() {
+            for f in failures {
+                println!("{}", f);
+            }
+            panic!("Border corrupted at width {}", width);
+        }
+    }
 }

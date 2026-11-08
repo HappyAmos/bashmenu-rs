@@ -489,23 +489,36 @@ fn main() -> Result<()> {
 
             for (r_idx, (line_str, ranges)) in gutter_layouts.into_iter().enumerate() {
                 let row_y = (area.y + area.height).saturating_sub(1 + (footer_rows - r_idx) as u16);
+                let clipped_line = if line_str.len() > avail_w as usize {
+                    line_str.chars().take(avail_w as usize).collect::<String>()
+                } else {
+                    line_str
+                };
                 buf.set_string(
                     inner_x,
                     row_y,
-                    &line_str,
+                    &clipped_line,
                     Style::default().fg(Color::DarkGray),
                 );
                 for (tok_label, start, end) in ranges {
                     if let Some((_, action)) = items_all.iter().find(|(lbl, _)| *lbl == tok_label) {
                         let screen_start = inner_x + start as u16;
                         let screen_end = inner_x + end as u16;
-                        buf.set_string(screen_start, row_y, &tok_label, styles.accent);
-                        footer_hit_regions.push(FooterHitRegion {
-                            row: row_y,
-                            start_x: screen_start,
-                            end_x: screen_end,
-                            action: *action,
-                        });
+                        if screen_start < inner_x + avail_w {
+                            let max_tok_w = (inner_x + avail_w - screen_start) as usize;
+                            let display_tok = if tok_label.chars().count() > max_tok_w {
+                                tok_label.chars().take(max_tok_w).collect::<String>()
+                            } else {
+                                tok_label.to_string()
+                            };
+                            buf.set_string(screen_start, row_y, &display_tok, styles.accent);
+                            footer_hit_regions.push(FooterHitRegion {
+                                row: row_y,
+                                start_x: screen_start,
+                                end_x: screen_end.min(inner_x + avail_w),
+                                action: *action,
+                            });
+                        }
                     }
                 }
             }
