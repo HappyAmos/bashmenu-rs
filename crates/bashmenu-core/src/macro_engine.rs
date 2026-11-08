@@ -173,6 +173,7 @@ pub fn resolve_dev_dir(home_dir: &Path, bashmenu_dir: &Path) -> PathBuf {
     // 7. Fallback to git rev-parse if git CLI is present
     if let Ok(output) = std::process::Command::new("git")
         .args(["rev-parse", "--show-toplevel"])
+        .stdin(std::process::Stdio::null())
         .output()
     {
         if output.status.success() {
@@ -513,6 +514,7 @@ fn eval_command_substitution(cmd_str: &str) -> String {
     let output = std::process::Command::new("/bin/bash")
         .arg("-c")
         .arg(trimmed)
+        .stdin(std::process::Stdio::null())
         .output()
         .ok()
         .map(|out| String::from_utf8_lossy(&out.stdout).trim().to_string())

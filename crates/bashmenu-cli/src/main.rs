@@ -1561,7 +1561,15 @@ fn main() -> Result<()> {
                                             );
                                         }
                                     }
-                                    menu_view.handle_key(key.code)
+                                    if key.code == KeyCode::Char('c')
+                                        && key
+                                            .modifiers
+                                            .contains(crossterm::event::KeyModifiers::CONTROL)
+                                    {
+                                        MenuAction::Exit
+                                    } else {
+                                        menu_view.handle_key(key.code)
+                                    }
                                 }
                                 ShortcutDispatchResult::LeaderActivated
                                 | ShortcutDispatchResult::LeaderCancelled => MenuAction::None,

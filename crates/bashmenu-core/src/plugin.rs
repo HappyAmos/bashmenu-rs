@@ -374,7 +374,9 @@ impl PluginEngine {
             c
         };
 
-        cmd.stdout(Stdio::piped()).stderr(Stdio::null());
+        cmd.stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null());
 
         let child = match cmd.spawn() {
             Ok(c) => c,

@@ -39,6 +39,25 @@ pub struct Pager {
     pub page_rows: usize,
 }
 
+/// RAII guard ensuring terminal raw mode and alternate screen are restored
+/// on drop.
+struct PagerTerminalGuard {
+    keep_alt: bool,
+}
+
+impl Drop for PagerTerminalGuard {
+    fn drop(&mut self) {
+        let mut out = stdout();
+        if !self.keep_alt {
+            let _ = execute!(out, Show, LeaveAlternateScreen);
+        }
+        let _ = disable_raw_mode();
+        let _ = out.flush();
+        #[cfg(unix)]
+        bashmenu_tui::ensure_terminal_sane();
+    }
+}
+
 impl Pager {
     /// Initializes a new interactive pager with document lines and configuration arguments.
     pub fn new(lines: Vec<String>, args: PagerArgs) -> Self {
@@ -121,6 +140,7 @@ impl Pager {
             execute!(out, EnterAlternateScreen, Hide)?;
         }
         out.flush()?;
+        let _guard = PagerTerminalGuard { keep_alt };
 
         self.query_size();
         self.clamp_top();
@@ -136,11 +156,6 @@ impl Pager {
             }
         }
 
-        if !keep_alt {
-            execute!(out, Show, LeaveAlternateScreen)?;
-        }
-        disable_raw_mode()?;
-        out.flush()?;
         Ok(())
     }
 
@@ -637,6 +652,8 @@ impl Pager {
             // Temporarily leave raw mode and alternate screen to launch child viewer
             execute!(stdout(), Show, LeaveAlternateScreen)?;
             disable_raw_mode()?;
+            #[cfg(unix)]
+            bashmenu_tui::ensure_terminal_sane();
 
             let mut cmd =
                 Command::new(std::env::current_exe().unwrap_or_else(|_| PathBuf::from("bmpager")));
@@ -646,6 +663,8 @@ impl Pager {
             cmd.arg(&full_file);
             let _ = cmd.status();
 
+            #[cfg(unix)]
+            bashmenu_tui::ensure_terminal_sane();
             enable_raw_mode()?;
             execute!(stdout(), EnterAlternateScreen, Hide)?;
             stdout().flush()?;
@@ -675,6 +694,8 @@ impl Pager {
         // Temporarily leave raw mode and alternate screen
         execute!(stdout(), Show, LeaveAlternateScreen)?;
         disable_raw_mode()?;
+        #[cfg(unix)]
+        bashmenu_tui::ensure_terminal_sane();
 
         let err_msg = open_editor(
             &target_file,
@@ -683,6 +704,8 @@ impl Pager {
         )?;
 
         // Re-enter raw mode and alternate screen
+        #[cfg(unix)]
+        bashmenu_tui::ensure_terminal_sane();
         enable_raw_mode()?;
         execute!(stdout(), EnterAlternateScreen, Hide)?;
         stdout().flush()?;

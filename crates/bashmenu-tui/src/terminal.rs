@@ -860,6 +860,7 @@ impl TerminalGuard {
             None => std::env::remove_var("BASHMENU_CHILD_ALT"),
         }
 
+        ensure_terminal_sane();
         enable_raw_mode()?;
         execute!(
             self.terminal.backend_mut(),
@@ -893,6 +894,7 @@ impl TerminalGuard {
         let result = action();
 
         // 3. Re-enter alternate screen and raw mode
+        ensure_terminal_sane();
         enable_raw_mode()?;
         execute!(
             self.terminal.backend_mut(),
@@ -986,7 +988,6 @@ impl TerminalGuard {
 impl Drop for TerminalGuard {
     /// Restores terminal raw mode, cursor visibility, and alternate screen.
     fn drop(&mut self) {
-        let _ = disable_raw_mode();
         if self.keep_alt_on_drop {
             let _ = execute!(self.terminal.backend_mut(), DisableMouseCapture);
         } else {
@@ -998,5 +999,65 @@ impl Drop for TerminalGuard {
             );
         }
         let _ = self.terminal.backend_mut().flush();
+        let _ = disable_raw_mode();
+
+        if !self.keep_alt_on_drop {
+            ensure_terminal_sane();
+        }
+    }
+}
+
+/// Restores canonical cooked mode, ensuring character echo, line-buffering,
+/// signal processing, and newline translations are strictly enabled.
+#[cfg(unix)]
+pub fn ensure_terminal_sane() {
+    let fds = [libc::STDIN_FILENO, libc::STDOUT_FILENO, libc::STDERR_FILENO];
+    for &fd in &fds {
+        if unsafe { libc::isatty(fd) } == 1 {
+            unsafe {
+                let mut termios = std::mem::zeroed::<libc::termios>();
+                if libc::tcgetattr(fd, &mut termios) == 0 {
+                    termios.c_lflag |=
+                        libc::ECHO | libc::ICANON | libc::ISIG | libc::ECHOE | libc::ECHOK;
+                    termios.c_iflag |= libc::ICRNL;
+                    termios.c_iflag &= !(libc::IGNCR | libc::INLCR);
+                    termios.c_oflag |= libc::OPOST | libc::ONLCR;
+                    let _ = libc::tcsetattr(fd, libc::TCSADRAIN, &termios);
+                }
+            }
+        }
+    }
+    if let Ok(dev_tty) = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open("/dev/tty")
+    {
+        use std::os::unix::io::AsRawFd;
+        let fd = dev_tty.as_raw_fd();
+        unsafe {
+            let mut termios = std::mem::zeroed::<libc::termios>();
+            if libc::tcgetattr(fd, &mut termios) == 0 {
+                termios.c_lflag |=
+                    libc::ECHO | libc::ICANON | libc::ISIG | libc::ECHOE | libc::ECHOK;
+                termios.c_iflag |= libc::ICRNL;
+                termios.c_iflag &= !(libc::IGNCR | libc::INLCR);
+                termios.c_oflag |= libc::OPOST | libc::ONLCR;
+                let _ = libc::tcsetattr(fd, libc::TCSADRAIN, &termios);
+            }
+        }
+    }
+}
+
+/// No-op fallback for non-unix targets.
+#[cfg(not(unix))]
+pub fn ensure_terminal_sane() {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ensure_terminal_sane_callable() {
+        ensure_terminal_sane();
     }
 }

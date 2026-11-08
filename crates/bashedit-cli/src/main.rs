@@ -720,8 +720,8 @@ fn main() -> Result<()> {
             );
 
             if handled_modal {
-                if let ActiveModal::None = active_modal {
-                    // Check if exit was requested from confirm modal
+                if tabs.is_empty() {
+                    break;
                 }
                 continue;
             }
@@ -1500,7 +1500,9 @@ fn handle_active_modal(
                     KeyCode::Char('q') | KeyCode::Char('Q') | KeyCode::Esc => {
                         tabs[*tab_idx].cleanup_swap();
                         if tabs.len() == 1 {
-                            std::process::exit(0);
+                            tabs.clear();
+                            *active_modal = ActiveModal::None;
+                            return true;
                         } else {
                             tabs.remove(*tab_idx);
                             if *active_tab_idx >= tabs.len() {
@@ -1522,7 +1524,9 @@ fn handle_active_modal(
                     if bashmenu_tui::is_close_button_clicked(inner, m.row, m.column) {
                         tabs[*tab_idx].cleanup_swap();
                         if tabs.len() == 1 {
-                            std::process::exit(0);
+                            tabs.clear();
+                            *active_modal = ActiveModal::None;
+                            return true;
                         } else {
                             tabs.remove(*tab_idx);
                             if *active_tab_idx >= tabs.len() {
@@ -1569,7 +1573,9 @@ fn handle_active_modal(
                             if rel_x >= pos {
                                 tabs[*tab_idx].cleanup_swap();
                                 if tabs.len() == 1 {
-                                    std::process::exit(0);
+                                    tabs.clear();
+                                    *active_modal = ActiveModal::None;
+                                    return true;
                                 } else {
                                     tabs.remove(*tab_idx);
                                     if *active_tab_idx >= tabs.len() {
@@ -1646,7 +1652,8 @@ fn handle_active_modal(
                     for t in tabs.iter() {
                         t.cleanup_swap();
                     }
-                    std::process::exit(0);
+                    tabs.clear();
+                    *active_modal = ActiveModal::None;
                 } else {
                     *active_modal = ActiveModal::None;
                 }

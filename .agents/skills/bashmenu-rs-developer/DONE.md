@@ -851,3 +851,20 @@
 - [x] Tests & Verification:
   - Added unit test `test_arbitrary_nested_dot_paths_never_flatten` in `crates/bashmenu-core/src/config.rs` asserting nested dictionary creation, dot-path resolution via `get_value`, and clean, non-flat YAML serialization across multiple nesting tiers.
   - Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` (all passing).
+
+## Phase 34: Terminal Echo & Raw Mode Clean Restoration on Exit
+- [x] Fixed issue where exiting `bashmenu` occasionally returned to the terminal with character echo disabled (`stty -echo`) where typed characters were invisible and the cursor did not advance until pressing `Enter`.
+- [x] Terminal Guard & Canonical Cooked State Restoration (`crates/bashmenu-tui/src/terminal.rs`, `crates/bashmenu-tui/src/lib.rs`):
+  - Implemented `ensure_terminal_sane()` using `libc::tcgetattr` and `libc::tcsetattr` with `libc::TCSADRAIN` across `STDIN_FILENO`, `STDOUT_FILENO`, `STDERR_FILENO`, and `/dev/tty` to unconditionally enforce `ECHO | ICANON | ISIG | ECHOE | ECHOK`, `ICRNL`, and `OPOST | ONLCR` whenever leaving raw mode back to the host shell.
+  - Updated `TerminalGuard::drop()` to flush output, disable raw mode, and call `ensure_terminal_sane()` when returning to the host terminal.
+  - Updated `TerminalGuard::suspend` and `TerminalGuard::suspend_keep_alt` to sanitize terminal attributes before calling `enable_raw_mode()`, preventing child commands (or crashed/interrupted subprocesses) that left raw mode enabled from corrupting crossterm's baseline snapshot.
+  - Updated `install_panic_hook()` to call `ensure_terminal_sane()` ensuring terminal echo and canonical buffering are restored even if an uncaught panic occurs.
+- [x] Child Tool & Background Process Hygiene:
+  - Fixed `crates/bashedit-cli/src/main.rs`: Replaced 4 calls to `std::process::exit(0)` with clean event loop breaks (`tabs.clear()`), ensuring `TerminalGuard`'s `Drop` implementation executes properly and restores terminal state.
+  - Fixed `crates/bmpager-cli/src/pager.rs`: Wrapped pager event loop in RAII `PagerTerminalGuard` with `Drop` calling `ensure_terminal_sane()`, and sanitized termios around external editor / child viewer suspensions.
+  - Fixed `crates/bashmenu-core/src/plugin.rs` and `crates/bashmenu-core/src/macro_engine.rs`: Explicitly isolated child subprocess `stdin` via `.stdin(Stdio::null())` so background plugin fetches and `{command:...}` macro probes cannot inherit or interfere with controlling terminal state.
+  - Fixed `crates/bashmenu-cli/src/main.rs`: Handled `Ctrl+C` (`KeyCode::Char('c')` + `KeyModifiers::CONTROL`) in the main menu to break cleanly via `MenuAction::Exit`.
+- [x] Tests & Verification:
+  - Added unit test `test_ensure_terminal_sane_callable` in `crates/bashmenu-tui/src/terminal.rs`.
+  - Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, and `shellcheck *.sh scripts/*.sh`.
+

@@ -49,7 +49,7 @@ pub use style::{
     downsample_color_to_tier, parse_color_value, parse_color_value_with_tier, parse_style_pair,
     parse_style_pair_with_tier, ColorTier, ResolvedThemeStyles,
 };
-pub use terminal::TerminalGuard;
+pub use terminal::{ensure_terminal_sane, TerminalGuard};
 pub use text_input::TextInput;
 pub use toast::{ActiveToast, ToastRack};
 pub use transition::{
@@ -63,6 +63,7 @@ pub use wallpaper::{
     ANSI8_NAMES,
 };
 
+use std::io::Write;
 use std::panic;
 
 /// Registers global panic hook restoring raw mode and alternate screen
@@ -76,6 +77,8 @@ pub fn install_panic_hook() {
             crossterm::terminal::LeaveAlternateScreen,
             crossterm::cursor::Show
         );
+        let _ = std::io::stdout().flush();
+        ensure_terminal_sane();
         default_hook(info);
     }));
 }
