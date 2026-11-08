@@ -683,3 +683,28 @@
 - [x] Reset `last_interaction = Instant::now()` on `MenuAction::Reload`, `StreamOutputModal` closing, and `Event::FocusGained` events.
 - [x] Added contract test in `crates/bashmenu-cli/tests/audit_items_test.rs` (`test_inactivity_timeout_timer_reset_contract`) asserting that 5+ minute simulated child execution durations never trigger the screensaver immediately upon return.
 - [x] Verified 100% test pass rate across the workspace, zero Clippy warnings, and zero Rustfmt warnings.
+
+## Phase 24: Menu Editor Item Type Modal Scrolling, Horizontal Text Scrolling & Mouse Selection
+- [x] Commit `1801dcd`: Fixed Menu Editor item type picker modal scrolling/visibility and enabled horizontal text scrolling & mouse selection across all text input boxes.
+- [x] Item Type Picker Modal (`crates/menuedit-cli/src/type_picker.rs`):
+  - Corrected modal height sizing dynamically (`(ITEM_TYPES.len() + 4).min(area.height - 2)`) so all 16 item types (including `{divider}`) fit comfortably without truncation on standard terminals.
+  - Added smooth vertical scrolling via `Up`/`Down`, `j`/`k`, `PageUp`/`PageDown`, `Home`/`End`, and mouse scroll wheel up/down (`ScrollUp`/`ScrollDown`).
+  - Added `▲` and `▼` scroll indicator rendering when item list overflows the viewport.
+  - Implemented direct mouse click selection on any visible row to select and confirm the item type immediately.
+- [x] Horizontal Text Scrolling (`crates/bashmenu-tui/src/text_input.rs`, `crates/menuedit-cli/src/item_edit.rs`, `crates/menuedit-cli/src/shortcut_editor.rs`, `crates/themeedit-cli/src/main.rs`, `crates/bashmenu-tui/src/modals/background_config.rs`):
+  - Added `scroll_offset` tracking to `TextInput` along with `ensure_cursor_visible(w)` and `scroll_for_width(w)`.
+  - Replaced hardcoded `.take(field_w)` truncation with windowed character slicing `chars.iter().skip(scroll_offset).take(field_w)`.
+  - Allowed Left/Right arrows and Home/End keys to reach both ends of long text strings without clipping or losing cursor visibility.
+  - Maintained inverted selection highlighting across scrolled text.
+- [x] Comprehensive Mouse Selection in Menu Editor Form (`crates/menuedit-cli/src/item_edit.rs`, `crates/menuedit-cli/src/shortcut_editor.rs`):
+  - Left-clicking on any form text input now focuses the control and positions the cursor at the clicked character column taking `scroll_offset` into account.
+  - Added mouse drag selection and Shift+LeftClick selection across inputs.
+  - Left-clicking on any checkbox (`AltBufferChk`, `QuietChk`, `NoFormattingChk`, `MaskedChk`, `RefreshChk`, `ShowWhitespaceChk`, `ExternalChk`) directly toggles its checked state.
+  - Left-clicking on `[Change Type (CTRL+T)]` opens the item type picker modal.
+  - Left-clicking on `[Browse]` buttons triggers filesystem file/directory browsing.
+  - Left-clicking on Execution Mode radio selector cycles streaming/interactive/console modes.
+  - Multi-line radio options input supports clicking to set line row and column position.
+- [x] Integration & Unit Tests:
+  - Added `test_item_type_picker_modal_scrolling_and_all_items` in `crates/menuedit-cli/tests/menuedit_test.rs` testing all 16 types, `{divider}`, navigation keys, mouse wheel, and row clicking.
+  - Added `test_item_edit_modal_horizontal_scrolling_and_mouse_interactions` in `crates/menuedit-cli/tests/menuedit_test.rs` testing long text scrolling, mouse focus, cursor placement, checkbox toggles, and button clicks.
+- [x] Remote CI Run: `42433248218` passed completely with zero warnings or failures.
