@@ -1551,9 +1551,14 @@ fn test_preview_menu_items_uniform_text_color() {
     let p_inner_x = area.x + 2;
     let item2_y = area.y + 3; // content_start_y + 1
 
+    // Shortcut "2. " is styled with styles.shortcut_key
+    let sc_cell = &buf[(p_inner_x + 6, item2_y)];
+    assert_eq!(sc_cell.symbol(), "2");
+    assert_eq!(sc_cell.fg, styles.shortcut_key.fg.unwrap());
+
     // Characters in "Browse Directory" should all have styles.text foreground
     let browse_text = "Browse Directory";
-    let start_col = p_inner_x + 6; // after prefix and icon
+    let start_col = p_inner_x + 9; // after prefix (2), icon (4), and shortcut (3)
     for offset in 0..browse_text.len() as u16 {
         let cell = &buf[(start_col + offset, item2_y)];
         assert_eq!(
@@ -1816,4 +1821,100 @@ fn test_themeedit_title_window_close_button_footer_tokens() {
     assert!(def_c256.contains_key("title"));
     assert!(def_c256.contains_key("window_close_button"));
     assert!(def_c256.contains_key("footer"));
+}
+
+#[test]
+fn test_preview_faux_plugin_uniform_color_and_shortcuts() {
+    use bashmenu_tui::ResolvedThemeStyles;
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use themeedit_cli::{get_token_preview_spans, render_preview_pane, PreviewMode};
+
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    let state = ThemeEditorState::new(fixture_path, Some("dracula".to_string()));
+    let styles = ResolvedThemeStyles::from_theme(&state.current_theme, true);
+
+    let area = Rect::new(0, 0, 70, 24);
+    let mut buf = Buffer::empty(area);
+    let mut compositor = None;
+
+    render_preview_pane(area, &mut buf, PreviewMode::Menu, &styles, &mut compositor);
+
+    let p_inner_x = area.x + 2;
+    let gt_y = area.y + area.height.saturating_sub(3);
+    let plugin_start_y = gt_y.saturating_sub(3);
+
+    // 1. Verify faux plugin rows are 100% styled in styles.plugin.fg (no divider color bleed on Alienware/Mem/Pi-3B)
+    for y in (plugin_start_y + 1)..gt_y {
+        let mut row_text = String::new();
+        for x in p_inner_x..(area.x + area.width - 2) {
+            let cell = &buf[(x, y)];
+            row_text.push_str(cell.symbol());
+            // If the cell contains text (e.g. Alienware, Mem, Pi-3B, Weather, CPU, Online), verify it has styles.plugin.fg
+            if !cell.symbol().trim().is_empty() {
+                assert_eq!(
+                    cell.fg,
+                    styles.plugin.fg.unwrap(),
+                    "Cell '{}' at ({}, {}) in faux plugin must have styles.plugin foreground",
+                    cell.symbol(),
+                    x,
+                    y
+                );
+            }
+        }
+        if y == plugin_start_y + 1 {
+            assert!(row_text.contains("Alienware"));
+        } else if y == plugin_start_y + 2 {
+            assert!(row_text.contains("Mem") && row_text.contains("Pi-3B"));
+        }
+    }
+
+    // 2. Verify shortcut numbers/letters are rendered on all menu items with shortcut_key color
+    let content_start_y = area.y + 2;
+    // Active Item 1 shortcut "1."
+    assert_eq!(buf[(p_inner_x + 6, content_start_y)].symbol(), "1");
+    assert_eq!(
+        buf[(p_inner_x + 6, content_start_y)].fg,
+        styles.shortcut_key.fg.unwrap()
+    );
+    // Inactive Item 2 shortcut "2."
+    assert_eq!(buf[(p_inner_x + 6, content_start_y + 1)].symbol(), "2");
+    assert_eq!(
+        buf[(p_inner_x + 6, content_start_y + 1)].fg,
+        styles.shortcut_key.fg.unwrap()
+    );
+    // Inactive Item 3 shortcut "3."
+    assert_eq!(buf[(p_inner_x + 6, content_start_y + 2)].symbol(), "3");
+    assert_eq!(
+        buf[(p_inner_x + 6, content_start_y + 2)].fg,
+        styles.shortcut_key.fg.unwrap()
+    );
+    // Exit Item 4 shortcut "4."
+    assert_eq!(buf[(p_inner_x + 6, content_start_y + 4)].symbol(), "4");
+    assert_eq!(
+        buf[(p_inner_x + 6, content_start_y + 4)].fg,
+        styles.shortcut_key.fg.unwrap()
+    );
+
+    // 3. Verify get_token_preview_spans for shortcut_key returns menu item shortcut spans
+    let sc_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label.contains("Shortcut Gutter"))
+        .unwrap();
+    let spans = get_token_preview_spans(sc_token, area, PreviewMode::Menu, &styles);
+    assert_eq!(spans.len(), 4);
+    assert_eq!(spans[0], (content_start_y, p_inner_x + 6, p_inner_x + 9));
+    assert_eq!(
+        spans[1],
+        (content_start_y + 1, p_inner_x + 6, p_inner_x + 9)
+    );
+    assert_eq!(
+        spans[2],
+        (content_start_y + 2, p_inner_x + 6, p_inner_x + 9)
+    );
+    assert_eq!(
+        spans[3],
+        (content_start_y + 4, p_inner_x + 6, p_inner_x + 9)
+    );
 }

@@ -515,11 +515,15 @@ fn main() -> Result<()> {
                         raw_ch
                     };
 
+                    let text_fg = styles.text.fg.unwrap_or(Color::White);
+                    let text_bg = styles.text.bg.unwrap_or(styles.background);
+                    let cursor_style = Style::default()
+                        .fg(text_bg)
+                        .bg(text_fg)
+                        .add_modifier(Modifier::BOLD);
+
                     let style = if is_cursor {
-                        Style::default()
-                            .fg(Color::Black)
-                            .bg(Color::White)
-                            .add_modifier(Modifier::BOLD)
+                        cursor_style
                     } else if is_selected {
                         styles.highlight.add_modifier(Modifier::REVERSED)
                     } else {
@@ -534,13 +538,11 @@ fn main() -> Result<()> {
                     let cursor_view_col =
                         active_tab.cursor_col.saturating_sub(active_tab.scroll_col);
                     if cursor_view_col < text_w {
+                        let text_fg = styles.text.fg.unwrap_or(Color::White);
+                        let text_bg = styles.text.bg.unwrap_or(styles.background);
+                        let cursor_style = Style::default().fg(text_bg).bg(text_fg);
                         let screen_x = text_start_x + cursor_view_col as u16;
-                        buf.set_string(
-                            screen_x,
-                            screen_y,
-                            " ",
-                            Style::default().fg(Color::Black).bg(Color::White),
-                        );
+                        buf.set_string(screen_x, screen_y, " ", cursor_style);
                     }
                 }
             }

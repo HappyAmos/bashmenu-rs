@@ -1826,11 +1826,14 @@ pub fn get_token_preview_spans(
         }
         TokenKind::Color(key) if key == "accent" => {
             // Accent is the submenu chevron indicator glyph '»' on inactive submenu item 2
-            spans.push((content_start_y + 1, p_inner_x + 22, p_inner_x + 26));
+            spans.push((content_start_y + 1, p_inner_x + 25, p_inner_x + 28));
         }
         TokenKind::Color(key) if key == "shortcut_key" => {
-            // Shortcut keys in help gutter
-            spans.push((gt_y + 1, right_area.x + 2, sep_x));
+            // Shortcut keys in menu items
+            spans.push((content_start_y, p_inner_x + 6, p_inner_x + 9));
+            spans.push((content_start_y + 1, p_inner_x + 6, p_inner_x + 9));
+            spans.push((content_start_y + 2, p_inner_x + 6, p_inner_x + 9));
+            spans.push((content_start_y + 4, p_inner_x + 6, p_inner_x + 9));
         }
         TokenKind::Indicator => {
             spans.push((content_start_y, p_inner_x, p_inner_x + 2));

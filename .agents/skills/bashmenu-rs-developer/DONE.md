@@ -777,3 +777,21 @@
 - [x] Verification & CI:
   - Passed `cargo fmt --all --check` and `cargo clippy --workspace --all-targets -- -D warnings` with zero warnings or errors.
   - Remote GitHub Actions CI run `42441058572` passed completely with `'success'`.
+
+## Phase 29: Input Cursor Text Color Parity, Faux Plugin Uniform Coloring & Theme Editor Shortcut Keys
+- [x] Input Cursor Text Color Parity Across All Programs:
+  - `crates/bashedit-cli/src/main.rs`: Derived cursor block color directly from `styles.text.fg` on editor canvas and trailing line ends rather than hardcoded `Color::White`, maintaining full parity with the edited text color.
+  - `crates/bashmenu-tui/src/modals/note_editor.rs`: Derived cursor style and end-of-chunk space cursor directly from active `line_style.fg` and `styles.background` instead of `styles.highlight`.
+  - `crates/menuedit-cli/src/item_edit.rs`: Replaced hardcoded black-on-white inverted styles in `FormRow::Input`, `FormRow::MultiLineInputRow`, and `FormRow::InputWithBrowse` with `box_style.add_modifier(Modifier::REVERSED)` and `inp_style.add_modifier(Modifier::REVERSED)`.
+  - `crates/menuedit-cli/src/shortcut_editor.rs`: Guaranteed cursor cell reverses `styles.text` with editor background without inheriting underline modifier.
+  - `crates/themeedit-cli/src/main.rs`: Unified trailing space cursor with `box_style.add_modifier(Modifier::REVERSED)`.
+- [x] Theme Editor Faux Plugin Uniform Styling (`crates/themeedit-cli/src/preview.rs`):
+  - Fixed faux plugin rows displaying in two colors by changing `Alienware`, `Mem`, and `Pi-3B` span styling from `preview_styles.divider` to `preview_styles.plugin`.
+- [x] Theme Editor Preview Shortcut Keys (`crates/themeedit-cli/src/preview.rs`, `crates/themeedit-cli/src/lib.rs`, `crates/themeedit-cli/src/main.rs`):
+  - Rendered shortcut indicators (`1. `, `2. `, `3. `, `4. `) on active and inactive menu preview rows using `preview_styles.shortcut_key` and active highlight style.
+  - Updated `get_token_preview_spans` for `shortcut_key` token to flash the 4 shortcut key spans on the menu items.
+  - Updated `hit_test_preview` to detect clicks on shortcut key columns (`p_inner_x + 6 .. p_inner_x + 9`), directly selecting `shortcut_key`.
+- [x] Unit & Integration Tests:
+  - Added `test_preview_faux_plugin_uniform_color_and_shortcuts` to `crates/themeedit-cli/tests/themeedit_test.rs` validating uniform plugin text foregrounds, preview shortcut key rendering, and token preview spans.
+  - Updated `test_preview_menu_items_uniform_text_color` to account for shortcut key positioning and verify shortcut key foreground styling.
+  - Workspace tests passing (`cargo test --workspace`), clippy clean (`-D warnings`), and fmt clean (`cargo fmt --all --check`).

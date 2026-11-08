@@ -953,6 +953,10 @@ impl NoteEditorModal {
                 buf.set_string(inner.x + 2, y, " ".repeat(vline.indent_margin), line_style);
             }
 
+            let fg = line_style.fg.unwrap_or(Color::White);
+            let bg = line_style.bg.unwrap_or(styles.background);
+            let cursor_style = Style::default().fg(bg).bg(fg).add_modifier(Modifier::BOLD);
+
             for (col_idx, &c) in vline.chars.iter().enumerate() {
                 let logical_col = vline.start_col + col_idx;
                 let is_selected = self.is_pos_selected(vline.logical_row, logical_col);
@@ -960,7 +964,7 @@ impl NoteEditorModal {
                 let cell_style = if is_selected {
                     line_style.add_modifier(Modifier::REVERSED)
                 } else if is_cursor {
-                    styles.highlight.add_modifier(Modifier::BOLD)
+                    cursor_style
                 } else {
                     line_style
                 };
@@ -974,7 +978,7 @@ impl NoteEditorModal {
                         line_start_x + c_col as u16,
                         y,
                         " ",
-                        styles.highlight.add_modifier(Modifier::BOLD),
+                        Style::default().fg(bg).bg(fg),
                     );
                 }
             }

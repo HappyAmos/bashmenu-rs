@@ -2571,7 +2571,10 @@ fn draw_input(
             st = st.add_modifier(Modifier::REVERSED);
         }
         if focused && idx == input.cursor {
-            st = st.add_modifier(Modifier::REVERSED);
+            st = styles
+                .text
+                .bg(styles.background)
+                .add_modifier(Modifier::REVERSED);
         }
         buf[(rect.x + col as u16, rect.y)]
             .set_symbol(&ch.to_string())

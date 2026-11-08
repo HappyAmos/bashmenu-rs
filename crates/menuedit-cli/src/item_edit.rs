@@ -2700,12 +2700,7 @@ impl FormRow {
                         let rel = safe_cursor - scroll;
                         let cur_x = inner.x + 3 + rel as u16;
                         if cur_x < inner.x + inner.width - 2 {
-                            buf[(cur_x, y)].set_style(
-                                Style::default()
-                                    .fg(Color::Black)
-                                    .bg(Color::White)
-                                    .add_modifier(Modifier::REVERSED),
-                            );
+                            buf[(cur_x, y)].set_style(box_style.add_modifier(Modifier::REVERSED));
                         }
                     }
                 }
@@ -2800,12 +2795,8 @@ impl FormRow {
                             let rel = c - scroll_col;
                             let cur_x = inner.x + 3 + rel as u16;
                             if cur_x < inner.x + 2 + content_w as u16 + 1 {
-                                buf[(cur_x, y)].set_style(
-                                    Style::default()
-                                        .fg(Color::Black)
-                                        .bg(Color::White)
-                                        .add_modifier(Modifier::REVERSED),
-                                );
+                                buf[(cur_x, y)]
+                                    .set_style(box_style.add_modifier(Modifier::REVERSED));
                             }
                         }
                     }
@@ -2878,12 +2869,7 @@ impl FormRow {
                         let rel = safe_cursor - scroll;
                         let cur_x = inner.x + 3 + rel as u16;
                         if cur_x < inner.x + 2 + inp_w as u16 + 2 {
-                            buf[(cur_x, y)].set_style(
-                                Style::default()
-                                    .fg(Color::Black)
-                                    .bg(Color::White)
-                                    .add_modifier(Modifier::REVERSED),
-                            );
+                            buf[(cur_x, y)].set_style(inp_style.add_modifier(Modifier::REVERSED));
                         }
                     }
                 }

@@ -252,7 +252,7 @@ fn main() -> Result<()> {
                         let cursor_col = text_start_x + rel_cursor as u16;
                         if let Some(cell) = buf.cell_mut((cursor_col, left_area.y)) {
                             cell.set_char(' ');
-                            cell.modifier |= Modifier::REVERSED;
+                            cell.set_style(box_style.add_modifier(Modifier::REVERSED));
                         }
                     }
                 }
@@ -1762,22 +1762,31 @@ fn hit_test_preview(
                 if col >= p_inner_x && col < p_inner_x + 2 {
                     return Some(("indicator", row, p_inner_x, p_inner_x + 2));
                 }
-                if col >= p_inner_x + 2 && col < p_inner_x + 24 {
-                    return Some(("highlight_text", row, p_inner_x + 2, p_inner_x + 24));
+                if col >= p_inner_x + 6 && col < p_inner_x + 9 {
+                    return Some(("shortcut_key", row, p_inner_x + 6, p_inner_x + 9));
+                }
+                if col >= p_inner_x + 2 && col < p_inner_x + 28 {
+                    return Some(("highlight_text", row, p_inner_x + 2, p_inner_x + 28));
                 }
                 return Some(("highlight", row, p_inner_x, p_inner_x + p_avail_w));
             }
             if row == content_start_y + 1 {
                 // Item 2: Browse Directory »
-                if (col >= p_inner_x + 22 && col < p_inner_x + 26)
+                if col >= p_inner_x + 6 && col < p_inner_x + 9 {
+                    return Some(("shortcut_key", row, p_inner_x + 6, p_inner_x + 9));
+                }
+                if (col >= p_inner_x + 25 && col < p_inner_x + 29)
                     || col >= right_area.x + right_area.width.saturating_sub(6)
                 {
-                    return Some(("accent", row, p_inner_x + 22, p_inner_x + 26));
+                    return Some(("accent", row, p_inner_x + 25, p_inner_x + 29));
                 }
                 return Some(("text", row, p_inner_x, p_inner_x + p_avail_w));
             }
             if row == content_start_y + 2 {
                 // Item 3: System Configuration
+                if col >= p_inner_x + 6 && col < p_inner_x + 9 {
+                    return Some(("shortcut_key", row, p_inner_x + 6, p_inner_x + 9));
+                }
                 return Some(("text", row, p_inner_x, p_inner_x + p_avail_w));
             }
             if row == content_start_y + 3 {
@@ -1786,6 +1795,9 @@ fn hit_test_preview(
             }
             if row == content_start_y + 4 {
                 // Item 4: Exit
+                if col >= p_inner_x + 6 && col < p_inner_x + 9 {
+                    return Some(("shortcut_key", row, p_inner_x + 6, p_inner_x + 9));
+                }
                 return Some(("text", row, p_inner_x, p_inner_x + p_avail_w));
             }
             // Pseudo plugins
