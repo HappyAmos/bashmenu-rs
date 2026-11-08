@@ -763,3 +763,17 @@
 - [x] Unit & Integration Tests (`crates/themeedit-cli/tests/themeedit_test.rs`):
   - Added `test_themeedit_title_window_close_button_footer_tokens` verifying token existence, alias selection, color retrieval, value updates in `colors_256`, preview flash spans, and default theme generation.
 - [x] Remote CI Run: `42437847593` passed completely with zero warnings or failures.
+
+## Phase 28: Learning Proposal & Invariants Codification (Phases 23-27)
+- [x] Commit `81d3725`: Codified permanent developer rules and skills from completed Phases 23–27 into `.agents/rules/invariants.md` and `.agents/skills/bashmenu-rs-developer/SKILL.md`.
+- [x] Invariants Codified:
+  - **Theme Selection Highlight Bar & Highlight Text Invariant (`highlight`, `highlight_text`):** Documented index 0 (`fg`) vs index 1 (`bg`) contract, margin-to-margin rendering across `p_avail_w`, contrasting text calculation, and 3-tier synchronization.
+  - **Complete Theme Token Parity & Hit-Testing Invariant:** Mandated 1:1 parity between `ResolvedThemeStyles` and `ThemeEditorState::tokens` (`title`, `window_close_button`, `footer`, `highlight`, `highlight_text`, etc.), requiring matching preview spans, hit-test coordinates, and modal picker titles.
+  - **Inactivity Timeout Reset Contract on External Program Return:** Mandated immediate `last_activity = Instant::now()` reset on return from all external commands, child subshells, editors, and companion CLI tools.
+  - **Form Navigation, Text Input Horizontal Scrolling & Modal Viewports Invariant:** Mandated dynamic height calculation, screen height clamping, vertical scrolling with indicators (`▲`/`▼`) for option modals, horizontal `scroll_offset` tracking for `TextInput`, and mouse selection/drag/checkbox toggling.
+  - **Contextual Modal Autofocus & Asset Directory Invariant:** Mandated autofocus on invoking setting when opening dialogs, and asset path discovery prioritizing repo wallpapers before system directories.
+- [x] Developer Skill Updated:
+  - Cross-referenced theme token parity, inactivity reset contracts, and horizontal text scrolling/modal viewport rules in `.agents/skills/bashmenu-rs-developer/SKILL.md`.
+- [x] Verification & CI:
+  - Passed `cargo fmt --all --check` and `cargo clippy --workspace --all-targets -- -D warnings` with zero warnings or errors.
+  - Remote GitHub Actions CI run `42441058572` passed completely with `'success'`.
