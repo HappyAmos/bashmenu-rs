@@ -1,6 +1,7 @@
 //! Configuration definitions and persistence for `bashmenu.yml`.
 
 use crate::error::{BashMenuError, Result};
+use crate::macro_engine::resolve_dev_dir;
 use crate::theme::{Theme, WallpaperConfig, WallpaperSetting};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -610,8 +611,8 @@ pub fn get_user_config_dir() -> PathBuf {
 ///    Look in `get_user_config_dir().join(target)`. If it exists, return it.
 /// 4. Environment override (`$BASHMENU_DIR`):
 ///    If set and `$BASHMENU_DIR/<target>` exists, return it.
-/// 5. Test Fixtures fallback (for unit tests running inside workspace crates):
-///    If `tests/fixtures/<target>` exists, return it.
+/// 5. Repository root fallback:
+///    If the file exists in the repository root directory (`resolve_dev_dir`), return it.
 /// 6. Default fallback:
 ///    Return `get_user_config_dir().join(target)`. This ensures saved files
 ///    always persist to `~/.config/bashmenu/` regardless of working directory.
@@ -641,14 +642,13 @@ pub fn resolve_app_path<P: AsRef<Path>>(target: P) -> PathBuf {
         return target.to_path_buf();
     }
 
-    let fixture_paths = [
-        PathBuf::from("tests/fixtures").join(target),
-        PathBuf::from("../../tests/fixtures").join(target),
-    ];
-    for fix in fixture_paths {
-        if fix.exists() {
-            return fix;
-        }
+    let home = std::env::var("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("/"));
+    let dev_dir = resolve_dev_dir(&home, &user_cfg_dir);
+    let dev_path = dev_dir.join(target);
+    if dev_path.exists() {
+        return dev_path;
     }
 
     // Default to the single source of truth in ~/.config/bashmenu/
@@ -685,11 +685,11 @@ mod tests {
 
     #[test]
     fn test_load_and_save_config_roundtrip() {
-        let fixture_path = Path::new("../../tests/fixtures/bashmenu.yml");
+        let fixture_path = Path::new("../../bashmenu.yml");
         if fixture_path.exists() {
-            let config = load_config(fixture_path).expect("Failed to load bashmenu.yml fixture");
+            let config = load_config(fixture_path).expect("Failed to load bashmenu.yml");
             assert_eq!(config.version, "0.0.1");
-            assert_eq!(config.theme, "alaska-mountain");
+            assert_eq!(config.theme, "canopy");
             assert_eq!(config.settings.tabstop, Some(4));
             assert_eq!(config.settings.use_nerd_fonts, Some(true));
 

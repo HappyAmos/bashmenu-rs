@@ -1385,7 +1385,7 @@ fn main() -> Result<()> {
                                         PLACEHOLDER_HELP_TEXT,
                                     ));
                                 }
-                                KeyCode::Char('a') => {
+                                KeyCode::Char('a') | KeyCode::Char('A') | KeyCode::Insert => {
                                     active_modal = ActiveModal::TypePicker(
                                         ItemTypePickerModal::new("command"),
                                         None,
@@ -1408,7 +1408,7 @@ fn main() -> Result<()> {
                                         );
                                     }
                                 }
-                                KeyCode::Char('d') => {
+                                KeyCode::Char('d') | KeyCode::Char('D') | KeyCode::Delete => {
                                     if let Some(node) = visible_nodes.get(selected_node_idx) {
                                         active_modal = ActiveModal::ConfirmDelete(
                                             ConfirmModal::new(

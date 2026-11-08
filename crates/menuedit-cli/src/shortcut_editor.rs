@@ -2177,8 +2177,8 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                                 state.selected_idx = state.config.shortcuts.len() - 1;
                             }
                         }
-                        // [a] Add new shortcut entry
-                        KeyCode::Char('a') | KeyCode::Char('A') => {
+                        // [a] / [Insert] Add new shortcut entry
+                        KeyCode::Char('a') | KeyCode::Char('A') | KeyCode::Insert => {
                             let new_entry = ShortcutEntry::default();
                             state.add_shortcut(new_entry.clone());
                             active_modal = ActiveShortcutModal::Edit {

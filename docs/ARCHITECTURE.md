@@ -23,8 +23,6 @@ bashmenu-rs/
 ├── install.sh                    # Multi-binary release installer (~/.local/bin)
 ├── uninstall.sh                  # Uninstallation script
 ├── patches/libyml/               # Vendored libyml fix for flow scalar string join overflow
-├── tests/
-│   └── fixtures/                 # Golden production YAML fixtures (yml, mnu, themes, shortcuts)
 └── crates/
     ├── bashmenu-core/            # Shared data models, Serde loaders, macro & plugin engines, notebooks
     ├── bashmenu-tui/             # Reusable Ratatui widgets, custom borders, modals, wallpaper, transitions, fb

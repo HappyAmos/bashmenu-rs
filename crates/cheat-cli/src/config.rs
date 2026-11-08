@@ -28,7 +28,7 @@ pub fn expand_tilde<P: AsRef<Path>>(path: P) -> PathBuf {
 /// Checks candidate locations in order:
 /// 1. `CHEAT_CONFIG` environment variable
 /// 2. User config directory (`~/.config/bashmenu/cheat.yml`)
-/// 3. Test fixtures fallback (`tests/fixtures/cheat.yml`)
+/// 3. Repository root fallback (`cheat.yml`)
 ///
 /// If no configuration file exists, creates a default one pointing to `~/cheat`.
 pub fn get_config_path() -> Result<PathBuf> {
@@ -44,13 +44,19 @@ pub fn get_config_path() -> Result<PathBuf> {
         return Ok(user_cfg);
     }
 
-    let fixture_paths = [
-        PathBuf::from("tests/fixtures/cheat.yml"),
-        PathBuf::from("../../tests/fixtures/cheat.yml"),
-    ];
-    for fix in &fixture_paths {
-        if fix.is_file() {
-            return Ok(fix.clone());
+    let home = std::env::var("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("/"));
+    let dev_dir = bashmenu_core::resolve_dev_dir(&home, &user_cfg);
+    let dev_cheat = dev_dir.join("cheat.yml");
+    if dev_cheat.is_file() {
+        return Ok(dev_cheat);
+    }
+
+    let root_paths = [PathBuf::from("cheat.yml"), PathBuf::from("../../cheat.yml")];
+    for p in &root_paths {
+        if p.is_file() {
+            return Ok(p.clone());
         }
     }
 

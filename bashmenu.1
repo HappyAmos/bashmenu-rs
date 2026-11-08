@@ -2,7 +2,16 @@
 .SH NAME
 bashmenu \- lightweight Textual TUI menu engine and settings manager
 .SH SYNOPSIS
+.B bashmenu
+[\fB\-c\fR \fIconfig\fR]
+[\fB\-m\fR \fImenu\fR]
+[\fB\-t\fR \fItheme\fR]
+[\fB\-s\fR \fIshortcuts\fR]
+[\fB\-r\fR|\fB\-\-repo\fR]
+[\fB\-\-local\fR]
+.br
 .B bashmenu.sh
+[\fBoptions\fR]
 .SH DESCRIPTION
 .B bashmenu
 is a data-driven, Textual-based Text User Interface (TUI) menu engine designed
@@ -209,7 +218,7 @@ Return to parent menu, or quit if at the root menu level.
 When returning from editors, or scripts with refresh: true, the engine traces and preserves your submenu coordinate depth to return you to your exact location, skipping the root menu.
 .SS Visual Menu Editor (menuedit)
 .TP
-.B a
+.B a, Insert
 Add new menu option node.
 .TP
 .B e, ENTER
@@ -221,7 +230,7 @@ Change selected item type.
 .B SPACE, LEFT, RIGHT
 Expand or collapse submenu tree node.
 .TP
-.B d
+.B d, Delete
 Delete selected menu option node (with confirm box).
 .TP
 .B m

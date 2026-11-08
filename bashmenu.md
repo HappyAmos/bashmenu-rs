@@ -69,6 +69,17 @@ HA Bash Menu is comprised of modular scripts and configuration files:
 | :--- | :--- |
 | `bashmenu.1` | Terminal manual page for HA Bash Menu. |
 
+### 1.2 Command-Line Options (`bashmenu`)
+
+| Option | Short | Description |
+| :--- | :--- | :--- |
+| `--config <FILE>` | `-c` | Explicit path to configuration file (default: `~/.config/bashmenu/bashmenu.yml`). |
+| `--menu <FILE>` | `-m` | Explicit path to menu definition file (default: `~/.config/bashmenu/bashmenu.mnu`). |
+| `--theme <NAME>` | `-t` | Override active theme name. |
+| `--shortcuts <FILE>` | `-s` | Explicit path to keyboard shortcuts file (default: `~/.config/bashmenu/shortcuts.yml`). |
+| `--repo` | `-r` | Load configuration files (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`) from repository root directory. |
+| `--local` | | Load and save configuration files in current working directory. |
+
 ---
 
 ## 2. Dynamic Scripts & Templates References
@@ -145,11 +156,11 @@ Used as dynamic templates for code generation, settings, or block injections:
 
 | Keybinding | Action |
 | :--- | :--- |
-| `a` | Add new menu option node. |
+| `a` / `Insert` | Add new menu option node. |
 | `e` / `ENTER` | Edit selected node properties (opens `ItemEditModal`). |
 | `t` | Change selected item type. |
 | `SPACE` / `LEFT` / `RIGHT` | Expand or collapse submenu tree node. |
-| `d` | Delete selected option node (with confirm box). |
+| `d` / `Delete` | Delete selected option node (with confirm box). |
 | `m` | Move selected node down. |
 | `M` | Move selected node up. |
 | `>` | Indent item into preceding Submenu folder. |

@@ -123,9 +123,6 @@ CONFIG_DIR="$HOME/.config/bashmenu"
 mkdir -p "$CONFIG_DIR"
 for cfg in bashmenu.yml bashmenu.mnu bashmenu.themes shortcuts.yml cheat.yml; do
     src="$SCRIPT_DIR/$cfg"
-    if [ ! -f "$src" ]; then
-        src="$SCRIPT_DIR/tests/fixtures/$cfg"
-    fi
     dest="$CONFIG_DIR/$cfg"
     if [ "$cfg" = "bashmenu.mnu" ] && [ "$UPDATE_MENU" = "true" ] && [ -f "$src" ]; then
         if [ -f "$dest" ]; then

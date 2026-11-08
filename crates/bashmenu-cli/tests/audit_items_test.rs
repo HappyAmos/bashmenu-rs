@@ -107,11 +107,11 @@ fn test_inactivity_timeout_timer_reset_contract() {
     let ms = timeout.milliseconds.unwrap_or(0);
     assert!(ms > 0, "Inactivity timeout ms must be greater than 0");
 
-    // Simulate returning from an external command that ran for 5 minutes
-    let mut last_interaction = Instant::now() - Duration::from_secs(300);
+    // Simulate returning from an external command that ran longer than the timeout
+    let mut last_interaction = Instant::now() - Duration::from_millis(ms + 1000);
     assert!(
         last_interaction.elapsed().as_millis() >= ms as u128,
-        "Simulated 5 minute command run exceeds timeout threshold"
+        "Simulated command run exceeds timeout threshold"
     );
 
     // Contract: Upon returning from an external command or sub-tool,
@@ -121,5 +121,21 @@ fn test_inactivity_timeout_timer_reset_contract() {
     assert!(
         last_interaction.elapsed().as_millis() < ms as u128,
         "Resetting last_interaction prevents immediate screensaver trigger upon return"
+    );
+}
+
+#[test]
+fn test_bashmenu_repo_flag_in_help_and_parsing() {
+    let bin = env!("CARGO_BIN_EXE_bashmenu");
+    let output = Command::new(bin)
+        .arg("--help")
+        .output()
+        .expect("bashmenu --help must run");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("-r, --repo"),
+        "Help output must document -r, --repo flag: {}",
+        stdout
     );
 }

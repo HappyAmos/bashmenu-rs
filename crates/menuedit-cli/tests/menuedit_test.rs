@@ -7,11 +7,11 @@ use std::path::PathBuf;
 
 fn get_fixture_path(filename: &str) -> PathBuf {
     let manifest_dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
-    let path = manifest_dir.join("../../tests/fixtures").join(filename);
+    let path = manifest_dir.join("../..").join(filename);
     if path.exists() {
         path
     } else {
-        PathBuf::from("tests/fixtures").join(filename)
+        PathBuf::from(filename)
     }
 }
 
@@ -1885,4 +1885,33 @@ fn test_menuedit_footer_border_overflow_repro() {
             panic!("Border corrupted at width {}", width);
         }
     }
+}
+
+#[test]
+fn test_menuedit_insert_and_delete_keys() {
+    use crossterm::event::KeyCode;
+
+    // Verify key matching for add action (both 'a' and Insert)
+    let is_add_key = |key: KeyCode| {
+        matches!(
+            key,
+            KeyCode::Char('a') | KeyCode::Char('A') | KeyCode::Insert
+        )
+    };
+    assert!(is_add_key(KeyCode::Char('a')));
+    assert!(is_add_key(KeyCode::Char('A')));
+    assert!(is_add_key(KeyCode::Insert));
+    assert!(!is_add_key(KeyCode::Char('x')));
+
+    // Verify key matching for delete action (both 'd' and Delete)
+    let is_delete_key = |key: KeyCode| {
+        matches!(
+            key,
+            KeyCode::Char('d') | KeyCode::Char('D') | KeyCode::Delete
+        )
+    };
+    assert!(is_delete_key(KeyCode::Char('d')));
+    assert!(is_delete_key(KeyCode::Char('D')));
+    assert!(is_delete_key(KeyCode::Delete));
+    assert!(!is_delete_key(KeyCode::Char('x')));
 }

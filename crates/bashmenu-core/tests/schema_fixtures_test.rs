@@ -4,11 +4,11 @@ use std::path::{Path, PathBuf};
 
 fn fixture_path(filename: &str) -> PathBuf {
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let path = manifest_dir.join("../../tests/fixtures").join(filename);
+    let path = manifest_dir.join("../..").join(filename);
     if path.exists() {
         path
     } else {
-        PathBuf::from("tests/fixtures").join(filename)
+        PathBuf::from(filename)
     }
 }
 
@@ -31,14 +31,14 @@ fn test_parse_production_bashmenu_yml() {
 
     let config = load_config(&fixture).expect("Failed to parse production bashmenu.yml");
     assert_eq!(config.version, "0.0.1");
-    assert_eq!(config.theme, "alaska-mountain");
+    assert_eq!(config.theme, "canopy");
     assert_eq!(config.settings.tabstop, Some(4));
     assert_eq!(config.settings.use_nerd_fonts, Some(true));
     assert_eq!(
         config.settings.scripts_dir,
         Some("{bashmenu_dir}/scripts".to_string())
     );
-    assert_eq!(config.settings.transition, Some("fade".to_string()));
+    assert_eq!(config.settings.transition, Some("blinds".to_string()));
     assert_eq!(config.settings.transition_speed, Some("normal".to_string()));
     assert_eq!(config.settings.modal_animation, Some("zoom".to_string()));
     assert_eq!(
@@ -54,7 +54,7 @@ fn test_parse_production_bashmenu_yml() {
         "# =============================================================================="
     ));
     assert!(written.contains("BashMenu Configuration (bashmenu.yml)"));
-    assert!(written.contains("theme: alaska-mountain"));
+    assert!(written.contains("theme: canopy"));
     let _ = fs::remove_file(tmp);
 }
 
@@ -207,10 +207,7 @@ fn test_config_get_set_value_and_menu_item_helpers() {
     let mut config = load_config(&fixture).expect("Failed to parse production bashmenu.yml");
 
     // Test get_value
-    assert_eq!(
-        config.get_value("theme"),
-        Some("alaska-mountain".to_string())
-    );
+    assert_eq!(config.get_value("theme"), Some("canopy".to_string()));
     assert_eq!(
         config.get_value("settings.use_nerd_fonts"),
         Some("true".to_string())

@@ -29,6 +29,12 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
   - **Complete & Log to `DONE.md`:** When a task is completed (including verification, commit, push, and remote CI verification), you MUST remove the `PENDING:` label, mark the task as complete (`- [x]`), and append a summary of the completed task to `.agents/skills/bashmenu-rs-developer/DONE.md`.
   - **Prune Completed Tasks & Re-Check:** When there are no more tasks left to complete, remove finished (`- [x]`) tasks from the TODO list. Finally, when all tasks are completed, you MUST re-check the TODO list (`~/.config/bashmenu/notebooks/notes.yml` and `.agents/skills/bashmenu-rs-developer/TODO.md`) to ensure no new tasks were added while you were working.
   - **Long-Running Process Periodic Status Updates:** When working on long running processes (tasks that are more than 1 minute to complete), give a short blurb of what you are working on at least every 2 minutes.
+- **Single Source of Truth Config Files & Repository Root Invariant:**
+  - The true and only original default configuration files (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `cheat.yml`) are stored strictly in the project's root directory.
+  - The `/tests/fixtures` directory has been removed; never re-create fixtures directories or duplicate configuration templates.
+  - Test suites and fallback resolution must point directly to the project root default files.
+- **Repository Root CLI Argument Invariant (`--repo` / `-r`):**
+  - Passing `--repo` or `-r` to `bashmenu` forces loading `bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, and `shortcuts.yml` directly from the repository root directory (`resolve_dev_dir`) rather than user config or current working directory.
 - **Configuration Header Preservation Invariant (`bashmenu.yml`):**
   - Never use raw file writes with `serde_yml::to_string()` directly to overwrite `bashmenu.yml`.
   - Always call `bashmenu_core::config::save_config(path, config)` so that `CONFIG_HEADER` comments, documentation, and placeholder references are cleanly preserved at the top of the file.
@@ -230,6 +236,9 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
     - `confirm`: `on_yes:` and `on_no:` action inputs with `[ Browse... ]` pickers, rendered at runtime via a 3-button `ConfirmModal` (`Yes`, `No`, `Cancel`).
   - Selection Synchronization (`<F4>`): Launching `menuedit` from `bashmenu` passes `--select-path`, `--select-title`, and `--title-chain` to focus the active item automatically, and uses `ToastRack` notifications for status events.
   - Type Mutation (<kbd>Ctrl+T</kbd> / <kbd>t</kbd>): Reconfigure item types post-creation. Migrate payloads to target canonical keys (`command`, `script`, `editor` -> `file`, `config`/`toggle`/`radio` -> `key`, `python`) and prune obsolete keys. Submenu transitions handle container initialization and tree refresh.
+  - Tree Navigation & Keybindings:
+    - Adding Items: Both <kbd>a</kbd> and <kbd>Insert</kbd> open `ItemTypePickerModal` to add a new node.
+    - Deleting Items: Both <kbd>d</kbd> and <kbd>Delete</kbd> open `ConfirmModal` to delete the selected node.
   - Help Bar Footer: 2-line vertical container with two 1-line centered horizontal rows:
     - Row 1: `[a] Add`, `[e/ENTER] Edit`, `[t] Type`, `[SPACE] Toggle`, `[d] Delete`, `[m] Move Dn`, `[M] Move Up`.
     - Row 2: `[>] Indent`, `[<] Outdent`, `[CTRL+A] ASCII`, `[CTRL+P] Placeholders`, `[s] Save`, `[ESC/q] Exit`.

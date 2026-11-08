@@ -73,6 +73,10 @@ struct Cli {
     /// Load and save configuration files in current working directory
     #[arg(long)]
     local: bool,
+
+    /// Load configuration files from the repository root directory
+    #[arg(short, long)]
+    repo: bool,
 }
 
 /// Active popup modal dialog currently being presented in the main menu loop.
@@ -214,9 +218,21 @@ fn main() -> Result<()> {
 
     let cli = Cli::parse();
 
+    let repo_dir = if cli.repo {
+        let home = std::env::var("HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| PathBuf::from("/"));
+        let cfg_dir = bashmenu_core::get_user_config_dir();
+        Some(bashmenu_core::resolve_dev_dir(&home, &cfg_dir))
+    } else {
+        None
+    };
+
     // 2. Load Configuration and Menus
     let config_path = if let Some(ref cp) = cli.config {
         resolve_file_path(cp, cli.local)
+    } else if let Some(ref rdir) = repo_dir {
+        rdir.join("bashmenu.yml")
     } else if cli.local {
         PathBuf::from("./bashmenu.yml")
     } else {
@@ -244,6 +260,8 @@ fn main() -> Result<()> {
 
     let menu_path = if let Some(ref mp) = cli.menu {
         resolve_file_path(mp, cli.local)
+    } else if let Some(ref rdir) = repo_dir {
+        rdir.join("bashmenu.mnu")
     } else if cli.local {
         PathBuf::from("./bashmenu.mnu")
     } else {
@@ -267,6 +285,8 @@ fn main() -> Result<()> {
 
     let shortcuts_path = if let Some(ref sp) = cli.shortcuts {
         resolve_file_path(sp, cli.local)
+    } else if let Some(ref rdir) = repo_dir {
+        rdir.join("shortcuts.yml")
     } else {
         resolve_shortcuts_path(cli.local)
     };
@@ -278,7 +298,9 @@ fn main() -> Result<()> {
     let mut shortcut_dispatcher = ShortcutDispatcher::new(shortcuts_cfg.clone());
 
     // 3. Load Themes
-    let themes_path = if cli.local {
+    let themes_path = if let Some(ref rdir) = repo_dir {
+        rdir.join("bashmenu.themes")
+    } else if cli.local {
         PathBuf::from("./bashmenu.themes")
     } else {
         let user_themes = bashmenu_core::get_user_config_dir().join("bashmenu.themes");

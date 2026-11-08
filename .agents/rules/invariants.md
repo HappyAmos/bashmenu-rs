@@ -8,7 +8,9 @@
   - Watch run: `gh run watch <ID>` (always pass an explicit ID to avoid interactive hangs).
 
 ## 2. Configuration & State Persistence
-- **Single Source of Truth Config Path & `{dev_dir}`:** User configurations reside in `~/.config/bashmenu/` (`{bashmenu_dir}`), while `{dev_dir}` dynamically resolves the local git repository root directory (never hardcoded).
+- **Single Source of Truth Config Path & Project Root Defaults:** User configurations reside in `~/.config/bashmenu/` (`{bashmenu_dir}`), while `{dev_dir}` dynamically resolves the local git repository root directory (never hardcoded). The true and only original default configuration files (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `cheat.yml`) are stored strictly in the project's root directory. The `/tests/fixtures` directory has been removed and must never be reintroduced. All test harnesses, fallbacks, and loaders must reference the project root files directly.
+- **Repository Root Mode (`--repo` / `-r`):** Passing `--repo` or `-r` to `bashmenu` forces the engine to load `bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, and `shortcuts.yml` directly from the repository root directory (`resolve_dev_dir`) rather than user config or current working directory.
+- **Menu Editor Add & Delete Key Parity (`menuedit`):** In the visual menu tree editor, pressing either <kbd>a</kbd> or <kbd>Insert</kbd> initiates adding a new menu item node (opening the item type picker), while pressing either <kbd>d</kbd> or <kbd>Delete</kbd> initiates deleting the currently selected menu item node (prompting confirmation).
 - **Config Header Preservation:** When saving or modifying `bashmenu.yml`, ALWAYS use `bashmenu_core::save_config(path, config)` instead of raw YAML dumps. This guarantees the top-level `CONFIG_HEADER` comment documentation is preserved.
 - **Configuration Structural Integrity Invariant (`bashmenu.yml`, `BashMenuConfig::set_value`):** Configuration writes via `BashMenuConfig::set_value` must NEVER write dot-delimited paths as flat literal keys containing periods into `Settings.extra`, `BashMenuConfig.extra`, or `user` maps. All multi-level configuration paths must either map to strongly-typed struct fields (e.g. `settings.inactivity_timeout.*`) or be decomposed recursively into nested YAML mappings (`serde_yml::Mapping`). YAML serialization of `bashmenu.yml` must never emit dotted flat keys.
 - **Theme Editor Save Invariant (`themeedit`):** <kbd>Ctrl+S</kbd> must save directly to disk whenever `theme_name` is set. Only untitled themes divert to "Save As". <kbd>Ctrl+A</kbd> opens "Save As".
@@ -93,7 +95,7 @@
   - `cheat` (Interactive cheatsheet browser)
 - **Convenience Symlinks:** Must link `bm` -> `bashmenu` and `rich` -> `rich.sh`.
 - **Manual Page Installation:** Must install `bashmenu.1` to `$MAN_DIR` (`$HOME/.local/share/man/man1` or system equivalent).
-- **Configuration Seeding:** Must copy initial configuration fixtures (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `cheat.yml`) into `~/.config/bashmenu/` without overwriting existing user files.
+- **Configuration Seeding:** Must copy initial default configuration files (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `cheat.yml`) from project root into `~/.config/bashmenu/` without overwriting existing user files.
 - **Output Banner:** The summary of installed commands displayed to the user must explicitly list `cheat` along with all other tools.
 
 ### Uninstaller (`uninstall.sh`)

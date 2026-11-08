@@ -4,7 +4,7 @@ use unicode_width::UnicodeWidthStr;
 
 #[test]
 fn test_status_gutter_interpolation() {
-    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/bashmenu.yml");
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../bashmenu.yml");
     let config = load_config(fixture).expect("load config");
 
     let mut ctx = MacroContext::new(&config);
@@ -20,7 +20,7 @@ fn test_status_gutter_interpolation() {
 
     // Gutter template: '| Theme: {theme} | {user} | Battery: ... | {user.localip} | [b]{date_time_24_short}[/b]'
     assert!(
-        interpolated.contains("Theme: alaska-mountain"),
+        interpolated.contains(&format!("Theme: {}", config.theme)),
         "Theme should be interpolated: {}",
         interpolated
     );
@@ -75,7 +75,7 @@ fn test_icon_slot_4_columns_strict_invariant() {
 
 #[test]
 fn test_right_aligned_bracket_placeholders_expansion() {
-    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/bashmenu.yml");
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../bashmenu.yml");
     let mut config = load_config(fixture).expect("load config");
     config.settings.ping_target = Some("1.1.1.1".to_string());
     config.settings.check_for_updates = Some(false);
@@ -139,7 +139,7 @@ fn test_right_aligned_bracket_placeholders_expansion() {
 
 #[test]
 fn test_profile_and_editor_placeholders_expansion() {
-    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/bashmenu.yml");
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../bashmenu.yml");
     let config = load_config(fixture).expect("load config");
 
     let mut ctx = MacroContext::new(&config);
@@ -200,7 +200,7 @@ fn test_profile_and_editor_placeholders_expansion() {
 
 #[test]
 fn test_dev_dir_placeholder_resolution() {
-    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/bashmenu.yml");
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../bashmenu.yml");
     let config = load_config(fixture).expect("load config");
     let ctx = MacroContext::new(&config);
 
@@ -233,7 +233,7 @@ fn test_dev_dir_placeholder_resolution() {
 
 #[test]
 fn test_utc_seconds_and_command_placeholders() {
-    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/bashmenu.yml");
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../bashmenu.yml");
     let config = load_config(fixture).expect("load config");
     let mut ctx = MacroContext::new(&config);
     ctx.home_dir = std::path::PathBuf::from("/home/testuser");
@@ -261,7 +261,7 @@ fn test_file_and_dir_picker_macros_and_modifiers() {
     };
     use std::path::PathBuf;
 
-    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/bashmenu.yml");
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../bashmenu.yml");
     let config = load_config(fixture).expect("load config");
     let mut ctx = MacroContext::new(&config);
     ctx.home_dir = PathBuf::from("/home/testuser");

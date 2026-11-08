@@ -919,3 +919,29 @@
 
 
 
+## Phase 38: Menuedit Insert/Delete Keys, `--repo` / `-r` CLI Option, and Single Root Defaults
+- [x] Menu Editor Key Parity (`crates/menuedit-cli/src/main.rs`, `crates/menuedit-cli/src/shortcut_editor.rs`):
+  - In addition to `<d>` initiating menu item deletion, `<Delete>` key now does as well (`KeyCode::Char('d') | KeyCode::Char('D') | KeyCode::Delete`).
+  - In addition to `<a>` initiating adding a new menu item, `<Insert>` key now does as well (`KeyCode::Char('a') | KeyCode::Char('A') | KeyCode::Insert`).
+  - Added `<Insert>` support to shortcut editor item creation for consistency.
+  - Added unit test `test_menuedit_insert_and_delete_keys` in `crates/menuedit-cli/tests/menuedit_test.rs`.
+- [x] Repository Root CLI Option (`--repo` / `-r` in `crates/bashmenu-cli/src/main.rs`):
+  - Added `--repo` / `-r` flag to `Cli` struct in `bashmenu`.
+  - When `--repo` / `-r` is passed, `bashmenu` resolves the repository root directory dynamically via `bashmenu_core::resolve_dev_dir(&home, &cfg_dir)` and loads `bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, and `shortcuts.yml` directly from the repo root directory.
+  - Added integration test `test_bashmenu_repo_flag_in_help_and_parsing` in `crates/bashmenu-cli/tests/audit_items_test.rs`.
+  - Updated `bashmenu.sh` trampoline launcher help to document `-r, --repo`.
+- [x] Eradication of `/tests/fixtures` & Unification on Project Root Default Configs:
+  - Completely removed the `/tests/fixtures` directory and removed any duplicated configuration templates.
+  - Placed `cheat.yml` at project root alongside `bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, and `shortcuts.yml`.
+  - Updated `crates/bashmenu-core/src/config.rs` (`resolve_app_path`) and `crates/cheat-cli/src/config.rs` (`get_config_path`) to check the project root directly via `resolve_dev_dir` rather than checking `tests/fixtures`.
+  - Updated all unit and integration tests across `bashmenu-core`, `bashmenu-tui`, `menuedit-cli`, and `themeedit-cli` to load configuration files directly from the repository root directory.
+  - Updated `install.sh` to copy default configuration files directly from `$SCRIPT_DIR` without falling back to `tests/fixtures`.
+  - Updated `docs/ARCHITECTURE.md` architecture diagram.
+- [x] Documentation & Invariants Synchronization:
+  - Updated `.agents/rules/invariants.md` and `.agents/skills/bashmenu-rs-developer/SKILL.md` to codify that the true and only original configuration files live in the project root, document `--repo` / `-r`, and document `<Insert>` / `<Delete>` keybindings.
+  - Updated `bashmenu.md` and `bashmenu.1` with documentation for `--repo` / `-r` and `<Insert>` / `<Delete>`.
+- [x] Tests & Verification:
+  - `cargo fmt --all --check` passed (zero formatting diffs).
+  - `cargo clippy --workspace --all-targets -- -D warnings` passed (zero compiler warnings/errors).
+  - `cargo test --workspace` passed (100% test pass across all 9 crates).
+  - `shellcheck *.sh scripts/*.sh` passed (clean exit 0).
