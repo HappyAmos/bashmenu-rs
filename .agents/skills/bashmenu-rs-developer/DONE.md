@@ -708,3 +708,21 @@
   - Added `test_item_type_picker_modal_scrolling_and_all_items` in `crates/menuedit-cli/tests/menuedit_test.rs` testing all 16 types, `{divider}`, navigation keys, mouse wheel, and row clicking.
   - Added `test_item_edit_modal_horizontal_scrolling_and_mouse_interactions` in `crates/menuedit-cli/tests/menuedit_test.rs` testing long text scrolling, mouse focus, cursor placement, checkbox toggles, and button clicks.
 - [x] Remote CI Run: `42433248218` passed completely with zero warnings or failures.
+
+## Phase 25: Theme Editor Highlighter Setting Highlight Background Bar
+- [x] Commit `16e9338`: Fixed Theme Editor highlighter configuring the highlight color as the text foreground instead of the margin-to-margin highlight bar background.
+- [x] Highlight Palette Token Invariant (`crates/themeedit-cli/src/lib.rs`):
+  - Updated `set_color_token_value()` for `"highlight"` to store the chosen color into index 1 (`bg`) of the sequence `[fg, bg]`, instead of index 0 (`fg`).
+  - Added automatic high-contrast foreground calculation (`fg`) for the highlight text (preserving existing theme `fg` if contrasting, or using dark text for light bars / light text for dark bars) so menu item text remains clearly readable.
+  - Synchronized `colors_16` and `colors_8` tiers with appropriate `COLOR_BLACK` or `COLOR_WHITE` high-contrast foregrounds and downsampled backgrounds.
+  - Kept `"selection"` in sync with `"highlight"` whenever present in the theme palette.
+- [x] Token Inspection & Color Retrieval (`crates/themeedit-cli/src/lib.rs`):
+  - Updated `get_token_value_display()` to inspect index 1 (`bg`) of the `"highlight"` sequence so the tree property view displays the background bar color rather than the text color.
+  - Updated `get_color_token_color()` and `get_color_token_u8()` for `"highlight"` to return the background bar color (index 1), ensuring the color picker and dropper initialize with and reference the highlight bar background.
+- [x] Margin-to-Margin Highlight Rendering (`crates/themeedit-cli/src/preview.rs`):
+  - Added full cell background fill (`buf[(x, content_start_y)].bg = bg`) across `p_inner_x..(p_inner_x + p_avail_w)` in `PreviewMode::Menu` matching `menu_view.rs`.
+  - Added full tree cell background fill across the pane width in `PreviewMode::MenuEditor`.
+- [x] Unit & Integration Tests (`crates/themeedit-cli/tests/themeedit_test.rs`):
+  - Updated `test_create_theme_with_base_monochrome` to assert the monochrome highlight bar background (`255`).
+  - Added `test_themeedit_highlighter_sets_margin_to_margin_background_bar` verifying initial background retrieval, setting highlight color to index 201, verifying contrasting foreground, and verifying that every cell in the preview pane across `p_avail_w` has `bg == Color::Indexed(201)`.
+- [x] Remote CI Run: `42435677068` passed completely with zero warnings or failures.
