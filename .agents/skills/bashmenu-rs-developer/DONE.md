@@ -726,3 +726,21 @@
   - Updated `test_create_theme_with_base_monochrome` to assert the monochrome highlight bar background (`255`).
   - Added `test_themeedit_highlighter_sets_margin_to_margin_background_bar` verifying initial background retrieval, setting highlight color to index 201, verifying contrasting foreground, and verifying that every cell in the preview pane across `p_avail_w` has `bg == Color::Indexed(201)`.
 - [x] Remote CI Run: `42435677068` passed completely with zero warnings or failures.
+
+## Phase 26: Highlight Text Color Theme Token in Theme Editor
+- [x] Commit `915596f`: Added new Color Theme Token (`highlight_text`) in Theme Editor to customize text color on the selection highlight bar.
+- [x] Theme Palette Invariant & Style Resolution (`crates/bashmenu-tui/src/style.rs`):
+  - Updated `ResolvedThemeStyles::from_theme` to parse `p.get("highlight_text")` across color tiers, overriding `resolved.highlight.fg` while preserving the highlight bar background.
+- [x] Theme Editor Token Tree & Palette Sync (`crates/themeedit-cli/src/lib.rs`):
+  - Added `TokenItem { label: "Highlight Text Color", kind: TokenKind::Color("highlight_text") }` under `TokenCategory::Colors`.
+  - Implemented `get_token_value_display()` for `"highlight_text"` to display the text foreground color from `highlight_text` or index 0 of `highlight`.
+  - Implemented `get_color_token_color()` and `get_color_token_u8()` for `"highlight_text"` returning the text foreground color.
+  - Implemented `set_color_token_value()` for `"highlight_text"` updating index 0 of the `highlight` sequence and `highlight_text` across `colors_256`, `colors_16`, and `colors_8` tiers, preserving the bar background and syncing `"selection"`.
+  - Added `"highlight_text"` to `select_token_by_key()` with aliases `highlight_fg` and `highlight_foreground`.
+  - Added preview spans in `get_token_preview_spans()` for `highlight_text` flashing `content_start_y, p_inner_x + 2..p_inner_x + 24`.
+- [x] Interactive UI & Hit Testing (`crates/themeedit-cli/src/main.rs`):
+  - Updated `open_selected_token_picker()` to display `"Pick Highlight Text Color"` for `highlight_text` and `"Pick Highlight Bar Color"` for `highlight`.
+  - Updated `hit_test_preview()` on active menu row `content_start_y`: clicking the text portion (`p_inner_x + 2..p_inner_x + 24`) selects `"highlight_text"`, while clicking padding/bar selects `"highlight"`.
+- [x] Unit & Integration Tests (`crates/themeedit-cli/tests/themeedit_test.rs`):
+  - Added `test_themeedit_highlight_text_token_configuration` verifying token existence, initial foreground retrieval, alias selection, color update to index 46, YAML palette sequence update (`[46, 201]`), style resolution (`fg == 46`, `bg == 201`), and preview flashing spans.
+- [x] Remote CI Run: `42436916241` passed completely with zero warnings or failures.
