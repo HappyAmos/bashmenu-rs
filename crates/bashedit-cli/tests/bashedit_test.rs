@@ -2,8 +2,10 @@
 //! recovery invariants.
 
 use bashedit_cli::{
-    compute_file_sha256, get_swap_path, is_pid_running, read_swap_file, remove_swap_file,
-    write_swap_file, EditorBuffer, SWAP_MAGIC,
+    compute_file_sha256, compute_visual_lines, cursor_to_visual, get_swap_path, is_pid_running,
+    move_visual_down, move_visual_end, move_visual_home, move_visual_up, page_visual_down,
+    page_visual_up, read_swap_file, remove_swap_file, wrap_line_ranges, write_swap_file,
+    EditorBuffer, SWAP_MAGIC,
 };
 use std::fs;
 use std::path::PathBuf;
@@ -295,6 +297,7 @@ fn test_editor_legend_row_spread() {
         "F6 MD",
         "F7 Lineno",
         "F8 MD Ref",
+        "F9 Wrap",
     ];
     let items_r2 = [
         "^N Tab",
@@ -314,11 +317,11 @@ fn test_editor_legend_row_spread() {
     assert_eq!(bashmenu_tui::gutter_text_width(&line_r1), avail_w);
     assert_eq!(bashmenu_tui::gutter_text_width(&line_r2), avail_w);
 
-    assert_eq!(ranges_r1.len(), 8);
+    assert_eq!(ranges_r1.len(), 9);
     assert_eq!(ranges_r2.len(), 8);
 
     assert_eq!(ranges_r1[0].0, 0);
-    assert_eq!(ranges_r1[7].1, avail_w);
+    assert_eq!(ranges_r1[8].1, avail_w);
     assert_eq!(ranges_r2[0].0, 0);
     assert_eq!(ranges_r2[7].1, avail_w);
 }
@@ -408,4 +411,188 @@ fn test_bashedit_cli_whitespace_and_tab_flags() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("--show-whitespace"));
     assert!(stdout.contains("--tab-to-spaces"));
+    assert!(stdout.contains("--wrap"));
+}
+
+#[test]
+fn test_wrap_line_ranges() {
+    // Empty line
+    let empty: Vec<char> = "".chars().collect();
+    assert_eq!(wrap_line_ranges(&empty, 20), vec![(0, 0)]);
+
+    // Short line within width
+    let short: Vec<char> = "hello world".chars().collect();
+    assert_eq!(wrap_line_ranges(&short, 20), vec![(0, 11)]);
+
+    // Word wrap at whitespace
+    let text: Vec<char> = "alpha beta gamma delta".chars().collect();
+    // "alpha beta " is 11 chars
+    // "gamma delta" is 11 chars
+    let ranges = wrap_line_ranges(&text, 11);
+    assert_eq!(ranges, vec![(0, 11), (11, 22)]);
+    assert_eq!(
+        &text[ranges[0].0..ranges[0].1],
+        &"alpha beta ".chars().collect::<Vec<_>>()[..]
+    );
+    assert_eq!(
+        &text[ranges[1].0..ranges[1].1],
+        &"gamma delta".chars().collect::<Vec<_>>()[..]
+    );
+
+    // Long word exceeding line width breaks at boundary
+    let long_word: Vec<char> = "abcdefghijklmnopqrstuvwxyz".chars().collect();
+    let ranges_long = wrap_line_ranges(&long_word, 10);
+    assert_eq!(ranges_long, vec![(0, 10), (10, 20), (20, 26)]);
+}
+
+#[test]
+fn test_compute_visual_lines() {
+    let lines = vec![
+        "First short line".to_string(),
+        "Second very long line that will certainly wrap across multiple rows in bashedit"
+            .to_string(),
+        "Third line".to_string(),
+    ];
+    let v_lines = compute_visual_lines(&lines, 30);
+
+    // Line 0 is short, exactly 1 chunk
+    assert_eq!(v_lines[0].doc_row, 0);
+    assert!(v_lines[0].is_first_chunk);
+    assert!(v_lines[0].is_last_chunk);
+
+    // Line 1 is long and wraps
+    let line1_chunks: Vec<_> = v_lines.iter().filter(|v| v.doc_row == 1).collect();
+    assert!(line1_chunks.len() >= 3);
+    assert!(line1_chunks[0].is_first_chunk);
+    assert!(!line1_chunks[0].is_last_chunk);
+    assert!(!line1_chunks[1].is_first_chunk);
+    assert!(!line1_chunks[1].is_last_chunk);
+    assert!(line1_chunks.last().unwrap().is_last_chunk);
+
+    // Line 2 is short, exactly 1 chunk
+    let line2_chunks: Vec<_> = v_lines.iter().filter(|v| v.doc_row == 2).collect();
+    assert_eq!(line2_chunks.len(), 1);
+    assert!(line2_chunks[0].is_first_chunk);
+    assert!(line2_chunks[0].is_last_chunk);
+}
+
+#[test]
+fn test_cursor_to_visual_mapping() {
+    let lines = vec![
+        "0123456789".to_string(),
+        "abcdefghij 0123456789 extra".to_string(),
+    ];
+    // With width 11:
+    // doc_row 0: (0, 10) -> v_idx 0
+    // doc_row 1: "abcdefghij " (0..11) -> v_idx 1, "0123456789 " (11..22) -> v_idx 2, "extra" (22..27) -> v_idx 3
+    let v_lines = compute_visual_lines(&lines, 11);
+
+    // Document 0, col 5
+    assert_eq!(cursor_to_visual(&v_lines, 0, 5), (0, 5));
+
+    // Document 1, col 3 -> visual row 1, col 3
+    assert_eq!(cursor_to_visual(&v_lines, 1, 3), (1, 3));
+
+    // Document 1, col 14 -> visual row 2, col 3
+    assert_eq!(cursor_to_visual(&v_lines, 1, 14), (2, 3));
+
+    // Document 1, col 24 -> visual row 3, col 2
+    assert_eq!(cursor_to_visual(&v_lines, 1, 24), (3, 2));
+}
+
+#[test]
+fn test_visual_vertical_navigation() {
+    let lines = vec![
+        "Short header".to_string(),
+        "First segment of wrapped text. Second segment of wrapped text. Third segment.".to_string(),
+        "Short footer".to_string(),
+    ];
+    let v_lines = compute_visual_lines(&lines, 32);
+
+    let mut row = 0;
+    let mut col = 5;
+
+    // Move down from doc_row 0 into first chunk of doc_row 1
+    move_visual_down(&v_lines, &mut row, &mut col);
+    assert_eq!(row, 1);
+    assert_eq!(col, 5);
+
+    // Move down into second chunk of doc_row 1
+    move_visual_down(&v_lines, &mut row, &mut col);
+    assert_eq!(row, 1);
+    let (v_idx, col_off) = cursor_to_visual(&v_lines, row, col);
+    assert_eq!(v_idx, 2);
+    assert_eq!(col_off, 5);
+
+    // Move up back into first chunk of doc_row 1
+    move_visual_up(&v_lines, &mut row, &mut col);
+    assert_eq!(row, 1);
+    assert_eq!(cursor_to_visual(&v_lines, row, col).0, 1);
+
+    // Move up back to doc_row 0
+    move_visual_up(&v_lines, &mut row, &mut col);
+    assert_eq!(row, 0);
+    assert_eq!(cursor_to_visual(&v_lines, row, col).0, 0);
+
+    // Move up at top boundary doesn't panic or change
+    move_visual_up(&v_lines, &mut row, &mut col);
+    assert_eq!(row, 0);
+}
+
+#[test]
+fn test_visual_home_and_end_navigation() {
+    let lines = vec![
+        "First segment of wrapped line. Second segment of wrapped line. Third segment.".to_string(),
+    ];
+    let v_lines = compute_visual_lines(&lines, 32);
+
+    // Place cursor in middle of chunk 1 (visual row 1)
+    let chunk1_start = v_lines[1].start_col;
+    let mut col = chunk1_start + 10;
+    assert_ne!(col, chunk1_start);
+
+    // First Home moves to start of visual chunk
+    move_visual_home(&v_lines, 0, &mut col);
+    assert_eq!(col, chunk1_start);
+
+    // Second Home moves to start of entire document line (0)
+    move_visual_home(&v_lines, 0, &mut col);
+    assert_eq!(col, 0);
+
+    // First End moves to end of first visual chunk
+    let line_len = lines[0].chars().count();
+    move_visual_end(&v_lines, 0, &mut col, line_len);
+    assert_eq!(col, v_lines[0].end_col.saturating_sub(1));
+
+    // Second End moves to end of full document line
+    move_visual_end(&v_lines, 0, &mut col, line_len);
+    assert_eq!(col, line_len);
+}
+
+#[test]
+fn test_visual_page_navigation() {
+    let mut lines = Vec::new();
+    for i in 0..20 {
+        lines.push(format!("Line {} with some text", i));
+    }
+    let v_lines = compute_visual_lines(&lines, 40);
+
+    let mut row = 0;
+    let mut col = 0;
+
+    // Page down by 5
+    page_visual_down(&v_lines, &mut row, &mut col, 5);
+    assert_eq!(row, 5);
+
+    // Page down by 10
+    page_visual_down(&v_lines, &mut row, &mut col, 10);
+    assert_eq!(row, 15);
+
+    // Page up by 7
+    page_visual_up(&v_lines, &mut row, &mut col, 7);
+    assert_eq!(row, 8);
+
+    // Page up past top clamps to 0
+    page_visual_up(&v_lines, &mut row, &mut col, 20);
+    assert_eq!(row, 0);
 }

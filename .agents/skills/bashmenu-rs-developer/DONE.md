@@ -878,3 +878,26 @@
   - Added unit test `test_themeedit_root_frame_background_color_matches_theme` in `crates/themeedit-cli/tests/themeedit_test.rs` asserting initial background fill matches the selected theme background and dynamically updates when changing `background`.
   - Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` (all 34 themeedit tests and all workspace crates passing), and `shellcheck *.sh scripts/*.sh`.
 
+## Phase 36: BashEdit Toggleable Soft-Wrap (<F9>) with Word Wrapping and Visual Row Navigation
+- [x] Implemented toggleable soft-wrap in `bashedit` with visual row navigation, whitespace word-boundary wrapping, and logical cursor preservation.
+- [x] Core Visual Line Modeling & Wrapped Navigation (`crates/bashedit-cli/src/lib.rs`):
+  - Defined `VisualLine` struct tracking logical document row (`doc_row`), chunk slice ranges (`start_col`, `end_col`), and chunk markers (`is_first_chunk`, `is_last_chunk`).
+  - Implemented `wrap_line_ranges(chars, width)` enforcing word-boundary wrapping on whitespace with fallback splitting for long words exceeding viewport width.
+  - Implemented `compute_visual_lines(lines, width)` to generate flattened visual row layouts for multi-line documents.
+  - Implemented `cursor_to_visual(v_lines, cursor_row, cursor_col)` mapping document coordinates to visual row index and column offsets.
+  - Implemented visual navigation primitives: `move_visual_up`, `move_visual_down`, `move_visual_home`, `move_visual_end`, `page_visual_up`, and `page_visual_down`.
+- [x] Editor Canvas Rendering & Interaction (`crates/bashedit-cli/src/main.rs`):
+  - Added CLI flag `--wrap` and footer action `FooterAction::ToggleWrap` (`"F9 Wrap"`).
+  - Integrated visual line computation into canvas rendering: displays line number (`format!("{:>4} │ ", doc_row + 1)`) only on the initial chunk (`is_first_chunk`), while continuation chunks render a blank gutter (`"     │ "`).
+  - Preserved logical cursor coordinates (`cursor_row`, `cursor_col`) across rendering and status display so document location (`Line A/B, Col C`) behaves as if unwrapped.
+  - Mapped `F9` and `Alt+W` (plus footer mouse clicks) to toggle soft-wrap mode dynamically with status notifications.
+  - Bound vertical navigation (`Up`, `Down`, `Home`, `End`, `PageUp`, `PageDown`) and mouse click/scroll wheel actions to visual rows when soft-wrap is enabled.
+- [x] Documentation & Help Overlays (`crates/bashmenu-core/src/constants.rs`, `bashmenu.md`):
+  - Updated `BASHEDIT_HELP_TEXT` to include `| F9 / Alt+W | Toggle Soft-Wrap |`.
+  - Updated `bashmenu.md` Section 3.3 built-in editor keybindings table.
+- [x] Tests & Verification:
+  - Added unit test suite in `crates/bashedit-cli/tests/bashedit_test.rs` covering `test_wrap_line_ranges`, `test_compute_visual_lines`, `test_cursor_to_visual_mapping`, `test_visual_vertical_navigation`, `test_visual_home_and_end_navigation`, and `test_visual_page_navigation`.
+  - Updated `test_editor_legend_row_spread` and `--help` CLI flag test.
+  - Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` (all 23 bashedit tests and full workspace passing), and `shellcheck *.sh scripts/*.sh`.
+
+

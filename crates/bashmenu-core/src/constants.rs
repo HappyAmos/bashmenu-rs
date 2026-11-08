@@ -128,6 +128,7 @@ pub const BASHEDIT_HELP_TEXT: &str = "\
 | `F6` | Markdown Preview (via bmpager --markdown) |
 | `F7` / `Alt+N` | Toggle Line Numbers |
 | `F8` | Show Markdown Syntax Quick Reference |
+| `F9` / `Alt+W` | Toggle Soft-Wrap |
 | `^O` / `^R` | Open File Picker |
 | `^S` | Save File |
 | `^A` / `^Shift+S` | Save File As (Save Under New Name) |

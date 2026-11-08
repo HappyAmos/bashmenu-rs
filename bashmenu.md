@@ -187,6 +187,7 @@ Used as dynamic templates for code generation, settings, or block injections:
 | `F6` | View Markdown preview via `bmpager --markdown --no-file`. |
 | `F7` | Toggle line numbers gutter display. |
 | `F8` | View Markdown syntax quick reference modal. |
+| `F9` / `Alt+W` | Toggle soft-wrap text display. |
 | `Ctrl+Q` / `ESC` | Exit editor (prompts save if modified). |
 | `Ctrl+O` / `Ctrl+R` | Open file via file picker modal. |
 | `Ctrl+S` | Save active file. |

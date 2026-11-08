@@ -3,7 +3,9 @@
 
 use anyhow::Result;
 use bashedit_cli::{
-    get_swap_path, is_pid_running, read_swap_file, remove_swap_file, EditorBuffer, SwapHeader,
+    compute_visual_lines, cursor_to_visual, get_swap_path, is_pid_running, move_visual_down,
+    move_visual_end, move_visual_home, move_visual_up, page_visual_down, page_visual_up,
+    read_swap_file, remove_swap_file, EditorBuffer, SwapHeader, VisualLine,
 };
 use bashmenu_core::{
     load_config, load_themes, ToastNotification, ToastSeverity, BASHEDIT_HELP_TEXT,
@@ -49,6 +51,10 @@ struct Cli {
     #[arg(long)]
     show_whitespace: bool,
 
+    /// Soft-wrap long lines to fit terminal viewport
+    #[arg(long)]
+    wrap: bool,
+
     /// Convert tab keypresses to spaces instead of raw tab characters
     #[arg(long, default_value = "true", action = clap::ArgAction::Set)]
     tab_to_spaces: bool,
@@ -84,6 +90,8 @@ enum FooterAction {
     MarkdownPreview,
     /// Toggle line number gutter display
     ToggleLineno,
+    /// Toggle soft-wrap text display
+    ToggleWrap,
     /// Open Markdown syntax reference modal
     MarkdownReference,
     /// Create a new untitled editor tab
@@ -296,6 +304,7 @@ fn main() -> Result<()> {
     let mut active_tab_idx = 0;
     let mut show_line_numbers = true;
     let mut show_whitespace = cli.show_whitespace;
+    let mut soft_wrap = cli.wrap;
     let tab_to_spaces = cli.tab_to_spaces;
     let mut shared_cutbuffer: Vec<String> = Vec::new();
 
@@ -339,21 +348,41 @@ fn main() -> Result<()> {
         let line_num_w: usize = if show_line_numbers { 7 } else { 0 };
         let text_w = (area.width as usize).saturating_sub(line_num_w + 2);
 
+        let v_lines: Vec<VisualLine> = if soft_wrap {
+            compute_visual_lines(&tabs[active_tab_idx].lines, text_w)
+        } else {
+            Vec::new()
+        };
+
         // Adjust scrolling for active tab
         {
             let active_tab = &mut tabs[active_tab_idx];
-            if active_tab.cursor_row < active_tab.scroll_row {
-                active_tab.scroll_row = active_tab.cursor_row;
-            } else if active_tab.cursor_row >= active_tab.scroll_row + editor_canvas_h
-                && editor_canvas_h > 0
-            {
-                active_tab.scroll_row = active_tab.cursor_row.saturating_sub(editor_canvas_h - 1);
-            }
+            if soft_wrap {
+                let (cursor_vrow, _) =
+                    cursor_to_visual(&v_lines, active_tab.cursor_row, active_tab.cursor_col);
+                if cursor_vrow < active_tab.scroll_row {
+                    active_tab.scroll_row = cursor_vrow;
+                } else if cursor_vrow >= active_tab.scroll_row + editor_canvas_h
+                    && editor_canvas_h > 0
+                {
+                    active_tab.scroll_row = cursor_vrow.saturating_sub(editor_canvas_h - 1);
+                }
+                active_tab.scroll_col = 0;
+            } else {
+                if active_tab.cursor_row < active_tab.scroll_row {
+                    active_tab.scroll_row = active_tab.cursor_row;
+                } else if active_tab.cursor_row >= active_tab.scroll_row + editor_canvas_h
+                    && editor_canvas_h > 0
+                {
+                    active_tab.scroll_row =
+                        active_tab.cursor_row.saturating_sub(editor_canvas_h - 1);
+                }
 
-            if active_tab.cursor_col < active_tab.scroll_col {
-                active_tab.scroll_col = active_tab.cursor_col;
-            } else if active_tab.cursor_col >= active_tab.scroll_col + text_w && text_w > 0 {
-                active_tab.scroll_col = active_tab.cursor_col.saturating_sub(text_w - 1);
+                if active_tab.cursor_col < active_tab.scroll_col {
+                    active_tab.scroll_col = active_tab.cursor_col;
+                } else if active_tab.cursor_col >= active_tab.scroll_col + text_w && text_w > 0 {
+                    active_tab.scroll_col = active_tab.cursor_col.saturating_sub(text_w - 1);
+                }
             }
         }
 
@@ -459,90 +488,207 @@ fn main() -> Result<()> {
             let selection_range = active_tab.get_selection_range();
 
             for view_row in 0..editor_canvas_h {
-                let doc_row = active_tab.scroll_row + view_row;
                 let screen_y = editor_canvas_y + view_row as u16;
 
-                if doc_row >= active_tab.lines.len() {
-                    buf.set_string(inner_x, screen_y, "~", Style::default().fg(Color::DarkGray));
-                    continue;
-                }
+                if soft_wrap {
+                    let v_idx = active_tab.scroll_row + view_row;
 
-                if show_line_numbers {
-                    let l_num_str = format!("{:>4} │ ", doc_row + 1);
-                    buf.set_string(
-                        inner_x,
-                        screen_y,
-                        &l_num_str,
-                        Style::default().fg(Color::DarkGray),
-                    );
-                }
+                    if v_idx >= v_lines.len() {
+                        buf.set_string(
+                            inner_x,
+                            screen_y,
+                            "~",
+                            Style::default().fg(Color::DarkGray),
+                        );
+                        continue;
+                    }
 
-                let line_str = &active_tab.lines[doc_row];
-                let chars: Vec<char> = line_str.chars().collect();
-                let text_start_x = inner_x + line_num_w as u16;
+                    let vl = &v_lines[v_idx];
+                    let doc_row = vl.doc_row;
 
-                for view_col in 0..text_w {
-                    let doc_col = active_tab.scroll_col + view_col;
-                    let screen_x = text_start_x + view_col as u16;
-
-                    let raw_ch = chars.get(doc_col).copied().unwrap_or(' ');
-                    let is_cursor =
-                        doc_row == active_tab.cursor_row && doc_col == active_tab.cursor_col;
-
-                    let is_selected = if let Some(((sy, sx), (ey, ex))) = selection_range {
-                        if sy == ey {
-                            doc_row == sy && doc_col >= sx && doc_col < ex
-                        } else if doc_row == sy {
-                            doc_col >= sx
-                        } else if doc_row == ey {
-                            doc_col < ex
+                    if show_line_numbers {
+                        if vl.is_first_chunk {
+                            let l_num_str = format!("{:>4} │ ", doc_row + 1);
+                            buf.set_string(
+                                inner_x,
+                                screen_y,
+                                &l_num_str,
+                                Style::default().fg(Color::DarkGray),
+                            );
                         } else {
-                            doc_row > sy && doc_row < ey
+                            let blank_gutter = "     │ ";
+                            buf.set_string(
+                                inner_x,
+                                screen_y,
+                                blank_gutter,
+                                Style::default().fg(Color::DarkGray),
+                            );
                         }
-                    } else {
-                        false
-                    };
+                    }
 
-                    let display_ch = if show_whitespace {
-                        if raw_ch == ' ' && doc_col < chars.len() {
-                            '·'
-                        } else if raw_ch == '\t' {
-                            '→'
+                    let line_str = &active_tab.lines[doc_row];
+                    let chars: Vec<char> = line_str.chars().collect();
+                    let text_start_x = inner_x + line_num_w as u16;
+                    let slice_len = vl.end_col.saturating_sub(vl.start_col);
+
+                    for view_col in 0..text_w {
+                        let doc_col = vl.start_col + view_col;
+                        let screen_x = text_start_x + view_col as u16;
+
+                        if view_col < slice_len {
+                            let raw_ch = chars.get(doc_col).copied().unwrap_or(' ');
+                            let is_cursor = doc_row == active_tab.cursor_row
+                                && doc_col == active_tab.cursor_col;
+
+                            let is_selected = if let Some(((sy, sx), (ey, ex))) = selection_range {
+                                if sy == ey {
+                                    doc_row == sy && doc_col >= sx && doc_col < ex
+                                } else if doc_row == sy {
+                                    doc_col >= sx
+                                } else if doc_row == ey {
+                                    doc_col < ex
+                                } else {
+                                    doc_row > sy && doc_row < ey
+                                }
+                            } else {
+                                false
+                            };
+
+                            let display_ch = if show_whitespace {
+                                if raw_ch == ' ' {
+                                    '·'
+                                } else if raw_ch == '\t' {
+                                    '→'
+                                } else {
+                                    raw_ch
+                                }
+                            } else {
+                                raw_ch
+                            };
+
+                            let text_fg = styles.text.fg.unwrap_or(Color::White);
+                            let text_bg = styles.text.bg.unwrap_or(styles.background);
+                            let cursor_style = Style::default()
+                                .fg(text_bg)
+                                .bg(text_fg)
+                                .add_modifier(Modifier::BOLD);
+
+                            let style = if is_cursor {
+                                cursor_style
+                            } else if is_selected {
+                                styles.highlight.add_modifier(Modifier::REVERSED)
+                            } else {
+                                styles.text
+                            };
+
+                            buf.set_string(screen_x, screen_y, display_ch.to_string(), style);
+                        }
+                    }
+
+                    // Trailing cursor on wrapped row if at end of logical line
+                    if vl.is_last_chunk
+                        && doc_row == active_tab.cursor_row
+                        && active_tab.cursor_col >= vl.end_col
+                    {
+                        let cursor_view_col = slice_len;
+                        if cursor_view_col < text_w {
+                            let text_fg = styles.text.fg.unwrap_or(Color::White);
+                            let text_bg = styles.text.bg.unwrap_or(styles.background);
+                            let cursor_style = Style::default().fg(text_bg).bg(text_fg);
+                            let screen_x = text_start_x + cursor_view_col as u16;
+                            buf.set_string(screen_x, screen_y, " ", cursor_style);
+                        }
+                    }
+                } else {
+                    let doc_row = active_tab.scroll_row + view_row;
+
+                    if doc_row >= active_tab.lines.len() {
+                        buf.set_string(
+                            inner_x,
+                            screen_y,
+                            "~",
+                            Style::default().fg(Color::DarkGray),
+                        );
+                        continue;
+                    }
+
+                    if show_line_numbers {
+                        let l_num_str = format!("{:>4} │ ", doc_row + 1);
+                        buf.set_string(
+                            inner_x,
+                            screen_y,
+                            &l_num_str,
+                            Style::default().fg(Color::DarkGray),
+                        );
+                    }
+
+                    let line_str = &active_tab.lines[doc_row];
+                    let chars: Vec<char> = line_str.chars().collect();
+                    let text_start_x = inner_x + line_num_w as u16;
+
+                    for view_col in 0..text_w {
+                        let doc_col = active_tab.scroll_col + view_col;
+                        let screen_x = text_start_x + view_col as u16;
+
+                        let raw_ch = chars.get(doc_col).copied().unwrap_or(' ');
+                        let is_cursor =
+                            doc_row == active_tab.cursor_row && doc_col == active_tab.cursor_col;
+
+                        let is_selected = if let Some(((sy, sx), (ey, ex))) = selection_range {
+                            if sy == ey {
+                                doc_row == sy && doc_col >= sx && doc_col < ex
+                            } else if doc_row == sy {
+                                doc_col >= sx
+                            } else if doc_row == ey {
+                                doc_col < ex
+                            } else {
+                                doc_row > sy && doc_row < ey
+                            }
+                        } else {
+                            false
+                        };
+
+                        let display_ch = if show_whitespace {
+                            if raw_ch == ' ' && doc_col < chars.len() {
+                                '·'
+                            } else if raw_ch == '\t' {
+                                '→'
+                            } else {
+                                raw_ch
+                            }
                         } else {
                             raw_ch
-                        }
-                    } else {
-                        raw_ch
-                    };
+                        };
 
-                    let text_fg = styles.text.fg.unwrap_or(Color::White);
-                    let text_bg = styles.text.bg.unwrap_or(styles.background);
-                    let cursor_style = Style::default()
-                        .fg(text_bg)
-                        .bg(text_fg)
-                        .add_modifier(Modifier::BOLD);
-
-                    let style = if is_cursor {
-                        cursor_style
-                    } else if is_selected {
-                        styles.highlight.add_modifier(Modifier::REVERSED)
-                    } else {
-                        styles.text
-                    };
-
-                    buf.set_string(screen_x, screen_y, display_ch.to_string(), style);
-                }
-
-                // Cursor rendered at trailing end of line
-                if doc_row == active_tab.cursor_row && active_tab.cursor_col >= chars.len() {
-                    let cursor_view_col =
-                        active_tab.cursor_col.saturating_sub(active_tab.scroll_col);
-                    if cursor_view_col < text_w {
                         let text_fg = styles.text.fg.unwrap_or(Color::White);
                         let text_bg = styles.text.bg.unwrap_or(styles.background);
-                        let cursor_style = Style::default().fg(text_bg).bg(text_fg);
-                        let screen_x = text_start_x + cursor_view_col as u16;
-                        buf.set_string(screen_x, screen_y, " ", cursor_style);
+                        let cursor_style = Style::default()
+                            .fg(text_bg)
+                            .bg(text_fg)
+                            .add_modifier(Modifier::BOLD);
+
+                        let style = if is_cursor {
+                            cursor_style
+                        } else if is_selected {
+                            styles.highlight.add_modifier(Modifier::REVERSED)
+                        } else {
+                            styles.text
+                        };
+
+                        buf.set_string(screen_x, screen_y, display_ch.to_string(), style);
+                    }
+
+                    // Cursor rendered at trailing end of line
+                    if doc_row == active_tab.cursor_row && active_tab.cursor_col >= chars.len() {
+                        let cursor_view_col =
+                            active_tab.cursor_col.saturating_sub(active_tab.scroll_col);
+                        if cursor_view_col < text_w {
+                            let text_fg = styles.text.fg.unwrap_or(Color::White);
+                            let text_bg = styles.text.bg.unwrap_or(styles.background);
+                            let cursor_style = Style::default().fg(text_bg).bg(text_fg);
+                            let screen_x = text_start_x + cursor_view_col as u16;
+                            buf.set_string(screen_x, screen_y, " ", cursor_style);
+                        }
                     }
                 }
             }
@@ -565,6 +711,7 @@ fn main() -> Result<()> {
                 ("F6 MD", FooterAction::MarkdownPreview),
                 ("F7 Lineno", FooterAction::ToggleLineno),
                 ("F8 MD Ref", FooterAction::MarkdownReference),
+                ("F9 Wrap", FooterAction::ToggleWrap),
             ];
 
             let legend_avail_w = (area.width as usize).saturating_sub(2);
@@ -805,6 +952,14 @@ fn main() -> Result<()> {
                             ));
                             continue;
                         }
+                        KeyCode::F(9) => {
+                            soft_wrap = !soft_wrap;
+                            tabs[active_tab_idx].status_message = format!(
+                                "Soft wrap {}",
+                                if soft_wrap { "enabled" } else { "disabled" }
+                            );
+                            continue;
+                        }
                         _ => {}
                     }
 
@@ -1008,6 +1163,14 @@ fn main() -> Result<()> {
                                 );
                                 continue;
                             }
+                            KeyCode::Char('w') => {
+                                soft_wrap = !soft_wrap;
+                                tabs[active_tab_idx].status_message = format!(
+                                    "Soft wrap {}",
+                                    if soft_wrap { "enabled" } else { "disabled" }
+                                );
+                                continue;
+                            }
                             _ => {}
                         }
                     }
@@ -1055,12 +1218,77 @@ fn main() -> Result<()> {
                         }
                         KeyCode::Left => active_tab.move_left(),
                         KeyCode::Right => active_tab.move_right(),
-                        KeyCode::Up => active_tab.move_up(),
-                        KeyCode::Down => active_tab.move_down(),
-                        KeyCode::Home => active_tab.move_home(),
-                        KeyCode::End => active_tab.move_end(),
-                        KeyCode::PageUp => active_tab.page_up(editor_canvas_h),
-                        KeyCode::PageDown => active_tab.page_down(editor_canvas_h),
+                        KeyCode::Up => {
+                            if soft_wrap {
+                                move_visual_up(
+                                    &v_lines,
+                                    &mut active_tab.cursor_row,
+                                    &mut active_tab.cursor_col,
+                                );
+                            } else {
+                                active_tab.move_up();
+                            }
+                        }
+                        KeyCode::Down => {
+                            if soft_wrap {
+                                move_visual_down(
+                                    &v_lines,
+                                    &mut active_tab.cursor_row,
+                                    &mut active_tab.cursor_col,
+                                );
+                            } else {
+                                active_tab.move_down();
+                            }
+                        }
+                        KeyCode::Home => {
+                            if soft_wrap {
+                                move_visual_home(
+                                    &v_lines,
+                                    active_tab.cursor_row,
+                                    &mut active_tab.cursor_col,
+                                );
+                            } else {
+                                active_tab.move_home();
+                            }
+                        }
+                        KeyCode::End => {
+                            if soft_wrap {
+                                let line_len =
+                                    active_tab.lines[active_tab.cursor_row].chars().count();
+                                move_visual_end(
+                                    &v_lines,
+                                    active_tab.cursor_row,
+                                    &mut active_tab.cursor_col,
+                                    line_len,
+                                );
+                            } else {
+                                active_tab.move_end();
+                            }
+                        }
+                        KeyCode::PageUp => {
+                            if soft_wrap {
+                                page_visual_up(
+                                    &v_lines,
+                                    &mut active_tab.cursor_row,
+                                    &mut active_tab.cursor_col,
+                                    editor_canvas_h,
+                                );
+                            } else {
+                                active_tab.page_up(editor_canvas_h);
+                            }
+                        }
+                        KeyCode::PageDown => {
+                            if soft_wrap {
+                                page_visual_down(
+                                    &v_lines,
+                                    &mut active_tab.cursor_row,
+                                    &mut active_tab.cursor_col,
+                                    editor_canvas_h,
+                                );
+                            } else {
+                                active_tab.page_down(editor_canvas_h);
+                            }
+                        }
                         KeyCode::Backspace => active_tab.delete_backspace(),
                         KeyCode::Delete => active_tab.delete_char(),
                         KeyCode::Enter => active_tab.insert_newline(),
@@ -1156,15 +1384,35 @@ fn main() -> Result<()> {
                     } else if m.row >= editor_canvas_y && m.row < divider_y {
                         let click_v_row = (m.row - editor_canvas_y) as usize;
                         let active_tab = &mut tabs[active_tab_idx];
-                        let target_row = active_tab.scroll_row + click_v_row;
-                        if target_row < active_tab.lines.len() {
-                            active_tab.cursor_row = target_row;
-                            let line_offset = if show_line_numbers { 7 } else { 0 };
-                            let inner_x = area.x + 1;
-                            if m.column >= inner_x + line_offset {
-                                let v_col = (m.column - inner_x - line_offset) as usize;
-                                active_tab.cursor_col = active_tab.scroll_col + v_col;
-                                active_tab.clamp_cursor();
+                        if soft_wrap {
+                            let target_v_idx = active_tab.scroll_row + click_v_row;
+                            if target_v_idx < v_lines.len() {
+                                let vl = &v_lines[target_v_idx];
+                                active_tab.cursor_row = vl.doc_row;
+                                let line_offset = if show_line_numbers { 7 } else { 0 };
+                                let inner_x = area.x + 1;
+                                if m.column >= inner_x + line_offset {
+                                    let v_col = (m.column - inner_x - line_offset) as usize;
+                                    let max_col = if vl.is_last_chunk {
+                                        vl.end_col
+                                    } else {
+                                        vl.end_col.saturating_sub(1)
+                                    };
+                                    active_tab.cursor_col = (vl.start_col + v_col).min(max_col);
+                                    active_tab.clamp_cursor();
+                                }
+                            }
+                        } else {
+                            let target_row = active_tab.scroll_row + click_v_row;
+                            if target_row < active_tab.lines.len() {
+                                active_tab.cursor_row = target_row;
+                                let line_offset = if show_line_numbers { 7 } else { 0 };
+                                let inner_x = area.x + 1;
+                                if m.column >= inner_x + line_offset {
+                                    let v_col = (m.column - inner_x - line_offset) as usize;
+                                    active_tab.cursor_col = active_tab.scroll_col + v_col;
+                                    active_tab.clamp_cursor();
+                                }
                             }
                         }
                     } else {
@@ -1218,6 +1466,13 @@ fn main() -> Result<()> {
                                             } else {
                                                 "disabled"
                                             }
+                                        );
+                                    }
+                                    FooterAction::ToggleWrap => {
+                                        soft_wrap = !soft_wrap;
+                                        tabs[active_tab_idx].status_message = format!(
+                                            "Soft wrap {}",
+                                            if soft_wrap { "enabled" } else { "disabled" }
                                         );
                                     }
                                     FooterAction::MarkdownReference => {
@@ -1298,13 +1553,33 @@ fn main() -> Result<()> {
                     }
                 } else if let MouseEventKind::ScrollDown = m.kind {
                     let active_tab = &mut tabs[active_tab_idx];
-                    active_tab.cursor_row =
-                        (active_tab.cursor_row + 3).min(active_tab.lines.len().saturating_sub(1));
-                    active_tab.clamp_cursor();
+                    if soft_wrap {
+                        for _ in 0..3 {
+                            move_visual_down(
+                                &v_lines,
+                                &mut active_tab.cursor_row,
+                                &mut active_tab.cursor_col,
+                            );
+                        }
+                    } else {
+                        active_tab.cursor_row = (active_tab.cursor_row + 3)
+                            .min(active_tab.lines.len().saturating_sub(1));
+                        active_tab.clamp_cursor();
+                    }
                 } else if let MouseEventKind::ScrollUp = m.kind {
                     let active_tab = &mut tabs[active_tab_idx];
-                    active_tab.cursor_row = active_tab.cursor_row.saturating_sub(3);
-                    active_tab.clamp_cursor();
+                    if soft_wrap {
+                        for _ in 0..3 {
+                            move_visual_up(
+                                &v_lines,
+                                &mut active_tab.cursor_row,
+                                &mut active_tab.cursor_col,
+                            );
+                        }
+                    } else {
+                        active_tab.cursor_row = active_tab.cursor_row.saturating_sub(3);
+                        active_tab.clamp_cursor();
+                    }
                 }
             }
         }

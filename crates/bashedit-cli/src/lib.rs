@@ -856,3 +856,232 @@ pub fn get_clipboard_text() -> Option<String> {
 pub fn set_clipboard_text(text: &str) {
     bashmenu_tui::set_clipboard_text(text);
 }
+
+/// Represents a single visual screen row for a soft-wrapped document line.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct VisualLine {
+    /// Zero-based document line index
+    pub doc_row: usize,
+    /// Start character column offset (inclusive) in document line
+    pub start_col: usize,
+    /// End character column offset (exclusive) in document line
+    pub end_col: usize,
+    /// True if this is the first visual row of the logical line
+    pub is_first_chunk: bool,
+    /// True if this is the last visual row of the logical line
+    pub is_last_chunk: bool,
+}
+
+/// Computes word-wrapped slices `(start_col, end_col)` for a character line.
+///
+/// Wraps at whitespace if possible, breaking long words only if they exceed
+/// `width`.
+pub fn wrap_line_ranges(chars: &[char], width: usize) -> Vec<(usize, usize)> {
+    if chars.is_empty() || width == 0 {
+        return vec![(0, 0)];
+    }
+    let mut ranges = Vec::new();
+    let mut start = 0;
+    while start < chars.len() {
+        let remaining = chars.len() - start;
+        if remaining <= width {
+            ranges.push((start, chars.len()));
+            break;
+        }
+
+        let max_end = start + width;
+        let mut break_point = None;
+        for i in (start + 1..=max_end).rev() {
+            if chars[i - 1].is_whitespace() {
+                break_point = Some(i);
+                break;
+            }
+        }
+
+        let end = break_point.unwrap_or(max_end);
+        ranges.push((start, end));
+        start = end;
+    }
+    ranges
+}
+
+/// Computes the complete visual line layout for all lines in the buffer.
+pub fn compute_visual_lines(lines: &[String], width: usize) -> Vec<VisualLine> {
+    if lines.is_empty() || width == 0 {
+        return vec![VisualLine {
+            doc_row: 0,
+            start_col: 0,
+            end_col: 0,
+            is_first_chunk: true,
+            is_last_chunk: true,
+        }];
+    }
+    let mut result = Vec::new();
+    for (doc_row, line) in lines.iter().enumerate() {
+        let chars: Vec<char> = line.chars().collect();
+        let ranges = wrap_line_ranges(&chars, width);
+        let n_ranges = ranges.len();
+        for (chunk_idx, (start_col, end_col)) in ranges.into_iter().enumerate() {
+            result.push(VisualLine {
+                doc_row,
+                start_col,
+                end_col,
+                is_first_chunk: chunk_idx == 0,
+                is_last_chunk: chunk_idx + 1 == n_ranges,
+            });
+        }
+    }
+    result
+}
+
+/// Finds the visual row index and column offset for given logical coordinates.
+pub fn cursor_to_visual(
+    v_lines: &[VisualLine],
+    cursor_row: usize,
+    cursor_col: usize,
+) -> (usize, usize) {
+    if v_lines.is_empty() {
+        return (0, 0);
+    }
+    let mut last_match = 0;
+    for (v_idx, vl) in v_lines.iter().enumerate() {
+        if vl.doc_row == cursor_row {
+            last_match = v_idx;
+            if vl.is_last_chunk {
+                if cursor_col >= vl.start_col && cursor_col <= vl.end_col {
+                    return (v_idx, cursor_col.saturating_sub(vl.start_col));
+                }
+            } else if cursor_col >= vl.start_col && cursor_col < vl.end_col {
+                return (v_idx, cursor_col - vl.start_col);
+            }
+        } else if vl.doc_row > cursor_row {
+            break;
+        }
+    }
+    let vl = &v_lines[last_match];
+    (last_match, cursor_col.saturating_sub(vl.start_col))
+}
+
+/// Moves cursor up by one visual row in soft-wrapped layout.
+pub fn move_visual_up(v_lines: &[VisualLine], cursor_row: &mut usize, cursor_col: &mut usize) {
+    if v_lines.is_empty() {
+        return;
+    }
+    let (v_idx, col_offset) = cursor_to_visual(v_lines, *cursor_row, *cursor_col);
+    if v_idx > 0 {
+        let target_vl = &v_lines[v_idx - 1];
+        let slice_len = target_vl.end_col - target_vl.start_col;
+        let max_col = if target_vl.is_last_chunk {
+            slice_len
+        } else {
+            slice_len.saturating_sub(1)
+        };
+        *cursor_row = target_vl.doc_row;
+        *cursor_col = target_vl.start_col + col_offset.min(max_col);
+    }
+}
+
+/// Moves cursor down by one visual row in soft-wrapped layout.
+pub fn move_visual_down(v_lines: &[VisualLine], cursor_row: &mut usize, cursor_col: &mut usize) {
+    if v_lines.is_empty() {
+        return;
+    }
+    let (v_idx, col_offset) = cursor_to_visual(v_lines, *cursor_row, *cursor_col);
+    if v_idx + 1 < v_lines.len() {
+        let target_vl = &v_lines[v_idx + 1];
+        let slice_len = target_vl.end_col - target_vl.start_col;
+        let max_col = if target_vl.is_last_chunk {
+            slice_len
+        } else {
+            slice_len.saturating_sub(1)
+        };
+        *cursor_row = target_vl.doc_row;
+        *cursor_col = target_vl.start_col + col_offset.min(max_col);
+    }
+}
+
+/// Moves cursor to start of visual row (or document line start if already there).
+pub fn move_visual_home(v_lines: &[VisualLine], cursor_row: usize, cursor_col: &mut usize) {
+    if v_lines.is_empty() {
+        *cursor_col = 0;
+        return;
+    }
+    let (v_idx, _) = cursor_to_visual(v_lines, cursor_row, *cursor_col);
+    let target_vl = &v_lines[v_idx];
+    if *cursor_col != target_vl.start_col {
+        *cursor_col = target_vl.start_col;
+    } else {
+        *cursor_col = 0;
+    }
+}
+
+/// Moves cursor to end of visual row (or document line end if already there).
+pub fn move_visual_end(
+    v_lines: &[VisualLine],
+    cursor_row: usize,
+    cursor_col: &mut usize,
+    line_len: usize,
+) {
+    if v_lines.is_empty() {
+        *cursor_col = line_len;
+        return;
+    }
+    let (v_idx, _) = cursor_to_visual(v_lines, cursor_row, *cursor_col);
+    let target_vl = &v_lines[v_idx];
+    let end_limit = if target_vl.is_last_chunk {
+        line_len
+    } else {
+        target_vl.end_col.saturating_sub(1)
+    };
+    if *cursor_col < end_limit {
+        *cursor_col = end_limit;
+    } else {
+        *cursor_col = line_len;
+    }
+}
+
+/// Scrolls cursor up by `page_size` visual rows.
+pub fn page_visual_up(
+    v_lines: &[VisualLine],
+    cursor_row: &mut usize,
+    cursor_col: &mut usize,
+    page_size: usize,
+) {
+    if v_lines.is_empty() {
+        return;
+    }
+    let (v_idx, col_offset) = cursor_to_visual(v_lines, *cursor_row, *cursor_col);
+    let target_idx = v_idx.saturating_sub(page_size);
+    let target_vl = &v_lines[target_idx];
+    let slice_len = target_vl.end_col - target_vl.start_col;
+    let max_col = if target_vl.is_last_chunk {
+        slice_len
+    } else {
+        slice_len.saturating_sub(1)
+    };
+    *cursor_row = target_vl.doc_row;
+    *cursor_col = target_vl.start_col + col_offset.min(max_col);
+}
+
+/// Scrolls cursor down by `page_size` visual rows.
+pub fn page_visual_down(
+    v_lines: &[VisualLine],
+    cursor_row: &mut usize,
+    cursor_col: &mut usize,
+    page_size: usize,
+) {
+    if v_lines.is_empty() {
+        return;
+    }
+    let (v_idx, col_offset) = cursor_to_visual(v_lines, *cursor_row, *cursor_col);
+    let target_idx = (v_idx + page_size).min(v_lines.len().saturating_sub(1));
+    let target_vl = &v_lines[target_idx];
+    let slice_len = target_vl.end_col - target_vl.start_col;
+    let max_col = if target_vl.is_last_chunk {
+        slice_len
+    } else {
+        slice_len.saturating_sub(1)
+    };
+    *cursor_row = target_vl.doc_row;
+    *cursor_col = target_vl.start_col + col_offset.min(max_col);
+}
