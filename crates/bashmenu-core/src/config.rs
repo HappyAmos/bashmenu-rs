@@ -287,6 +287,31 @@ impl BashMenuConfig {
         self.extra.remove("settings.inactivity_timeout.command");
         self.extra.remove("inactivity_timeout.milliseconds");
         self.extra.remove("inactivity_timeout.command");
+
+        // Migrate any stray dotted flat keys in settings.extra into nested mappings
+        let stray_settings_keys: Vec<(String, serde_yml::Value)> = self
+            .settings
+            .extra
+            .iter()
+            .filter(|(k, _)| k.contains('.'))
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        for (k, v) in stray_settings_keys {
+            self.settings.extra.remove(&k);
+            insert_nested_yaml_value(&mut self.settings.extra, &k, v);
+        }
+
+        // Migrate any stray dotted flat keys in self.extra into nested mappings
+        let stray_extra_keys: Vec<(String, serde_yml::Value)> = self
+            .extra
+            .iter()
+            .filter(|(k, _)| k.contains('.'))
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        for (k, v) in stray_extra_keys {
+            self.extra.remove(&k);
+            insert_nested_yaml_value(&mut self.extra, &k, v);
+        }
     }
 
     /// Retrieve value from nested configuration using dot-notation string.
@@ -503,15 +528,61 @@ impl BashMenuConfig {
             }
             _ => {
                 if let Some(key) = norm.strip_prefix("settings.") {
-                    self.settings.extra.insert(key.to_string(), value);
+                    insert_nested_yaml_value(&mut self.settings.extra, key, value);
                 } else if let Some(key) = norm.strip_prefix("user.") {
-                    self.user.insert(key.to_string(), value);
+                    insert_nested_yaml_value(&mut self.user, key, value);
                 } else {
-                    self.extra.insert(norm.to_string(), value);
+                    insert_nested_yaml_value(&mut self.extra, norm, value);
                 }
             }
         }
         true
+    }
+}
+
+/// Inserts a value into a YAML map, decomposing dot-separated paths into nested mappings
+/// to guarantee that dotted flat keys are never emitted in configuration YAML.
+fn insert_nested_yaml_value(
+    map: &mut HashMap<String, serde_yml::Value>,
+    path: &str,
+    value: serde_yml::Value,
+) {
+    let parts: Vec<&str> = path.split('.').collect();
+    if parts.is_empty() {
+        return;
+    }
+    if parts.len() == 1 {
+        map.insert(parts[0].to_string(), value);
+        return;
+    }
+
+    let top_key = parts[0].to_string();
+    let entry = map
+        .entry(top_key)
+        .or_insert_with(|| serde_yml::Value::Mapping(serde_yml::Mapping::new()));
+
+    let mut curr = entry;
+    for &part in &parts[1..parts.len() - 1] {
+        if !curr.is_mapping() {
+            *curr = serde_yml::Value::Mapping(serde_yml::Mapping::new());
+        }
+        let mapping = curr.as_mapping_mut().unwrap();
+        let key = serde_yml::Value::String(part.to_string());
+        if !mapping.contains_key(&key) || !mapping.get(&key).is_some_and(|v| v.is_mapping()) {
+            mapping.insert(
+                key.clone(),
+                serde_yml::Value::Mapping(serde_yml::Mapping::new()),
+            );
+        }
+        curr = mapping.get_mut(&key).unwrap();
+    }
+
+    if !curr.is_mapping() {
+        *curr = serde_yml::Value::Mapping(serde_yml::Mapping::new());
+    }
+    if let Some(mapping) = curr.as_mapping_mut() {
+        let leaf_key = serde_yml::Value::String(parts.last().unwrap().to_string());
+        mapping.insert(leaf_key, value);
     }
 }
 
@@ -758,5 +829,62 @@ mod tests {
             .settings
             .extra
             .contains_key("inactivity_timeout.command"));
+    }
+
+    #[test]
+    fn test_arbitrary_nested_dot_paths_never_flatten() {
+        let mut config = BashMenuConfig::default();
+
+        // Set arbitrary nested dotted path under user
+        assert!(config.set_value(
+            "user.profile.contact.email",
+            serde_yml::Value::String("user@example.com".to_string()),
+        ));
+
+        // Set arbitrary nested dotted path under settings
+        assert!(config.set_value(
+            "settings.custom_feature.sub_option.enabled",
+            serde_yml::Value::Bool(true),
+        ));
+
+        // Set arbitrary nested dotted path in extra
+        assert!(config.set_value(
+            "experimental.flags.speed",
+            serde_yml::Value::String("ludicrous".to_string()),
+        ));
+
+        // Verify none of the maps contain literal keys with dots
+        assert!(!config.user.contains_key("profile.contact.email"));
+        assert!(!config
+            .settings
+            .extra
+            .contains_key("custom_feature.sub_option.enabled"));
+        assert!(!config.extra.contains_key("experimental.flags.speed"));
+
+        // Verify get_value resolves them via dot path navigation
+        assert_eq!(
+            config.get_value("user.profile.contact.email"),
+            Some("user@example.com".to_string())
+        );
+        assert_eq!(
+            config.get_value("settings.custom_feature.sub_option.enabled"),
+            Some("true".to_string())
+        );
+        assert_eq!(
+            config.get_value("experimental.flags.speed"),
+            Some("ludicrous".to_string())
+        );
+
+        // Verify YAML output is properly structured and contains no flat dotted keys
+        let temp_dir = std::env::temp_dir();
+        let test_out = temp_dir.join("test_save_nested_paths.yml");
+        save_config(&test_out, &config).expect("Save config");
+        let saved_str = fs::read_to_string(&test_out).expect("Read config");
+
+        assert!(!saved_str.contains("profile.contact.email:"));
+        assert!(!saved_str.contains("custom_feature.sub_option.enabled:"));
+        assert!(!saved_str.contains("flags.speed:"));
+        assert!(saved_str.contains("email: user@example.com"));
+        let _ = fs::remove_file(test_out);
     }
 }

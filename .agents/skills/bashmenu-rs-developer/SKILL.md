@@ -32,6 +32,10 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
 - **Configuration Header Preservation Invariant (`bashmenu.yml`):**
   - Never use raw file writes with `serde_yml::to_string()` directly to overwrite `bashmenu.yml`.
   - Always call `bashmenu_core::config::save_config(path, config)` so that `CONFIG_HEADER` comments, documentation, and placeholder references are cleanly preserved at the top of the file.
+- **Configuration Structural Integrity Invariant (`bashmenu.yml`, `BashMenuConfig::set_value`):**
+  - Configuration writes via `BashMenuConfig::set_value` must NEVER write dot-delimited paths as flat literal keys containing periods into `Settings.extra`, `BashMenuConfig.extra`, or `user` maps.
+  - All multi-level configuration paths must either map to strongly-typed struct fields (e.g. `settings.inactivity_timeout.*`) or be decomposed recursively into nested YAML mappings (`serde_yml::Mapping`).
+  - YAML serialization of `bashmenu.yml` must never emit dotted flat keys.
 - **Verification, Linting & Formatting:**
   - Format checking: `cargo fmt --all --check`
   - Clippy linting: `cargo clippy --workspace --all-targets -- -D warnings`

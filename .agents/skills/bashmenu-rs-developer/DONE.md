@@ -841,3 +841,13 @@
   - Added `test_inactivity_timeout_set_value_and_sanitize` in `crates/bashmenu-core/src/config.rs` validating in-memory mutation, dot-path resolution via `get_value`, clean YAML serialization under `settings.inactivity_timeout:`, and migration of legacy flattened keys.
   - Validated schemas with `ymlcheck` on `bashmenu.yml`, `bashmenu.mnu`, and `bashmenu.themes`.
   - Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` (all passing).
+
+## Phase 33: Codify Configuration Structural Integrity Invariant & Recursive Dotted Path Decomposition
+- [x] Codified the **Configuration Structural Integrity Invariant (`bashmenu.yml`, `BashMenuConfig::set_value`)** in `.agents/rules/invariants.md` and `.agents/skills/bashmenu-rs-developer/SKILL.md`.
+- [x] Core Config Recursive Map Decomposition (`crates/bashmenu-core/src/config.rs`):
+  - Implemented `insert_nested_yaml_value(map, path, value)` to decompose arbitrary dot-delimited configuration paths (e.g. `user.profile.contact.email`, `settings.custom.sub_option`) into strongly structured, nested `serde_yml::Mapping` objects.
+  - Updated `BashMenuConfig::set_value` to use `insert_nested_yaml_value` across `settings.extra`, `user`, and `extra` maps, preventing any literal dotted string keys from ever being written flat into configuration YAML.
+  - Enhanced `BashMenuConfig::sanitize()` to detect and automatically migrate any legacy dotted flat keys in `settings.extra` and `extra` into proper nested YAML mappings.
+- [x] Tests & Verification:
+  - Added unit test `test_arbitrary_nested_dot_paths_never_flatten` in `crates/bashmenu-core/src/config.rs` asserting nested dictionary creation, dot-path resolution via `get_value`, and clean, non-flat YAML serialization across multiple nesting tiers.
+  - Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` (all passing).
