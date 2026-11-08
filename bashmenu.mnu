@@ -32,8 +32,8 @@ items:
           icon: '{nf::#f422}'
           action: '{scripts_dir}/glyphs.sh {param}'
           prompt: 'Enter search term:'
-          window_percent: 75
           stream: true
+          window_percent: 75
       - Unicode Block Explorer:
           type: script
           icon: '{nf::#f0ed0:}'
@@ -157,14 +157,14 @@ items:
       - Install autoexec.sh Launcher:
           type: inject_block
           icon: '{nf::#ead3}'
-          block_id: launch_autoexec
           target: ~/.bashrc
           template: '{templates_dir}/autoexec.sh.tmpl'
+          block_id: launch_autoexec
       - Install bash_aliases From Template:
           type: inject_block
           icon: '{nf::#eeb6}'
-          target: ~/.bash_aliases
           block_id: bash_aliases
+          target: ~/.bash_aliases
           template: '{templates_dir}/bash_aliases.tmpl'
       - Install Basics [vim mc htop glow gum curl wget git shellcheck shfmt jq yq]:
           type: submenu
@@ -275,13 +275,13 @@ items:
           quiet: false
           alt_buffer: true
           tabstop: 4
+          stream: false
+          show_whitespace: false
+          external: false
           refresh: false
           exec_mode: console
           masked: false
-          stream: false
-          show_whitespace: false
           no_formatting: false
-          external: false
       - '{divider}': null
       - Back To Main Menu:
           type: back
@@ -289,21 +289,21 @@ items:
           quiet: false
           alt_buffer: true
           tabstop: 4
-          show_whitespace: false
-          refresh: false
-          stream: false
           exec_mode: console
+          external: false
           masked: false
           no_formatting: false
-          external: false
+          refresh: false
+          show_whitespace: false
+          stream: false
       - '{divider}': null
-    no_formatting: false
-    show_whitespace: false
-    stream: false
-    masked: false
-    external: false
     refresh: false
     exec_mode: console
+    no_formatting: false
+    show_whitespace: false
+    external: false
+    masked: false
+    stream: false
 - Network Utilities:
     type: submenu
     icon: '{nf::#ef09:}'
@@ -323,8 +323,8 @@ items:
           type: config
           icon: '{nf::#f11ab}'
           prompt: 'Enter Hostname or IP Address:'
-          title: Edit Ping Target
           key: settings.ping_target
+          title: Edit Ping Target
       - IP Information:
           type: script
           icon: '{nf::#F0A5F:}'
@@ -346,8 +346,8 @@ items:
             type: message
             title: Task Cancelled
             message: Ping request was cancelled by user.
-          message: Start pinging target host {settings.ping_target}?
           title: Confirm Ping Task
+          message: Start pinging target host {settings.ping_target}?
       - Show Configured DNS [getdns.py]:
           type: script
           icon: '{nf::#f01d6}'
@@ -416,22 +416,24 @@ items:
                 show_whitespace: true
             - Edit Screensaver Delay [{app.settings.inactivity_timeout.milliseconds}]:
                 type: config
+                icon: '{nf::#f093a}'
                 action: app.settings.inactivity_timeout.milliseconds
                 prompt: Number of milliseconds before screensaver runs
                 interactive: true
                 quiet: false
                 alt_buffer: true
                 tabstop: 4
-                masked: false
                 refresh: false
-                key: app.settings.inactivity_timeout.milliseconds
-                external: false
-                stream: false
-                show_whitespace: false
-                no_formatting: false
                 exec_mode: console
+                show_whitespace: false
+                key: app.settings.inactivity_timeout.milliseconds
+                stream: false
+                no_formatting: false
+                external: false
+                masked: false
             - Edit Screensaver Program [{app.settings.inactivity_timeout.command}]:
                 type: config
+                icon: '{nf::#f093a}'
                 action: app.settings.inactivity_timeout.command
                 interactive: true
                 quiet: false
@@ -439,12 +441,12 @@ items:
                 tabstop: 4
                 refresh: false
                 stream: false
-                exec_mode: console
-                show_whitespace: false
-                masked: false
-                external: false
                 no_formatting: false
                 key: app.settings.inactivity_timeout.command
+                masked: false
+                external: false
+                show_whitespace: false
+                exec_mode: console
             - Edit Scripts [{scripts_dir}]:
                 type: editor
                 icon: '{nf::#eae9}'
@@ -478,15 +480,15 @@ items:
             - Enable Automatic Updates (git pull) [{settings.check_for_updates}]:
                 type: toggle
                 icon: '{nf::#ea77}'
-                key: settings.check_for_updates
                 title: Toggle Auto Update
                 message: Enable automatic updates?
+                key: settings.check_for_updates
             - Enable Nerd Fonts [{settings.use_nerd_fonts}]:
                 type: toggle
                 icon: '{nf::#f031}'
-                title: Toggle Nerd Fonts
                 key: settings.use_nerd_fonts
                 message: Enable colorful menu emojis and Nerd Fonts?
+                title: Toggle Nerd Fonts
             - Help Gutter Hover Delay [[{app.settings.help_gutter_delay}] seconds]:
                 type: config
                 icon: '{nf::#f05a}'
@@ -500,8 +502,8 @@ items:
                 type: config
                 icon: '{nf::#f07e}'
                 prompt: 'Enter Nerd Font character width mode (auto, 1, 2):'
-                title: Configure Nerd Font Glyph Width
                 key: settings.nerd_font_width
+                title: Configure Nerd Font Glyph Width
             - Editor Tab to Spaces Mode [{settings.tab_to_spaces}]:
                 type: toggle
                 icon: '{nf::#ec3c}'
@@ -522,6 +524,8 @@ items:
                 interactive: true
                 quiet: false
                 alt_buffer: true
+                title: Pager Text Editor [{settings.pager_editor}]
+                key: settings.pager_editor
                 options:
                 - label: Default System Editor ($EDITOR)
                   value: default
@@ -529,8 +533,6 @@ items:
                   value: builtin
                 - label: Vim
                   value: vim
-                title: Pager Text Editor [{settings.pager_editor}]
-                key: settings.pager_editor
             - Menu Transition Effect [{settings.transition}]:
                 type: radio
                 icon: '{nf::#f0d0}'
@@ -539,8 +541,8 @@ items:
                 interactive: true
                 quiet: false
                 alt_buffer: true
-                key: settings.transition
                 title: Return Transition Effect [{settings.transition}]
+                key: settings.transition
                 options:
                 - label: Instant (Synchronized DEC Mode 2026 buffered redraw)
                   value: instant
@@ -572,6 +574,7 @@ items:
                 interactive: true
                 quiet: false
                 alt_buffer: true
+                key: settings.transition_speed
                 options:
                 - label: Fast (~60-75ms, snappy 15ms/step)
                   value: fast
@@ -579,7 +582,6 @@ items:
                   value: normal
                 - label: Slow (Deliberate, ~200-250ms, 50ms/step)
                   value: slow
-                key: settings.transition_speed
                 title: Screen Transition Speed [{settings.transition_speed}]
             - Modal Animation Effect [{settings.modal_animation}]:
                 type: radio
@@ -604,7 +606,6 @@ items:
                 interactive: true
                 quiet: false
                 alt_buffer: true
-                title: Modal Animation Speed [{settings.modal_animation_speed}]
                 options:
                 - label: Fast (~36ms, snappy 12ms/step)
                   value: fast
@@ -613,6 +614,7 @@ items:
                 - label: Slow (~120ms, deliberate 40ms/step)
                   value: slow
                 key: settings.modal_animation_speed
+                title: Modal Animation Speed [{settings.modal_animation_speed}]
             - Linux Framebuffer Support [{settings.framebuffer}]:
                 type: radio
                 icon: '{nf::#f2db}'
@@ -634,8 +636,8 @@ items:
                 type: config
                 icon: '{nf::#ebf3}'
                 prompt: 'Enter status gutter format. Available options: {user}, {battery}, {date}, {date_time_24}, {date_time_24_short}, {date_time_12}, {date_time_12_short}, {host}, {user-mode}, {version}, {utc_seconds}'
-                key: settings.status_gutter
                 title: Configure Status Gutter
+                key: settings.status_gutter
             - Status Gutter Refresh Rate [[{app.settings.refresh_interval}] seconds]:
                 type: config
                 icon: '{nf:@:#f1452}'
@@ -651,8 +653,8 @@ items:
                 interactive: true
                 quiet: false
                 alt_buffer: true
-                key: app.settings.toast_timeout
                 title: Configure Toast Message Timeout
+                key: app.settings.toast_timeout
             - '{divider}': null
             - Back to Options & Settings:
                 type: back
@@ -676,13 +678,13 @@ items:
           quiet: true
           alt_buffer: true
           tabstop: 4
-          external: false
-          refresh: false
+          masked: false
           show_whitespace: false
-          no_formatting: false
           exec_mode: console
           stream: false
-          masked: false
+          external: false
+          refresh: false
+          no_formatting: false
       - Update Grub:
           type: command
           icon: '{nf::#f11e7}'
@@ -691,14 +693,14 @@ items:
           interactive: false
           quiet: true
           tabstop: 4
-          window_percent: 65
+          external: false
+          refresh: false
           masked: false
           stream: true
-          refresh: false
           exec_mode: streaming
-          no_formatting: false
-          external: false
+          window_percent: 65
           show_whitespace: false
+          no_formatting: false
       - Edit .bash_aliases [{bash_aliases}]:
           type: editor
           icon: '{nf::#f11e7}'
@@ -800,10 +802,10 @@ items:
           prompt: 'Enter your postal code/zip code:'
           interactive: false
           quiet: true
-          stream: true
           title: Weather Location [{user.postal_code}]
-          key: user.postal_code
           picker: none
+          stream: true
+          key: user.postal_code
       - Weather -> 3 Day [curl wttr.in/{user.postal_code}]:
           type: command
           icon: '{nf::#eef0:}'
@@ -833,13 +835,13 @@ items:
     quiet: true
     alt_buffer: true
     tabstop: 4
-    refresh: false
-    no_formatting: false
+    exec_mode: console
     stream: false
     masked: false
+    refresh: false
     external: false
     show_whitespace: false
-    exec_mode: console
+    no_formatting: false
 - Exit Menu:
     type: exit
     icon: '{nf::#f0a48:}'

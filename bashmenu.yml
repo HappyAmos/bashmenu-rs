@@ -5,13 +5,13 @@
 # or shorthand shortcuts ({theme}, {user.<key>}, {settings.<key>}).
 # ==============================================================================
 version: '0.0.1'
-theme: mountain
+theme: black-eyed-susans
 user:
-  antigravity: cd {dir_picker} && agy -c
-  postal_code: 49079
   localip: '[b]{localip}[/b]'
   example_filepath: '{bashmenu_dir}'
+  antigravity: cd {dir_picker} && agy -c
   example_string: A string of text
+  postal_code: 49079
   example_boolean: true
 settings:
   cache_dir: '{home}/.cache/bashmenu'
