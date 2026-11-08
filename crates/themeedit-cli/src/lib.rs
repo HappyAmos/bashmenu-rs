@@ -314,6 +314,10 @@ impl ThemeEditorState {
                 kind: TokenKind::Color("highlight".to_string()),
             },
             TokenItem {
+                label: "Highlight Text Color".to_string(),
+                kind: TokenKind::Color("highlight_text".to_string()),
+            },
+            TokenItem {
                 label: "Border Color".to_string(),
                 kind: TokenKind::Color("border".to_string()),
             },
@@ -583,6 +587,26 @@ impl ThemeEditorState {
                         } else if let Some(s) = val.as_str() {
                             return s.to_string();
                         }
+                    } else if key == "highlight_text" {
+                        if let Some(val) = c_map.get("highlight") {
+                            if let Some(seq) = val.as_sequence() {
+                                if let Some(fg) = seq.first().and_then(|v| v.as_i64()) {
+                                    if fg >= 0 {
+                                        return format!("Color {}", fg);
+                                    }
+                                } else if let Some(s) = seq.first().and_then(|v| v.as_str()) {
+                                    if s != "-1" {
+                                        return s.to_string();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if key == "highlight_text" {
+                    let styles = ResolvedThemeStyles::from_theme(&self.current_theme, true);
+                    if let Some(fg) = styles.highlight.fg {
+                        return format!("Color {}", color_to_u8(fg));
                     }
                 }
                 "Default".to_string()
@@ -746,24 +770,17 @@ impl ThemeEditorState {
             } else if key == "highlight" {
                 let (r, g, b) = bashmenu_tui::color_to_rgb(color);
                 let lum = (r as u32 * 299 + g as u32 * 587 + b as u32 * 114) / 1000;
-                let existing_fg = c_map
-                    .get("highlight")
-                    .and_then(|v| v.as_sequence())
-                    .and_then(|seq| seq.first())
-                    .cloned();
+                let existing_fg = c_map.get("highlight_text").cloned().or_else(|| {
+                    c_map
+                        .get("highlight")
+                        .and_then(|v| v.as_sequence())
+                        .and_then(|seq| seq.first())
+                        .cloned()
+                });
                 let fg_val = if let Some(efg) = existing_fg {
                     if let Some(efg_color) = bashmenu_tui::parse_color_value(&efg) {
                         if efg_color != Color::Reset {
-                            let (fr, fg_g, fb) = bashmenu_tui::color_to_rgb(efg_color);
-                            let f_lum =
-                                (fr as u32 * 299 + fg_g as u32 * 587 + fb as u32 * 114) / 1000;
-                            if (f_lum as i32 - lum as i32).abs() >= 60 {
-                                efg
-                            } else if lum > 128 {
-                                serde_yml::Value::Number(16.into())
-                            } else {
-                                serde_yml::Value::Number(255.into())
-                            }
+                            efg
                         } else if lum > 128 {
                             serde_yml::Value::Number(16.into())
                         } else {
@@ -785,6 +802,20 @@ impl ThemeEditorState {
                 if c_map.contains_key("selection") {
                     c_map.insert("selection".to_string(), pair);
                 }
+            } else if key == "highlight_text" {
+                let existing_bg = c_map
+                    .get("highlight")
+                    .and_then(|v| v.as_sequence())
+                    .and_then(|seq| seq.get(1))
+                    .cloned()
+                    .unwrap_or_else(|| serde_yml::Value::Number(201.into()));
+
+                let pair = serde_yml::Value::Sequence(vec![val.clone(), existing_bg]);
+                c_map.insert("highlight".to_string(), pair.clone());
+                c_map.insert(key.to_string(), val.clone());
+                if c_map.contains_key("selection") {
+                    c_map.insert("selection".to_string(), pair);
+                }
             } else {
                 c_map.insert(
                     key.to_string(),
@@ -803,13 +834,37 @@ impl ThemeEditorState {
                 } else if key == "highlight" {
                     let (r, g, b) = bashmenu_tui::color_to_rgb(color);
                     let lum = (r as u32 * 299 + g as u32 * 587 + b as u32 * 114) / 1000;
-                    let fg_16 = if lum > 128 {
-                        serde_yml::Value::String("COLOR_BLACK".to_string())
-                    } else {
-                        serde_yml::Value::String("COLOR_WHITE".to_string())
-                    };
-                    let pair_16 = serde_yml::Value::Sequence(vec![fg_16, val_16]);
+                    let existing_fg_16 = c16
+                        .get("highlight_text")
+                        .cloned()
+                        .or_else(|| {
+                            c16.get("highlight")
+                                .and_then(|v| v.as_sequence())
+                                .and_then(|seq| seq.first())
+                                .cloned()
+                        })
+                        .unwrap_or_else(|| {
+                            if lum > 128 {
+                                serde_yml::Value::String("COLOR_BLACK".to_string())
+                            } else {
+                                serde_yml::Value::String("COLOR_WHITE".to_string())
+                            }
+                        });
+                    let pair_16 = serde_yml::Value::Sequence(vec![existing_fg_16, val_16]);
                     c16.insert(key.to_string(), pair_16.clone());
+                    if c16.contains_key("selection") {
+                        c16.insert("selection".to_string(), pair_16);
+                    }
+                } else if key == "highlight_text" {
+                    let existing_bg_16 = c16
+                        .get("highlight")
+                        .and_then(|v| v.as_sequence())
+                        .and_then(|seq| seq.get(1))
+                        .cloned()
+                        .unwrap_or_else(|| serde_yml::Value::String("COLOR_BLUE".to_string()));
+                    let pair_16 = serde_yml::Value::Sequence(vec![val_16.clone(), existing_bg_16]);
+                    c16.insert("highlight".to_string(), pair_16.clone());
+                    c16.insert(key.to_string(), val_16);
                     if c16.contains_key("selection") {
                         c16.insert("selection".to_string(), pair_16);
                     }
@@ -832,13 +887,37 @@ impl ThemeEditorState {
                 } else if key == "highlight" {
                     let (r, g, b) = bashmenu_tui::color_to_rgb(color);
                     let lum = (r as u32 * 299 + g as u32 * 587 + b as u32 * 114) / 1000;
-                    let fg_8 = if lum > 128 {
-                        serde_yml::Value::String("COLOR_BLACK".to_string())
-                    } else {
-                        serde_yml::Value::String("COLOR_WHITE".to_string())
-                    };
-                    let pair_8 = serde_yml::Value::Sequence(vec![fg_8, val_8]);
+                    let existing_fg_8 = c8
+                        .get("highlight_text")
+                        .cloned()
+                        .or_else(|| {
+                            c8.get("highlight")
+                                .and_then(|v| v.as_sequence())
+                                .and_then(|seq| seq.first())
+                                .cloned()
+                        })
+                        .unwrap_or_else(|| {
+                            if lum > 128 {
+                                serde_yml::Value::String("COLOR_BLACK".to_string())
+                            } else {
+                                serde_yml::Value::String("COLOR_WHITE".to_string())
+                            }
+                        });
+                    let pair_8 = serde_yml::Value::Sequence(vec![existing_fg_8, val_8]);
                     c8.insert(key.to_string(), pair_8.clone());
+                    if c8.contains_key("selection") {
+                        c8.insert("selection".to_string(), pair_8);
+                    }
+                } else if key == "highlight_text" {
+                    let existing_bg_8 = c8
+                        .get("highlight")
+                        .and_then(|v| v.as_sequence())
+                        .and_then(|seq| seq.get(1))
+                        .cloned()
+                        .unwrap_or_else(|| serde_yml::Value::String("COLOR_BLUE".to_string()));
+                    let pair_8 = serde_yml::Value::Sequence(vec![val_8.clone(), existing_bg_8]);
+                    c8.insert("highlight".to_string(), pair_8.clone());
+                    c8.insert(key.to_string(), val_8);
                     if c8.contains_key("selection") {
                         c8.insert("selection".to_string(), pair_8);
                     }
@@ -864,6 +943,31 @@ impl ThemeEditorState {
 
     /// Retrieves the current Ratatui Color for a palette token key.
     pub fn get_color_token_color(&self, key: &str) -> Color {
+        if key == "highlight_text" {
+            if let Some(c_map) = &self.current_theme.colors_256 {
+                if let Some(val) = c_map.get(key) {
+                    if let Some(c) = bashmenu_tui::parse_color_value(val) {
+                        if c != Color::Reset {
+                            return c;
+                        }
+                    }
+                }
+                if let Some(val) = c_map.get("highlight") {
+                    if let Some(seq) = val.as_sequence() {
+                        if let Some(fg_val) = seq.first() {
+                            if let Some(c) = bashmenu_tui::parse_color_value(fg_val) {
+                                if c != Color::Reset {
+                                    return c;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            let styles = ResolvedThemeStyles::from_theme(&self.current_theme, true);
+            return styles.highlight.fg.unwrap_or(Color::Black);
+        }
+
         if key == "highlight" {
             if let Some(c_map) = &self.current_theme.colors_256 {
                 if let Some(val) = c_map.get(key) {
@@ -1008,7 +1112,7 @@ impl ThemeEditorState {
 
     /// Retrieves the current 8-bit color index for a palette token key.
     pub fn get_color_token_u8(&self, key: &str) -> u8 {
-        if key == "highlight" {
+        if key == "highlight" || key == "highlight_text" {
             let c = self.get_color_token_color(key);
             return color_to_u8(c);
         }
@@ -1484,6 +1588,8 @@ impl ThemeEditorState {
                         (k == "shortcut_key" && (key == "shortcut_gutter" || key == "shortcut"))
                             || (k == "text" && key == "content")
                             || (k == "plugin" && (key == "plugin_text" || key == "plugins"))
+                            || (k == "highlight_text"
+                                && (key == "highlight_fg" || key == "highlight_foreground"))
                             || (k == "background"
                                 && (key == "bg" || key == "bg_color" || key == "background_color"))
                     }
@@ -1664,6 +1770,9 @@ pub fn get_token_preview_spans(
         }
         TokenKind::Color(key) if key == "highlight" => {
             spans.push((content_start_y, p_inner_x, p_inner_x + p_avail_w));
+        }
+        TokenKind::Color(key) if key == "highlight_text" => {
+            spans.push((content_start_y, p_inner_x + 2, p_inner_x + 24));
         }
         TokenKind::Color(key) if key == "text" => {
             spans.push((content_start_y + 1, p_inner_x + 2, p_inner_x + 22));

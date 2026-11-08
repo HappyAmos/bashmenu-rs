@@ -525,6 +525,11 @@ impl ResolvedThemeStyles {
             if let Some(st) = parse_style_pair_with_tier(p.get("highlight"), tier) {
                 resolved.highlight = st.add_modifier(Modifier::BOLD);
             }
+            if let Some(st) = parse_style_pair_with_tier(p.get("highlight_text"), tier) {
+                if let Some(fg) = st.fg {
+                    resolved.highlight = resolved.highlight.fg(fg);
+                }
+            }
             if let Some(st) = parse_style_pair_with_tier(p.get("accent"), tier) {
                 resolved.accent = st;
             }

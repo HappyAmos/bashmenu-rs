@@ -1556,6 +1556,10 @@ fn open_selected_token_picker(state: &mut ThemeEditorState, active_modal: &mut A
             let initial_color = state.get_color_token_color(&key);
             let title = if key == "background" {
                 "Pick Background Color"
+            } else if key == "highlight_text" {
+                "Pick Highlight Text Color"
+            } else if key == "highlight" {
+                "Pick Highlight Bar Color"
             } else {
                 "Pick Theme Color"
             };
@@ -1747,6 +1751,9 @@ fn hit_test_preview(
                 // Active menu row
                 if col >= p_inner_x && col < p_inner_x + 2 {
                     return Some(("indicator", row, p_inner_x, p_inner_x + 2));
+                }
+                if col >= p_inner_x + 2 && col < p_inner_x + 24 {
+                    return Some(("highlight_text", row, p_inner_x + 2, p_inner_x + 24));
                 }
                 return Some(("highlight", row, p_inner_x, p_inner_x + p_avail_w));
             }

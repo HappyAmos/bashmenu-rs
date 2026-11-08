@@ -1617,3 +1617,83 @@ fn test_themeedit_highlighter_sets_margin_to_margin_background_bar() {
         );
     }
 }
+
+#[test]
+fn test_themeedit_highlight_text_token_configuration() {
+    use bashmenu_tui::ResolvedThemeStyles;
+    use ratatui::layout::Rect;
+    use ratatui::style::Color;
+    use themeedit_cli::{get_token_preview_spans, PreviewMode, ThemeEditorState, TokenKind};
+
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(fixture_path, Some("dracula".to_string()));
+
+    // 1. Verify "Highlight Text Color" token exists in tokens
+    let text_token = state
+        .tokens
+        .iter()
+        .find(|t| matches!(&t.kind, TokenKind::Color(k) if k == "highlight_text"))
+        .cloned()
+        .expect("Highlight Text Color token must exist in tokens");
+    assert_eq!(text_token.label, "Highlight Text Color");
+
+    // 2. Initial color should be fg of highlight
+    let init_fg = state.get_color_token_color("highlight_text");
+    let init_styles = ResolvedThemeStyles::from_theme(&state.current_theme, true);
+    assert_eq!(init_styles.highlight.fg, Some(init_fg));
+    assert_eq!(
+        state.get_token_value_display(&text_token),
+        format!("Color {}", state.get_color_token_u8("highlight_text"))
+    );
+
+    // 3. Selection by aliases
+    assert!(state.select_token_by_key("highlight_text"));
+    assert_eq!(
+        state.current_selected_token().map(|t| &t.kind),
+        Some(&TokenKind::Color("highlight_text".to_string()))
+    );
+    assert!(state.select_token_by_key("highlight_fg"));
+    assert_eq!(
+        state.current_selected_token().map(|t| &t.kind),
+        Some(&TokenKind::Color("highlight_text".to_string()))
+    );
+    assert!(state.select_token_by_key("highlight_foreground"));
+    assert_eq!(
+        state.current_selected_token().map(|t| &t.kind),
+        Some(&TokenKind::Color("highlight_text".to_string()))
+    );
+
+    // 4. Update the highlight_text color to 46 (bright green)
+    state.set_color_token_value("highlight_text", Color::Indexed(46));
+    assert_eq!(
+        state.get_color_token_color("highlight_text"),
+        Color::Indexed(46)
+    );
+    assert_eq!(state.get_color_token_u8("highlight_text"), 46);
+
+    // Verify colors_256 map
+    let c256_map = state.current_theme.colors_256.as_ref().unwrap();
+    assert_eq!(
+        c256_map.get("highlight_text"),
+        Some(&serde_yml::Value::Number(46.into()))
+    );
+    let hl_seq = c256_map
+        .get("highlight")
+        .and_then(|v| v.as_sequence())
+        .unwrap();
+    assert_eq!(hl_seq[0], serde_yml::Value::Number(46.into()));
+
+    // 5. Resolved styles must have fg=46 and bg intact
+    let styles = ResolvedThemeStyles::from_theme(&state.current_theme, true);
+    assert_eq!(styles.highlight.fg, Some(Color::Indexed(46)));
+    assert_eq!(styles.highlight.bg, init_styles.highlight.bg);
+
+    // 6. Preview spans for highlight_text flash the text span
+    let right_area = Rect::new(30, 0, 50, 20);
+    let spans = get_token_preview_spans(&text_token, right_area, PreviewMode::Menu, &styles);
+    assert_eq!(spans.len(), 1);
+    let (sy, sx1, sx2) = spans[0];
+    assert_eq!(sy, right_area.y + 2);
+    assert_eq!(sx1, right_area.x + 4);
+    assert_eq!(sx2, right_area.x + 26);
+}
