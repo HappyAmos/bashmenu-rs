@@ -2004,3 +2004,51 @@ fn test_theme_indicator_token_configuration_and_persistence() {
     assert_eq!(spans[0].0, area.y + 2); // content_start_y
     assert_eq!(spans[0].1, area.x + 2); // p_inner_x
 }
+
+#[test]
+fn test_themeedit_root_frame_background_color_matches_theme() {
+    use bashmenu_tui::ResolvedThemeStyles;
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::style::Color;
+    use themeedit_cli::render_root_frame;
+
+    // 1. Verify with a theme having a distinct background color (qbasic: 19)
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(fixture_path, Some("qbasic".to_string()));
+    let styles = ResolvedThemeStyles::from_theme(&state.current_theme, true);
+    assert_eq!(styles.background, Color::Indexed(19));
+
+    let area = Rect::new(0, 0, 80, 24);
+    let mut buf = Buffer::empty(area);
+    render_root_frame(
+        area,
+        &mut buf,
+        &state.current_name,
+        state.is_modified,
+        &styles,
+    );
+
+    // Verify cell background across root frame matches theme background
+    assert_eq!(buf[(0, 0)].bg, Color::Indexed(19));
+    assert_eq!(buf[(10, 10)].bg, Color::Indexed(19));
+    assert_eq!(buf[(40, 12)].bg, Color::Indexed(19));
+    assert_eq!(buf[(79, 23)].bg, Color::Indexed(19));
+
+    // 2. Change background color and verify frame background updates
+    state.set_color_token("background", 52);
+    let updated_styles = ResolvedThemeStyles::from_theme(&state.current_theme, true);
+    assert_eq!(updated_styles.background, Color::Indexed(52));
+
+    render_root_frame(
+        area,
+        &mut buf,
+        &state.current_name,
+        state.is_modified,
+        &updated_styles,
+    );
+    assert_eq!(buf[(0, 0)].bg, Color::Indexed(52));
+    assert_eq!(buf[(10, 10)].bg, Color::Indexed(52));
+    assert_eq!(buf[(40, 12)].bg, Color::Indexed(52));
+    assert_eq!(buf[(79, 23)].bg, Color::Indexed(52));
+}

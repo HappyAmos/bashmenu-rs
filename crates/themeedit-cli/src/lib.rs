@@ -11,10 +11,12 @@ use bashmenu_core::{
     WallpaperSetting, WindowBorders,
 };
 use bashmenu_tui::{ResolvedThemeStyles, TextInput};
+use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::Color;
+use ratatui::style::{Color, Style};
+use ratatui::widgets::{Block, Borders, Widget};
 use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use unicode_width::UnicodeWidthStr;
 
 /// Category grouping for theme attributes in the editor sidebar tree.
@@ -242,6 +244,12 @@ impl ThemeEditorState {
             .filter(|n| !n.trim().is_empty())
             .or_else(|| {
                 // Try reading active theme from bashmenu.yml if available
+                let cfg_path = bashmenu_core::resolve_app_path(Path::new("bashmenu.yml"));
+                if let Ok(cfg) = bashmenu_core::load_config(&cfg_path) {
+                    if themes.contains_key(&cfg.theme) {
+                        return Some(cfg.theme);
+                    }
+                }
                 if let Ok(home) = std::env::var("HOME") {
                     let cfg_path = PathBuf::from(home).join(".config/bashmenu/bashmenu.yml");
                     if let Ok(cfg) = bashmenu_core::load_config(&cfg_path) {
@@ -2037,4 +2045,34 @@ pub fn relativize_wallpaper_path(path: &std::path::Path) -> String {
         }
     }
     path.to_string_lossy().to_string()
+}
+
+/// Renders the root window frame and background fill for the Theme Editor.
+///
+/// Fills all cells in `area` with `styles.background` and renders the outer
+/// border block styled with the theme's background color.
+pub fn render_root_frame(
+    area: Rect,
+    buf: &mut Buffer,
+    theme_name: &str,
+    is_modified: bool,
+    styles: &ResolvedThemeStyles,
+) {
+    for y in area.y..area.y + area.height {
+        for x in area.x..area.x + area.width {
+            buf[(x, y)].reset();
+            buf[(x, y)].set_bg(styles.background);
+        }
+    }
+
+    let root_block = Block::default()
+        .borders(Borders::ALL)
+        .title(format!(
+            "─[ ThemeEdit: {}{} ]",
+            theme_name,
+            if is_modified { " (Modified)" } else { "" }
+        ))
+        .border_style(Style::default().fg(Color::Cyan))
+        .style(Style::default().bg(styles.background));
+    root_block.render(area, buf);
 }

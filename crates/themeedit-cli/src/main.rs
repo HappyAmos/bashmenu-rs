@@ -17,13 +17,12 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Widget};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use themeedit_cli::{
     default_wallpaper_dir, extract_preview_cell_color, extract_preview_color_at, format_color_code,
-    get_token_preview_spans, relativize_wallpaper_path, render_preview_pane, PreviewMode,
-    ThemeEditorState, TokenKind, TreeRow,
+    get_token_preview_spans, relativize_wallpaper_path, render_preview_pane, render_root_frame,
+    PreviewMode, ThemeEditorState, TokenKind, TreeRow,
 };
 
 /// Command-line argument configuration for the Theme Editor (`themeedit`).
@@ -121,7 +120,7 @@ fn main() -> Result<()> {
     let mut toast_rack = ToastRack::new();
     let mut is_editing_name = false;
     let mut preview_buffer = Buffer::empty(Rect::default());
-    let cfg_path = bashmenu_core::get_user_config_dir().join("bashmenu.yml");
+    let cfg_path = bashmenu_core::resolve_app_path(Path::new("bashmenu.yml"));
     let delay_secs = bashmenu_core::load_config(&cfg_path)
         .ok()
         .map(|c| c.help_gutter_delay())
@@ -149,22 +148,13 @@ fn main() -> Result<()> {
             guard.draw(|f| {
                 let buf = f.buffer_mut();
 
-                for y in area.y..area.y + area.height {
-                    for x in area.x..area.x + area.width {
-                        buf[(x, y)].reset();
-                    }
-                }
-
-                // Background fill
-                let root_block = Block::default()
-                    .borders(Borders::ALL)
-                    .title(format!(
-                        "─[ ThemeEdit: {}{} ]",
-                        state.current_name,
-                        if state.is_modified { " (Modified)" } else { "" }
-                    ))
-                    .border_style(Style::default().fg(Color::Cyan));
-                root_block.render(area, buf);
+                render_root_frame(
+                    area,
+                    buf,
+                    &state.current_name,
+                    state.is_modified,
+                    &preview_styles,
+                );
 
                 // Universal close button [X] on top right just left of border
                 if area.width > 6 {

@@ -868,3 +868,13 @@
   - Added unit test `test_ensure_terminal_sane_callable` in `crates/bashmenu-tui/src/terminal.rs`.
   - Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, and `shellcheck *.sh scripts/*.sh`.
 
+## Phase 35: Theme Editor Root Frame Background Color Parity
+- [x] Fixed issue where `themeedit` root window frame and buffer clear initialized with default/reset background color rather than the background color of the currently set theme.
+- [x] Theme Editor Rendering & App Path Resolution (`crates/themeedit-cli/src/lib.rs`, `crates/themeedit-cli/src/main.rs`):
+  - Implemented `render_root_frame(area, buf, theme_name, is_modified, styles)` in `crates/themeedit-cli/src/lib.rs` that explicitly sets `buf[(x, y)].set_bg(styles.background)` across all cells in `area` and renders the outer `Block` with `.style(Style::default().bg(styles.background))`.
+  - Updated `main.rs` to call `render_root_frame()` and resolve configuration via `bashmenu_core::resolve_app_path(Path::new("bashmenu.yml"))`.
+  - Updated `ThemeEditorState::new` in `crates/themeedit-cli/src/lib.rs` to query `resolve_app_path(Path::new("bashmenu.yml"))` to resolve the active theme configured in `bashmenu.yml` before fallback.
+- [x] Tests & Verification:
+  - Added unit test `test_themeedit_root_frame_background_color_matches_theme` in `crates/themeedit-cli/tests/themeedit_test.rs` asserting initial background fill matches the selected theme background and dynamically updates when changing `background`.
+  - Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` (all 34 themeedit tests and all workspace crates passing), and `shellcheck *.sh scripts/*.sh`.
+
