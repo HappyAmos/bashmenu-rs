@@ -234,6 +234,61 @@ impl BashMenuConfig {
         self.settings.help_gutter_delay.unwrap_or(4.0)
     }
 
+    /// Sanitizes configuration by migrating legacy or flattened settings keys.
+    pub fn sanitize(&mut self) {
+        if let Some(val) = self
+            .settings
+            .extra
+            .remove("inactivity_timeout.milliseconds")
+        {
+            let ms = match &val {
+                serde_yml::Value::Number(n) => n
+                    .as_u64()
+                    .or_else(|| {
+                        n.as_i64()
+                            .and_then(|v| if v >= 0 { Some(v as u64) } else { None })
+                    })
+                    .or_else(|| {
+                        n.as_f64()
+                            .and_then(|v| if v >= 0.0 { Some(v as u64) } else { None })
+                    }),
+                serde_yml::Value::String(s) => s.trim().parse::<u64>().ok(),
+                _ => None,
+            };
+            if let Some(ms_val) = ms {
+                self.settings
+                    .inactivity_timeout
+                    .get_or_insert_with(Default::default)
+                    .milliseconds = Some(ms_val);
+            }
+        }
+        if let Some(val) = self.settings.extra.remove("inactivity_timeout.command") {
+            let cmd = match &val {
+                serde_yml::Value::String(s) => {
+                    let trimmed = s.trim();
+                    if trimmed.is_empty() {
+                        None
+                    } else {
+                        Some(trimmed.to_string())
+                    }
+                }
+                serde_yml::Value::Number(n) => Some(n.to_string()),
+                _ => None,
+            };
+            if cmd.is_some() {
+                self.settings
+                    .inactivity_timeout
+                    .get_or_insert_with(Default::default)
+                    .command = cmd;
+            }
+        }
+        self.extra
+            .remove("settings.inactivity_timeout.milliseconds");
+        self.extra.remove("settings.inactivity_timeout.command");
+        self.extra.remove("inactivity_timeout.milliseconds");
+        self.extra.remove("inactivity_timeout.command");
+    }
+
     /// Retrieve value from nested configuration using dot-notation string.
     pub fn get_value(&self, key_path: &str) -> Option<String> {
         let val = serde_json::to_value(self).ok()?;
@@ -328,6 +383,63 @@ impl BashMenuConfig {
                     serde_yml::Value::String(s) => Some(s.clone()),
                     _ => None,
                 };
+            }
+            "settings.inactivity_timeout.milliseconds" | "inactivity_timeout.milliseconds" => {
+                let ms = match &value {
+                    serde_yml::Value::Number(n) => n
+                        .as_u64()
+                        .or_else(|| {
+                            n.as_i64()
+                                .and_then(|v| if v >= 0 { Some(v as u64) } else { None })
+                        })
+                        .or_else(|| {
+                            n.as_f64()
+                                .and_then(|v| if v >= 0.0 { Some(v as u64) } else { None })
+                        }),
+                    serde_yml::Value::String(s) => s.trim().parse::<u64>().ok(),
+                    _ => None,
+                };
+                let timeout = self
+                    .settings
+                    .inactivity_timeout
+                    .get_or_insert_with(Default::default);
+                timeout.milliseconds = ms;
+                self.settings
+                    .extra
+                    .remove("inactivity_timeout.milliseconds");
+                self.extra
+                    .remove("settings.inactivity_timeout.milliseconds");
+                self.extra.remove("inactivity_timeout.milliseconds");
+            }
+            "settings.inactivity_timeout.command" | "inactivity_timeout.command" => {
+                let cmd = match &value {
+                    serde_yml::Value::String(s) => {
+                        let trimmed = s.trim();
+                        if trimmed.is_empty() {
+                            None
+                        } else {
+                            Some(trimmed.to_string())
+                        }
+                    }
+                    serde_yml::Value::Number(n) => Some(n.to_string()),
+                    _ => None,
+                };
+                let timeout = self
+                    .settings
+                    .inactivity_timeout
+                    .get_or_insert_with(Default::default);
+                timeout.command = cmd;
+                self.settings.extra.remove("inactivity_timeout.command");
+                self.extra.remove("settings.inactivity_timeout.command");
+                self.extra.remove("inactivity_timeout.command");
+            }
+            "settings.inactivity_timeout" | "inactivity_timeout" => {
+                if let Ok(timeout) = serde_yml::from_value::<InactivityTimeout>(value) {
+                    self.settings.inactivity_timeout = Some(timeout);
+                    self.settings.extra.remove("inactivity_timeout");
+                    self.extra.remove("settings.inactivity_timeout");
+                    self.extra.remove("inactivity_timeout");
+                }
             }
             "settings.transition" => {
                 self.settings.transition = match &value {
@@ -479,7 +591,8 @@ pub fn load_config<P: AsRef<Path>>(path: P) -> Result<BashMenuConfig> {
         path: p.to_path_buf(),
         source: e,
     })?;
-    let config: BashMenuConfig = serde_yml::from_str(&content)?;
+    let mut config: BashMenuConfig = serde_yml::from_str(&content)?;
+    config.sanitize();
     Ok(config)
 }
 
@@ -543,5 +656,107 @@ mod tests {
         // Test get_value via dot-path
         let val_str = config.get_value("settings.help_gutter_delay");
         assert_eq!(val_str, Some("0.0".to_string()));
+    }
+
+    #[test]
+    fn test_inactivity_timeout_set_value_and_sanitize() {
+        let mut config = BashMenuConfig::default();
+
+        // Initially inactivity_timeout is None
+        assert_eq!(config.settings.inactivity_timeout, None);
+
+        // Set milliseconds via app.settings.inactivity_timeout.milliseconds
+        assert!(config.set_value(
+            "app.settings.inactivity_timeout.milliseconds",
+            serde_yml::Value::Number(serde_yml::Number::from(60000)),
+        ));
+        assert_eq!(
+            config
+                .settings
+                .inactivity_timeout
+                .as_ref()
+                .and_then(|t| t.milliseconds),
+            Some(60000)
+        );
+        assert_eq!(
+            config.get_value("app.settings.inactivity_timeout.milliseconds"),
+            Some("60000".to_string())
+        );
+
+        // Set command via settings.inactivity_timeout.command
+        assert!(config.set_value(
+            "settings.inactivity_timeout.command",
+            serde_yml::Value::String("kcchase".to_string()),
+        ));
+        assert_eq!(
+            config
+                .settings
+                .inactivity_timeout
+                .as_ref()
+                .and_then(|t| t.command.as_deref()),
+            Some("kcchase")
+        );
+        assert_eq!(
+            config.get_value("settings.inactivity_timeout.command"),
+            Some("kcchase".to_string())
+        );
+
+        // Ensure extra maps are clean (no long flattened string keys)
+        assert!(!config
+            .settings
+            .extra
+            .contains_key("inactivity_timeout.milliseconds"));
+        assert!(!config
+            .settings
+            .extra
+            .contains_key("inactivity_timeout.command"));
+
+        // Verify save_config does not output flattened extra keys
+        let temp_dir = std::env::temp_dir();
+        let test_out = temp_dir.join("test_save_inactivity_timeout.yml");
+        save_config(&test_out, &config).expect("Save config");
+        let saved_str = fs::read_to_string(&test_out).expect("Read config");
+        assert!(
+            saved_str.contains("milliseconds: 60000") && saved_str.contains("command: kcchase")
+        );
+        assert!(!saved_str.contains("inactivity_timeout.milliseconds:"));
+        assert!(!saved_str.contains("inactivity_timeout.command:"));
+        let _ = fs::remove_file(test_out);
+
+        // Test sanitize migration from legacy/stray flattened keys in extra
+        let mut legacy_config = BashMenuConfig::default();
+        legacy_config.settings.extra.insert(
+            "inactivity_timeout.milliseconds".to_string(),
+            serde_yml::Value::Number(serde_yml::Number::from(120000)),
+        );
+        legacy_config.settings.extra.insert(
+            "inactivity_timeout.command".to_string(),
+            serde_yml::Value::String("cmatrix -s".to_string()),
+        );
+        legacy_config.sanitize();
+        assert_eq!(
+            legacy_config
+                .settings
+                .inactivity_timeout
+                .as_ref()
+                .and_then(|t| t.milliseconds),
+            Some(120000)
+        );
+        assert_eq!(
+            legacy_config
+                .settings
+                .inactivity_timeout
+                .as_ref()
+                .and_then(|t| t.command.as_deref()),
+            Some("cmatrix -s")
+        );
+        assert!(!legacy_config
+            .settings
+            .extra
+            .contains_key("inactivity_timeout.milliseconds"));
+        assert!(!legacy_config
+            .settings
+            .extra
+            .contains_key("inactivity_timeout.command"));
     }
 }

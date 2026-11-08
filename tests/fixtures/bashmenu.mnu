@@ -383,6 +383,7 @@ items:
             - Edit Screensaver Program [{app.settings.inactivity_timeout.command}]:
                 type: config
                 action: app.settings.inactivity_timeout.command
+                prompt: Screensaver command to execute on idle timeout
                 interactive: true
                 quiet: false
                 alt_buffer: true

@@ -828,3 +828,16 @@
 - [x] Unit & Integration Tests:
   - Added `test_theme_indicator_token_configuration_and_persistence` in `crates/themeedit-cli/tests/themeedit_test.rs` validating category placement under `Theme:`, keyboard selection, Unicode character configuration, CP437 ASCII macro expansion, Nerd Font macro handling, save/load roundtripping to `.themes` file, and preview span dimensions.
   - Verified zero formatting issues (`cargo fmt --all --check`), zero Clippy warnings (`cargo clippy --workspace --all-targets -- -D warnings`), and 100% test pass across workspace (`cargo test --workspace`).
+
+## Phase 32: Fix Screensaver Delay and Program Config Persistence in bashmenu.yml
+- [x] Fixed issue where updating screensaver options (`[Edit Screensaver Delay]` and `[Edit Screensaver Program]`) in `Main Menu -> Options & Settings -> Bashmenu Settings` appended flattened strings to the end of `bashmenu.yml` instead of updating `settings.inactivity_timeout.milliseconds` and `settings.inactivity_timeout.command`.
+- [x] Core Config Fix (`crates/bashmenu-core/src/config.rs`):
+  - Updated `BashMenuConfig::set_value` to support `settings.inactivity_timeout.milliseconds` (and `app.settings.inactivity_timeout.milliseconds`) and `settings.inactivity_timeout.command` (and `app.settings.inactivity_timeout.command`), updating `self.settings.inactivity_timeout` directly in-place.
+  - Added cleanup logic in `set_value` and `sanitize()` that clears any accidental/legacy flattened keys (`inactivity_timeout.milliseconds`, `inactivity_timeout.command`) from `self.settings.extra` and `self.extra`.
+  - Added `BashMenuConfig::sanitize()` called automatically in `load_config()` to transparently migrate any existing flattened screensaver keys into `settings.inactivity_timeout`.
+- [x] Menu Schema & Prompt Enhancements (`bashmenu.mnu`, `tests/fixtures/bashmenu.mnu`):
+  - Added explicit `prompt: Screensaver command to execute on idle timeout` to `Edit Screensaver Program [{app.settings.inactivity_timeout.command}]` for modal display parity.
+- [x] Tests & Verification:
+  - Added `test_inactivity_timeout_set_value_and_sanitize` in `crates/bashmenu-core/src/config.rs` validating in-memory mutation, dot-path resolution via `get_value`, clean YAML serialization under `settings.inactivity_timeout:`, and migration of legacy flattened keys.
+  - Validated schemas with `ymlcheck` on `bashmenu.yml`, `bashmenu.mnu`, and `bashmenu.themes`.
+  - Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` (all passing).
