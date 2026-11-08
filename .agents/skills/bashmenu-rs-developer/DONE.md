@@ -900,4 +900,22 @@
   - Updated `test_editor_legend_row_spread` and `--help` CLI flag test.
   - Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` (all 23 bashedit tests and full workspace passing), and `shellcheck *.sh scripts/*.sh`.
 
+## Phase 37: Cross-Platform `sc` and `cmatrix` Installation Handling (`install_basics.sh`)
+- [x] Implemented robust multi-platform installation, repository discovery, and symlink resolution for `sc` and `cmatrix` in `scripts/install_basics.sh`.
+- [x] Package Name Translation & Alternative Fallbacks:
+  - Added `ensure_sc_symlink()` and `is_pkg_installed()`: detects `sc` or its modern active fork `sc-im`, creating an automated symlink `sc -> sc-im` in `$(get_bin_dir)` when `sc-im` is installed so `sc` commands execute transparently across environments.
+  - Termux (`pkg`): Handled `sc-im` package name mapping for `sc`.
+  - macOS (`brew`): Handled `sc-im` formula mapping for `sc`.
+  - Debian / Ubuntu (`apt`): Handled `universe` repository activation for `cmatrix` and fallback to `sc-im` if classic `sc` is absent.
+  - Fedora / RHEL / CentOS / Rocky / AlmaLinux (`dnf` / `yum`): Automated EPEL repository enablement (`epel-release`) for `cmatrix` and `sc-im`.
+  - Arch Linux (`pacman`): Handled `sc` / `sc-im` package resolution.
+  - Alpine Linux (`apk`): Handled automatic enablement of community repository in `/etc/apk/repositories` for `cmatrix` and `sc-im`.
+  - openSUSE (`zypper`): Handled `sc` / `sc-im` fallback.
+- [x] Troubleshooting & Solution Guidance (`get_solution_for_pkg`):
+  - Added dedicated resolution paths for `sc` and `cmatrix` with commands for each supported package manager.
+- [x] Tests & Verification:
+  - Verified `shellcheck *.sh scripts/*.sh` (zero warnings).
+  - Verified `cargo fmt --all --check` and `cargo clippy --workspace --all-targets -- -D warnings`.
+
+
 

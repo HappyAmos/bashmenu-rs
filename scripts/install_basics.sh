@@ -12,7 +12,7 @@
 
 SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-PACKAGES=(vim mc htop glow gum curl wget git shellcheck shfmt jq yq)
+PACKAGES=(vim mc htop glow gum curl wget git shellcheck shfmt jq yq sc cmatrix)
 
 IS_TERMUX=false
 IS_MAC=false
@@ -83,6 +83,34 @@ get_bin_dir() {
     fi
 }
 
+ensure_sc_symlink() {
+    if ! command -v sc &>/dev/null && command -v sc-im &>/dev/null; then
+        local target_bin
+        target_bin="$(get_bin_dir)"
+        local sc_im_bin
+        sc_im_bin="$(command -v sc-im)"
+        if [ -w "$target_bin" ]; then
+            ln -sf "$sc_im_bin" "$target_bin/sc" 2>/dev/null || true
+        elif [ "$(id -u)" = 0 ]; then
+            ln -sf "$sc_im_bin" "$target_bin/sc" 2>/dev/null || true
+        elif command -v sudo &>/dev/null; then
+            run_as_root ln -sf "$sc_im_bin" "$target_bin/sc" 2>/dev/null || true
+        fi
+    fi
+}
+
+is_pkg_installed() {
+    local pkg="$1"
+    if command -v "$pkg" &>/dev/null; then
+        return 0
+    fi
+    if [ "$pkg" = "sc" ] && command -v sc-im &>/dev/null; then
+        ensure_sc_symlink
+        return 0
+    fi
+    return 1
+}
+
 # Function to display tailored solutions for failed package installations
 get_solution_for_pkg() {
     local pkg="$1"
@@ -126,6 +154,27 @@ get_solution_for_pkg() {
             echo "      2. Install using Haskell cabal: cabal install shellcheck"
             echo "      3. Download binary from https://github.com/koalaman/shellcheck/releases"
             ;;
+        sc)
+            echo "  - Issue: 'sc' (Spreadsheet Calculator) is often packaged as 'sc-im' or requires extra repositories."
+            echo "  - Solutions:"
+            echo "      1. Debian/Ubuntu: sudo add-apt-repository -y universe && sudo apt-get update && sudo apt-get install -y sc (or sc-im)"
+            echo "      2. macOS: brew install sc-im"
+            echo "      3. Termux: pkg install sc-im"
+            echo "      4. Fedora/RHEL: sudo dnf install epel-release && sudo dnf install sc-im"
+            echo "      5. Arch Linux: sudo pacman -S sc-im (or yay -S sc)"
+            echo "      6. Alpine Linux: enable community repo in /etc/apk/repositories && apk add sc-im"
+            ;;
+        cmatrix)
+            echo "  - Issue: 'cmatrix' failed to install via package manager '$PKG_MANAGER'."
+            echo "  - Solutions:"
+            echo "      1. Debian/Ubuntu: sudo add-apt-repository -y universe && sudo apt-get update && sudo apt-get install -y cmatrix"
+            echo "      2. RHEL/CentOS/Rocky/AlmaLinux: sudo dnf install epel-release && sudo dnf install cmatrix"
+            echo "      3. Fedora: sudo dnf install cmatrix"
+            echo "      4. Alpine Linux: enable community repo in /etc/apk/repositories && apk add cmatrix"
+            echo "      5. macOS: brew install cmatrix"
+            echo "      6. Termux: pkg install cmatrix"
+            echo "      7. Arch Linux: sudo pacman -S cmatrix"
+            ;;
         *)
             echo "  - Issue: '$pkg' could not be installed using package manager '$PKG_MANAGER'."
             echo "  - Solutions:"
@@ -164,7 +213,7 @@ for pkg in "${PACKAGES[@]}"; do
     echo ""
     echo "Processing package: $pkg"
 
-    if command -v "$pkg" &> /dev/null; then
+    if is_pkg_installed "$pkg"; then
         echo "  [✓] $pkg is already installed."
         INSTALLED+=("$pkg")
         continue
@@ -175,48 +224,149 @@ for pkg in "${PACKAGES[@]}"; do
 
     case "$PKG_MANAGER" in
         pkg)
-            if pkg install -y "$pkg"; then
-                INSTALL_SUCCESS=true
+            if [ "$pkg" = "sc" ]; then
+                if pkg install -y sc 2>/dev/null || pkg install -y sc-im; then
+                    ensure_sc_symlink
+                    INSTALL_SUCCESS=true
+                fi
+            else
+                if pkg install -y "$pkg"; then
+                    INSTALL_SUCCESS=true
+                fi
             fi
             ;;
         apt)
-            if run_as_root apt-get install -y "$pkg"; then
-                INSTALL_SUCCESS=true
+            if [ "$pkg" = "sc" ]; then
+                if run_as_root apt-get install -y sc; then
+                    INSTALL_SUCCESS=true
+                else
+                    if command -v add-apt-repository &>/dev/null; then
+                        run_as_root add-apt-repository -y universe 2>/dev/null || true
+                        run_as_root apt-get update -qq || true
+                    fi
+                    if run_as_root apt-get install -y sc 2>/dev/null || run_as_root apt-get install -y sc-im; then
+                        ensure_sc_symlink
+                        INSTALL_SUCCESS=true
+                    fi
+                fi
+            elif [ "$pkg" = "cmatrix" ]; then
+                if run_as_root apt-get install -y cmatrix; then
+                    INSTALL_SUCCESS=true
+                else
+                    if command -v add-apt-repository &>/dev/null; then
+                        run_as_root add-apt-repository -y universe 2>/dev/null || true
+                        run_as_root apt-get update -qq || true
+                    fi
+                    if run_as_root apt-get install -y cmatrix; then
+                        INSTALL_SUCCESS=true
+                    fi
+                fi
+            else
+                if run_as_root apt-get install -y "$pkg"; then
+                    INSTALL_SUCCESS=true
+                fi
             fi
             ;;
-        dnf)
-            if run_as_root dnf install -y "$pkg"; then
-                INSTALL_SUCCESS=true
-            fi
-            ;;
-        yum)
-            if run_as_root yum install -y "$pkg"; then
-                INSTALL_SUCCESS=true
+        dnf|yum)
+            if [ "$pkg" = "cmatrix" ]; then
+                if run_as_root "$PKG_MANAGER" install -y cmatrix; then
+                    INSTALL_SUCCESS=true
+                else
+                    echo "  [→] Attempting to enable EPEL repository for cmatrix..."
+                    run_as_root "$PKG_MANAGER" install -y epel-release 2>/dev/null || true
+                    if run_as_root "$PKG_MANAGER" install -y cmatrix; then
+                        INSTALL_SUCCESS=true
+                    fi
+                fi
+            elif [ "$pkg" = "sc" ]; then
+                if run_as_root "$PKG_MANAGER" install -y sc 2>/dev/null || run_as_root "$PKG_MANAGER" install -y sc-im 2>/dev/null; then
+                    ensure_sc_symlink
+                    INSTALL_SUCCESS=true
+                else
+                    echo "  [→] Attempting to enable EPEL repository for sc-im..."
+                    run_as_root "$PKG_MANAGER" install -y epel-release 2>/dev/null || true
+                    if run_as_root "$PKG_MANAGER" install -y sc-im; then
+                        ensure_sc_symlink
+                        INSTALL_SUCCESS=true
+                    fi
+                fi
+            else
+                if run_as_root "$PKG_MANAGER" install -y "$pkg"; then
+                    INSTALL_SUCCESS=true
+                fi
             fi
             ;;
         pacman)
-            if run_as_root pacman -S --noconfirm "$pkg"; then
-                INSTALL_SUCCESS=true
+            if [ "$pkg" = "sc" ]; then
+                if run_as_root pacman -S --noconfirm sc 2>/dev/null || run_as_root pacman -S --noconfirm sc-im; then
+                    ensure_sc_symlink
+                    INSTALL_SUCCESS=true
+                fi
+            else
+                if run_as_root pacman -S --noconfirm "$pkg"; then
+                    INSTALL_SUCCESS=true
+                fi
             fi
             ;;
         zypper)
-            if run_as_root zypper install -y "$pkg"; then
-                INSTALL_SUCCESS=true
+            if [ "$pkg" = "sc" ]; then
+                if run_as_root zypper install -y sc 2>/dev/null || run_as_root zypper install -y sc-im; then
+                    ensure_sc_symlink
+                    INSTALL_SUCCESS=true
+                fi
+            else
+                if run_as_root zypper install -y "$pkg"; then
+                    INSTALL_SUCCESS=true
+                fi
             fi
             ;;
         apk)
-            if run_as_root apk add "$pkg"; then
-                INSTALL_SUCCESS=true
+            if [ "$pkg" = "cmatrix" ]; then
+                if run_as_root apk add "$pkg"; then
+                    INSTALL_SUCCESS=true
+                else
+                    if [ -f /etc/apk/repositories ] && grep -q '^#.*\/community' /etc/apk/repositories; then
+                        run_as_root sed -i '/\/community/s/^#//' /etc/apk/repositories 2>/dev/null || true
+                        run_as_root apk update &>/dev/null || true
+                    fi
+                    if run_as_root apk add "$pkg"; then
+                        INSTALL_SUCCESS=true
+                    fi
+                fi
+            elif [ "$pkg" = "sc" ]; then
+                if run_as_root apk add sc 2>/dev/null; then
+                    INSTALL_SUCCESS=true
+                else
+                    if [ -f /etc/apk/repositories ] && grep -q '^#.*\/community' /etc/apk/repositories; then
+                        run_as_root sed -i '/\/community/s/^#//' /etc/apk/repositories 2>/dev/null || true
+                        run_as_root apk update &>/dev/null || true
+                    fi
+                    if run_as_root apk add sc-im; then
+                        ensure_sc_symlink
+                        INSTALL_SUCCESS=true
+                    fi
+                fi
+            else
+                if run_as_root apk add "$pkg"; then
+                    INSTALL_SUCCESS=true
+                fi
             fi
             ;;
         brew)
-            if brew install "$pkg"; then
-                INSTALL_SUCCESS=true
+            if [ "$pkg" = "sc" ]; then
+                if brew install sc 2>/dev/null || brew install sc-im; then
+                    ensure_sc_symlink
+                    INSTALL_SUCCESS=true
+                fi
+            else
+                if brew install "$pkg"; then
+                    INSTALL_SUCCESS=true
+                fi
             fi
             ;;
     esac
 
-    if [ "$INSTALL_SUCCESS" = true ] && command -v "$pkg" &> /dev/null; then
+    if [ "$INSTALL_SUCCESS" = true ] && is_pkg_installed "$pkg"; then
         echo "  [✓] Successfully installed $pkg."
         INSTALLED+=("$pkg")
         continue
@@ -228,7 +378,7 @@ for pkg in "${PACKAGES[@]}"; do
         echo "  [!] Package manager failed for $pkg. Trying fallback installer: install_${pkg}.sh..."
         chmod +x "$FALLBACK_SCRIPT" 2>/dev/null || true
         if bash "$FALLBACK_SCRIPT"; then
-            if command -v "$pkg" &> /dev/null; then
+            if is_pkg_installed "$pkg"; then
                 echo "  [✓] Successfully installed $pkg via fallback script."
                 INSTALLED+=("$pkg")
                 continue
