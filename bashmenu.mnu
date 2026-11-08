@@ -32,8 +32,8 @@ items:
           icon: '{nf::#f422}'
           action: '{scripts_dir}/glyphs.sh {param}'
           prompt: 'Enter search term:'
-          stream: true
           window_percent: 75
+          stream: true
       - Unicode Block Explorer:
           type: script
           icon: '{nf::#f0ed0:}'
@@ -157,15 +157,15 @@ items:
       - Install autoexec.sh Launcher:
           type: inject_block
           icon: '{nf::#ead3}'
-          template: '{templates_dir}/autoexec.sh.tmpl'
-          target: ~/.bashrc
           block_id: launch_autoexec
+          target: ~/.bashrc
+          template: '{templates_dir}/autoexec.sh.tmpl'
       - Install bash_aliases From Template:
           type: inject_block
           icon: '{nf::#eeb6}'
           target: ~/.bash_aliases
-          template: '{templates_dir}/bash_aliases.tmpl'
           block_id: bash_aliases
+          template: '{templates_dir}/bash_aliases.tmpl'
       - Install Basics [vim mc htop glow gum curl wget git shellcheck shfmt jq yq]:
           type: submenu
           icon: '{nf::#ed5b}'
@@ -264,7 +264,8 @@ items:
     submenu:
       title: New submenu
       items:
-      - Play VT Animation File [{curl -s http://artscene.textfiles.com/vt100/movglobe.vt | pv -q -L 2000}]:
+      - '{divider}': null
+      - Play VT Animation File [{curl -s [URL] | pv -q -L 2000}]:
           type: command
           icon: '{nf::#f52c}'
           command: curl -s {param} | pv -q -L 2000
@@ -276,32 +277,33 @@ items:
           tabstop: 4
           refresh: false
           exec_mode: console
-          stream: false
           masked: false
+          stream: false
           show_whitespace: false
           no_formatting: false
           external: false
+      - '{divider}': null
       - Back To Main Menu:
           type: back
           interactive: true
           quiet: false
           alt_buffer: true
           tabstop: 4
+          show_whitespace: false
+          refresh: false
+          stream: false
+          exec_mode: console
           masked: false
           no_formatting: false
-          exec_mode: console
-          stream: false
-          refresh: false
-          show_whitespace: false
           external: false
       - '{divider}': null
-    stream: false
-    refresh: false
-    masked: false
-    exec_mode: console
-    show_whitespace: false
-    external: false
     no_formatting: false
+    show_whitespace: false
+    stream: false
+    masked: false
+    external: false
+    refresh: false
+    exec_mode: console
 - Network Utilities:
     type: submenu
     icon: '{nf::#ef09:}'
@@ -420,14 +422,14 @@ items:
                 quiet: false
                 alt_buffer: true
                 tabstop: 4
-                exec_mode: console
                 masked: false
-                show_whitespace: false
-                no_formatting: false
                 refresh: false
                 key: app.settings.inactivity_timeout.milliseconds
                 external: false
                 stream: false
+                show_whitespace: false
+                no_formatting: false
+                exec_mode: console
             - Edit Screensaver Program [{app.settings.inactivity_timeout.command}]:
                 type: config
                 action: app.settings.inactivity_timeout.command
@@ -435,14 +437,14 @@ items:
                 quiet: false
                 alt_buffer: true
                 tabstop: 4
+                refresh: false
+                stream: false
                 exec_mode: console
+                show_whitespace: false
                 masked: false
                 external: false
-                stream: false
-                refresh: false
                 no_formatting: false
                 key: app.settings.inactivity_timeout.command
-                show_whitespace: false
             - Edit Scripts [{scripts_dir}]:
                 type: editor
                 icon: '{nf::#eae9}'
@@ -476,9 +478,9 @@ items:
             - Enable Automatic Updates (git pull) [{settings.check_for_updates}]:
                 type: toggle
                 icon: '{nf::#ea77}'
-                message: Enable automatic updates?
-                title: Toggle Auto Update
                 key: settings.check_for_updates
+                title: Toggle Auto Update
+                message: Enable automatic updates?
             - Enable Nerd Fonts [{settings.use_nerd_fonts}]:
                 type: toggle
                 icon: '{nf::#f031}'
@@ -510,8 +512,8 @@ items:
                 type: config
                 icon: '{nf::#ee10}'
                 prompt: 'Enter tabstop distance (spaces per TAB press):'
-                key: settings.tabstop
                 title: Configure Tabstop Distance
+                key: settings.tabstop
             - Pager Text Editor [{settings.pager_editor}]:
                 type: radio
                 icon: '{nf::#f044}'
@@ -520,7 +522,6 @@ items:
                 interactive: true
                 quiet: false
                 alt_buffer: true
-                key: settings.pager_editor
                 options:
                 - label: Default System Editor ($EDITOR)
                   value: default
@@ -529,6 +530,7 @@ items:
                 - label: Vim
                   value: vim
                 title: Pager Text Editor [{settings.pager_editor}]
+                key: settings.pager_editor
             - Menu Transition Effect [{settings.transition}]:
                 type: radio
                 icon: '{nf::#f0d0}'
@@ -570,8 +572,6 @@ items:
                 interactive: true
                 quiet: false
                 alt_buffer: true
-                title: Screen Transition Speed [{settings.transition_speed}]
-                key: settings.transition_speed
                 options:
                 - label: Fast (~60-75ms, snappy 15ms/step)
                   value: fast
@@ -579,6 +579,8 @@ items:
                   value: normal
                 - label: Slow (Deliberate, ~200-250ms, 50ms/step)
                   value: slow
+                key: settings.transition_speed
+                title: Screen Transition Speed [{settings.transition_speed}]
             - Modal Animation Effect [{settings.modal_animation}]:
                 type: radio
                 icon: '{nf::#f065}'
@@ -587,13 +589,13 @@ items:
                 interactive: true
                 quiet: false
                 alt_buffer: true
+                key: settings.modal_animation
                 title: Modal Animation Effect [{settings.modal_animation}]
                 options:
                 - label: Zoom (Animated grow from launch point and shrink on close)
                   value: zoom
                 - label: None (Instant popup open and close)
                   value: none
-                key: settings.modal_animation
             - Modal Animation Speed [{settings.modal_animation_speed}]:
                 type: radio
                 icon: '{nf::#f0e7}'
@@ -603,7 +605,6 @@ items:
                 quiet: false
                 alt_buffer: true
                 title: Modal Animation Speed [{settings.modal_animation_speed}]
-                key: settings.modal_animation_speed
                 options:
                 - label: Fast (~36ms, snappy 12ms/step)
                   value: fast
@@ -611,6 +612,7 @@ items:
                   value: normal
                 - label: Slow (~120ms, deliberate 40ms/step)
                   value: slow
+                key: settings.modal_animation_speed
             - Linux Framebuffer Support [{settings.framebuffer}]:
                 type: radio
                 icon: '{nf::#f2db}'
@@ -619,8 +621,8 @@ items:
                 interactive: true
                 quiet: false
                 alt_buffer: true
-                key: settings.framebuffer
                 title: Linux Framebuffer Support [{settings.framebuffer}]
+                key: settings.framebuffer
                 options:
                 - label: Auto (Detect /dev/fb0 on Linux console)
                   value: auto
@@ -649,8 +651,8 @@ items:
                 interactive: true
                 quiet: false
                 alt_buffer: true
-                title: Configure Toast Message Timeout
                 key: app.settings.toast_timeout
+                title: Configure Toast Message Timeout
             - '{divider}': null
             - Back to Options & Settings:
                 type: back
@@ -674,13 +676,13 @@ items:
           quiet: true
           alt_buffer: true
           tabstop: 4
-          exec_mode: console
           external: false
-          stream: false
-          no_formatting: false
-          masked: false
-          show_whitespace: false
           refresh: false
+          show_whitespace: false
+          no_formatting: false
+          exec_mode: console
+          stream: false
+          masked: false
       - Update Grub:
           type: command
           icon: '{nf::#f11e7}'
@@ -689,14 +691,14 @@ items:
           interactive: false
           quiet: true
           tabstop: 4
-          show_whitespace: false
-          no_formatting: false
-          masked: false
           window_percent: 65
-          refresh: false
-          external: false
+          masked: false
           stream: true
+          refresh: false
           exec_mode: streaming
+          no_formatting: false
+          external: false
+          show_whitespace: false
       - Edit .bash_aliases [{bash_aliases}]:
           type: editor
           icon: '{nf::#f11e7}'
@@ -799,8 +801,8 @@ items:
           interactive: false
           quiet: true
           stream: true
-          key: user.postal_code
           title: Weather Location [{user.postal_code}]
+          key: user.postal_code
           picker: none
       - Weather -> 3 Day [curl wttr.in/{user.postal_code}]:
           type: command
@@ -822,13 +824,22 @@ items:
           icon: '{nf::#f048:}'
       - '{divider}': null
 - '{divider}': null
-- Help [rich.sh bashmenu.md]:
+- Help [bmpager -m bashmenu.md]:
     type: command
     icon: '{nf::#f02d6:}'
-    action: '{scripts_dir}/rich.sh {bashmenu_dir}/bashmenu.md'
+    command: bmpager -m {bashmenu_dir}/bashmenu.md
+    action: bmpager -m {bashmenu_dir}/bashmenu.md
     interactive: true
     quiet: true
     alt_buffer: true
+    tabstop: 4
+    refresh: false
+    no_formatting: false
+    stream: false
+    masked: false
+    external: false
+    show_whitespace: false
+    exec_mode: console
 - Exit Menu:
     type: exit
     icon: '{nf::#f0a48:}'

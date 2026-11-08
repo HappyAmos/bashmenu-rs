@@ -14,13 +14,6 @@ leader_key: ctrl+space
 leader_timeout_ms: 1500
 show_leader_hint: true
 shortcuts:
-- key: <leader> s
-  description: Keyboard Shortcuts Editor
-  type: command
-  action: shortcutedit
-  execution_mode: console
-  quiet: true
-  alt_buffer: true
 - key: <leader> t
   description: Interactive Shell
   type: command
