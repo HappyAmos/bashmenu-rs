@@ -1,3 +1,11 @@
+## Environment Inspection & Universal Macro Enhancements
+- [x] Implemented `{which}` macro and placeholder displaying interactive environment paths message box.
+- [x] Added `full_file_location` and explicit path overrides in `MacroContext::with_paths`.
+- [x] Enhanced `MessageModal` width clamping up to 78 columns with wrapped BBCode span preservation for formatted tables.
+- [x] Added menu item and shortcut interception in `bashmenu-cli` for `{which}` triggers.
+- [x] Added unit tests in `crates/bashmenu-core/tests/macro_engine_test.rs` and integration tests in `crates/bashmenu-cli/tests/audit_items_test.rs`.
+- [x] Updated 6-tier parity documentation (`PLACEHOLDER_HELP_TEXT`, `bashmenu.md`, `bashmenu.1`, `invariants.md`, `SKILL.md`).
+
 # BashMenu-RS Completed Tasks (DONE)
 
 ## Phase 0: Project Initiation

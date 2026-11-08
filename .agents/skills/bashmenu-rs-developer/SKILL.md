@@ -35,6 +35,9 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
   - Test suites and fallback resolution must point directly to the project root default files.
 - **Repository Root CLI Argument Invariant (`--repo` / `-r`):**
   - Passing `--repo` or `-r` to `bashmenu` forces loading `bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, and `shortcuts.yml` directly from the repository root directory (`resolve_dev_dir`) rather than user config or current working directory.
+- **Environment Overview Macro Invariant (`{which}`):**
+  - The `{which}` macro resolves to a formatted Markdown table reporting the application version and canonical paths of `bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, and `cheat.yml`.
+  - When encountered in menu item actions, commands, scripts, messages, prompts, or item types, `bashmenu` intercepts the action and displays an interactive `MessageModal` with the environment overview table.
 - **Configuration Header Preservation Invariant (`bashmenu.yml`):**
   - Never use raw file writes with `serde_yml::to_string()` directly to overwrite `bashmenu.yml`.
   - Always call `bashmenu_core::config::save_config(path, config)` so that `CONFIG_HEADER` comments, documentation, and placeholder references are cleanly preserved at the top of the file.

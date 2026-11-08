@@ -482,6 +482,12 @@ pub fn wrap_prompt_text(text: &str, max_w: usize) -> Vec<String> {
             lines.push(String::new());
             continue;
         }
+        let vis_w =
+            unicode_width::UnicodeWidthStr::width(crate::bbcode::strip_bbcode(paragraph).as_str());
+        if vis_w <= max_w {
+            lines.push(paragraph.to_string());
+            continue;
+        }
         let mut current = String::new();
         for word in paragraph.split_whitespace() {
             let word_w = unicode_width::UnicodeWidthStr::width(word);

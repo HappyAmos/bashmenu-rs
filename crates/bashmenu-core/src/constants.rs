@@ -88,6 +88,7 @@ pub const PLACEHOLDER_HELP_TEXT: &str = "\
 {toast:SECONDS:\"MESSAGE\"}    │ Displays non-blocking popup toast message
 {nf:<char>:<hex>:<emoji>}    │ Adaptive Nerd Font / Unicode / Emoji glyph
 {app.<key.path>}             │ Configuration key in bashmenu.yml (e.g. {app.theme})
+{which}                      │ Environment inspection modal / overview table
 {<key.path>}                 │ Refers to nested key in bashmenu.yml (e.g. {user.postal_code})
 ";
 

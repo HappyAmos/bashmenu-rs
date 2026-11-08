@@ -1,4 +1,7 @@
-use bashmenu_core::{format_icon_slot, interpolate_placeholders, load_config, MacroContext};
+use bashmenu_core::{
+    format_icon_slot, full_file_location, interpolate_placeholders, load_config, BashMenuConfig,
+    MacroContext,
+};
 use std::path::Path;
 use unicode_width::UnicodeWidthStr;
 
@@ -352,4 +355,68 @@ fn test_file_and_dir_picker_macros_and_modifiers() {
         item.command.as_deref(),
         Some("cd /home/testuser/github/bashmenu-rs && opencode")
     );
+}
+
+#[test]
+fn test_which_placeholder_resolution() {
+    let config = BashMenuConfig {
+        version: "1.2.3".to_string(),
+        ..Default::default()
+    };
+
+    let td = std::env::temp_dir().join(format!(
+        "bashmenu_which_test_{}_{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&td).unwrap();
+    let cfg_path = td.join("bashmenu.yml");
+    let mnu_path = td.join("bashmenu.mnu");
+    let thm_path = td.join("bashmenu.themes");
+    let shc_path = td.join("shortcuts.yml");
+    let cht_path = td.join("cheat.yml");
+
+    std::fs::write(&cfg_path, "version: 1.2.3\n").unwrap();
+    std::fs::write(&mnu_path, "menu: []\n").unwrap();
+    std::fs::write(&thm_path, "themes: {}\n").unwrap();
+    std::fs::write(&shc_path, "shortcuts: []\n").unwrap();
+    std::fs::write(&cht_path, "cheats: []\n").unwrap();
+
+    let ctx = MacroContext::new(&config).with_paths(
+        cfg_path.clone(),
+        mnu_path.clone(),
+        thm_path.clone(),
+        shc_path.clone(),
+        cht_path.clone(),
+    );
+
+    let output = interpolate_placeholders("Inspect:\n{which}", &ctx);
+    let _ = std::fs::remove_dir_all(&td);
+
+    assert!(output.contains("## Current Bashmenu Environment:"));
+    assert!(output.contains("| Information | Truth |"));
+    assert!(output.contains("| [b]Version:[/b] | 1.2.3 |"));
+    assert!(output.contains(&format!(
+        "| [b]bashmenu.yml:[/b] | {} |",
+        full_file_location(&cfg_path)
+    )));
+    assert!(output.contains(&format!(
+        "| [b]bashmenu.mnu:[/b] | {} |",
+        full_file_location(&mnu_path)
+    )));
+    assert!(output.contains(&format!(
+        "| [b]bashmenu.themes:[/b] | {} |",
+        full_file_location(&thm_path)
+    )));
+    assert!(output.contains(&format!(
+        "| [b]shortcuts.yml:[/b] | {} |",
+        full_file_location(&shc_path)
+    )));
+    assert!(output.contains(&format!(
+        "| [b]cheat.yml:[/b] | {} |",
+        full_file_location(&cht_path)
+    )));
 }

@@ -25,6 +25,16 @@ pub struct MacroContext<'a> {
     pub home_dir: PathBuf,
     /// Development/repository root directory where bashmenu-rs resides
     pub dev_dir: PathBuf,
+    /// Full path to active bashmenu.yml file (if explicitly known)
+    pub config_path: Option<PathBuf>,
+    /// Full path to active bashmenu.mnu file (if explicitly known)
+    pub menu_path: Option<PathBuf>,
+    /// Full path to active bashmenu.themes file (if explicitly known)
+    pub themes_path: Option<PathBuf>,
+    /// Full path to active shortcuts.yml file (if explicitly known)
+    pub shortcuts_path: Option<PathBuf>,
+    /// Full path to active cheat.yml file (if explicitly known)
+    pub cheat_path: Option<PathBuf>,
     /// Terminal viewport width
     pub window_width: usize,
     /// Terminal viewport height
@@ -33,6 +43,24 @@ pub struct MacroContext<'a> {
     pub screen_width: usize,
     /// Extra runtime variables
     pub extra_vars: HashMap<String, String>,
+}
+
+/// Returns the full canonical file location (or absolute path) for path.
+pub fn full_file_location(path: &Path) -> String {
+    let s = if let Ok(canon) = std::fs::canonicalize(path) {
+        canon.to_string_lossy().to_string()
+    } else if path.is_absolute() {
+        path.to_string_lossy().to_string()
+    } else if let Ok(cwd) = std::env::current_dir() {
+        cwd.join(path).to_string_lossy().to_string()
+    } else {
+        path.to_string_lossy().to_string()
+    };
+    if let Some(stripped) = s.strip_prefix(r"\\?\") {
+        stripped.to_string()
+    } else {
+        s
+    }
 }
 
 impl<'a> MacroContext<'a> {
@@ -63,11 +91,137 @@ impl<'a> MacroContext<'a> {
             bashmenu_dir,
             home_dir,
             dev_dir,
+            config_path: None,
+            menu_path: None,
+            themes_path: None,
+            shortcuts_path: None,
+            cheat_path: None,
             window_width: 80,
             window_height: 24,
             screen_width: 80,
             extra_vars: HashMap::new(),
         }
+    }
+
+    /// Sets explicit file paths for environment inspection ({which}).
+    pub fn with_paths(
+        mut self,
+        config_path: PathBuf,
+        menu_path: PathBuf,
+        themes_path: PathBuf,
+        shortcuts_path: PathBuf,
+        cheat_path: PathBuf,
+    ) -> Self {
+        self.config_path = Some(config_path);
+        self.menu_path = Some(menu_path);
+        self.themes_path = Some(themes_path);
+        self.shortcuts_path = Some(shortcuts_path);
+        self.cheat_path = Some(cheat_path);
+        self
+    }
+
+    /// Resolves the current path to bashmenu.yml.
+    pub fn resolve_config_path(&self) -> PathBuf {
+        self.config_path.clone().unwrap_or_else(|| {
+            let p = self.bashmenu_dir.join("bashmenu.yml");
+            if p.exists() {
+                p
+            } else {
+                let dev = self.dev_dir.join("bashmenu.yml");
+                if dev.exists() {
+                    dev
+                } else {
+                    p
+                }
+            }
+        })
+    }
+
+    /// Resolves the current path to bashmenu.mnu.
+    pub fn resolve_menu_path(&self) -> PathBuf {
+        self.menu_path.clone().unwrap_or_else(|| {
+            let p = self.bashmenu_dir.join("bashmenu.mnu");
+            if p.exists() {
+                p
+            } else {
+                let dev = self.dev_dir.join("bashmenu.mnu");
+                if dev.exists() {
+                    dev
+                } else {
+                    p
+                }
+            }
+        })
+    }
+
+    /// Resolves the current path to bashmenu.themes.
+    pub fn resolve_themes_path(&self) -> PathBuf {
+        self.themes_path.clone().unwrap_or_else(|| {
+            let p = self.bashmenu_dir.join("bashmenu.themes");
+            if p.exists() {
+                p
+            } else {
+                let dev = self.dev_dir.join("bashmenu.themes");
+                if dev.exists() {
+                    dev
+                } else {
+                    p
+                }
+            }
+        })
+    }
+
+    /// Resolves the current path to shortcuts.yml.
+    pub fn resolve_shortcuts_path(&self) -> PathBuf {
+        self.shortcuts_path.clone().unwrap_or_else(|| {
+            let p = self.bashmenu_dir.join("shortcuts.yml");
+            if p.exists() {
+                p
+            } else {
+                let dev = self.dev_dir.join("shortcuts.yml");
+                if dev.exists() {
+                    dev
+                } else {
+                    p
+                }
+            }
+        })
+    }
+
+    /// Resolves the current path to cheat.yml.
+    pub fn resolve_cheat_path(&self) -> PathBuf {
+        self.cheat_path.clone().unwrap_or_else(|| {
+            let p = self.bashmenu_dir.join("cheat.yml");
+            if p.exists() {
+                p
+            } else {
+                let dev = self.dev_dir.join("cheat.yml");
+                if dev.exists() {
+                    dev
+                } else {
+                    p
+                }
+            }
+        })
+    }
+
+    /// Formats the `{which}` environment overview table.
+    pub fn format_which_info(&self) -> String {
+        let cfg = self.resolve_config_path();
+        let mnu = self.resolve_menu_path();
+        let thm = self.resolve_themes_path();
+        let shc = self.resolve_shortcuts_path();
+        let cht = self.resolve_cheat_path();
+
+        format!(
+            "## Current Bashmenu Environment:\n| Information | Truth |\n| [b]Version:[/b] | {} |\n| [b]bashmenu.yml:[/b] | {} |\n| [b]bashmenu.mnu:[/b] | {} |\n| [b]bashmenu.themes:[/b] | {} |\n| [b]shortcuts.yml:[/b] | {} |\n| [b]cheat.yml:[/b] | {} |",
+            self.config.version,
+            full_file_location(&cfg),
+            full_file_location(&mnu),
+            full_file_location(&thm),
+            full_file_location(&shc),
+            full_file_location(&cht),
+        )
     }
 }
 
@@ -1148,6 +1302,9 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
     }
     if res.contains("{version}") {
         direct_map.insert("{version}", ctx.config.version.clone());
+    }
+    if res.contains("{which}") {
+        direct_map.insert("{which}", ctx.format_which_info());
     }
     if res.contains("{theme}") || res.contains("{app.theme}") {
         direct_map.insert("{theme}", ctx.config.theme.clone());

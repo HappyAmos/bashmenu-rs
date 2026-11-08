@@ -23,8 +23,9 @@ pub use glyph::{
 };
 pub use macro_engine::{
     apply_dir_picker_macros, apply_file_picker_macros, clear_command_cache, extract_picker_spec,
-    extract_toasts, interpolate_placeholders, parse_picker_macro, resolve_config_dot_path,
-    resolve_dev_dir, MacroContext, PickerSpec, ToastNotification, ToastSeverity,
+    extract_toasts, full_file_location, interpolate_placeholders, parse_picker_macro,
+    resolve_config_dot_path, resolve_dev_dir, MacroContext, PickerSpec, ToastNotification,
+    ToastSeverity,
 };
 pub use menu::{
     load_menu, save_menu, ConfirmAction, ConfirmActionDetails, ExecutionMode, MenuItem,

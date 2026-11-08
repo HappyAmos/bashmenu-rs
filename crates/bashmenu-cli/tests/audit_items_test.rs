@@ -139,3 +139,62 @@ fn test_bashmenu_repo_flag_in_help_and_parsing() {
         stdout
     );
 }
+
+#[test]
+fn test_which_environment_info_modal_formatting() {
+    let repo_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
+    let yml_path = repo_root.join("bashmenu.yml");
+    let mnu_path = repo_root.join("bashmenu.mnu");
+    let thm_path = repo_root.join("bashmenu.themes");
+    let shc_path = repo_root.join("shortcuts.yml");
+    let cht_path = repo_root.join("cheat.yml");
+
+    let config = bashmenu_core::load_config(&yml_path).expect("bashmenu.yml must load");
+    let ctx = bashmenu_core::MacroContext::new(&config).with_paths(
+        yml_path.clone(),
+        mnu_path.clone(),
+        thm_path.clone(),
+        shc_path.clone(),
+        cht_path.clone(),
+    );
+
+    let which_text = ctx.format_which_info();
+    assert!(which_text.contains("## Current Bashmenu Environment:"));
+    assert!(which_text.contains("| Information | Truth |"));
+    assert!(which_text.contains(&format!("| [b]Version:[/b] | {} |", config.version)));
+    assert!(which_text.contains(&format!(
+        "| [b]bashmenu.yml:[/b] | {} |",
+        bashmenu_core::full_file_location(&yml_path)
+    )));
+    assert!(which_text.contains(&format!(
+        "| [b]bashmenu.mnu:[/b] | {} |",
+        bashmenu_core::full_file_location(&mnu_path)
+    )));
+    assert!(which_text.contains(&format!(
+        "| [b]bashmenu.themes:[/b] | {} |",
+        bashmenu_core::full_file_location(&thm_path)
+    )));
+    assert!(which_text.contains(&format!(
+        "| [b]shortcuts.yml:[/b] | {} |",
+        bashmenu_core::full_file_location(&shc_path)
+    )));
+    assert!(which_text.contains(&format!(
+        "| [b]cheat.yml:[/b] | {} |",
+        bashmenu_core::full_file_location(&cht_path)
+    )));
+
+    // Verify modal dimensions and wrapped formatting does not split table rows
+    let (w, h) =
+        bashmenu_tui::modals::MessageModal::new("Current Bashmenu Environment", &which_text)
+            .dialog_dimensions(ratatui::layout::Rect::new(0, 0, 100, 30));
+    assert!(
+        w >= 70,
+        "Dialog width should accommodate table without line truncation: {}",
+        w
+    );
+    assert!(
+        h >= 10,
+        "Dialog height should accommodate header + table rows: {}",
+        h
+    );
+}

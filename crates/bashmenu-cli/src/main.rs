@@ -316,6 +316,19 @@ fn main() -> Result<()> {
         Default::default()
     };
 
+    let cheat_path = if let Some(ref rdir) = repo_dir {
+        rdir.join("cheat.yml")
+    } else if cli.local {
+        PathBuf::from("./cheat.yml")
+    } else {
+        let user_cheat = bashmenu_core::get_user_config_dir().join("cheat.yml");
+        if user_cheat.exists() {
+            user_cheat
+        } else {
+            bashmenu_core::resolve_app_path(Path::new("cheat.yml"))
+        }
+    };
+
     let mut use_nerd = config.settings.use_nerd_fonts.unwrap_or(false);
     let active_theme = themes.get(&config.theme);
     let mut styles = if let Some(t) = active_theme {
@@ -326,8 +339,19 @@ fn main() -> Result<()> {
     };
 
     // 4. Macro Context & Status Gutter
+    macro_rules! make_macro_ctx {
+        ($cfg:expr) => {
+            MacroContext::new($cfg).with_paths(
+                config_path.clone(),
+                menu_path.clone(),
+                themes_path.clone(),
+                shortcuts_path.clone(),
+                cheat_path.clone(),
+            )
+        };
+    }
     let status_gutter = {
-        let initial_ctx = MacroContext::new(&config);
+        let initial_ctx = make_macro_ctx!(&config);
         config
             .settings
             .status_gutter
@@ -440,7 +464,7 @@ fn main() -> Result<()> {
         if last_plugin_check.elapsed() >= gutter_interval {
             plugin_engine.trigger_refresh(&config, false);
             if let Some(ref gutter_tmpl) = config.settings.status_gutter {
-                let mut ctx = MacroContext::new(&config);
+                let mut ctx = make_macro_ctx!(&config);
                 ctx.window_width = size.width as usize;
                 ctx.window_height = size.height as usize;
                 ctx.screen_width = size.width as usize;
@@ -589,7 +613,7 @@ fn main() -> Result<()> {
             if let (Some(ms), Some(cmd_raw)) = (timeout.milliseconds, timeout.command.as_deref()) {
                 if ms > 0 && last_interaction.elapsed().as_millis() >= ms as u128 {
                     last_interaction = Instant::now();
-                    let mut ctx = MacroContext::new(&config);
+                    let mut ctx = make_macro_ctx!(&config);
                     ctx.window_width = size.width as usize;
                     ctx.window_height = size.height as usize;
                     let cmd = interpolate_placeholders(cmd_raw, &ctx);
@@ -717,7 +741,7 @@ fn main() -> Result<()> {
                             config.settings.status_gutter = Some(new_gutter.clone());
                             let _ = save_config(&config_path, &config);
                             menu_view.set_config(config.clone());
-                            let mut ctx = MacroContext::new(&config);
+                            let mut ctx = make_macro_ctx!(&config);
                             ctx.window_width = size.width as usize;
                             ctx.window_height = size.height as usize;
                             let gutter_str = interpolate_placeholders(&new_gutter, &ctx);
@@ -1294,7 +1318,7 @@ fn main() -> Result<()> {
                             if key_path == "settings.status_gutter" {
                                 let new_gutter =
                                     config.settings.status_gutter.clone().unwrap_or_default();
-                                let mut ctx = MacroContext::new(&config);
+                                let mut ctx = make_macro_ctx!(&config);
                                 ctx.window_width = size.width as usize;
                                 ctx.window_height = size.height as usize;
                                 let gutter_str = interpolate_placeholders(&new_gutter, &ctx);
@@ -1343,7 +1367,7 @@ fn main() -> Result<()> {
                             if key_path == "settings.status_gutter" {
                                 let new_gutter =
                                     config.settings.status_gutter.clone().unwrap_or_default();
-                                let mut ctx = MacroContext::new(&config);
+                                let mut ctx = make_macro_ctx!(&config);
                                 ctx.window_width = size.width as usize;
                                 ctx.window_height = size.height as usize;
                                 let gutter_str = interpolate_placeholders(&new_gutter, &ctx);
@@ -1393,7 +1417,7 @@ fn main() -> Result<()> {
                     };
                     if let Some(opt_path) = chosen {
                         if let Some(target_path) = opt_path {
-                            let mut ctx = MacroContext::new(&config);
+                            let mut ctx = make_macro_ctx!(&config);
                             ctx.window_width = size.width as usize;
                             ctx.window_height = size.height as usize;
                             ctx.screen_width = size.width as usize;
@@ -1655,7 +1679,7 @@ fn main() -> Result<()> {
 
                     match action {
                         MenuAction::Help => {
-                            let ctx = MacroContext::new(&config);
+                            let ctx = make_macro_ctx!(&config);
                             let cand = ctx.bashmenu_dir.join("bashmenu.md");
                             let doc_path = if cand.exists() {
                                 cand
@@ -1795,7 +1819,7 @@ fn main() -> Result<()> {
                             let wp_config = config.resolve_wallpaper(active_theme);
                             menu_view.set_wallpaper(wp_config);
 
-                            let mut ctx = MacroContext::new(&config);
+                            let mut ctx = make_macro_ctx!(&config);
                             ctx.window_width = size.width as usize;
                             ctx.window_height = size.height as usize;
                             ctx.screen_width = size.width as usize;
@@ -1902,7 +1926,7 @@ fn main() -> Result<()> {
                                     menu_view.render(f.area(), f.buffer_mut());
                                 });
                             }
-                            let mut ctx = MacroContext::new(&config);
+                            let mut ctx = make_macro_ctx!(&config);
                             ctx.window_width = size.width as usize;
                             ctx.window_height = size.height as usize;
                             ctx.screen_width = size.width as usize;
@@ -1985,12 +2009,44 @@ fn main() -> Result<()> {
                             }
                         }
                         MenuAction::Execute(item) => {
-                            let mut ctx = MacroContext::new(&config);
+                            let mut ctx = make_macro_ctx!(&config);
                             ctx.window_width = size.width as usize;
                             ctx.window_height = size.height as usize;
                             ctx.screen_width = size.width as usize;
 
-                            if item.r#type == MenuItemType::Toggle
+                            let has_which = item
+                                .action
+                                .as_deref()
+                                .map(|s| s.contains("{which}"))
+                                .unwrap_or(false)
+                                || item
+                                    .command
+                                    .as_deref()
+                                    .map(|s| s.contains("{which}"))
+                                    .unwrap_or(false)
+                                || item
+                                    .script
+                                    .as_deref()
+                                    .map(|s| s.contains("{which}"))
+                                    .unwrap_or(false)
+                                || item
+                                    .message()
+                                    .map(|s| s.contains("{which}"))
+                                    .unwrap_or(false)
+                                || item
+                                    .prompt
+                                    .as_deref()
+                                    .map(|s| s.contains("{which}"))
+                                    .unwrap_or(false)
+                                || matches!(item.r#type, MenuItemType::Other(ref s) if s == "which");
+
+                            if has_which {
+                                let which_info = ctx.format_which_info();
+                                active_modal = ActiveModal::Message(MessageModal::new(
+                                    "Current Bashmenu Environment",
+                                    which_info,
+                                ));
+                            } else if item.r#type == MenuItemType::Toggle
                                 || matches!(item.r#type, MenuItemType::Other(ref s) if s == "toggle" || s == "config_toggle")
                             {
                                 if let Some(key_path) = item.key() {

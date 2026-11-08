@@ -40,12 +40,12 @@ impl MessageModal {
 
     /// Returns the target dialog dimensions for this modal.
     pub fn dialog_dimensions(&self, area: Rect) -> (u16, u16) {
-        let max_w = 64.min(area.width.saturating_sub(4));
-        let wrapped =
-            super::input::wrap_prompt_text(&self.message, max_w.saturating_sub(4) as usize);
+        let max_w = 78.min(area.width.saturating_sub(2)).max(20);
+        let avail_inner_w = max_w.saturating_sub(4) as usize;
+        let wrapped = super::input::wrap_prompt_text(&self.message, avail_inner_w);
         let max_line_w = wrapped
             .iter()
-            .map(|l| l.chars().count())
+            .map(|l| unicode_width::UnicodeWidthStr::width(crate::bbcode::strip_bbcode(l).as_str()))
             .max()
             .unwrap_or(20);
         let dialog_w = (max_line_w as u16 + 8).min(max_w).max(20.min(max_w));
@@ -56,12 +56,12 @@ impl MessageModal {
 
     /// Renders message modal
     pub fn render(&self, area: Rect, styles: &ResolvedThemeStyles, buf: &mut Buffer) -> Rect {
-        let max_w = 64.min(area.width.saturating_sub(4));
-        let wrapped =
-            super::input::wrap_prompt_text(&self.message, max_w.saturating_sub(4) as usize);
+        let max_w = 78.min(area.width.saturating_sub(2)).max(20);
+        let avail_inner_w = max_w.saturating_sub(4) as usize;
+        let wrapped = super::input::wrap_prompt_text(&self.message, avail_inner_w);
         let max_line_w = wrapped
             .iter()
-            .map(|l| l.chars().count())
+            .map(|l| unicode_width::UnicodeWidthStr::width(crate::bbcode::strip_bbcode(l).as_str()))
             .max()
             .unwrap_or(20);
         let dialog_w = (max_line_w as u16 + 8).min(max_w).max(20.min(max_w));
@@ -74,11 +74,14 @@ impl MessageModal {
         for (i, line) in wrapped.iter().enumerate() {
             let y = inner.y + 1 + i as u16;
             if y < inner.y + inner.height.saturating_sub(2) {
-                let clipped: String = line
-                    .chars()
-                    .take(inner.width.saturating_sub(4) as usize)
-                    .collect();
-                buf.set_string(inner.x + 2, y, &clipped, styles.text);
+                let avail_line_w = inner.width.saturating_sub(4);
+                let spans = crate::bbcode::parse_bbcode_spans(line, styles.text);
+                buf.set_line(
+                    inner.x + 2,
+                    y,
+                    &ratatui::text::Line::from(spans),
+                    avail_line_w,
+                );
             }
         }
 
