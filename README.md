@@ -8,28 +8,34 @@
 
 ---
 
+## What On Earth Is This?
+
+This started as a Bash menu script to create reproducible installs for my homelab, then a Python version, then a Rust version. This rust version was vibe coded using Google Antigravity. While I throw as much as I can at it, it should be considered to be in an alpha state. In addition to being a script launcher, over time I've incorporated a built-in editor (because why not), a visual theme editor, a keyboard shortcuts editor (default is a <ctrl> + <space> leader key then a shortcut key), visual menu editor, a custom pager that does a decent job of rendering basic Markdown in a terminal, a cheatsheet management tool (list, search, etc.) which uses the built-in pager tool to display Markdown, and a plethora of small utility scripts.
+
+Installation is fairly simple if you already have Rust installed. Just clone this Github repository, then run the install.sh script. The script copies binaries and symlinks to ~/.local/bin/. Configuration files are stored in ~/.config/bashmenu, while cache is installed in ~/.cache/bashmenu. A utility script is included in the repository root, uninstall.sh, that removes binaries, symlinks, and cache from ~/.local/bin, ~/.config/bashmenu, and ~/.cache/bashmenu, respectively. The repository is not removed when uninstalling.
+
 ## Features
 
-- **Blazing Fast Startup & Execution**: Sub-10ms cold start, instantaneous mouse and keyboard interaction, and zero garbage collection pauses.
-- **Pure Terminal TUI**: Built with [Ratatui](https://github.com/ratatui/ratatui) and [Crossterm](https://github.com/crossterm-rs/crossterm) using double-buffered cell diffing and atomic DEC Mode 2026 synchronized output.
-- **Configurable Visual Screen Transitions**: Smooth animated transitions (`fade`, `curtain`, `instant`, `none`) on startup, menu page/submenu navigation, notebook viewing, modal popups, and application switching (with `transition: false` bypass support).
-- **Direct Linux Framebuffer Support (`/dev/fb0`)**: Native, self-contained hardware video memory blitting (`mmap` + ioctl) for truecolor graphics directly on Linux kernel consoles without requiring external terminal emulators.
-- **Automated Color Resolution Fallback**: Adaptive `ColorTier` detection (`Color8`, `Color16`, `Color256`, `TrueColor`) with Euclidean RGB downsampling to standard 16 and 8 ANSI colors on minimal consoles (`TERM=linux`, VT100, etc.).
-- **Notebook Concurrent Conflict Resolution & 3-Way Merge**: Atomic note swap files (`.<stem>.note.<slug>.swp`) and smart 3-way line merge resolution (`[ Merge ]`, `[ Overwrite Disk ]`, `[ Reload Disk ]`, `[ Save As Copy ]`) preventing multi-agent or concurrent editing overwrites.
-- **TrueColor Wallpaper Compositor**: Half-block (`▀`) and quarter-block ANSI background rendering with aspect scaling (cover, fit, stretch, center, tile), color blending, clustering, and quantization.
-- **Dynamic 6-Tier Macro Engine**: Evaluates `{env:...}`, runtime paths (`{home}`, `{bashmenu_dir}`, `{dev_dir}`, `{scripts_dir}`, `{notebooks_dir}`), time badges, and dot-notation config keys (`{user.<key>}`, `{settings.<key>}`).
-- **Interactive Directives**: Supports `{command:<cmd>}` cached stdout, `{param}` / `{prompt}` modal inputs, `{file_picker}` / `{dir_picker}`, and `{toast:...}` notifications.
-- **Adaptive Glyph Resolver**: `{nf:[char]:[nerd]:[emoji]}` resolves icons based on font configuration while strictly maintaining a 4-column visual icon slot.
-- **Background Plugin Engine**: Non-blocking asynchronous worker threads executing periodic shell scripts with multi-column table layouts and sequential list formatting.
-- **Global Leader Chords & Which-Key Overlay**: Configurable `<leader>` key (e.g. `<Ctrl+Space>`) with interactive popup discovery and custom bindings in `shortcuts.yml`.
+- **Pure Terminal TUI**
+- **Configurable Visual Screen Transitions**
+- **Direct Linux Framebuffer Support (`/dev/fb0`)**
+- **Automated Color Resolution Fallback**
+- **Notebook Concurrent Conflict Resolution & 3-Way Merge**
+- **TrueColor Wallpaper Compositor**
+- **Macro Engine**
+- **Interactive Directives**
+- **Adaptive Nerdfont & Glyph Resolver**
+- **Background Plugin Engine**
+- **Global Leader Chords & Which-Key Overlay**
+
 - **Interactive Companion Tool Suite**:
   - `bashmenu` (`bm`): Main interactive menu system with nested submenu stacks, screensavers, and clean raw-mode process suspension.
   - `menuedit`: Visual menu hierarchy tree editor with add/edit/delete/move actions and type mutation.
   - `shortcutedit`: Visual keyboard shortcuts and leader chord editor.
   - `themeedit`: Visual theme & palette editor with 2D 256-color picker, CP437 ASCII picker, and split-screen live preview.
   - `bashedit`: Full-screen terminal text editor with colocated `.<filename>.swp` swap files, crash recovery prompts, and universal clipboard.
-  - `bmpager`: Standalone terminal pager with CommonMark markdown parsing, fenced code block framing, OSC 8 clickable hyperlinks, and vim navigation.
-  - `cheat`: Fast CLI Markdown cheatsheet search engine and interactive viewer.
+  - `bmpager`: Standalone terminal pager with markdown parsing, fenced code block framing, clickable hyperlinks, soft word wrap and shortcuts to edit.
+  - `cheat`: CLI Markdown cheatsheet search engine and interactive viewer.
   - `ymlcheck`: Standalone YAML schema validator and configuration linter.
 
 ---
