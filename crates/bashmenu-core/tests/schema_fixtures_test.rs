@@ -30,7 +30,7 @@ fn test_parse_production_bashmenu_yml() {
     );
 
     let config = load_config(&fixture).expect("Failed to parse production bashmenu.yml");
-    assert_eq!(config.version, "0.0.1");
+    assert_eq!(config.version, "0.0.2");
     assert_eq!(config.theme, "canopy");
     assert_eq!(config.settings.tabstop, Some(4));
     assert_eq!(config.settings.use_nerd_fonts, Some(true));
