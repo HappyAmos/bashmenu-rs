@@ -36,8 +36,7 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
 - **Repository Root CLI Argument Invariant (`--repo` / `-r`):**
   - Passing `--repo` or `-r` to `bashmenu` forces loading `bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, and `shortcuts.yml` directly from the repository root directory (`resolve_dev_dir`) rather than user config or current working directory.
 - **Environment Overview Macro (`{which}`) & Application Version (`{version}`) Invariant:**
-  - `{version}` resolves to the application release version from `Cargo.toml` (`workspace.package.version`), falling back to compile-time `CARGO_PKG_VERSION`.
-  - The configuration schema version in `bashmenu.yml` represents the version the file was written for and is accessible via `{app.version}`.
+  - `{version}` resolves to the application release version from `Cargo.toml` (`workspace.package.version`), falling back to compile-time `CARGO_PKG_VERSION`. `{app.version}` is removed to prevent ambiguity.
   - The `{which}` macro resolves to a formatted Markdown table reporting the application release version and canonical paths of `bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, and `cheat.yml`.
   - When encountered in menu item actions, commands, scripts, messages, prompts, or item types, `bashmenu` intercepts the action and displays an interactive `MessageModal` with the environment overview table.
 - **Configuration Header Preservation Invariant (`bashmenu.yml`):**

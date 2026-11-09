@@ -36,7 +36,7 @@ pub struct MacroContext<'a> {
     /// Full path to active cheat.yml file (if explicitly known)
     pub cheat_path: Option<PathBuf>,
     /// Application release version from Cargo.toml workspace.package.version
-    pub app_version: String,
+    pub version: String,
     /// Terminal viewport width
     pub window_width: usize,
     /// Terminal viewport height
@@ -87,7 +87,7 @@ impl<'a> MacroContext<'a> {
                 }
             });
         let dev_dir = resolve_dev_dir(&home_dir, &bashmenu_dir);
-        let app_version = resolve_workspace_version(&dev_dir);
+        let version = resolve_workspace_version(&dev_dir);
 
         Self {
             config,
@@ -99,7 +99,7 @@ impl<'a> MacroContext<'a> {
             themes_path: None,
             shortcuts_path: None,
             cheat_path: None,
-            app_version,
+            version,
             window_width: 80,
             window_height: 24,
             screen_width: 80,
@@ -108,9 +108,14 @@ impl<'a> MacroContext<'a> {
     }
 
     /// Sets an explicit application version for the context.
-    pub fn with_app_version(mut self, version: impl Into<String>) -> Self {
-        self.app_version = version.into();
+    pub fn with_version(mut self, version: impl Into<String>) -> Self {
+        self.version = version.into();
         self
+    }
+
+    /// Alias for `with_version`.
+    pub fn with_app_version(self, version: impl Into<String>) -> Self {
+        self.with_version(version)
     }
 
     /// Sets explicit file paths for environment inspection ({which}).
@@ -225,7 +230,7 @@ impl<'a> MacroContext<'a> {
 
         format!(
             "## Current Bashmenu Environment:\n| [b]Information[/b] | [b]Truth[/b] |\n| [b]Version:[/b] | {} |\n| [b]bashmenu.yml:[/b] | {} |\n| [b]bashmenu.mnu:[/b] | {} |\n| [b]bashmenu.themes:[/b] | {} |\n| [b]shortcuts.yml:[/b] | {} |\n| [b]cheat.yml:[/b] | {} |",
-            self.app_version,
+            self.version,
             full_file_location(&cfg),
             full_file_location(&mnu),
             full_file_location(&thm),
@@ -612,8 +617,18 @@ fn get_battery_status() -> String {
 /// Resolves a dot-delimited configuration path (e.g. `"user.postal_code"` or `"settings.ping_target"`)
 /// against the provided JSON Value representation of `BashMenuConfig`.
 pub fn resolve_config_dot_path(config_val: &serde_json::Value, path: &str) -> Option<String> {
+    // "{version}" is reserved exclusively for the application release version
+    // sourced from root Cargo.toml workspace.package.version.
+    // Disallow {app.version}, {bashmenu.version}, or config "version" through dot path.
+    if path == "version" || path == "app.version" || path == "bashmenu.version" {
+        return None;
+    }
+
     let parts: Vec<&str> = path.split('.').collect();
     if parts.is_empty() {
+        return None;
+    }
+    if parts.len() == 2 && (parts[0] == "app" || parts[0] == "bashmenu") && parts[1] == "version" {
         return None;
     }
 
@@ -1358,7 +1373,7 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
         direct_map.insert("{user-mode}", user_mode.to_string());
     }
     if res.contains("{version}") {
-        direct_map.insert("{version}", ctx.app_version.clone());
+        direct_map.insert("{version}", ctx.version.clone());
     }
     if res.contains("{which}") {
         direct_map.insert("{which}", ctx.format_which_info());

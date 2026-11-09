@@ -399,7 +399,11 @@ fn test_which_placeholder_resolution() {
     let _ = std::fs::remove_dir_all(&td);
 
     assert_eq!(interpolate_placeholders("{version}", &ctx), "1.2.3");
-    assert_eq!(interpolate_placeholders("{app.version}", &ctx), "1.2.3");
+    // {app.version} was removed to prevent confusion: it must not resolve
+    assert_eq!(
+        interpolate_placeholders("{app.version}", &ctx),
+        "{app.version}"
+    );
     assert!(output.contains("## Current Bashmenu Environment:"));
     assert!(output.contains("| [b]Information[/b] | [b]Truth[/b] |"));
     assert!(output.contains("| [b]Version:[/b] | 1.2.3 |"));

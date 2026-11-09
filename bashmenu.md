@@ -1005,7 +1005,7 @@ These variables are dynamically resolved using active configuration and environm
 | `{battery_stat}` / `{battery_status}` | Current battery charging status (e.g., `Charging`, `Discharging`, `Full`, `Not charging`, or `N/A`). Performance-optimized with a 5-second cache. |
 | `{theme}` | Active color theme name from `bashmenu.yml` (e.g., `tokyo_night`, `dracula`). |
 | `{localip}` | Primary outbound IPv4 address (e.g., `192.168.1.50`). Evaluated on demand via UDP socket probe with TTL cache. |
-| `{version}` | Application release version string resolved from workspace root `Cargo.toml` (`workspace.package.version`) or compile-time package version. (Note: the configuration schema version defined in `bashmenu.yml` can be queried via `{app.version}`). |
+| `{version}` | Application release version string resolved from workspace root `Cargo.toml` (`workspace.package.version`) or compile-time package version. |
 | `{utc_seconds}` | Current UTC time in seconds since epoch. |
 | `{window_width}` | Current active window width in character columns. |
 | `{window_height}` | Current active window height in character lines. |

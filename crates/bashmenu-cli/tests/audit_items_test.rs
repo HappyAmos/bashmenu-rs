@@ -161,15 +161,16 @@ fn test_which_environment_info_modal_formatting() {
     let which_text = ctx.format_which_info();
     assert_eq!(
         bashmenu_core::interpolate_placeholders("{version}", &ctx),
-        ctx.app_version
+        ctx.version
     );
+    // {app.version} was removed to prevent confusion; it does not resolve
     assert_eq!(
         bashmenu_core::interpolate_placeholders("{app.version}", &ctx),
-        config.version
+        "{app.version}"
     );
     assert!(which_text.contains("## Current Bashmenu Environment:"));
     assert!(which_text.contains("| [b]Information[/b] | [b]Truth[/b] |"));
-    assert!(which_text.contains(&format!("| [b]Version:[/b] | {} |", ctx.app_version)));
+    assert!(which_text.contains(&format!("| [b]Version:[/b] | {} |", ctx.version)));
     assert!(which_text.contains(&format!(
         "| [b]bashmenu.yml:[/b] | {} |",
         bashmenu_core::full_file_location(&yml_path)

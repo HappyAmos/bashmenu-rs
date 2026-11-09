@@ -1,5 +1,5 @@
 ## Environment Inspection & Universal Macro Enhancements
-- [x] Sourced `{version}` and `{which}` version information from repository `Cargo.toml` (`workspace.package.version`), with `env!("CARGO_PKG_VERSION")` fallback, while preserving `bashmenu.yml` schema version as `{app.version}`.
+- [x] Sourced `{version}` and `{which}` version information from repository `Cargo.toml` (`workspace.package.version`), with `env!("CARGO_PKG_VERSION")` fallback, and removed `{app.version}` to eliminate ambiguity.
 - [x] Formatted `{which}` table headers with `[b]Information[/b]` and `[b]Truth[/b]`.
 - [x] Implemented native Markdown rendering in `MessageModal` for headings (`##`) and pipe-separated tables (`|`) with box-drawing borders and BBCode span formatting.
 - [x] Implemented `{which}` macro and placeholder displaying interactive environment paths message box.
