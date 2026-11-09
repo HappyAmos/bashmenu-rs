@@ -385,17 +385,21 @@ fn test_which_placeholder_resolution() {
     std::fs::write(&shc_path, "shortcuts: []\n").unwrap();
     std::fs::write(&cht_path, "cheats: []\n").unwrap();
 
-    let ctx = MacroContext::new(&config).with_paths(
-        cfg_path.clone(),
-        mnu_path.clone(),
-        thm_path.clone(),
-        shc_path.clone(),
-        cht_path.clone(),
-    );
+    let ctx = MacroContext::new(&config)
+        .with_paths(
+            cfg_path.clone(),
+            mnu_path.clone(),
+            thm_path.clone(),
+            shc_path.clone(),
+            cht_path.clone(),
+        )
+        .with_app_version("1.2.3");
 
     let output = interpolate_placeholders("Inspect:\n{which}", &ctx);
     let _ = std::fs::remove_dir_all(&td);
 
+    assert_eq!(interpolate_placeholders("{version}", &ctx), "1.2.3");
+    assert_eq!(interpolate_placeholders("{app.version}", &ctx), "1.2.3");
     assert!(output.contains("## Current Bashmenu Environment:"));
     assert!(output.contains("| [b]Information[/b] | [b]Truth[/b] |"));
     assert!(output.contains("| [b]Version:[/b] | 1.2.3 |"));
@@ -419,4 +423,20 @@ fn test_which_placeholder_resolution() {
         "| [b]cheat.yml:[/b] | {} |",
         full_file_location(&cht_path)
     )));
+}
+
+#[test]
+fn test_resolve_workspace_version_from_cargo_toml() {
+    let td = std::env::temp_dir().join(format!("cargo_ver_test_{}", std::process::id()));
+    std::fs::create_dir_all(&td).unwrap();
+    let cargo_file = td.join("Cargo.toml");
+    std::fs::write(
+        &cargo_file,
+        "[workspace.package]\nversion = \"2.5.0\"\nedition = \"2021\"\n",
+    )
+    .unwrap();
+
+    let ver = bashmenu_core::resolve_workspace_version(&td);
+    let _ = std::fs::remove_dir_all(&td);
+    assert_eq!(ver, "2.5.0");
 }

@@ -35,6 +35,8 @@ pub struct MacroContext<'a> {
     pub shortcuts_path: Option<PathBuf>,
     /// Full path to active cheat.yml file (if explicitly known)
     pub cheat_path: Option<PathBuf>,
+    /// Application release version from Cargo.toml workspace.package.version
+    pub app_version: String,
     /// Terminal viewport width
     pub window_width: usize,
     /// Terminal viewport height
@@ -85,6 +87,7 @@ impl<'a> MacroContext<'a> {
                 }
             });
         let dev_dir = resolve_dev_dir(&home_dir, &bashmenu_dir);
+        let app_version = resolve_workspace_version(&dev_dir);
 
         Self {
             config,
@@ -96,11 +99,18 @@ impl<'a> MacroContext<'a> {
             themes_path: None,
             shortcuts_path: None,
             cheat_path: None,
+            app_version,
             window_width: 80,
             window_height: 24,
             screen_width: 80,
             extra_vars: HashMap::new(),
         }
+    }
+
+    /// Sets an explicit application version for the context.
+    pub fn with_app_version(mut self, version: impl Into<String>) -> Self {
+        self.app_version = version.into();
+        self
     }
 
     /// Sets explicit file paths for environment inspection ({which}).
@@ -215,7 +225,7 @@ impl<'a> MacroContext<'a> {
 
         format!(
             "## Current Bashmenu Environment:\n| [b]Information[/b] | [b]Truth[/b] |\n| [b]Version:[/b] | {} |\n| [b]bashmenu.yml:[/b] | {} |\n| [b]bashmenu.mnu:[/b] | {} |\n| [b]bashmenu.themes:[/b] | {} |\n| [b]shortcuts.yml:[/b] | {} |\n| [b]cheat.yml:[/b] | {} |",
-            self.config.version,
+            self.app_version,
             full_file_location(&cfg),
             full_file_location(&mnu),
             full_file_location(&thm),
@@ -223,6 +233,53 @@ impl<'a> MacroContext<'a> {
             full_file_location(&cht),
         )
     }
+}
+
+/// Extracts workspace.package.version from Cargo.toml if available,
+/// falling back to the compile-time CARGO_PKG_VERSION.
+pub fn resolve_workspace_version(dev_dir: &Path) -> String {
+    // 1. Check dev_dir/Cargo.toml
+    let cand = dev_dir.join("Cargo.toml");
+    if let Some(ver) = parse_cargo_workspace_version(&cand) {
+        return ver;
+    }
+
+    // 2. Check current working directory ancestors for root Cargo.toml
+    if let Ok(cwd) = std::env::current_dir() {
+        for ancestor in cwd.ancestors() {
+            let p = ancestor.join("Cargo.toml");
+            if p.exists() {
+                if let Some(ver) = parse_cargo_workspace_version(&p) {
+                    return ver;
+                }
+            }
+        }
+    }
+
+    // 3. Fallback to compile-time package version
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
+fn parse_cargo_workspace_version(path: &Path) -> Option<String> {
+    if !path.exists() {
+        return None;
+    }
+    let content = std::fs::read_to_string(path).ok()?;
+    let mut in_workspace_package = false;
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') {
+            in_workspace_package = trimmed == "[workspace.package]";
+        } else if in_workspace_package && trimmed.starts_with("version") {
+            if let Some((_, val)) = trimmed.split_once('=') {
+                let clean = val.trim().trim_matches(['"', '\'']);
+                if !clean.is_empty() {
+                    return Some(clean.to_string());
+                }
+            }
+        }
+    }
+    None
 }
 
 /// Resolves the repository / project github directory where bashmenu-rs resides on the PC.
@@ -1301,7 +1358,7 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
         direct_map.insert("{user-mode}", user_mode.to_string());
     }
     if res.contains("{version}") {
-        direct_map.insert("{version}", ctx.config.version.clone());
+        direct_map.insert("{version}", ctx.app_version.clone());
     }
     if res.contains("{which}") {
         direct_map.insert("{which}", ctx.format_which_info());

@@ -686,6 +686,9 @@ Active color theme name from bashmenu.yml (e.g. tokyo_night, dracula).
 Primary outbound IPv4 address (e.g. 192.168.1.50). Evaluated on demand
 via UDP socket probe with TTL cache.
 .TP
+.B {version}
+Application release version string resolved from workspace root Cargo.toml (workspace.package.version) or compile-time release version. To access the configuration schema version defined in bashmenu.yml, use {app.version}.
+.TP
 .B {utc_seconds}
 Current UTC epoch seconds.
 .TP

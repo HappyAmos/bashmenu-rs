@@ -87,7 +87,7 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
 name = "bashedit-cli"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "bashmenu-core",
@@ -103,7 +103,7 @@ dependencies = [
 
 [[package]]
 name = "bashmenu-cli"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "bashmenu-core",
@@ -117,7 +117,7 @@ dependencies = [
 
 [[package]]
 name = "bashmenu-core"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "libc",
@@ -131,7 +131,7 @@ dependencies = [
 
 [[package]]
 name = "bashmenu-tui"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "bashmenu-core",
@@ -161,7 +161,7 @@ dependencies = [
 
 [[package]]
 name = "bmpager-cli"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "bashmenu-core",
@@ -208,7 +208,7 @@ checksum = "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600"
 
 [[package]]
 name = "cheat-cli"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "bashmenu-core",
@@ -606,7 +606,7 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 
 [[package]]
 name = "menuedit-cli"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "bashmenu-core",
@@ -1049,7 +1049,7 @@ dependencies = [
 
 [[package]]
 name = "themeedit-cli"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "bashmenu-core",
@@ -1258,7 +1258,7 @@ checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
 
 [[package]]
 name = "ymlcheck-cli"
-version = "0.1.1"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "bashmenu-core",

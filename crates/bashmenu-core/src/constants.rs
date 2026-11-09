@@ -61,7 +61,7 @@ pub const PLACEHOLDER_HELP_TEXT: &str = "\
 {battery_status}             │ Alias for {battery_stat}
 {localip}                    │ Primary outbound IPv4 address
 {user-mode}                  │ Privilege level (User or Root)
-{version}                    │ BashMenu application version
+{version}                    │ Application release version (from Cargo.toml)
 {theme}                      │ Active color theme name (or {app.theme})
 
 ── Date & Time Placeholders ──
