@@ -36,8 +36,10 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
 - **Repository Root CLI Argument Invariant (`--repo` / `-r`):**
   - Passing `--repo` or `-r` to `bashmenu` forces loading `bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, and `shortcuts.yml` directly from the repository root directory (`resolve_dev_dir`) rather than user config or current working directory.
 - **Environment Overview Macro (`{which}`) & Application Version (`{version}`) Invariant:**
-  - `{version}` resolves to the application release version from `Cargo.toml` (`workspace.package.version`), falling back to compile-time `CARGO_PKG_VERSION`. `{app.version}` is removed to prevent ambiguity.
+  - `{version}` and the Version row in `{which}` must resolve from root `Cargo.toml` `workspace.package.version` (with `env!("CARGO_PKG_VERSION")` fallback).
+  - `{app.version}` is removed and blocked in `resolve_config_dot_path` to prevent confusion with config schema versions.
   - The `{which}` macro resolves to a formatted Markdown table reporting the application release version and canonical paths of `bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, and `cheat.yml`.
+  - `MessageModal` automatically renders markdown tables (`|`) with box borders and headings (`##`) with BBCode styling.
   - When encountered in menu item actions, commands, scripts, messages, prompts, or item types, `bashmenu` intercepts the action and displays an interactive `MessageModal` with the environment overview table.
 - **Configuration Header Preservation Invariant (`bashmenu.yml`):**
   - Never use raw file writes with `serde_yml::to_string()` directly to overwrite `bashmenu.yml`.
