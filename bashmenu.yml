@@ -4,7 +4,7 @@
 # '{app.<key>}' namespace (e.g. {app.theme}, {app.settings.tabstop}, {app.user.postal_code}),
 # or shorthand shortcuts ({theme}, {user.<key>}, {settings.<key>}).
 # ==============================================================================
-version: '0.0.1'
+version: '0.0.2'
 theme: canopy
 user:
   example_boolean: true
