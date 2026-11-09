@@ -21,6 +21,14 @@ shortcuts:
   execution_mode: console
   quiet: true
   alt_buffer: false
+- key: <leader> w
+  description: Which Version
+  type: script
+  action: '{which}'
+  script: '{which}'
+  execution_mode: console
+  quiet: false
+  alt_buffer: true
 - key: <leader> k
   description: KCChase Screensaver
   type: command
