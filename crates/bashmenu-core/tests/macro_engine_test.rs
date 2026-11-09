@@ -397,7 +397,7 @@ fn test_which_placeholder_resolution() {
     let _ = std::fs::remove_dir_all(&td);
 
     assert!(output.contains("## Current Bashmenu Environment:"));
-    assert!(output.contains("| Information | Truth |"));
+    assert!(output.contains("| [b]Information[/b] | [b]Truth[/b] |"));
     assert!(output.contains("| [b]Version:[/b] | 1.2.3 |"));
     assert!(output.contains(&format!(
         "| [b]bashmenu.yml:[/b] | {} |",

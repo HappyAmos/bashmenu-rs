@@ -1,4 +1,6 @@
 ## Environment Inspection & Universal Macro Enhancements
+- [x] Formatted `{which}` table headers with `[b]Information[/b]` and `[b]Truth[/b]`.
+- [x] Implemented native Markdown rendering in `MessageModal` for headings (`##`) and pipe-separated tables (`|`) with box-drawing borders and BBCode span formatting.
 - [x] Implemented `{which}` macro and placeholder displaying interactive environment paths message box.
 - [x] Added `full_file_location` and explicit path overrides in `MacroContext::with_paths`.
 - [x] Enhanced `MessageModal` width clamping up to 78 columns with wrapped BBCode span preservation for formatted tables.

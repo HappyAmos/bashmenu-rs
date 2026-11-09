@@ -160,7 +160,7 @@ fn test_which_environment_info_modal_formatting() {
 
     let which_text = ctx.format_which_info();
     assert!(which_text.contains("## Current Bashmenu Environment:"));
-    assert!(which_text.contains("| Information | Truth |"));
+    assert!(which_text.contains("| [b]Information[/b] | [b]Truth[/b] |"));
     assert!(which_text.contains(&format!("| [b]Version:[/b] | {} |", config.version)));
     assert!(which_text.contains(&format!(
         "| [b]bashmenu.yml:[/b] | {} |",

@@ -128,6 +128,49 @@ fn test_message_modal_dismiss() {
 }
 
 #[test]
+fn test_message_modal_markdown_heading_and_table_rendering() {
+    let msg = "\
+## Current Bashmenu Environment:
+| [b]Information[/b] | [b]Truth[/b] |
+| [b]Version:[/b] | 0.0.1 |
+| [b]bashmenu.yml:[/b] | /path/to/bashmenu.yml |
+";
+    let modal = MessageModal::new("Current Bashmenu Environment", msg);
+    let styles = ResolvedThemeStyles::default();
+    let area = Rect::new(0, 0, 80, 24);
+
+    let (w, h) = modal.dialog_dimensions(area);
+    assert!(w >= 40, "Dialog width should fit table: {}", w);
+    assert!(h >= 8, "Dialog height should fit header and table: {}", h);
+
+    let mut buf = Buffer::empty(area);
+    modal.render(area, &styles, &mut buf);
+    let content = format!("{:?}", buf);
+
+    // Verify markdown heading rendered
+    assert!(content.contains("Current Bashmenu Environment:"));
+
+    // Verify table borders rendered
+    assert!(content.contains("┌"));
+    assert!(content.contains("┬"));
+    assert!(content.contains("┐"));
+    assert!(content.contains("│"));
+    assert!(content.contains("├"));
+    assert!(content.contains("┼"));
+    assert!(content.contains("┤"));
+    assert!(content.contains("└"));
+    assert!(content.contains("┴"));
+    assert!(content.contains("┘"));
+
+    // Verify cell contents rendered
+    assert!(content.contains("Information"));
+    assert!(content.contains("Truth"));
+    assert!(content.contains("Version:"));
+    assert!(content.contains("0.0.1"));
+    assert!(content.contains("/path/to/bashmenu.yml"));
+}
+
+#[test]
 fn test_grid_pickers_navigation() {
     // 256 Color grid (initial 0 = black)
     let mut color_modal = ColorGridModal::new("Select Color", 0);

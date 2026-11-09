@@ -214,7 +214,7 @@ impl<'a> MacroContext<'a> {
         let cht = self.resolve_cheat_path();
 
         format!(
-            "## Current Bashmenu Environment:\n| Information | Truth |\n| [b]Version:[/b] | {} |\n| [b]bashmenu.yml:[/b] | {} |\n| [b]bashmenu.mnu:[/b] | {} |\n| [b]bashmenu.themes:[/b] | {} |\n| [b]shortcuts.yml:[/b] | {} |\n| [b]cheat.yml:[/b] | {} |",
+            "## Current Bashmenu Environment:\n| [b]Information[/b] | [b]Truth[/b] |\n| [b]Version:[/b] | {} |\n| [b]bashmenu.yml:[/b] | {} |\n| [b]bashmenu.mnu:[/b] | {} |\n| [b]bashmenu.themes:[/b] | {} |\n| [b]shortcuts.yml:[/b] | {} |\n| [b]cheat.yml:[/b] | {} |",
             self.config.version,
             full_file_location(&cfg),
             full_file_location(&mnu),
