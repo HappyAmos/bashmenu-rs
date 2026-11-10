@@ -30,8 +30,8 @@ fn test_parse_production_bashmenu_yml() {
     );
 
     let config = load_config(&fixture).expect("Failed to parse production bashmenu.yml");
-    assert_eq!(config.version, "0.0.2");
-    assert_eq!(config.theme, "canopy");
+    assert_eq!(config.version, "0.0.1");
+    assert_eq!(config.theme, "alaska-train");
     assert_eq!(config.settings.tabstop, Some(4));
     assert_eq!(config.settings.use_nerd_fonts, Some(true));
     assert_eq!(
@@ -54,7 +54,7 @@ fn test_parse_production_bashmenu_yml() {
         "# =============================================================================="
     ));
     assert!(written.contains("BashMenu Configuration (bashmenu.yml)"));
-    assert!(written.contains("theme: canopy"));
+    assert!(written.contains("theme: alaska-train"));
     let _ = fs::remove_file(tmp);
 }
 
@@ -207,7 +207,7 @@ fn test_config_get_set_value_and_menu_item_helpers() {
     let mut config = load_config(&fixture).expect("Failed to parse production bashmenu.yml");
 
     // Test get_value
-    assert_eq!(config.get_value("theme"), Some("canopy".to_string()));
+    assert_eq!(config.get_value("theme"), Some("alaska-train".to_string()));
     assert_eq!(
         config.get_value("settings.use_nerd_fonts"),
         Some("true".to_string())

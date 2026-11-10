@@ -1,6 +1,6 @@
-.TH BASHMENU 1 "2026-09-13" "v0.0.1" "HA Bash Menu Manual"
+.TH BASHMENU 1 "2026-11-09" "v0.1.2" "HA Bash Menu Manual"
 .SH NAME
-bashmenu \- lightweight Textual TUI menu engine and settings manager
+bashmenu \- lightweight Ratatui TUI menu engine and settings manager
 .SH SYNOPSIS
 .B bashmenu
 [\fB\-c\fR \fIconfig\fR]
@@ -14,7 +14,7 @@ bashmenu \- lightweight Textual TUI menu engine and settings manager
 [\fBoptions\fR]
 .SH DESCRIPTION
 .B bashmenu
-is a data-driven, Textual-based Text User Interface (TUI) menu engine designed
+is a data-driven, Ratatui-based Text User Interface (TUI) menu engine designed
 for Linux system administration, settings management, and command execution. It
 reads its menu structure from a YAML-formatted menu file, dynamically
 interpolates configurations and system environment variables, and supports
@@ -77,9 +77,6 @@ Terminal manual page for HA Bash Menu.
 .SS Provided Utility Scripts (scripts/)
 These custom utility scripts are stored inside the scripts directory:
 .TP
-.I scripts/ascii.sh
-Standard and Extended ASCII viewing utility.
-.TP
 .I scripts/asteroids.sh
 Terminal Asteroids game runner and automatic source build installer.
 .TP
@@ -104,9 +101,6 @@ Discovers currently configured upstream system DNS settings.
 .I scripts/glyphs.sh
 Curses preview dialog box utility for Unicode emojis and icons.
 .TP
-.I scripts/gorillas.py
-QBasic Gorillas clone TUI game implemented as a Textual Screen.
-.TP
 .I scripts/hostname.sh
 Discovers and displays system hostname, FQDN, kernel, and OS identity.
 .TP
@@ -119,44 +113,29 @@ Installs interactive cheat sheet terminal tools.
 .I scripts/install_games.sh
 Cross-platform installer for terminal games.
 .TP
-.I scripts/install_glow.sh
-Installer script for the Glow markdown viewer.
-.TP
-.I scripts/install_kmscon.sh
-Installs the kmscon console emulator for better Unicode rendering.
-.TP
 .I scripts/install_node.sh
 Installer script for Node.js via nvm or system package manager.
-.TP
-.I scripts/install_scripts.sh
-Installer script that registers and deploys custom bash scripts.
 .TP
 .I scripts/ip_info.sh
 Displays current network interface IP addresses and connection status.
 .TP
-.I scripts/ncurses_colors.py
-Visual tester for ncurses color support.
-.TP
 .I scripts/otd.sh
 Fetches a random "On This Day" historical quote/event and link from today.zenquotes.io API using curl and jq.
-.TP
-.I scripts/pager.sh
-Interactive full-screen terminal text pager supporting ANSI colors and links.
 .TP
 .I scripts/ping.sh
 Cross-platform ping wrapper with unprivileged TCP handshake latency fallback.
 .TP
-.I scripts/rich.sh
-Markdown file rendering wrapper utilizing Python Rich piped into pager.sh.
-.TP
 .I scripts/serverup.sh
 Cross-platform server ping and uptime availability check script.
+.TP
+.I scripts/sso-ssh.sh
+Automates Ed25519 SSH key generation, authorization, and configuration for passwordless remote server connections.
 .TP
 .I scripts/system_update.sh
 Cross-platform system update wrapper supporting apt, dnf, pacman, pkg, and brew.
 .TP
-.I scripts/theme_from_image.py
-Auto-generates HA Bash Menu theme palettes derived from an image file using Pillow color quantization.
+.I scripts/temp.sh
+Native server and CPU temperature reporting script supporting Celsius and Fahrenheit.
 .TP
 .I scripts/unicode.sh
 Interactive Unicode Block Explorer script.
@@ -520,11 +499,11 @@ True/False/Cancel settings toggle modal.
 Select single setting value from radio button list modal.
 .TP
 .B editor
-Opens file in built-in Nano-style editor.
+Opens file in built-in text editor (bashedit).
 .TP
 .B notebook
 Opens dynamic notes collection menu from YAML file ({notebooks_dir}/notes.yml).
-Supports interactive task-list checkboxes, Markdown/BBCode modal viewers, full TextArea editor modals with smart list auto-formatting, ghost text, shared cross-interface clipboard ([C]/Ctrl+C/Ctrl+V), help gutter note creation ([N]), atomic swap file crash recovery (.<stem>.note.<slug>.swp), and interactive 3-way merge conflict resolution ([Merge], [Overwrite], [Reload], [Save As]).
+Supports interactive task-list checkboxes, Markdown/BBCode modal viewers, full NoteEditorModal editor modals with smart list auto-formatting, ghost text, shared cross-interface clipboard ([C]/Ctrl+C/Ctrl+V), help gutter note creation ([N]), atomic swap file crash recovery (.<stem>.note.<slug>.swp), and interactive 3-way merge conflict resolution ([Merge], [Overwrite], [Reload], [Save As]).
 .TP
 .B confirm
 Launches Yes/No confirmation dialog box.
@@ -533,7 +512,7 @@ Launches Yes/No confirmation dialog box.
 Informational alert or popup dialog.
 .TP
 .B python
-Dispatches internal Python routine.
+Executes Python script or expression.
 .TP
 .B inject_block
 Installs or uninstalls template blocks inside profiles.
@@ -738,16 +717,16 @@ The application incorporates a rich inline formatting parser allowing developers
 use nested bracketed formatting tags inside labels, headers, status gutters, and dialogues.
 .TP
 .B [b]text[/b]
-Renders bold text (Rich Style(bold=True)).
+Renders bold text.
 .TP
 .B [u]text[/u]
-Renders underlined text (Rich Style(underline=True)).
+Renders underlined text.
 .TP
 .B [dim]text[/dim]
-Renders dimmed contrast text (Rich Style(dim=True)).
+Renders dimmed contrast text.
 .TP
 .B [reverse]text[/reverse]
-Renders reversed contrast text (Rich Style(reverse=True)).
+Renders reversed contrast text.
 .TP
 .B [color=color_name]text[/color]
 Renders custom theme-colored text. Supports active theme semantic tokens (text, border, title, highlight, footer, help_text, plugin, shortcut_key, accent, divider, background, selection, gutter, button_primary, button_error, button_cancel, button_success, window_close_button, scrollbar, whitespace), named ANSI/bright constants (COLOR_BLACK, COLOR_RED, COLOR_GREEN, COLOR_YELLOW, COLOR_BLUE, COLOR_MAGENTA, COLOR_CYAN, COLOR_WHITE, COLOR_GREY, COLOR_GRAY, COLOR_BRIGHT_BLACK, COLOR_BRIGHT_RED, COLOR_BRIGHT_GREEN, COLOR_BRIGHT_YELLOW, COLOR_BRIGHT_BLUE, COLOR_BRIGHT_MAGENTA, COLOR_BRIGHT_CYAN, COLOR_BRIGHT_WHITE, COLOR_ORANGE, COLOR_PURPLE, COLOR_PINK, COLOR_BROWN), 256-color palette numbers (0 to 255), and 24-bit TrueColor hex values (#rrggbb).
@@ -782,7 +761,7 @@ button_cancel, button_success, window_close_button, scrollbar, and whitespace (c
 non-visible whitespace character color in the text editor).
 .PP
 .B Formatting Rule for Editor Compatibility:
-Theme definitions maintain compact single-line flow-style bracket lists (e.g. title: [201, -1]). This enables bashedit.py's --display-theme-colors feature to accurately parse inline bracketed color values and render live color swatch previews.
+Theme definitions maintain compact single-line flow-style bracket lists (e.g. title: [201, -1]). This enables bashedit's color preview features and themeedit's parser to accurately parse inline bracketed color values and render live color swatch previews.
 .PP
 .B Color Fallback Resolution Tiers:
 The engine automatically queries terminal capabilities and gracefully degrades through four color tiers: TrueColor (24-bit / 16.7M colors, active under COLORTERM=truecolor or 24bit), 256-color palette (xterm 0-255 indices), 16-color ANSI palette (standard virtual terminals TERM=linux), and 8-color basic ANSI palette. Themes define explicit 256, 16, and 8 color blocks to guarantee high contrast across all environments.
@@ -836,10 +815,17 @@ Color channel quantization step between 1 and 32 (default: 1). Default 1 retains
 The inject_block type installs templates inside profile files (e.g. .bashrc).
 It wraps the template in markers (# CODEBLOCK:block_id:START/END) to manage
 seamless interactive installs, updates, and uninstalls.
-.SS In-Process Python Plugins (external: false)
-Python script items of type "script" can set "external: false" to run inside
-bashmenu's parent process, avoiding terminal flashes. Plugins must implement
-a Textual Screen subclass pushed via screen.app.push_screen().
+.SS Subprocess Execution Modes (Console, Streaming, Interactive)
+Commands and scripts support three subprocess execution modes:
+.IP \(bu 2
+.B Console Mode (execution_mode: console / default):
+Suspends TUI raw mode and runs directly on the terminal. Setting \fBalt_buffer: true\fR preserves the alternate screen buffer; setting \fBquiet: true\fR suppresses the return prompt.
+.IP \(bu 2
+.B Streaming Output Mode (stream: true / execution_mode: streaming):
+Executes the command in the background and streams output in real time into an in-TUI modal dialog. Dialog dimensions can be customized via \fBwindow_percent: N\fR (20% to 100%, default 65%).
+.IP \(bu 2
+.B Interactive Mode (interactive: true / execution_mode: interactive):
+Runs an interactive subprocess session with piped stdin inside the streaming modal frame.
 .SS Background Footer Plugins & Plugin Creation
 HA Bash Menu features an asynchronous, background-cached plugin architecture configured under
 .I settings.plugins
@@ -848,7 +834,7 @@ in
 Plugin output lines are rendered in a dedicated display area above the help footer.
 .IP \(bu 2
 .B Asynchronous Execution & Caching:
-Plugin scripts run in background daemon threads with re-entrant locking to ensure network calls never lag the main TUI rendering loop. Script outputs are cached in memory for the duration specified by
+Plugin scripts run in detached background worker threads with thread-safe caching and channel synchronization to ensure network calls never lag the main TUI rendering loop. Script outputs are cached in memory for the duration specified by
 .I sleep
 (in seconds, defaulting to 300). Setting
 .I sleep: 0
@@ -927,7 +913,7 @@ timer back to the start.
 .IP \(bu 2
 .B Alternate Screen Buffer Isolation:
 When triggered, the command executes in an alternate screen buffer (\(rsx1b[?1049h)
-after suspending Textual. This prevents disturbance to underlying terminal
+after suspending terminal raw mode. This prevents disturbance to underlying terminal
 lines and the active menu layout.
 .IP \(bu 2
 .B Automatic Restoration:

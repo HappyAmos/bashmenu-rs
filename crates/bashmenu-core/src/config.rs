@@ -689,7 +689,7 @@ mod tests {
         if fixture_path.exists() {
             let config = load_config(fixture_path).expect("Failed to load bashmenu.yml");
             assert!(!config.version.is_empty());
-            assert_eq!(config.theme, "canopy");
+            assert_eq!(config.theme, "alaska-train");
             assert_eq!(config.settings.tabstop, Some(4));
             assert_eq!(config.settings.use_nerd_fonts, Some(true));
 

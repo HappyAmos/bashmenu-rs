@@ -1,3 +1,12 @@
+## Documentation Modernization & Legacy Python Cleanup
+- [x] Audited and synchronized `bashmenu.md` and `bashmenu.1` against the Rust codebase (v0.1.2), replacing all legacy Textual, Rich, and Python runtime references with Ratatui architecture, double-buffered cell rendering, and native ANSI escape sequences.
+- [x] Replaced Section 7.2 in `bashmenu.md` and `.SS In-Process Python Plugins` in `bashmenu.1` with comprehensive documentation of subprocess execution modes (`execution_mode`, `stream`, `interactive`, `window_percent`, `alt_buffer`, `quiet`).
+- [x] Updated Section 2.1 utility scripts in `bashmenu.md` and `bashmenu.1` to match the exact active repository files in `scripts/`, removing obsolete references (`scripts/ascii.sh`, `scripts/gorillas.py`, `scripts/install_glow.sh`, `scripts/install_kmscon.sh`, `scripts/install_scripts.sh`, `scripts/ncurses_colors.py`, `scripts/pager.sh`, `scripts/rich.sh`, `scripts/theme_from_image.py`) and documenting new utilities (`scripts/sso-ssh.sh`, `scripts/temp.sh`).
+- [x] Updated command invocations for `themeedit` (replacing `themeedit.py` and `theme_from_image.py` with native `<F5>` auto-derivation), `bashedit` (replacing `bashedit.py`), `bmpager`, and `cheat`.
+- [x] Updated weather viewer commands in `bashmenu.mnu` to use `bmpager` rather than obsolete `scripts/pager.sh`.
+- [x] Corrected default theme expectations in `crates/bashmenu-core/src/config.rs` and `schema_fixtures_test.rs` to match active default theme `alaska-train`.
+- [x] Verified full workspace test suite (`cargo test --workspace`), format checking (`cargo fmt --all --check`), clippy lints (`cargo clippy --workspace --all-targets -- -D warnings`), shell script lints (`shellcheck *.sh scripts/*.sh`), and manpage validation (`man -l bashmenu.1`).
+
 ## Environment Inspection & Universal Macro Enhancements
 - [x] Sourced `{version}` and `{which}` version information from repository `Cargo.toml` (`workspace.package.version`), with `env!("CARGO_PKG_VERSION")` fallback, and removed `{app.version}` to eliminate ambiguity.
 - [x] Formatted `{which}` table headers with `[b]Information[/b]` and `[b]Truth[/b]`.

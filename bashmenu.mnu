@@ -889,14 +889,14 @@ items:
       - Weather -> 3 Day [curl wttr.in/{user.postal_code}]:
           type: command
           icon: '{nf::#eef0:}'
-          action: curl -s wttr.in/{user.postal_code} | {scripts_dir}/pager.sh
+          action: curl -s wttr.in/{user.postal_code} | bmpager
           interactive: true
           quiet: true
           alt_buffer: true
       - Weather -> 3 Day v.2. [curl v2.wttr.in/{user.postal_code}]:
           type: command
           icon: '{nf::#eef0:}'
-          action: curl -s v2.wttr.in/{user.postal_code} | {scripts_dir}/pager.sh
+          action: curl -s v2.wttr.in/{user.postal_code} | bmpager
           interactive: true
           quiet: true
           alt_buffer: true

@@ -1,7 +1,7 @@
-# HA Bash Menu Specification & User Manual (v0.0.1)
+# HA Bash Menu Specification & User Manual (v0.1.2)
 
 Welcome to the specification and user manual for HA Bash Menu, a lightweight,
-data-driven Textual Text User Interface (TUI) menu engine and configuration
+data-driven Ratatui Text User Interface (TUI) menu engine and configuration
 editor for Linux systems.
 
 <details>
@@ -34,7 +34,7 @@ editor for Linux systems.
   - [6.4 Console Tag Rich Formatting](#64-console-tag-rich-formatting)
 - [7. Advanced Integration Use Cases](#7-advanced-integration-use-cases)
   - [7.1 Modular Block Injection (`type: inject_block`)](#71-modular-block-injection-type-inject_block)
-  - [7.2 In-Process Python Plugins (`external: false`)](#72-in-process-python-plugins-external-false)
+  - [7.2 Subprocess Execution Modes (`execution_mode`, `stream`, `interactive`)](#72-subprocess-execution-modes-execution_mode-stream-interactive)
   - [7.3 Multi-Platform Support & Environment Detection](#73-multi-platform-support--environment-detection)
   - [7.4 Background Footer Plugins Architecture & Creation Guide](#74-background-footer-plugins-architecture--creation-guide)
 
@@ -89,7 +89,6 @@ These scripts are stored in the `/scripts` directory and can be used directly or
 
 | Script | Description |
 | :--- | :--- |
-| `scripts/ascii.sh` | Standard and Extended ASCII viewing utility. |
 | `scripts/asteroids.sh` | Asteroids game runner that downloads, compiles, and launches the terminal game. |
 | `scripts/bsdgames.sh` | Interactive runner menu for classic BSD games (adventure, atc, battlestar, robots, snake, tetris, etc.). |
 | `scripts/cheat.sh` | Cheatsheet lookup utility launcher trampoline for the native cheat binary. |
@@ -98,24 +97,18 @@ These scripts are stored in the `/scripts` directory and can be used directly or
 | `scripts/get_api_key.sh` | Script to securely retrieve and format API keys or credentials. |
 | `scripts/getdns.py` | CLI python utility to query and discover currently active upstream system DNS server settings. |
 | `scripts/glyphs.sh` | Curses search and preview dialog box utility for selecting Unicode emojis and Nerd Font icons. |
-| `scripts/gorillas.py` | QBasic Gorillas clone TUI game implemented as a Textual Screen, launched from the Games submenu. |
 | `scripts/hostname.sh` | Hostname and system identity discovery utility reporting hostname, FQDN, kernel, architecture, and OS distribution. |
 | `scripts/install_basics.sh` | Cross-platform basic tools installer wrapper. |
 | `scripts/install_cheat.sh` | Setup script that installs interactive cheat sheet terminal tools into the local environment. |
 | `scripts/install_games.sh` | Cross-platform installer for terminal games (ninvaders, nsnake, greed, moon-buggy, nethack, etc.). |
-| `scripts/install_glow.sh` | Installer script for the Glow markdown viewer. |
-| `scripts/install_kmscon.sh` | Installer script for the kmscon console emulator, enabling beautiful Unicode and KMS/DRM video support on raw Linux text consoles. |
 | `scripts/install_node.sh` | Installer script for Node.js via nvm or system package manager. |
-| `scripts/install_scripts.sh` | Deployment script to copy and register utility bash configurations. |
 | `scripts/ip_info.sh` | Displays current network interface IP addresses and connection status. |
-| `scripts/ncurses_colors.py` | Visual tester for ncurses color support. |
 | `scripts/otd.sh` | Shell script fetching a random "On This Day" historical quote/event and link from today.zenquotes.io API using curl and jq. |
-| `scripts/pager.sh` | Interactive full-screen terminal text pager supporting ANSI colors, vim/less keys, and link navigation. |
 | `scripts/ping.sh` | Cross-platform ping wrapper with unprivileged TCP handshake latency fallback for restricted environments. |
-| `scripts/rich.sh` | Markdown file rendering wrapper utilizing Python Rich piped into pager.sh. |
 | `scripts/serverup.sh` | Cross-platform server ping and uptime availability check script. |
+| `scripts/sso-ssh.sh` | Automates Ed25519 SSH key generation, authorization, and configuration for passwordless remote server connections. |
 | `scripts/system_update.sh` | Cross-platform system update wrapper supporting apt, dnf, pacman, pkg, and brew. |
-| `scripts/theme_from_image.py` | Auto-generates HA Bash Menu theme palettes derived from an image file using Pillow color quantization. |
+| `scripts/temp.sh` | Native server and CPU temperature reporting script supporting Celsius and Fahrenheit (`--fahrenheit` / `-f`). |
 | `scripts/unicode.sh` | Interactive Unicode Block Explorer script. |
 | `scripts/webopen.sh` | Cross-platform web browser launcher wrapper script that opens a specified URL, file, or default browser (supporting Linux, macOS, WSL, and Termux). Supports `--gui` / `-g` for graphical browsers and `--tty` / `tty` for terminal browsers (lynx, links, brow6el). |
 
@@ -278,7 +271,7 @@ The `cheat` standalone CLI tool searches, lists, and displays Markdown cheatshee
 | `-d`, `--directory` | Print the configured cheatsheets directory path. |
 | `-h`, `--help` | Print help information. |
 
-Configuration is stored in `~/.config/bashmenu/cheat.yml` (pointing to `dir: ~/cheat`). Cheatsheets are rendered via `rich.sh` or `bmpager --markdown` with raw text terminal fallback.
+Configuration is stored in `~/.config/bashmenu/cheat.yml` (pointing to `dir: ~/cheat`). Cheatsheets are rendered via `bmpager --markdown` with raw text terminal fallback.
 
 ### 3.7 Custom Keyboard Shortcuts Editor (`shortcutedit` / `menuedit --shortcuts`)
 `shortcutedit` (also accessible via `menuedit --shortcuts` or `F9` / `<leader> s` from the main menu) is a split-screen visual editor for `shortcuts.yml` (`{bashmenu_dir}/shortcuts.yml`).
@@ -305,11 +298,11 @@ Configuration is stored in `~/.config/bashmenu/cheat.yml` (pointing to `dir: ~/c
 - **Deleting:** Themes can be deleted from `bashmenu.themes` either by clicking the **[Delete]** button in the inspector panel under **General & Identity** (or pressing `Ctrl+D`), or directly from the Theme Picker modal (`F2`) using `[d]` / `Delete`. Both options present a confirmation dialog. If the theme is currently active in `bashmenu.yml`, the user is notified and the active theme is automatically switched to a fallback theme (e.g. `dracula`).
 
 *Launching Theme Editor:*
-- Directly via command line: `./themeedit.py [theme_name]`
+- Directly via command line: `themeedit [theme_name]` (or `themeedit -f <themes_file> -t <theme_name>`).
 - Directly inside HA Bash Menu via `F8` shortcut.
 - Inside HA Bash Menu via `F2` (Theme Picker) by pressing `e` on any highlighted theme.
 - Via the main menu under `Bashmenu Settings -> Theme Editor`.
-- Standalone CLI generator: `python3 scripts/theme_from_image.py <image.png> --name <theme_name> --save`
+- Auto-derive theme colors from wallpaper: press `<F5>` inside `themeedit` to automatically derive a harmonious 256-color palette (with 16/8-color perceptual downsampling) from the configured background wallpaper.
 
 ---
 
@@ -590,7 +583,7 @@ Color themes configure the visual palette for the main menu, visual menu editor,
 | `whitespace` | Non-visible whitespace characters (spaces, tabs, newlines) display color in the text editor. |
 | `window_close_button` | Close 'x' button in window title bars and modal dialogs. |
 
-*Formatting Rule for Editor Compatibility:* Theme definitions maintain compact single-line flow-style bracket lists (e.g., `title: [201, -1]`). This enables `bashedit.py`'s `--display-theme-colors` feature to accurately parse inline bracketed color values and render live color swatch previews.
+*Formatting Rule for Editor Compatibility:* Theme definitions maintain compact single-line flow-style bracket lists (e.g., `title: [201, -1]`). This enables `bashedit`'s color preview features and `themeedit`'s parser to accurately parse inline bracketed color values and render live color swatch previews.
 
 #### Color Mode Hierarchy & Adaptive Fallback:
 HA Bash Menu automatically detects terminal color capabilities and gracefully
@@ -727,7 +720,7 @@ twilight:
 
 #### Image Preparation for Optimal Performance
 
-Terminal emulators render text lines from left to right. When adjacent cells share identical foreground and background colors, Rich combines them into a single string span, emitting only one ANSI escape code for the entire block. When neighboring cells have different colors (common in raw dithered photographs), Rich emits a full 24-bit TrueColor escape sequence for **every single character**, which can flood the terminal PTY buffer and cause scrolling or cursor lag.
+Terminal emulators render text cells from left to right. When adjacent cells share identical foreground and background colors, terminal rendering emits only one ANSI color escape code for the entire horizontal block. When neighboring cells have different colors (common in raw unquantized photographs), the terminal must process a full 24-bit TrueColor escape sequence for **every single character**, which can saturate terminal PTY buffers and induce scrolling or cursor latency.
 
 BashMenu's engine includes built-in horizontal delta clustering to mitigate this, but preparing your images with proper quantization ensures the fastest, snappiest navigation possible.
 
@@ -736,13 +729,13 @@ to 80, height to 48. Use a maximum of 16 colors. Set the opacity in Krita to
 100%, turn off Pen if using a mouse (press `<f5>`, select Opacity, uncheck 'Enable Pen
 Settings'). Larger sizes work, but compression will introduce artifacts. If the menu feels
 sluggish with the background image, with the configured theme loaded, open the theme editor
-and press `<f2>` to open the background modal. Try setting opacity to 0.5, clustering to 32, 
-and quantization to 16.
+(`F8`) and press `<F4>` (or navigate to `Wallpaper Image` under `Theme:`) to configure background
+wallpaper. Try setting opacity to 0.5, clustering to 32, and quantization to 16 in `bashmenu.yml`.
 
 ##### Recommended Image Types
 
 1. **Flat Vector & Minimalist Art (Fastest — < 3 ms redraws)**
-   - Artworks featuring broad horizontal color bands, vector silhouettes, flat-color anime/landscape art, or clean skies (such as `twilight.png`) yield the fewest Rich segments and provide instantaneous keyboard response.
+   - Artworks featuring broad horizontal color bands, vector silhouettes, flat-color anime/landscape art, or clean skies (such as `twilight.png`) yield the fewest color escape transitions and cell modifications, providing instantaneous keyboard response.
 
 2. **Photographs & Complex Artwork**
    - Natural photos containing fine grain or dithering stippling should be pre-processed to remove high-frequency noise and prevent Floyd-Steinberg dither stippling.
@@ -785,7 +778,7 @@ Before using photographs as wallpapers, optimize them using ImageMagick (`conver
     -scale 480x360\! \
     assets/wallpapers/wallpaper.png
   ```
-  - Directly matches the terminal's native half-block character resolution (80×48), yielding ultra-low Rich span counts and a distinctive retro aesthetic.
+  - Directly matches the terminal's native half-block character resolution (80×48), yielding minimal ANSI escape sequences and instantaneous rendering with a distinctive retro aesthetic.
 
 ##### `pngquant` Recommendations
 
@@ -814,7 +807,7 @@ pngquant --nofs 24 --speed 1 --ext -clean.png input.png
 | `confirm` | Triggers a Yes/No confirmation dialog | `message`, `on_yes`, `on_no` |
 | `message` | Displays an informational pop-up dialog | `message`, `title` |
 | `toast` | Displays a non-blocking floating toast notification | `message`, `seconds`, `title` |
-| `python` | Dispatches internal Python utility function | `action` |
+| `python` | Executes Python script or expression | `action`, `script` |
 | `inject_block` | Installs/removes modular code segments | `template`, `target`, `block_id` |
 | `theme_selector`| Launches list of registered themes | *(automatic)* |
 | `{divider}` | Renders an aesthetic horizontal line separator styled by the theme | *(automatic)* |
@@ -865,15 +858,15 @@ Notes formatted in Markdown support interactive GFM task-list checkboxes (`- [ ]
 
 #### Help Gutter & Note Actions
 * **Create Note (`[N]`):** When entering a notebook submenu, the bottom help gutter displays `[N]: New Note`. Pressing `n` or `N` prompts for a note title and opens the note editor.
-* **View Note (`ENTER`):** Opens `NoteViewerModalScreen` with wrapped, formatted Markdown or BBCode text and interactive widgets.
+* **View Note (`ENTER`):** Opens `NoteViewerModal` with wrapped, formatted Markdown or BBCode text and interactive widgets.
 * **Copy Note (`[C]` / `Ctrl+C`):** Copies the raw note markdown text to the system clipboard and shared cutbuffer, enabling instant cross-interface pasting into the built-in text editor (`bashedit`), terminal prompts, or external applications.
-* **Edit Note (`[E]`):** Accessible directly from the note viewer to modify raw note text using Textual's full-screen TextArea editor modal.
+* **Edit Note (`[E]`):** Accessible directly from the note viewer to modify raw note text using the full-screen `NoteEditorModal` editor modal.
 * **Delete Note (`[D]`):** In a notebook submenu, the help gutter displays `[D]: Delete`. Pressing `d` or `D` on a selected note prompts confirmation before removing it. Outside of a notebook, `[D]` is inactive and omitted from the gutter.
 
 #### Smart Auto-Formatting, Ghost Text & Clipboard Interoperability
-* **Auto-Formatting on Enter:** When editing notes in `NoteEditorModalScreen`, pressing `Enter` automatically continues checkboxes (`- [ ]`), unordered bullets (`- `, `* `, `+ `), numbered lists (`1. ` -> `2. `), and blockquotes (`> `). Pressing `Enter` on an empty marker clears the marker (smart de-escalation).
+* **Auto-Formatting on Enter:** When editing notes in `NoteEditorModal`, pressing `Enter` automatically continues checkboxes (`- [ ]`), unordered bullets (`- `, `* `, `+ `), numbered lists (`1. ` -> `2. `), and blockquotes (`> `). Pressing `Enter` on an empty marker clears the marker (smart de-escalation).
 * **Faint Ghost Text & Tab Completion:** When starting a checkbox marker (e.g., typing `- [ `), faint ghost text appears suggesting `] ` which can be completed by pressing `Tab`.
-* **Unified Cutbuffer & Clipboard:** Notes and the built-in text editor (`bashedit.py`) share a unified clipboard subsystem utilizing platform tools (`wl-copy`/`wl-paste`, `xclip`, `xsel`, `pbcopy`/`pbpaste`, `termux`) with seamless fallback to `~/.cache/bashmenu/cutbuffer.txt` on headless systems.
+* **Unified Cutbuffer & Clipboard:** Notes and the built-in text editor (`bashedit`) share a unified clipboard subsystem utilizing platform tools (`wl-copy`/`wl-paste`, `xclip`, `xsel`, `pbcopy`/`pbpaste`, `termux`) with seamless fallback to `~/.cache/bashmenu/cutbuffer.txt` on headless systems.
 
 #### Swap File Recovery & 3-Way Merge Conflict Resolution
 To prevent data loss from terminal crashes, system reboots, or concurrent edits, the notebook editor maintains per-note swap files stored in the same directory as the notebook:
@@ -1059,10 +1052,10 @@ The application includes a rich formatting parser allowing developers to use inl
 
 | Tag | Description |
 | :--- | :--- |
-| `[b]text[/b]` | Renders text in **bold** (Rich `Style(bold=True)`). |
-| `[u]text[/u]` | Renders text with an **underline** (Rich `Style(underline=True)`). |
-| `[dim]text[/dim]` | Renders text with **dimmed** contrast (Rich `Style(dim=True)`). |
-| `[reverse]text[/reverse]` | Renders text in **reversed** foreground/background contrast (Rich `Style(reverse=True)`). |
+| `[b]text[/b]` | Renders text in **bold**. |
+| `[u]text[/u]` | Renders text with an **underline**. |
+| `[dim]text[/dim]` | Renders text with **dimmed** contrast. |
+| `[reverse]text[/reverse]` | Renders text in **reversed** foreground/background contrast. |
 | `[color=color_name]text[/color]` | Renders text in a custom theme color. |
 | `[table width=100%][tr][th]Col[/th][/tr][tr][td]Val[/td][/tr][/table]` | Renders an aligned Unicode box-drawing table (`┌─┬─┐`, `│ │ │`, `├─┼─┤`, `└─┴─┘`) with auto-sized or percentage column widths (e.g. 50/50, 33/33/33), bold headers, and in-cell text wrapping. |
 | `[list][*]Item 1[*]Item 2[/list]` | Renders an unordered bulleted list (`• Item 1`). Closing `[/*]` tags are optional. |
@@ -1141,24 +1134,24 @@ The template is injected wrapped in distinct boundaries:
 Selecting **Yes** installs or updates the settings block; selecting **No**
 uninstalls (erases) the code block cleanly from the target file.
 
-### 7.2 In-Process Python Plugins (`external: false`)
-You can run any custom python script directly in-process, preventing terminal
-clipping and console flashes:
-```yaml
-- label: Launch Custom Diagnostic TUI
-  type: script
-  action: "diagnostics_tui.py"
-  external: false
-```
-*Plugin requirement:* The python script must implement a Textual `Screen` subclass
-that is pushed via `screen.app.push_screen()`.
+### 7.2 Subprocess Execution Modes (`execution_mode`, `stream`, `interactive`)
+HA Bash Menu supports three distinct subprocess execution modes for commands and scripts:
+1. **Console Mode (`execution_mode: console` / default):**
+   Suspends the TUI raw mode and executes directly in the system terminal.
+   - `alt_buffer: true` (default): Runs in the terminal's alternate screen buffer, preserving underlying terminal lines.
+   - `quiet: true`: Suppresses the "Press [ENTER] to return to menu..." prompt upon completion, returning immediately to the menu.
+2. **Streaming Output Mode (`stream: true` or `execution_mode: streaming`):**
+   Executes the command in the background and streams standard output and standard error in real-time into an active `StreamOutputModal` dialog window inside the TUI.
+   - `window_percent: N`: Configures the floating modal dialog size as a percentage of the terminal window (e.g. `window_percent: 80`; clamped between 20% and 100%, defaults to 65%).
+3. **Interactive Mode (`interactive: true` or `execution_mode: interactive`):**
+   Launches an interactive child terminal session with piped standard input, allowing live user interaction within the streaming modal view.
 
 ### 7.3 Multi-Platform Support & Environment Detection
 HA Bash Menu incorporates an environment detection engine in `bashmenu.sh` enabling graceful degradation and multi-platform compatibility without manual configuration.
 
-- **Universal Shebangs:** All `.py` and `.sh` files leverage `#!/usr/bin/env` for maximum portability.
+- **Universal Shebangs:** All shell scripts and extension utilities leverage `#!/usr/bin/env bash` for maximum portability.
 - **Cross-Platform Package Wrappers:** By routing operations through wrappers like `scripts/system_update.sh`, the engine automatically translates dependency installs to the correct local package manager (`apt`, `dnf`, `pacman`, `pkg`, or `brew`), and smartly adds or omits `sudo` depending on whether it is running in standard Linux, macOS, WSL, or containerized user-spaces like Termux.
-- **Graceful Degradation:** Features dependent on low-level system daemon frameworks (e.g., `kmscon` or `systemd-resolved` DNS modification) check for Termux/WSL and fail gracefully, rather than crashing with environment errors.
+- **Graceful Degradation:** Features dependent on low-level system daemon frameworks (e.g., `systemd-resolved` DNS modification) check for Termux/WSL and fail gracefully, rather than crashing with environment errors.
 - **Direct Linux Framebuffer Support (`/dev/fb0`):** When executed on raw Linux Virtual Consoles (`/dev/tty1`-`/dev/tty6`, `TERM=linux`, or `console`), HA Bash Menu can directly access the Linux framebuffer device without external emulators (such as `fbterm` or `kmscon`). By directly querying variable and fixed screen info (`FBIOGET_VSCREENINFO`, `FBIOGET_FSCREENINFO` ioctls) and memory mapping (`mmap`) the video buffer, the engine renders TrueColor 32-bit (ARGB/XRGB/BGRA) and 16-bit (RGB565) background graphics directly on minimal netbooks and embedded Linux devices. In accordance with project architecture invariants, direct framebuffer rendering is completely self-contained within native Rust crate modules and requires zero external tool installations.
 
 ### 7.4 Background Footer Plugins Architecture & Creation Guide
@@ -1166,7 +1159,7 @@ HA Bash Menu incorporates an environment detection engine in `bashmenu.sh` enabl
 HA Bash Menu features an asynchronous, background-cached plugin architecture for displaying live feeds, status information, or quotes directly above the help footer.
 
 #### How Background Plugins Work:
-1. **Asynchronous Daemon Execution**: Plugin scripts run in background daemon threads (`threading.Thread(daemon=True)`) with thread-safe locking (`RLock`). This ensures network requests or slow command calls never freeze or lag the main TUI rendering loop.
+1. **Asynchronous Execution & Worker Threads**: Plugin scripts run in detached background worker threads (`std::thread::spawn`) with thread-safe `Arc<RwLock<...>>` memory caching and channel communication. This ensures network requests or slow command calls never freeze or lag the main TUI rendering loop.
 2. **In-Memory Caching & Sleep Interval**: The output of each plugin script is cached in memory. The `sleep` setting (default: `300` seconds) controls how long cached output remains valid before spawning a background refresh thread. Setting `sleep: 0` forces live execution on every frame tick.
 3. **Responsive Vertical Layout Priority**: Menu navigation options hold top rendering priority. The engine calculates available screen space between the menu options list and help footer (`max_plugin_rows`). On constrained terminal windows, plugin output lines are automatically wrapped, truncated, or hidden so menu navigation remains unhindered.
 4. **Pretext & Posttext Wrapping**: Optional `pretext` and `posttext` strings can be rendered before and after script output. These support full placeholder interpolation (including `{user.divider}` or `{divider}` for horizontal rule lines).
