@@ -32,8 +32,8 @@ items:
           icon: '{nf::#f422}'
           action: '{scripts_dir}/glyphs.sh {param}'
           prompt: 'Enter search term:'
-          stream: true
           window_percent: 75
+          stream: true
       - Unicode Block Explorer:
           type: script
           icon: '{nf::#f0ed0:}'
@@ -158,14 +158,14 @@ items:
           type: inject_block
           icon: '{nf::#ead3}'
           template: '{templates_dir}/autoexec.sh.tmpl'
-          block_id: launch_autoexec
           target: ~/.bashrc
+          block_id: launch_autoexec
       - Install bash_aliases From Template:
           type: inject_block
           icon: '{nf::#eeb6}'
-          target: ~/.bash_aliases
-          template: '{templates_dir}/bash_aliases.tmpl'
           block_id: bash_aliases
+          template: '{templates_dir}/bash_aliases.tmpl'
+          target: ~/.bash_aliases
       - Install Basics [vim mc htop glow gum curl wget git shellcheck shfmt jq yq sc cmatrix]:
           type: submenu
           icon: '{nf::#ed5b}'
@@ -176,14 +176,14 @@ items:
           submenu:
             title: Install Basics [vim mc htop glow gum curl wget git shellcheck shfmt jq yq]
             items: []
-          external: false
-          no_formatting: false
           stream: true
+          no_formatting: false
           exec_mode: streaming
-          masked: false
-          show_whitespace: false
+          external: false
           refresh: false
+          show_whitespace: false
           window_percent: 65
+          masked: false
       - Install Cheatsheets From Private Repo [https://github.com/HappyAmos/cheat.git]:
           type: script
           icon: '{nf::#f02aa}'
@@ -203,10 +203,10 @@ items:
           tabstop: 4
           refresh: false
           show_whitespace: false
-          stream: false
           exec_mode: console
           no_formatting: false
           external: false
+          stream: false
           masked: false
       - Install Nerd Fonts [curl https://raw.githubusercontent.com/officialrajdeepsingh/nerd-fonts-installer/main/install.sh]:
           type: command
@@ -237,6 +237,7 @@ items:
           submenu:
             title: New submenu
             items:
+            - '{divider}': null
             - Rust Book:
                 type: command
                 icon: '{nf::#f02d}'
@@ -251,6 +252,13 @@ items:
                 interactive: true
                 quiet: false
                 alt_buffer: true
+            - Google.com:
+                type: script
+                icon: '{nf::#f02ad}'
+                script: '{scripts_dir}/webopen.sh https://google.com'
+                interactive: true
+                quiet: false
+                alt_buffer: true
             - Textfiles (VT100 Art And Animations):
                 type: script
                 icon: '{nf::#ea85}'
@@ -261,20 +269,29 @@ items:
                 quiet: true
                 alt_buffer: true
                 tabstop: 4
-                stream: false
-                no_formatting: false
+                external: true
                 masked: false
                 exec_mode: console
+                stream: false
+                no_formatting: false
                 show_whitespace: false
-                external: true
                 refresh: false
-            - Google.com:
-                type: script
-                icon: '{nf::#f02ad}'
-                script: '{scripts_dir}/webopen.sh https://google.com'
+            - '{divider}': null
+            - Back:
+                type: back
+                icon: '{nf::#f048}'
                 interactive: true
                 quiet: false
                 alt_buffer: true
+                tabstop: 4
+                external: false
+                refresh: false
+                exec_mode: console
+                no_formatting: false
+                stream: false
+                masked: false
+                show_whitespace: false
+            - '{divider}': null
       - Launch GUI Web Browser [{scripts_dir}/webopen.sh --gui]:
           type: command
           icon: '{nf::#f268:}'
@@ -315,13 +332,13 @@ items:
           quiet: false
           alt_buffer: true
           tabstop: 4
-          exec_mode: console
-          stream: false
+          show_whitespace: false
           no_formatting: false
+          stream: false
+          external: false
           masked: false
           refresh: false
-          show_whitespace: false
-          external: false
+          exec_mode: console
       - '{divider}': null
       - Back To Main Menu:
           type: back
@@ -329,21 +346,21 @@ items:
           quiet: false
           alt_buffer: true
           tabstop: 4
-          masked: false
-          external: false
           show_whitespace: false
-          stream: false
-          refresh: false
           exec_mode: console
+          stream: false
           no_formatting: false
+          external: false
+          refresh: false
+          masked: false
       - '{divider}': null
     external: false
+    exec_mode: console
     masked: false
     stream: false
-    refresh: false
-    no_formatting: false
     show_whitespace: false
-    exec_mode: console
+    no_formatting: false
+    refresh: false
 - Network Utilities:
     type: submenu
     icon: '{nf::#ef09:}'
@@ -354,6 +371,17 @@ items:
       title: Network Utilities Options
       items:
       - '{divider}': null
+      - Configure DNS servers [dnsconfig.sh]:
+          type: script
+          icon: '{nf::#f0b8c}'
+          action: '{scripts_dir}/dnsconfig.sh {settings.dns.ipv4.primary} {settings.dns.ipv4.secondary} {settings.dns.ipv6.primary} {settings.dns.ipv6.secondary}'
+          stream: true
+      - Configure Ping Target [{settings.ping_target}]:
+          type: config
+          icon: '{nf::#f11ab}'
+          prompt: 'Enter Hostname or IP Address:'
+          key: settings.ping_target
+          title: Edit Ping Target
       - IP Information:
           type: script
           icon: '{nf::#F0A5F:}'
@@ -375,8 +403,8 @@ items:
             type: message
             title: Task Cancelled
             message: Ping request was cancelled by user.
-          title: Confirm Ping Task
           message: Start pinging target host {settings.ping_target}?
+          title: Confirm Ping Task
       - Show Configured DNS [getdns.py]:
           type: script
           icon: '{nf::#f01d6}'
@@ -420,8 +448,8 @@ items:
                 type: config
                 icon: '{nf::#ebf3}'
                 prompt: 'Enter status gutter format. Available options: {user}, {battery}, {date}, {date_time_24}, {date_time_24_short}, {date_time_12}, {date_time_12_short}, {host}, {user-mode}, {version}, {utc_seconds}'
-                key: settings.status_gutter
                 title: Configure Status Gutter
+                key: settings.status_gutter
             - Edit Shortcuts File [{shortcuts_file}]:
                 type: editor
                 icon: '{nf::#f11c}'
@@ -458,14 +486,14 @@ items:
                 quiet: false
                 alt_buffer: true
                 tabstop: 4
+                show_whitespace: false
+                no_formatting: false
+                masked: false
+                key: app.settings.inactivity_timeout.milliseconds
+                external: false
+                refresh: false
                 exec_mode: console
                 stream: false
-                key: app.settings.inactivity_timeout.milliseconds
-                masked: false
-                show_whitespace: false
-                external: false
-                no_formatting: false
-                refresh: false
             - Edit Screensaver Program [{app.settings.inactivity_timeout.command}]:
                 type: config
                 icon: '{nf::#f093a}'
@@ -475,13 +503,13 @@ items:
                 alt_buffer: true
                 tabstop: 4
                 exec_mode: console
-                masked: false
                 key: app.settings.inactivity_timeout.command
-                show_whitespace: false
-                stream: false
-                no_formatting: false
                 external: false
+                show_whitespace: false
                 refresh: false
+                no_formatting: false
+                masked: false
+                stream: false
             - Test Configured Screen Saver [{app.settings.inactivity_timeout.command}]:
                 type: command
                 icon: '{nf::#f093a}'
@@ -491,13 +519,13 @@ items:
                 quiet: true
                 alt_buffer: true
                 tabstop: 4
+                show_whitespace: false
                 no_formatting: false
-                masked: false
+                exec_mode: console
                 refresh: false
                 stream: false
-                exec_mode: console
-                show_whitespace: false
                 external: false
+                masked: false
             - Edit Scripts [{scripts_dir}]:
                 type: editor
                 icon: '{nf::#eae9}'
@@ -519,15 +547,22 @@ items:
                 alt_buffer: true
                 tabstop: 4
                 show_whitespace: true
-            - Edit Themes File [bashmenu.themes]:
+            - Edit Themes File [{bashmenu_dir}/bashmenu.themes]:
                 type: editor
                 icon: '{nf::#e22b}'
-                action: bashmenu.themes
+                action: '{bashmenu_dir}/bashmenu.themes'
                 file: '{bashmenu_dir}/bashmenu.themes'
                 interactive: true
                 quiet: false
                 alt_buffer: true
                 tabstop: 4
+                exec_mode: console
+                no_formatting: false
+                masked: false
+                refresh: false
+                stream: false
+                show_whitespace: false
+                external: false
             - Editor Tab to Spaces Mode [{settings.tab_to_spaces}]:
                 type: toggle
                 icon: '{nf::#ec3c}'
@@ -549,8 +584,8 @@ items:
             - Enable Nerd Fonts [{settings.use_nerd_fonts}]:
                 type: toggle
                 icon: '{nf::#f031}'
-                key: settings.use_nerd_fonts
                 title: Toggle Nerd Fonts
+                key: settings.use_nerd_fonts
                 message: Enable colorful menu emojis and Nerd Fonts?
             - Help Gutter Hover Delay [[{app.settings.help_gutter_delay}] seconds]:
                 type: config
@@ -559,8 +594,8 @@ items:
                 interactive: true
                 quiet: false
                 alt_buffer: true
-                key: app.settings.help_gutter_delay
                 title: Configure Help Gutter Hover Delay
+                key: app.settings.help_gutter_delay
             - Linux Framebuffer Support [{settings.framebuffer}]:
                 type: radio
                 icon: '{nf::#f2db}'
@@ -569,6 +604,7 @@ items:
                 interactive: true
                 quiet: false
                 alt_buffer: true
+                key: settings.framebuffer
                 options:
                 - label: Auto (Detect /dev/fb0 on Linux console)
                   value: auto
@@ -577,7 +613,6 @@ items:
                 - label: Disabled (Standard terminal TUI rendering)
                   value: 'false'
                 title: Linux Framebuffer Support [{settings.framebuffer}]
-                key: settings.framebuffer
             - Menu Transition Effect [{settings.transition}]:
                 type: radio
                 icon: '{nf::#f0d0}'
@@ -586,6 +621,7 @@ items:
                 interactive: true
                 quiet: false
                 alt_buffer: true
+                title: Return Transition Effect [{settings.transition}]
                 options:
                 - label: Instant (Synchronized DEC Mode 2026 buffered redraw)
                   value: instant
@@ -609,7 +645,6 @@ items:
                   value: wipedown
                 - label: None (Standard immediate redraw)
                   value: none
-                title: Return Transition Effect [{settings.transition}]
                 key: settings.transition
             - Menu Transition Speed [{settings.transition_speed}]:
                 type: radio
@@ -658,14 +693,14 @@ items:
                   value: normal
                 - label: Slow (~120ms, deliberate 40ms/step)
                   value: slow
-                title: Modal Animation Speed [{settings.modal_animation_speed}]
                 key: settings.modal_animation_speed
+                title: Modal Animation Speed [{settings.modal_animation_speed}]
             - Nerd Font Display Width [{settings.nerd_font_width}]:
                 type: config
                 icon: '{nf::#f07e}'
                 prompt: 'Enter Nerd Font character width mode (auto, 1, 2):'
-                title: Configure Nerd Font Glyph Width
                 key: settings.nerd_font_width
+                title: Configure Nerd Font Glyph Width
             - Pager Text Editor [{settings.pager_editor}]:
                 type: radio
                 icon: '{nf::#f044}'
@@ -674,7 +709,7 @@ items:
                 interactive: true
                 quiet: false
                 alt_buffer: true
-                title: Pager Text Editor [{settings.pager_editor}]
+                key: settings.pager_editor
                 options:
                 - label: Default System Editor ($EDITOR)
                   value: default
@@ -682,7 +717,7 @@ items:
                   value: builtin
                 - label: Vim
                   value: vim
-                key: settings.pager_editor
+                title: Pager Text Editor [{settings.pager_editor}]
             - Status Gutter Refresh Rate [[{app.settings.refresh_interval}] seconds]:
                 type: config
                 icon: '{nf:@:#f1452}'
@@ -698,8 +733,8 @@ items:
                 interactive: true
                 quiet: false
                 alt_buffer: true
-                key: app.settings.toast_timeout
                 title: Configure Toast Message Timeout
+                key: app.settings.toast_timeout
             - '{divider}': null
             - Back to Options & Settings:
                 type: back
@@ -733,13 +768,13 @@ items:
           quiet: true
           alt_buffer: true
           tabstop: 4
-          external: false
-          exec_mode: console
-          stream: false
-          masked: false
-          show_whitespace: false
-          no_formatting: false
           refresh: false
+          masked: false
+          exec_mode: console
+          no_formatting: false
+          show_whitespace: false
+          external: false
+          stream: false
       - Update Grub:
           type: command
           icon: '{nf::#f11e7}'
@@ -749,13 +784,13 @@ items:
           quiet: true
           tabstop: 4
           window_percent: 65
-          stream: true
-          masked: false
-          no_formatting: false
-          refresh: false
-          external: false
-          show_whitespace: false
           exec_mode: streaming
+          external: false
+          masked: false
+          stream: true
+          refresh: false
+          no_formatting: false
+          show_whitespace: false
       - '{divider}': null
       - Back to Main Menu:
           type: back
@@ -847,10 +882,10 @@ items:
           prompt: 'Enter your postal code/zip code:'
           interactive: false
           quiet: true
-          picker: none
-          title: Weather Location [{user.postal_code}]
           key: user.postal_code
           stream: true
+          title: Weather Location [{user.postal_code}]
+          picker: none
       - Weather -> 3 Day [curl wttr.in/{user.postal_code}]:
           type: command
           icon: '{nf::#eef0:}'
@@ -880,13 +915,13 @@ items:
     quiet: true
     alt_buffer: true
     tabstop: 4
-    exec_mode: console
-    refresh: false
-    masked: false
     external: false
-    stream: false
-    show_whitespace: false
+    masked: false
     no_formatting: false
+    exec_mode: console
+    stream: false
+    refresh: false
+    show_whitespace: false
 - Exit Menu:
     type: exit
     icon: '{nf::#f0a48:}'

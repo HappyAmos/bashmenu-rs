@@ -21,76 +21,76 @@ abstract:
     char: ▌
     timeout: 2.0
   '256':
-    toast_error:
-    - 196
+    gutter:
+    - 228
+    - -1
+    background: 16
+    selection:
+    - '#8e8eb3'
+    - 17
+    whitespace:
+    - 238
+    - -1
+    plugin:
+    - 229
+    - -1
+    help_text:
+    - 234
+    - -1
+    scrollbar:
+    - 103
+    - 236
+    window_close_button:
+    - 203
     - -1
     highlight:
     - '#8e8eb3'
     - 17
-    plugin:
-    - 229
-    - -1
-    gutter:
-    - 228
-    - -1
-    selection:
-    - '#8e8eb3'
-    - 17
-    text:
-    - 255
-    - -1
-    shadow:
-    - 236
-    - 16
     button_primary:
     - 16
     - 103
     button_error:
     - 255
     - 196
-    window_close_button:
-    - 203
+    button_cancel:
+    - 255
+    - 238
+    footer:
+    - 61
     - -1
-    background: 16
+    divider:
+    - 61
+    - -1
+    toast_info:
+    - 103
+    - -1
+    accent:
+    - 61
+    - -1
+    highlight_text: '#8e8eb3'
+    border:
+    - 61
+    - -1
+    shadow:
+    - 236
+    - 16
+    shortcut_key:
+    - 61
+    - -1
     title:
     - 14
     - -1
     button_success:
     - 255
     - 40
-    divider:
-    - 61
+    toast_error:
+    - 196
     - -1
-    help_text:
-    - 234
+    text:
+    - 255
     - -1
     toast_warning:
     - 214
-    - -1
-    shortcut_key:
-    - 61
-    - -1
-    toast_info:
-    - 103
-    - -1
-    border:
-    - 61
-    - -1
-    accent:
-    - 61
-    - -1
-    highlight_text: '#8e8eb3'
-    footer:
-    - 61
-    - -1
-    scrollbar:
-    - 103
-    - 236
-    button_cancel:
-    - 255
-    - 238
-    whitespace:
-    - 238
     - -1
   '16':
     button_cancel:
@@ -99,116 +99,90 @@ abstract:
     footer:
     - COLOR_BRIGHT_BLUE
     - -1
-    window_close_button:
-    - COLOR_BRIGHT_RED
+    border:
+    - COLOR_BRIGHT_BLUE
     - -1
-    whitespace:
+    shortcut_key:
+    - COLOR_BRIGHT_BLUE
+    - -1
+    button_primary:
     - COLOR_BLACK
-    - -1
-    plugin:
-    - COLOR_BRIGHT_WHITE
+    - COLOR_BRIGHT_BLUE
+    accent:
+    - COLOR_BRIGHT_BLUE
     - -1
     highlight:
     - COLOR_BRIGHT_BLUE
     - COLOR_BLACK
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
-    title:
-    - COLOR_BRIGHT_CYAN
-    - -1
-    scrollbar:
-    - COLOR_BRIGHT_BLUE
-    - COLOR_BLACK
-    button_primary:
-    - COLOR_BLACK
-    - COLOR_BRIGHT_BLUE
-    border:
-    - COLOR_BRIGHT_BLUE
-    - -1
-    shortcut_key:
-    - COLOR_BRIGHT_BLUE
-    - -1
-    toast_info:
-    - COLOR_BRIGHT_BLUE
-    - -1
-    gutter:
-    - COLOR_BRIGHT_YELLOW
-    - -1
-    button_success:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_BRIGHT_GREEN
-    selection:
-    - COLOR_BRIGHT_BLUE
-    - COLOR_BLACK
-    toast_error:
-    - COLOR_BRIGHT_RED
-    - -1
-    highlight_text: COLOR_BRIGHT_BLUE
-    button_error:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_BRIGHT_RED
     text:
     - COLOR_BRIGHT_WHITE
     - -1
-    divider:
-    - COLOR_BRIGHT_BLUE
+    window_close_button:
+    - COLOR_BRIGHT_RED
     - -1
-    help_text:
-    - COLOR_BLACK
-    - -1
-    accent:
-    - COLOR_BRIGHT_BLUE
-    - -1
-    toast_warning:
-    - COLOR_BRIGHT_YELLOW
-    - -1
-    background: COLOR_BLACK
-  '8':
-    footer:
-    - COLOR_BLUE
+    title:
+    - COLOR_BRIGHT_CYAN
     - -1
     whitespace:
     - COLOR_BLACK
     - -1
-    selection:
-    - COLOR_BLUE
-    - COLOR_BLACK
-    button_cancel:
-    - COLOR_WHITE
-    - COLOR_BLACK
+    highlight_text: COLOR_BRIGHT_BLUE
     plugin:
-    - COLOR_WHITE
+    - COLOR_BRIGHT_WHITE
+    - -1
+    scrollbar:
+    - COLOR_BRIGHT_BLUE
+    - COLOR_BLACK
+    divider:
+    - COLOR_BRIGHT_BLUE
+    - -1
+    button_success:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_BRIGHT_GREEN
+    toast_error:
+    - COLOR_BRIGHT_RED
+    - -1
+    gutter:
+    - COLOR_BRIGHT_YELLOW
+    - -1
+    toast_info:
+    - COLOR_BRIGHT_BLUE
     - -1
     button_error:
-    - COLOR_WHITE
-    - COLOR_RED
-    button_primary:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_BRIGHT_RED
+    selection:
+    - COLOR_BRIGHT_BLUE
     - COLOR_BLACK
-    - COLOR_BLUE
-    gutter:
+    background: COLOR_BLACK
+    toast_warning:
+    - COLOR_BRIGHT_YELLOW
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    help_text:
+    - COLOR_BLACK
+    - -1
+  '8':
+    toast_warning:
     - COLOR_YELLOW
     - -1
     scrollbar:
     - COLOR_BLUE
     - COLOR_BLACK
-    border:
-    - COLOR_BLUE
+    background: COLOR_BLACK
+    toast_error:
+    - COLOR_RED
     - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    highlight:
+    - COLOR_BLUE
+    - COLOR_BLACK
     toast_info:
     - COLOR_BLUE
-    - -1
-    shortcut_key:
-    - COLOR_BLUE
-    - -1
-    accent:
-    - COLOR_BLUE
-    - -1
-    button_success:
-    - COLOR_WHITE
-    - COLOR_GREEN
-    toast_warning:
-    - COLOR_YELLOW
     - -1
     window_close_button:
     - COLOR_RED
@@ -216,25 +190,51 @@ abstract:
     title:
     - COLOR_CYAN
     - -1
-    divider:
-    - COLOR_BLUE
+    help_text:
+    - COLOR_BLACK
     - -1
-    highlight_text: COLOR_BLUE
-    toast_error:
-    - COLOR_RED
-    - -1
-    highlight:
+    selection:
     - COLOR_BLUE
     - COLOR_BLACK
+    highlight_text: COLOR_BLUE
+    button_error:
+    - COLOR_WHITE
+    - COLOR_RED
+    accent:
+    - COLOR_BLUE
+    - -1
+    plugin:
+    - COLOR_WHITE
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_BLUE
+    border:
+    - COLOR_BLUE
+    - -1
+    button_success:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    footer:
+    - COLOR_BLUE
+    - -1
     shadow:
     - COLOR_BLACK
     - COLOR_BLACK
-    text:
-    - COLOR_WHITE
+    divider:
+    - COLOR_BLUE
     - -1
-    background: COLOR_BLACK
-    help_text:
+    shortcut_key:
+    - COLOR_BLUE
+    - -1
+    whitespace:
     - COLOR_BLACK
+    - -1
+    gutter:
+    - COLOR_YELLOW
     - -1
   background:
     enabled: true
@@ -273,191 +273,191 @@ alaska-mountain:
     char: ─
     length: '{window_width}'
   '256':
-    background: 235
+    button_error:
+    - 255
+    - 196
+    whitespace:
+    - 236
+    - -1
+    selection:
+    - 16
+    - 252
+    help_text:
+    - 68
+    - -1
+    shadow:
+    - 236
+    - COLOR_BLACK
+    text:
+    - 255
+    - -1
+    shortcut_key:
+    - 145
+    - -1
+    button_primary:
+    - 16
+    - 252
+    button_success:
+    - 255
+    - 40
+    scrollbar:
+    - 252
+    - 236
     border:
     - 239
     - -1
-    button_cancel:
-    - 255
-    - 236
     highlight:
     - 16
     - 252
-    text:
-    - 255
+    divider:
+    - 239
+    - -1
+    window_close_button:
+    - 203
+    - -1
+    title:
+    - 252
+    - -1
+    footer:
+    - 239
+    - -1
+    accent:
+    - 145
     - -1
     gutter:
     - 66
     - -1
-    selection:
-    - 16
-    - 252
-    divider:
-    - 239
-    - -1
-    whitespace:
-    - 236
-    - -1
-    help_text:
-    - 68
-    - -1
-    button_success:
-    - 255
-    - 40
-    title:
-    - 252
-    - -1
-    footer:
-    - 239
-    - -1
-    button_primary:
-    - 16
-    - 252
-    shortcut_key:
-    - 145
-    - -1
-    button_error:
-    - 255
-    - 196
-    accent:
-    - 145
-    - -1
-    shadow:
-    - 236
-    - COLOR_BLACK
-    scrollbar:
-    - 252
-    - 236
-    window_close_button:
-    - 203
-    - -1
+    background: 235
     plugin:
     - 145
     - -1
+    button_cancel:
+    - 255
+    - 236
   '16':
-    shortcut_key:
-    - COLOR_WHITE
-    - -1
-    plugin:
-    - COLOR_WHITE
-    - -1
-    divider:
-    - COLOR_GREY
-    - -1
-    text:
+    button_error:
     - COLOR_BRIGHT_WHITE
-    - -1
-    help_text:
-    - COLOR_WHITE
-    - -1
-    selection:
-    - COLOR_BLACK
-    - COLOR_WHITE
-    scrollbar:
-    - COLOR_WHITE
-    - COLOR_GREY
-    footer:
-    - COLOR_GREY
-    - -1
+    - COLOR_RED
     window_close_button:
     - COLOR_BRIGHT_RED
     - -1
-    accent:
-    - COLOR_WHITE
+    text:
+    - COLOR_BRIGHT_WHITE
     - -1
-    highlight:
+    divider:
+    - COLOR_GREY
+    - -1
+    button_primary:
     - COLOR_BLACK
     - COLOR_WHITE
-    background: COLOR_BLACK
     button_cancel:
     - COLOR_BRIGHT_WHITE
     - COLOR_GREY
-    title:
+    accent:
     - COLOR_WHITE
-    - -1
-    button_error:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_RED
-    gutter:
-    - COLOR_GREY
-    - -1
-    button_success:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_GREEN
-    shadow:
-    - COLOR_GREY
-    - COLOR_BLACK
-    whitespace:
-    - COLOR_GREY
     - -1
     border:
     - COLOR_GREY
     - -1
-    button_primary:
+    highlight:
     - COLOR_BLACK
     - COLOR_WHITE
-  '8':
+    button_success:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_GREEN
+    footer:
+    - COLOR_GREY
+    - -1
+    scrollbar:
+    - COLOR_WHITE
+    - COLOR_GREY
+    shortcut_key:
+    - COLOR_WHITE
+    - -1
+    background: COLOR_BLACK
+    plugin:
+    - COLOR_WHITE
+    - -1
+    help_text:
+    - COLOR_WHITE
+    - -1
+    gutter:
+    - COLOR_GREY
+    - -1
     selection:
     - COLOR_BLACK
     - COLOR_WHITE
+    shadow:
+    - COLOR_GREY
+    - COLOR_BLACK
+    title:
+    - COLOR_WHITE
+    - -1
+    whitespace:
+    - COLOR_GREY
+    - -1
+  '8':
     button_primary:
     - COLOR_BLACK
     - COLOR_WHITE
-    shortcut_key:
+    help_text:
     - COLOR_WHITE
+    - -1
+    gutter:
+    - COLOR_BLACK
     - -1
     divider:
     - COLOR_YELLOW
     - -1
+    scrollbar:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    whitespace:
+    - COLOR_BLACK
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    selection:
+    - COLOR_BLACK
+    - COLOR_WHITE
     highlight:
     - COLOR_BLACK
     - COLOR_WHITE
-    border:
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    shortcut_key:
+    - COLOR_WHITE
+    - -1
+    window_close_button:
     - COLOR_YELLOW
     - -1
     title:
     - COLOR_WHITE
     - -1
-    scrollbar:
-    - COLOR_WHITE
-    - COLOR_BLACK
     accent:
     - COLOR_WHITE
     - -1
+    border:
+    - COLOR_YELLOW
+    - -1
+    button_error:
+    - COLOR_WHITE
+    - COLOR_RED
+    background: COLOR_BLACK
+    footer:
+    - COLOR_YELLOW
+    - -1
+    button_success:
+    - COLOR_WHITE
+    - COLOR_GREEN
     plugin:
     - COLOR_WHITE
     - -1
     button_cancel:
     - COLOR_WHITE
     - COLOR_BLACK
-    button_error:
-    - COLOR_WHITE
-    - COLOR_RED
-    background: COLOR_BLACK
-    button_success:
-    - COLOR_WHITE
-    - COLOR_GREEN
-    footer:
-    - COLOR_YELLOW
-    - -1
-    gutter:
-    - COLOR_BLACK
-    - -1
-    help_text:
-    - COLOR_WHITE
-    - -1
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
-    whitespace:
-    - COLOR_BLACK
-    - -1
-    window_close_button:
-    - COLOR_YELLOW
-    - -1
-    text:
-    - COLOR_WHITE
-    - -1
   background:
     enabled: true
     image: assets/wallpapers/alaska-mountain.png
@@ -470,7 +470,7 @@ alaska-train:
   marquee:
     char: •
     gap: 5
-  indicator: '{nf:@::}'
+  indicator: '{nf:@:#f239:}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -491,9 +491,94 @@ alaska-train:
     gutter_top_tee: ┬
     gutter_bottom_tee: ┴
   '256':
+    button_error:
+    - 255
+    - 196
+    accent:
+    - 110
+    - -1
+    window_close_button:
+    - 203
+    - -1
+    gutter:
+    - 236
+    - -1
+    button_success:
+    - 255
+    - 65
+    highlight:
+    - 15
+    - '#5284ca'
+    selection:
+    - 15
+    - '#5284ca'
+    title:
+    - 189
+    - -1
+    border:
+    - '#578cd3'
+    - -1
     text:
     - 255
     - -1
+    scrollbar:
+    - 189
+    - 236
+    background: '#36392c'
+    help_text:
+    - 110
+    - -1
+    highlight_text: 15
+    footer:
+    - 240
+    - -1
+    plugin:
+    - 110
+    - -1
+    whitespace:
+    - 236
+    - -1
+    shadow:
+    - 236
+    - COLOR_BLACK
+    button_cancel:
+    - 255
+    - 236
+    shortcut_key:
+    - 110
+    - -1
+    button_primary:
+    - 16
+    - 189
+    editor:
+      background: 235
+      header:
+      - 189
+      - -1
+      tab_active:
+      - 16
+      - 189
+      tab_inactive:
+      - 255
+      - -1
+      gutter:
+      - 236
+      - -1
+      text:
+      - 255
+      - -1
+      selection:
+      - 16
+      - 189
+      whitespace:
+      - 236
+      - -1
+      status:
+      - 240
+      - -1
+      footer:
+      - 240
+      - -1
     divider:
     - 240
     - -1
@@ -523,72 +608,6 @@ alaska-train:
       scrollbar:
       - 189
       - 236
-    plugin:
-    - 110
-    - -1
-    title:
-    - 189
-    - -1
-    whitespace:
-    - 236
-    - -1
-    editor:
-      background: 235
-      header:
-      - 189
-      - -1
-      tab_active:
-      - 16
-      - 189
-      tab_inactive:
-      - 255
-      - -1
-      gutter:
-      - 236
-      - -1
-      text:
-      - 255
-      - -1
-      selection:
-      - 16
-      - 189
-      whitespace:
-      - 236
-      - -1
-      status:
-      - 240
-      - -1
-      footer:
-      - 240
-      - -1
-    accent:
-    - 110
-    - -1
-    button_error:
-    - 255
-    - 196
-    scrollbar:
-    - 189
-    - 236
-    background: 235
-    button_cancel:
-    - 255
-    - 236
-    button_success:
-    - 255
-    - 65
-    button_primary:
-    - 16
-    - 189
-    highlight:
-    - 16
-    - 189
-    window_close_button:
-    - 203
-    - -1
-    border:
-    - 240
-    - -1
     menu_editor:
       background: 235
       header:
@@ -612,89 +631,20 @@ alaska-train:
       footer:
       - 240
       - -1
-    footer:
-    - 240
-    - -1
-    shadow:
-    - 236
-    - COLOR_BLACK
-    gutter:
-    - 236
-    - -1
-    shortcut_key:
-    - 110
-    - -1
-    selection:
-    - 16
-    - 189
-    help_text:
-    - 110
-    - -1
   '16':
-    button_primary:
-    - COLOR_BLACK
-    - COLOR_BRIGHT_WHITE
-    window_close_button:
-    - COLOR_BRIGHT_RED
+    border:
+    - COLOR_BRIGHT_BLUE
     - -1
-    shortcut_key:
-    - COLOR_WHITE
-    - -1
-    help_text:
-    - COLOR_WHITE
-    - -1
-    background: COLOR_BLACK
-    gutter:
+    footer:
     - COLOR_GREY
     - -1
     button_success:
     - COLOR_BRIGHT_WHITE
     - COLOR_GREY
-    shadow:
-    - COLOR_GREY
-    - COLOR_BLACK
+    highlight:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_BRIGHT_BLUE
     accent:
-    - COLOR_WHITE
-    - -1
-    editor:
-      background: COLOR_BLACK
-      header:
-      - COLOR_BRIGHT_WHITE
-      - -1
-      tab_active:
-      - COLOR_BLACK
-      - COLOR_BRIGHT_WHITE
-      tab_inactive:
-      - COLOR_BRIGHT_WHITE
-      - -1
-      gutter:
-      - COLOR_GREY
-      - -1
-      text:
-      - COLOR_BRIGHT_WHITE
-      - -1
-      selection:
-      - COLOR_BLACK
-      - COLOR_BRIGHT_WHITE
-      whitespace:
-      - COLOR_GREY
-      - -1
-      status:
-      - COLOR_GREY
-      - -1
-      footer:
-      - COLOR_GREY
-      - -1
-    text:
-    - COLOR_BRIGHT_WHITE
-    - -1
-    divider:
-    - COLOR_GREY
-    - -1
-    scrollbar:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_GREY
-    plugin:
     - COLOR_WHITE
     - -1
     menu_editor:
@@ -720,20 +670,27 @@ alaska-train:
       footer:
       - COLOR_GREY
       - -1
-    button_cancel:
+    scrollbar:
     - COLOR_BRIGHT_WHITE
     - COLOR_GREY
-    title:
-    - COLOR_BRIGHT_WHITE
-    - -1
-    footer:
+    shadow:
     - COLOR_GREY
+    - COLOR_BLACK
+    background: COLOR_GREEN
+    plugin:
+    - COLOR_WHITE
     - -1
     selection:
-    - COLOR_BLACK
     - COLOR_BRIGHT_WHITE
-    border:
+    - COLOR_BRIGHT_BLUE
+    gutter:
     - COLOR_GREY
+    - -1
+    text:
+    - COLOR_BRIGHT_WHITE
+    - -1
+    window_close_button:
+    - COLOR_BRIGHT_RED
     - -1
     modals:
       backdrop:
@@ -761,37 +718,61 @@ alaska-train:
       scrollbar:
       - COLOR_BRIGHT_WHITE
       - COLOR_GREY
-    highlight:
-    - COLOR_BLACK
-    - COLOR_BRIGHT_WHITE
-    button_error:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_RED
     whitespace:
     - COLOR_GREY
     - -1
-  '8':
-    shadow:
+    button_primary:
     - COLOR_BLACK
-    - COLOR_BLACK
-    button_success:
-    - COLOR_WHITE
-    - COLOR_GREEN
+    - COLOR_BRIGHT_WHITE
+    highlight_text: COLOR_BRIGHT_WHITE
+    editor:
+      background: COLOR_BLACK
+      header:
+      - COLOR_BRIGHT_WHITE
+      - -1
+      tab_active:
+      - COLOR_BLACK
+      - COLOR_BRIGHT_WHITE
+      tab_inactive:
+      - COLOR_BRIGHT_WHITE
+      - -1
+      gutter:
+      - COLOR_GREY
+      - -1
+      text:
+      - COLOR_BRIGHT_WHITE
+      - -1
+      selection:
+      - COLOR_BLACK
+      - COLOR_BRIGHT_WHITE
+      whitespace:
+      - COLOR_GREY
+      - -1
+      status:
+      - COLOR_GREY
+      - -1
+      footer:
+      - COLOR_GREY
+      - -1
     shortcut_key:
     - COLOR_WHITE
     - -1
-    border:
-    - COLOR_YELLOW
-    - -1
-    scrollbar:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    plugin:
+    button_error:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_RED
+    help_text:
     - COLOR_WHITE
     - -1
-    text:
-    - COLOR_WHITE
+    divider:
+    - COLOR_GREY
     - -1
+    title:
+    - COLOR_BRIGHT_WHITE
+    - -1
+    button_cancel:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_GREY
+  '8':
     menu_editor:
       background: COLOR_BLACK
       header:
@@ -815,46 +796,9 @@ alaska-train:
       footer:
       - COLOR_YELLOW
       - -1
-    footer:
-    - COLOR_YELLOW
-    - -1
-    divider:
-    - COLOR_YELLOW
-    - -1
-    whitespace:
-    - COLOR_BLACK
-    - -1
-    window_close_button:
-    - COLOR_YELLOW
-    - -1
-    help_text:
+    button_success:
     - COLOR_WHITE
-    - -1
-    highlight:
-    - COLOR_BLACK
-    - COLOR_WHITE
-    button_cancel:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    title:
-    - COLOR_WHITE
-    - -1
-    accent:
-    - COLOR_WHITE
-    - -1
-    gutter:
-    - COLOR_BLACK
-    - -1
-    selection:
-    - COLOR_BLACK
-    - COLOR_WHITE
-    background: COLOR_BLACK
-    button_error:
-    - COLOR_WHITE
-    - COLOR_RED
-    button_primary:
-    - COLOR_BLACK
-    - COLOR_WHITE
+    - COLOR_GREEN
     editor:
       background: COLOR_BLACK
       header:
@@ -910,10 +854,69 @@ alaska-train:
       scrollbar:
       - COLOR_WHITE
       - COLOR_BLACK
+    plugin:
+    - COLOR_WHITE
+    - -1
+    footer:
+    - COLOR_YELLOW
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    selection:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    background: COLOR_GREEN
+    window_close_button:
+    - COLOR_YELLOW
+    - -1
+    scrollbar:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    title:
+    - COLOR_WHITE
+    - -1
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    accent:
+    - COLOR_WHITE
+    - -1
+    button_error:
+    - COLOR_WHITE
+    - COLOR_RED
+    highlight:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    divider:
+    - COLOR_YELLOW
+    - -1
+    shortcut_key:
+    - COLOR_WHITE
+    - -1
+    highlight_text: COLOR_WHITE
+    text:
+    - COLOR_WHITE
+    - -1
+    help_text:
+    - COLOR_WHITE
+    - -1
+    whitespace:
+    - COLOR_BLACK
+    - -1
+    border:
+    - COLOR_BLUE
+    - -1
+    gutter:
+    - COLOR_BLACK
+    - -1
   background:
     enabled: true
     image: assets/wallpapers/alaska-train.jpg
-    opacity: 0.5
+    opacity: 0.8500000238418579
     scaling: stretch
     clustering: 0
     quantization: 1
@@ -947,191 +950,191 @@ amber_crt:
     char: '{ascii:196}'
     length: '{window_width}'
   '256':
-    divider:
-    - 172
+    background: -1
+    whitespace:
+    - 130
+    - -1
+    button_error:
+    - 214
+    - 235
+    window_close_button:
+    - 214
     - -1
     button_success:
     - COLOR_BLACK
     - 214
+    shadow:
+    - 234
+    - COLOR_BLACK
     shortcut_key:
     - 220
     - -1
-    text:
+    title:
     - 214
     - -1
-    window_close_button:
-    - 214
+    gutter:
+    - 130
     - -1
     footer:
     - 172
     - -1
-    border:
-    - 172
-    - -1
-    button_cancel:
-    - 214
-    - 235
-    scrollbar:
-    - 214
-    - 234
-    button_error:
-    - 214
-    - 235
-    shadow:
-    - 234
+    highlight:
     - COLOR_BLACK
-    gutter:
-    - 130
-    - -1
-    plugin:
-    - 172
-    - -1
-    whitespace:
-    - 130
-    - -1
-    accent:
-    - 220
-    - -1
+    - 214
     selection:
     - 0
     - 214
-    highlight:
-    - COLOR_BLACK
+    scrollbar:
     - 214
-    title:
-    - 214
+    - 234
+    divider:
+    - 172
     - -1
     help_text:
     - 220
     - -1
+    accent:
+    - 220
+    - -1
+    plugin:
+    - 172
+    - -1
     button_primary:
     - COLOR_BLACK
     - 214
-    background: -1
+    text:
+    - 214
+    - -1
+    button_cancel:
+    - 214
+    - 235
+    border:
+    - 172
+    - -1
   '16':
+    plugin:
+    - COLOR_YELLOW
+    - -1
+    button_error:
+    - COLOR_YELLOW
+    - COLOR_BLACK
+    background: COLOR_BLACK
+    help_text:
+    - COLOR_YELLOW
+    - -1
     footer:
     - COLOR_YELLOW
     - -1
-    divider:
+    border:
     - COLOR_YELLOW
     - -1
-    highlight:
-    - COLOR_BLACK
-    - COLOR_YELLOW
-    border:
+    gutter:
+    - 8
+    - -1
+    title:
     - COLOR_YELLOW
     - -1
     button_success:
     - COLOR_BLACK
     - COLOR_YELLOW
-    scrollbar:
-    - COLOR_YELLOW
+    button_primary:
     - COLOR_BLACK
-    button_cancel:
+    - COLOR_YELLOW
+    window_close_button:
+    - COLOR_YELLOW
+    - -1
+    scrollbar:
     - COLOR_YELLOW
     - COLOR_BLACK
     text:
     - COLOR_YELLOW
     - -1
-    window_close_button:
-    - COLOR_YELLOW
-    - -1
-    background: COLOR_BLACK
-    shadow:
-    - 8
-    - COLOR_BLACK
-    button_error:
-    - COLOR_YELLOW
-    - COLOR_BLACK
     shortcut_key:
     - COLOR_WHITE
     - -1
-    help_text:
+    divider:
     - COLOR_YELLOW
     - -1
-    selection:
+    button_cancel:
+    - COLOR_YELLOW
     - COLOR_BLACK
-    - COLOR_YELLOW
-    title:
-    - COLOR_YELLOW
-    - -1
-    accent:
-    - COLOR_WHITE
-    - -1
-    button_primary:
+    selection:
     - COLOR_BLACK
     - COLOR_YELLOW
     whitespace:
     - 8
     - -1
-    gutter:
-    - 8
+    accent:
+    - COLOR_WHITE
     - -1
-    plugin:
+    highlight:
+    - COLOR_BLACK
     - COLOR_YELLOW
-    - -1
+    shadow:
+    - 8
+    - COLOR_BLACK
   '8':
+    help_text:
+    - COLOR_YELLOW
+    - -1
+    scrollbar:
+    - COLOR_YELLOW
+    - COLOR_BLACK
+    button_error:
+    - COLOR_YELLOW
+    - COLOR_BLACK
     button_cancel:
     - COLOR_YELLOW
     - COLOR_BLACK
-    title:
+    whitespace:
     - COLOR_YELLOW
     - -1
     border:
     - COLOR_YELLOW
     - -1
+    gutter:
+    - COLOR_YELLOW
+    - -1
     accent:
     - COLOR_WHITE
     - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    footer:
+    - COLOR_YELLOW
+    - -1
+    background: COLOR_BLACK
+    plugin:
+    - COLOR_YELLOW
+    - -1
+    text:
+    - COLOR_YELLOW
+    - -1
+    divider:
+    - COLOR_YELLOW
+    - -1
+    selection:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    highlight:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    window_close_button:
+    - COLOR_YELLOW
+    - -1
+    title:
+    - COLOR_YELLOW
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_YELLOW
     shortcut_key:
     - COLOR_WHITE
     - -1
     button_success:
     - COLOR_BLACK
     - COLOR_YELLOW
-    highlight:
-    - COLOR_BLACK
-    - COLOR_YELLOW
-    text:
-    - COLOR_YELLOW
-    - -1
-    gutter:
-    - COLOR_YELLOW
-    - -1
-    divider:
-    - COLOR_YELLOW
-    - -1
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
-    whitespace:
-    - COLOR_YELLOW
-    - -1
-    button_error:
-    - COLOR_YELLOW
-    - COLOR_BLACK
-    help_text:
-    - COLOR_YELLOW
-    - -1
-    selection:
-    - COLOR_BLACK
-    - COLOR_YELLOW
-    button_primary:
-    - COLOR_BLACK
-    - COLOR_YELLOW
-    plugin:
-    - COLOR_YELLOW
-    - -1
-    footer:
-    - COLOR_YELLOW
-    - -1
-    window_close_button:
-    - COLOR_YELLOW
-    - -1
-    background: COLOR_BLACK
-    scrollbar:
-    - COLOR_YELLOW
-    - COLOR_BLACK
 black-eyed-susans:
   marquee:
     char: •
@@ -1155,20 +1158,8 @@ black-eyed-susans:
     char: ▌
     timeout: 2.0
   '256':
-    whitespace:
-    - 234
-    - -1
-    toast_info:
-    - 136
-    - -1
-    button_cancel:
-    - 255
-    - 234
-    title:
-    - '#c4c4c4'
-    - -1
-    divider:
-    - 220
+    footer:
+    - 240
     - -1
     text:
     - 255
@@ -1176,197 +1167,209 @@ black-eyed-susans:
     plugin:
     - '#0b0700'
     - -1
-    gutter:
-    - 220
-    - -1
-    footer:
-    - 240
-    - -1
-    border:
-    - 214
+    whitespace:
+    - 234
     - -1
     scrollbar:
     - 136
     - 236
-    selection:
-    - 16
-    - 136
+    title:
+    - '#c4c4c4'
+    - -1
     toast_warning:
     - 58
     - -1
+    button_success:
+    - 255
+    - 40
+    button_error:
+    - 255
+    - 95
+    border:
+    - 214
+    - -1
+    toast_info:
+    - 136
+    - -1
+    shadow:
+    - 236
+    - 16
+    highlight:
+    - 16
+    - 136
+    selection:
+    - 16
+    - 136
+    toast_error:
+    - 95
+    - -1
     shortcut_key:
     - 130
+    - -1
+    button_cancel:
+    - 255
+    - 234
+    button_primary:
+    - 16
+    - 136
+    help_text:
+    - 220
+    - -1
+    background: '#140c01'
+    gutter:
+    - 220
+    - -1
+    divider:
+    - 220
     - -1
     window_close_button:
     - 203
     - -1
-    button_primary:
-    - 16
-    - 136
-    highlight:
-    - 16
-    - 136
-    button_error:
-    - 255
-    - 95
-    toast_error:
-    - 95
-    - -1
-    background: '#140c01'
-    button_success:
-    - 255
-    - 40
     accent:
     - 130
     - -1
-    help_text:
-    - 220
-    - -1
-    shadow:
-    - 236
-    - 16
   '16':
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
-    shortcut_key:
+    accent:
     - COLOR_BRIGHT_YELLOW
     - -1
-    border:
-    - COLOR_BRIGHT_YELLOW
-    - -1
-    divider:
-    - COLOR_BRIGHT_YELLOW
-    - -1
-    toast_info:
-    - COLOR_BRIGHT_YELLOW
-    - -1
-    background: COLOR_BLACK
     button_primary:
     - COLOR_BLACK
     - COLOR_BRIGHT_YELLOW
-    title:
-    - COLOR_WHITE
-    - -1
-    plugin:
-    - COLOR_BLACK
-    - -1
-    highlight:
-    - COLOR_BLACK
-    - COLOR_BRIGHT_YELLOW
-    toast_warning:
-    - COLOR_YELLOW
-    - -1
-    whitespace:
-    - COLOR_BLACK
-    - -1
-    button_success:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_BRIGHT_GREEN
-    window_close_button:
-    - COLOR_BRIGHT_RED
-    - -1
-    help_text:
-    - COLOR_BRIGHT_YELLOW
-    - -1
-    selection:
-    - COLOR_BLACK
-    - COLOR_BRIGHT_YELLOW
-    text:
-    - COLOR_BRIGHT_WHITE
-    - -1
     footer:
     - COLOR_GREY
     - -1
-    button_error:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_RED
-    accent:
-    - COLOR_BRIGHT_YELLOW
-    - -1
     button_cancel:
     - COLOR_BRIGHT_WHITE
     - COLOR_BLACK
-    toast_error:
-    - COLOR_RED
-    - -1
-    gutter:
-    - COLOR_BRIGHT_YELLOW
-    - -1
-    scrollbar:
-    - COLOR_BRIGHT_YELLOW
-    - COLOR_BLACK
-  '8':
-    button_error:
-    - COLOR_WHITE
-    - COLOR_RED
-    highlight:
-    - COLOR_BLACK
-    - COLOR_YELLOW
-    toast_info:
-    - COLOR_YELLOW
-    - -1
-    divider:
-    - COLOR_YELLOW
-    - -1
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
-    plugin:
-    - COLOR_BLACK
-    - -1
     text:
-    - COLOR_WHITE
-    - -1
-    button_primary:
-    - COLOR_BLACK
-    - COLOR_YELLOW
-    toast_error:
-    - COLOR_RED
-    - -1
-    button_cancel:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    accent:
-    - COLOR_YELLOW
-    - -1
-    footer:
-    - COLOR_BLACK
-    - -1
-    help_text:
-    - COLOR_YELLOW
-    - -1
-    window_close_button:
-    - COLOR_RED
-    - -1
-    title:
-    - COLOR_WHITE
-    - -1
-    shortcut_key:
-    - COLOR_YELLOW
-    - -1
-    gutter:
-    - COLOR_YELLOW
+    - COLOR_BRIGHT_WHITE
     - -1
     toast_warning:
     - COLOR_YELLOW
     - -1
-    scrollbar:
-    - COLOR_YELLOW
+    plugin:
     - COLOR_BLACK
-    selection:
-    - COLOR_BLACK
-    - COLOR_YELLOW
+    - -1
+    title:
+    - COLOR_WHITE
+    - -1
     background: COLOR_BLACK
     whitespace:
     - COLOR_BLACK
     - -1
+    selection:
+    - COLOR_BLACK
+    - COLOR_BRIGHT_YELLOW
+    divider:
+    - COLOR_BRIGHT_YELLOW
+    - -1
+    shortcut_key:
+    - COLOR_BRIGHT_YELLOW
+    - -1
+    window_close_button:
+    - COLOR_BRIGHT_RED
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    button_success:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_BRIGHT_GREEN
     border:
+    - COLOR_BRIGHT_YELLOW
+    - -1
+    button_error:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_RED
+    toast_info:
+    - COLOR_BRIGHT_YELLOW
+    - -1
+    gutter:
+    - COLOR_BRIGHT_YELLOW
+    - -1
+    scrollbar:
+    - COLOR_BRIGHT_YELLOW
+    - COLOR_BLACK
+    toast_error:
+    - COLOR_RED
+    - -1
+    help_text:
+    - COLOR_BRIGHT_YELLOW
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_BRIGHT_YELLOW
+  '8':
+    footer:
+    - COLOR_BLACK
+    - -1
+    background: COLOR_BLACK
+    divider:
+    - COLOR_YELLOW
+    - -1
+    help_text:
     - COLOR_YELLOW
     - -1
     button_success:
     - COLOR_WHITE
     - COLOR_GREEN
+    gutter:
+    - COLOR_YELLOW
+    - -1
+    plugin:
+    - COLOR_BLACK
+    - -1
+    window_close_button:
+    - COLOR_RED
+    - -1
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    toast_warning:
+    - COLOR_YELLOW
+    - -1
+    shortcut_key:
+    - COLOR_YELLOW
+    - -1
+    whitespace:
+    - COLOR_BLACK
+    - -1
+    toast_error:
+    - COLOR_RED
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    toast_info:
+    - COLOR_YELLOW
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    selection:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    border:
+    - COLOR_YELLOW
+    - -1
+    button_error:
+    - COLOR_WHITE
+    - COLOR_RED
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    title:
+    - COLOR_WHITE
+    - -1
+    accent:
+    - COLOR_YELLOW
+    - -1
+    scrollbar:
+    - COLOR_YELLOW
+    - COLOR_BLACK
+    highlight:
+    - COLOR_BLACK
+    - COLOR_YELLOW
   background:
     enabled: true
     image: assets/wallpapers/black-eyed-susan.jpg
@@ -1404,95 +1407,76 @@ canopy:
     char: ─
     length: '{window_width}'
   '256':
-    selection:
-    - 232
-    - 250
-    gutter:
-    - 109
-    - -1
-    divider:
-    - COLOR_WHITE
-    - -1
     button_primary:
     - COLOR_BLACK
     - 255
-    title:
-    - 255
-    - -1
-    shadow:
-    - 235
-    - COLOR_BLACK
-    plugin:
-    - 109
-    - -1
+    background: COLOR_BLACK
     shortcut_key:
     - 255
-    - -1
-    button_success:
-    - COLOR_BLACK
-    - 255
-    footer:
-    - 245
     - -1
     help_text:
     - 250
     - -1
+    selection:
+    - 232
+    - 250
+    divider:
+    - COLOR_WHITE
+    - -1
     accent:
     - 248
     - -1
-    border:
-    - 245
-    - -1
-    text:
-    - 252
-    - -1
-    button_cancel:
+    button_error:
     - 255
     - 240
     highlight:
     - 7
     - 66
-    window_close_button:
-    - 255
+    gutter:
+    - 109
     - -1
     whitespace:
     - 239
     - -1
-    button_error:
+    shadow:
+    - 235
+    - COLOR_BLACK
+    window_close_button:
+    - 255
+    - -1
+    button_cancel:
     - 255
     - 240
+    title:
+    - 255
+    - -1
+    plugin:
+    - 109
+    - -1
     scrollbar:
     - 250
     - 238
-    background: COLOR_BLACK
+    text:
+    - 252
+    - -1
+    footer:
+    - 245
+    - -1
+    border:
+    - 245
+    - -1
+    button_success:
+    - COLOR_BLACK
+    - 255
   '16':
-    text:
-    - COLOR_WHITE
-    - -1
-    button_cancel:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_GREY
-    border:
-    - COLOR_WHITE
-    - -1
     button_primary:
     - COLOR_BLACK
     - COLOR_BRIGHT_WHITE
-    shortcut_key:
-    - COLOR_BRIGHT_WHITE
-    - -1
-    background: COLOR_BLACK
-    button_success:
+    highlight:
+    - COLOR_WHITE
     - COLOR_BLACK
+    button_cancel:
     - COLOR_BRIGHT_WHITE
-    accent:
-    - COLOR_WHITE
-    - -1
-    selection:
-    - COLOR_BLACK
-    - COLOR_WHITE
-    scrollbar:
-    - COLOR_WHITE
     - COLOR_GREY
     divider:
     - COLOR_WHITE
@@ -1500,94 +1484,113 @@ canopy:
     button_error:
     - COLOR_BRIGHT_WHITE
     - COLOR_GREY
-    help_text:
-    - COLOR_WHITE
+    whitespace:
+    - COLOR_GREY
     - -1
-    window_close_button:
+    button_success:
+    - COLOR_BLACK
+    - COLOR_BRIGHT_WHITE
+    shortcut_key:
     - COLOR_BRIGHT_WHITE
     - -1
-    footer:
-    - COLOR_WHITE
-    - -1
+    background: COLOR_BLACK
     plugin:
     - COLOR_WHITE
     - -1
     gutter:
     - COLOR_WHITE
     - -1
-    highlight:
+    border:
     - COLOR_WHITE
-    - COLOR_BLACK
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    window_close_button:
+    - COLOR_BRIGHT_WHITE
+    - -1
     title:
     - COLOR_BRIGHT_WHITE
     - -1
-    whitespace:
+    scrollbar:
+    - COLOR_WHITE
     - COLOR_GREY
+    help_text:
+    - COLOR_WHITE
     - -1
+    footer:
+    - COLOR_WHITE
+    - -1
+    accent:
+    - COLOR_WHITE
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    selection:
+    - COLOR_BLACK
+    - COLOR_WHITE
   '8':
-    selection:
-    - COLOR_BLACK
+    highlight:
     - COLOR_WHITE
-    gutter:
+    - COLOR_BLACK
+    title:
+    - COLOR_WHITE
+    - -1
+    scrollbar:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_error:
+    - COLOR_WHITE
+    - COLOR_YELLOW
+    divider:
     - COLOR_WHITE
     - -1
     window_close_button:
     - COLOR_WHITE
     - -1
-    text:
-    - COLOR_WHITE
-    - -1
-    title:
-    - COLOR_WHITE
-    - -1
-    shortcut_key:
-    - COLOR_WHITE
-    - -1
-    button_cancel:
-    - COLOR_WHITE
-    - COLOR_YELLOW
-    highlight:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    whitespace:
-    - COLOR_YELLOW
-    - -1
-    background: COLOR_BLACK
-    divider:
-    - COLOR_WHITE
-    - -1
-    plugin:
+    help_text:
     - COLOR_WHITE
     - -1
     button_primary:
     - COLOR_BLACK
     - COLOR_WHITE
-    footer:
+    background: COLOR_BLACK
+    plugin:
     - COLOR_WHITE
     - -1
-    help_text:
+    text:
     - COLOR_WHITE
     - -1
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
-    scrollbar:
+    accent:
     - COLOR_WHITE
-    - COLOR_BLACK
-    border:
+    - -1
+    gutter:
     - COLOR_WHITE
     - -1
     button_success:
     - COLOR_BLACK
     - COLOR_WHITE
-    button_error:
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    footer:
+    - COLOR_WHITE
+    - -1
+    border:
+    - COLOR_WHITE
+    - -1
+    button_cancel:
     - COLOR_WHITE
     - COLOR_YELLOW
-    accent:
+    selection:
+    - COLOR_BLACK
     - COLOR_WHITE
+    shortcut_key:
+    - COLOR_WHITE
+    - -1
+    whitespace:
+    - COLOR_YELLOW
     - -1
   background:
     enabled: true
@@ -1625,81 +1628,75 @@ cyberpunk:
     char: ━
     length: '{window_width}'
   '256':
-    gutter:
-    - 201
-    - -1
-    help_text:
+    text:
     - 51
-    - -1
-    selection:
-    - COLOR_BLACK
-    - 51
-    title:
-    - 226
-    - -1
-    shadow:
-    - 236
-    - COLOR_BLACK
-    border:
-    - 201
-    - -1
-    button_cancel:
-    - COLOR_BLACK
-    - 51
-    plugin:
-    - 201
-    - -1
-    accent:
-    - 201
-    - -1
-    footer:
-    - 255
-    - -1
-    highlight:
-    - COLOR_BLACK
-    - 226
-    button_success:
-    - COLOR_BLACK
-    - 255
-    background: COLOR_BLACK
-    divider:
-    - 201
     - -1
     window_close_button:
     - 208
     - -1
-    whitespace:
-    - 240
-    - -1
-    scrollbar:
-    - 51
-    - 236
-    button_primary:
-    - COLOR_BLACK
-    - 226
-    shortcut_key:
-    - 226
-    - -1
-    text:
-    - 51
-    - -1
     button_error:
     - 201
     - 234
-  '16':
-    gutter:
-    - COLOR_MAGENTA
-    - -1
-    footer:
-    - COLOR_WHITE
-    - -1
-    divider:
-    - COLOR_MAGENTA
-    - -1
+    button_success:
+    - COLOR_BLACK
+    - 255
     selection:
     - COLOR_BLACK
-    - COLOR_CYAN
+    - 51
+    gutter:
+    - 201
+    - -1
+    title:
+    - 226
+    - -1
+    shortcut_key:
+    - 226
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - 226
+    shadow:
+    - 236
+    - COLOR_BLACK
+    help_text:
+    - 51
+    - -1
+    background: COLOR_BLACK
+    whitespace:
+    - 240
+    - -1
+    button_cancel:
+    - COLOR_BLACK
+    - 51
+    accent:
+    - 201
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - 226
+    scrollbar:
+    - 51
+    - 236
+    border:
+    - 201
+    - -1
     plugin:
+    - 201
+    - -1
+    divider:
+    - 201
+    - -1
+    footer:
+    - 255
+    - -1
+  '16':
+    whitespace:
+    - 8
+    - -1
+    plugin:
+    - COLOR_MAGENTA
+    - -1
+    divider:
     - COLOR_MAGENTA
     - -1
     scrollbar:
@@ -1708,52 +1705,42 @@ cyberpunk:
     accent:
     - COLOR_MAGENTA
     - -1
+    shadow:
+    - 8
+    - COLOR_BLACK
+    button_error:
+    - COLOR_MAGENTA
+    - COLOR_BLACK
     button_success:
     - COLOR_BLACK
     - COLOR_GREEN
-    shortcut_key:
+    button_primary:
+    - COLOR_BLACK
     - COLOR_YELLOW
-    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_YELLOW
     title:
     - COLOR_YELLOW
     - -1
-    help_text:
-    - COLOR_CYAN
+    gutter:
+    - COLOR_MAGENTA
+    - -1
+    background: COLOR_BLACK
+    shortcut_key:
+    - COLOR_YELLOW
     - -1
     text:
     - COLOR_CYAN
     - -1
-    button_cancel:
-    - COLOR_BLACK
-    - COLOR_CYAN
-    button_error:
-    - COLOR_MAGENTA
-    - COLOR_BLACK
-    background: COLOR_BLACK
-    highlight:
-    - COLOR_BLACK
-    - COLOR_YELLOW
-    border:
-    - COLOR_MAGENTA
-    - -1
-    whitespace:
-    - 8
+    footer:
+    - COLOR_WHITE
     - -1
     window_close_button:
     - COLOR_BRIGHT_RED
     - -1
-    button_primary:
-    - COLOR_BLACK
-    - COLOR_YELLOW
-    shadow:
-    - 8
-    - COLOR_BLACK
-  '8':
-    window_close_button:
-    - COLOR_RED
-    - -1
-    footer:
-    - COLOR_WHITE
+    help_text:
+    - COLOR_CYAN
     - -1
     selection:
     - COLOR_BLACK
@@ -1761,55 +1748,71 @@ cyberpunk:
     border:
     - COLOR_MAGENTA
     - -1
-    help_text:
-    - COLOR_CYAN
-    - -1
-    background: COLOR_BLACK
-    title:
-    - COLOR_YELLOW
-    - -1
-    button_primary:
+    button_cancel:
     - COLOR_BLACK
-    - COLOR_YELLOW
+    - COLOR_CYAN
+  '8':
+    gutter:
+    - COLOR_MAGENTA
+    - -1
     text:
     - COLOR_CYAN
     - -1
-    divider:
+    border:
     - COLOR_MAGENTA
     - -1
-    scrollbar:
-    - COLOR_CYAN
+    selection:
     - COLOR_BLACK
+    - COLOR_CYAN
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    window_close_button:
+    - COLOR_RED
+    - -1
+    button_cancel:
+    - COLOR_BLACK
+    - COLOR_CYAN
+    help_text:
+    - COLOR_CYAN
+    - -1
     button_success:
     - COLOR_BLACK
     - COLOR_GREEN
-    highlight:
+    scrollbar:
+    - COLOR_CYAN
     - COLOR_BLACK
+    footer:
+    - COLOR_WHITE
+    - -1
+    background: COLOR_BLACK
+    divider:
+    - COLOR_MAGENTA
+    - -1
+    title:
     - COLOR_YELLOW
+    - -1
     shortcut_key:
     - COLOR_YELLOW
+    - -1
+    plugin:
+    - COLOR_MAGENTA
     - -1
     shadow:
     - COLOR_BLACK
     - COLOR_BLACK
+    highlight:
+    - COLOR_BLACK
+    - COLOR_YELLOW
     accent:
-    - COLOR_MAGENTA
-    - -1
-    whitespace:
-    - COLOR_BLUE
-    - -1
-    plugin:
     - COLOR_MAGENTA
     - -1
     button_error:
     - COLOR_MAGENTA
     - COLOR_BLACK
-    gutter:
-    - COLOR_MAGENTA
+    whitespace:
+    - COLOR_BLUE
     - -1
-    button_cancel:
-    - COLOR_BLACK
-    - COLOR_CYAN
 dayscape:
   marquee:
     char: •
@@ -1839,115 +1842,82 @@ dayscape:
     char: ─
     length: '{window_width}'
   '256':
-    button_cancel:
-    - 16
-    - 101
-    button_error:
-    - 255
-    - 196
-    highlight:
-    - 255
-    - 235
-    plugin:
+    shortcut_key:
     - 58
-    - -1
-    shadow:
-    - 236
-    - COLOR_BLACK
-    whitespace:
-    - 101
-    - -1
-    text:
-    - 16
-    - -1
-    accent:
-    - 58
-    - -1
-    button_primary:
-    - 255
-    - 235
-    button_success:
-    - 255
-    - 64
-    title:
-    - 235
     - -1
     selection:
     - 255
     - 235
+    text:
+    - 16
+    - -1
+    border:
+    - 64
+    - -1
     gutter:
     - 11
-    - -1
-    help_text:
-    - 15
-    - -1
-    shortcut_key:
-    - 58
-    - -1
-    window_close_button:
-    - 203
     - -1
     scrollbar:
     - 235
     - 250
-    border:
-    - 64
+    accent:
+    - 58
     - -1
     background: 189
-    footer:
-    - 64
-    - -1
     divider:
     - 64
     - -1
-  '16':
     shadow:
-    - COLOR_GREY
+    - 236
     - COLOR_BLACK
-    window_close_button:
-    - COLOR_BRIGHT_RED
-    - -1
-    accent:
-    - COLOR_BLACK
+    button_error:
+    - 255
+    - 196
+    title:
+    - 235
     - -1
     button_success:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_GREEN
-    footer:
-    - COLOR_GREEN
+    - 255
+    - 64
+    button_cancel:
+    - 16
+    - 101
+    highlight:
+    - 255
+    - 235
+    window_close_button:
+    - 203
+    - -1
+    help_text:
+    - 15
     - -1
     plugin:
-    - COLOR_BLACK
+    - 58
     - -1
-    button_cancel:
-    - COLOR_BLACK
-    - COLOR_GREY
-    scrollbar:
-    - COLOR_BLACK
-    - COLOR_WHITE
-    selection:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_BLACK
+    footer:
+    - 64
+    - -1
     whitespace:
-    - COLOR_GREY
+    - 101
     - -1
     button_primary:
+    - 255
+    - 235
+  '16':
+    highlight:
     - COLOR_BRIGHT_WHITE
     - COLOR_BLACK
     background: COLOR_BRIGHT_WHITE
-    button_error:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_RED
-    help_text:
+    button_cancel:
     - COLOR_BLACK
+    - COLOR_GREY
+    window_close_button:
+    - COLOR_BRIGHT_RED
     - -1
     text:
     - COLOR_BLACK
     - -1
-    highlight:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_BLACK
-    title:
+    plugin:
     - COLOR_BLACK
     - -1
     gutter:
@@ -1956,74 +1926,107 @@ dayscape:
     border:
     - COLOR_GREEN
     - -1
-    shortcut_key:
-    - COLOR_BLACK
-    - -1
-    divider:
-    - COLOR_GREEN
-    - -1
-  '8':
-    title:
-    - COLOR_BLACK
-    - -1
-    window_close_button:
-    - COLOR_YELLOW
-    - -1
-    scrollbar:
-    - COLOR_BLACK
-    - COLOR_WHITE
-    background: COLOR_WHITE
-    button_error:
-    - COLOR_WHITE
-    - COLOR_RED
-    border:
-    - COLOR_GREEN
-    - -1
-    text:
-    - COLOR_BLACK
-    - -1
-    gutter:
-    - COLOR_YELLOW
-    - -1
-    selection:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    button_primary:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
-    whitespace:
-    - COLOR_YELLOW
-    - -1
     footer:
     - COLOR_GREEN
     - -1
     help_text:
     - COLOR_BLACK
     - -1
+    selection:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_BLACK
+    button_error:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_RED
+    accent:
+    - COLOR_BLACK
+    - -1
+    scrollbar:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    title:
+    - COLOR_BLACK
+    - -1
+    shortcut_key:
+    - COLOR_BLACK
+    - -1
+    button_primary:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_BLACK
+    whitespace:
+    - COLOR_GREY
+    - -1
+    divider:
+    - COLOR_GREEN
+    - -1
+    button_success:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_GREEN
+    shadow:
+    - COLOR_GREY
+    - COLOR_BLACK
+  '8':
+    text:
+    - COLOR_BLACK
+    - -1
     button_success:
     - COLOR_WHITE
     - COLOR_GREEN
-    button_cancel:
+    shadow:
     - COLOR_BLACK
-    - COLOR_YELLOW
-    shortcut_key:
+    - COLOR_BLACK
+    plugin:
+    - COLOR_BLACK
+    - -1
+    title:
     - COLOR_BLACK
     - -1
     divider:
     - COLOR_GREEN
     - -1
-    highlight:
+    shortcut_key:
+    - COLOR_BLACK
+    - -1
+    button_cancel:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    button_error:
     - COLOR_WHITE
-    - COLOR_BLACK
-    plugin:
-    - COLOR_BLACK
+    - COLOR_RED
+    window_close_button:
+    - COLOR_YELLOW
+    - -1
+    footer:
+    - COLOR_GREEN
     - -1
     accent:
     - COLOR_BLACK
     - -1
+    border:
+    - COLOR_GREEN
+    - -1
+    whitespace:
+    - COLOR_YELLOW
+    - -1
+    background: COLOR_WHITE
+    selection:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    help_text:
+    - COLOR_BLACK
+    - -1
+    scrollbar:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    button_primary:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    gutter:
+    - COLOR_YELLOW
+    - -1
+    highlight:
+    - COLOR_WHITE
+    - COLOR_BLACK
   background:
     enabled: true
     image: assets/wallpapers/dayscape.png
@@ -2057,29 +2060,20 @@ dracula:
     gutter_top_tee: ┬
     gutter_bottom_tee: ┴
   '256':
-    help_text:
-    - 117
-    - -1
-    border:
-    - 61
-    - -1
-    shadow:
-    - 236
-    - COLOR_BLACK
-    button_success:
+    button_cancel:
     - 255
-    - 84
-    footer:
-    - 61
+    - 239
+    window_close_button:
+    - 203
     - -1
+    plugin:
+    - 212
+    - -1
+    selection:
+    - 255
+    - 61
     accent:
     - 117
-    - -1
-    text:
-    - 255
-    - -1
-    whitespace:
-    - 239
     - -1
     title:
     - 201
@@ -2087,161 +2081,170 @@ dracula:
     shortcut_key:
     - 201
     - -1
-    gutter:
-    - 239
-    - -1
-    button_cancel:
+    text:
     - 255
-    - 239
-    plugin:
-    - 212
     - -1
-    button_error:
+    button_primary:
     - 255
-    - 60
+    - 61
     scrollbar:
     - 61
     - 236
+    help_text:
+    - 117
+    - -1
+    border:
+    - 61
+    - -1
+    background: COLOR_BLACK
+    footer:
+    - 61
+    - -1
+    gutter:
+    - 239
+    - -1
+    whitespace:
+    - 239
+    - -1
+    button_success:
+    - 255
+    - 84
+    divider:
+    - 61
+    - -1
     highlight:
     - 255
     - 201
-    window_close_button:
-    - 203
-    - -1
-    divider:
-    - 61
-    - -1
-    selection:
-    - 255
-    - 61
-    button_primary:
-    - 255
-    - 61
-    background: COLOR_BLACK
-  '16':
-    accent:
-    - COLOR_CYAN
-    - -1
-    background: COLOR_BLACK
-    divider:
-    - COLOR_BLUE
-    - -1
-    button_primary:
-    - COLOR_WHITE
-    - COLOR_BLUE
-    button_error:
-    - COLOR_WHITE
-    - COLOR_BLUE
-    highlight:
-    - COLOR_WHITE
-    - COLOR_MAGENTA
-    button_cancel:
-    - COLOR_WHITE
+    shadow:
+    - 236
     - COLOR_BLACK
+    button_error:
+    - 255
+    - 60
+  '16':
+    selection:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    footer:
+    - COLOR_BLUE
+    - -1
     whitespace:
     - 8
     - -1
     gutter:
     - 8
     - -1
-    text:
-    - COLOR_WHITE
+    shadow:
+    - 8
+    - COLOR_BLACK
+    plugin:
+    - COLOR_MAGENTA
     - -1
-    selection:
+    button_primary:
     - COLOR_WHITE
     - COLOR_BLUE
+    background: COLOR_BLACK
+    highlight:
+    - COLOR_WHITE
+    - COLOR_MAGENTA
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    shortcut_key:
+    - COLOR_MAGENTA
+    - -1
+    button_error:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    button_success:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    divider:
+    - COLOR_BLUE
+    - -1
     border:
     - COLOR_BLUE
+    - -1
+    accent:
+    - COLOR_CYAN
+    - -1
+    help_text:
+    - COLOR_CYAN
+    - -1
+    title:
+    - COLOR_MAGENTA
     - -1
     window_close_button:
     - COLOR_BRIGHT_RED
     - -1
-    button_success:
-    - COLOR_WHITE
-    - COLOR_GREEN
-    shortcut_key:
-    - COLOR_MAGENTA
-    - -1
-    scrollbar:
-    - COLOR_BLUE
-    - COLOR_BLACK
-    footer:
-    - COLOR_BLUE
-    - -1
-    plugin:
-    - COLOR_MAGENTA
-    - -1
-    help_text:
-    - COLOR_CYAN
-    - -1
-    title:
-    - COLOR_MAGENTA
-    - -1
-    shadow:
-    - 8
-    - COLOR_BLACK
-  '8':
-    title:
-    - COLOR_MAGENTA
-    - -1
-    border:
-    - COLOR_BLUE
-    - -1
     text:
     - COLOR_WHITE
     - -1
     scrollbar:
     - COLOR_BLUE
     - COLOR_BLACK
-    button_primary:
-    - COLOR_WHITE
-    - COLOR_BLUE
-    gutter:
-    - COLOR_BLUE
-    - -1
-    window_close_button:
-    - COLOR_RED
-    - -1
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
-    accent:
-    - COLOR_CYAN
-    - -1
-    button_error:
-    - COLOR_WHITE
-    - COLOR_BLUE
-    plugin:
-    - COLOR_MAGENTA
-    - -1
-    divider:
-    - COLOR_BLUE
-    - -1
-    button_success:
-    - COLOR_WHITE
-    - COLOR_GREEN
+  '8':
     shortcut_key:
     - COLOR_MAGENTA
-    - -1
-    footer:
-    - COLOR_BLUE
     - -1
     selection:
     - COLOR_WHITE
     - COLOR_BLUE
-    help_text:
-    - COLOR_CYAN
+    title:
+    - COLOR_MAGENTA
     - -1
+    background: COLOR_BLACK
     button_cancel:
     - COLOR_WHITE
     - COLOR_BLACK
-    highlight:
+    window_close_button:
+    - COLOR_RED
+    - -1
+    footer:
+    - COLOR_BLUE
+    - -1
+    border:
+    - COLOR_BLUE
+    - -1
+    button_primary:
     - COLOR_WHITE
+    - COLOR_BLUE
+    divider:
+    - COLOR_BLUE
+    - -1
+    plugin:
     - COLOR_MAGENTA
-    background: COLOR_BLACK
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    help_text:
+    - COLOR_CYAN
+    - -1
+    scrollbar:
+    - COLOR_BLUE
+    - COLOR_BLACK
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    button_success:
+    - COLOR_WHITE
+    - COLOR_GREEN
     whitespace:
     - COLOR_BLUE
     - -1
+    gutter:
+    - COLOR_BLUE
+    - -1
+    accent:
+    - COLOR_CYAN
+    - -1
+    highlight:
+    - COLOR_WHITE
+    - COLOR_MAGENTA
+    button_error:
+    - COLOR_WHITE
+    - COLOR_BLUE
 everforest:
   marquee:
     char: •
@@ -2270,154 +2273,169 @@ everforest:
     char: ─
     length: '{window_width}'
   '256':
-    background: 235
-    selection:
-    - 223
-    - 65
-    scrollbar:
-    - 142
-    - 237
     border:
-    - 108
-    - -1
-    whitespace:
-    - 108
-    - -1
-    shadow:
-    - 234
-    - 234
-    button_primary:
-    - 235
-    - 108
-    button_error:
-    - 235
-    - 167
-    title:
-    - 142
-    - -1
-    button_success:
-    - 235
-    - 142
-    gutter:
-    - 108
-    - -1
-    window_close_button:
-    - 167
-    - -1
-    divider:
-    - 65
-    - -1
-    footer:
     - 108
     - -1
     button_cancel:
     - 223
     - 238
+    footer:
+    - 108
+    - -1
     text:
     - 223
+    - -1
+    shortcut_key:
+    - 142
+    - -1
+    selection:
+    - 223
+    - 65
+    shadow:
+    - 234
+    - 234
+    scrollbar:
+    - 142
+    - 237
+    plugin:
+    - 175
+    - -1
+    gutter:
+    - 108
     - -1
     highlight:
     - 235
     - 142
-    accent:
+    whitespace:
     - 108
     - -1
-    plugin:
-    - 175
-    - -1
-    shortcut_key:
-    - 142
-    - -1
+    button_primary:
+    - 235
+    - 108
     help_text:
     - 108
     - -1
-  '16':
-    whitespace:
-    - 8
+    title:
+    - 142
     - -1
-    button_primary:
-    - COLOR_BLACK
-    - COLOR_GREEN
+    accent:
+    - 108
+    - -1
+    button_error:
+    - 235
+    - 167
     button_success:
-    - COLOR_BLACK
-    - COLOR_GREEN
-    text:
-    - COLOR_WHITE
+    - 235
+    - 142
+    window_close_button:
+    - 167
     - -1
-    shadow:
-    - 8
-    - COLOR_BLACK
     divider:
-    - COLOR_GREEN
+    - 65
     - -1
+    background: 235
+  '16':
     gutter:
     - 8
     - -1
-    help_text:
-    - COLOR_CYAN
-    - -1
-    scrollbar:
-    - COLOR_GREEN
-    - COLOR_BLACK
-    highlight:
-    - COLOR_BLACK
-    - COLOR_GREEN
-    selection:
-    - COLOR_WHITE
-    - COLOR_GREEN
-    border:
-    - COLOR_GREEN
-    - -1
-    background: COLOR_BLACK
-    accent:
-    - COLOR_CYAN
-    - -1
-    title:
-    - COLOR_GREEN
-    - -1
-    shortcut_key:
-    - COLOR_YELLOW
-    - -1
-    plugin:
-    - COLOR_MAGENTA
-    - -1
-    footer:
-    - COLOR_GREEN
-    - -1
-    button_cancel:
-    - COLOR_WHITE
-    - COLOR_BLACK
     window_close_button:
     - COLOR_BRIGHT_RED
     - -1
-    button_error:
+    selection:
     - COLOR_WHITE
-    - COLOR_RED
-  '8':
-    whitespace:
+    - COLOR_GREEN
+    button_success:
+    - COLOR_BLACK
+    - COLOR_GREEN
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_GREEN
+    shadow:
+    - 8
+    - COLOR_BLACK
+    divider:
+    - COLOR_GREEN
+    - -1
+    help_text:
+    - COLOR_CYAN
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    scrollbar:
+    - COLOR_GREEN
+    - COLOR_BLACK
+    background: COLOR_BLACK
+    footer:
     - COLOR_GREEN
     - -1
     border:
     - COLOR_GREEN
     - -1
-    gutter:
+    shortcut_key:
+    - COLOR_YELLOW
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_GREEN
+    title:
     - COLOR_GREEN
     - -1
-    window_close_button:
+    button_error:
+    - COLOR_WHITE
     - COLOR_RED
+    whitespace:
+    - 8
     - -1
+    plugin:
+    - COLOR_MAGENTA
+    - -1
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
     accent:
     - COLOR_CYAN
+    - -1
+  '8':
+    highlight:
+    - COLOR_BLACK
+    - COLOR_GREEN
+    whitespace:
+    - COLOR_GREEN
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    divider:
+    - COLOR_GREEN
     - -1
     button_success:
     - COLOR_BLACK
     - COLOR_GREEN
-    selection:
-    - COLOR_WHITE
+    button_primary:
+    - COLOR_BLACK
     - COLOR_GREEN
     scrollbar:
     - COLOR_GREEN
     - COLOR_BLACK
+    window_close_button:
+    - COLOR_RED
+    - -1
+    gutter:
+    - COLOR_GREEN
+    - -1
+    plugin:
+    - COLOR_MAGENTA
+    - -1
+    accent:
+    - COLOR_CYAN
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    button_error:
+    - COLOR_WHITE
+    - COLOR_RED
     button_cancel:
     - COLOR_WHITE
     - COLOR_BLACK
@@ -2427,34 +2445,19 @@ everforest:
     text:
     - COLOR_WHITE
     - -1
-    plugin:
-    - COLOR_MAGENTA
-    - -1
-    footer:
+    border:
     - COLOR_GREEN
     - -1
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
     help_text:
     - COLOR_CYAN
     - -1
-    button_primary:
-    - COLOR_BLACK
-    - COLOR_GREEN
-    button_error:
-    - COLOR_WHITE
-    - COLOR_RED
-    background: COLOR_BLACK
-    divider:
+    footer:
     - COLOR_GREEN
     - -1
     title:
     - COLOR_GREEN
     - -1
-    highlight:
-    - COLOR_BLACK
-    - COLOR_GREEN
+    background: COLOR_BLACK
 fall-tree:
   marquee:
     char: •
@@ -2484,6 +2487,18 @@ fall-tree:
     char: ─
     length: '{window_width}'
   '256':
+    divider:
+    - 239
+    - -1
+    plugin:
+    - 143
+    - -1
+    accent:
+    - 143
+    - -1
+    help_text:
+    - 143
+    - -1
     window_close_button:
     - 203
     - -1
@@ -2510,9 +2525,51 @@ fall-tree:
       footer:
       - 239
       - -1
-    button_success:
+    editor:
+      background: 233
+      header:
+      - 189
+      - -1
+      tab_active:
+      - 16
+      - 189
+      tab_inactive:
+      - 255
+      - -1
+      gutter:
+      - 235
+      - -1
+      text:
+      - 255
+      - -1
+      selection:
+      - 16
+      - 189
+      whitespace:
+      - 235
+      - -1
+      status:
+      - 239
+      - -1
+      footer:
+      - 239
+      - -1
+    border:
+    - 239
+    - -1
+    button_error:
     - 255
-    - 40
+    - 196
+    background: 233
+    footer:
+    - 239
+    - -1
+    title:
+    - 189
+    - -1
+    shortcut_key:
+    - 143
+    - -1
     modals:
       backdrop:
       - 236
@@ -2539,180 +2596,44 @@ fall-tree:
       scrollbar:
       - 189
       - 236
-    footer:
-    - 239
+    button_cancel:
+    - 255
+    - 235
+    text:
+    - 255
     - -1
+    shadow:
+    - 236
+    - COLOR_BLACK
+    button_success:
+    - 255
+    - 40
+    button_primary:
+    - 16
+    - 189
     highlight:
     - 16
     - 243
-    background: 233
-    text:
-    - 255
-    - -1
-    selection:
-    - 16
-    - 189
-    button_error:
-    - 255
-    - 196
-    shortcut_key:
-    - 143
-    - -1
-    title:
-    - 189
-    - -1
-    help_text:
-    - 143
-    - -1
-    plugin:
-    - 143
-    - -1
     scrollbar:
     - 189
     - 236
-    button_primary:
+    selection:
     - 16
     - 189
-    whitespace:
-    - 235
-    - -1
     gutter:
     - 235
     - -1
-    shadow:
-    - 236
-    - COLOR_BLACK
-    accent:
-    - 143
-    - -1
-    button_cancel:
-    - 255
+    whitespace:
     - 235
-    border:
-    - 239
-    - -1
-    editor:
-      background: 233
-      header:
-      - 189
-      - -1
-      tab_active:
-      - 16
-      - 189
-      tab_inactive:
-      - 255
-      - -1
-      gutter:
-      - 235
-      - -1
-      text:
-      - 255
-      - -1
-      selection:
-      - 16
-      - 189
-      whitespace:
-      - 235
-      - -1
-      status:
-      - 239
-      - -1
-      footer:
-      - 239
-      - -1
-    divider:
-    - 239
     - -1
   '16':
-    editor:
-      background: COLOR_BLACK
-      header:
-      - COLOR_BRIGHT_WHITE
-      - -1
-      tab_active:
-      - COLOR_BLACK
-      - COLOR_BRIGHT_WHITE
-      tab_inactive:
-      - COLOR_BRIGHT_WHITE
-      - -1
-      gutter:
-      - COLOR_BLACK
-      - -1
-      text:
-      - COLOR_BRIGHT_WHITE
-      - -1
-      selection:
-      - COLOR_BLACK
-      - COLOR_BRIGHT_WHITE
-      whitespace:
-      - COLOR_BLACK
-      - -1
-      status:
-      - COLOR_GREY
-      - -1
-      footer:
-      - COLOR_GREY
-      - -1
-    selection:
-    - COLOR_BLACK
-    - COLOR_BRIGHT_WHITE
-    menu_editor:
-      background: COLOR_BLACK
-      header:
-      - COLOR_BRIGHT_WHITE
-      - -1
-      border:
-      - COLOR_GREY
-      - -1
-      text:
-      - COLOR_BRIGHT_WHITE
-      - -1
-      selection:
-      - COLOR_BLACK
-      - COLOR_BRIGHT_WHITE
-      button_save:
-      - COLOR_BLACK
-      - COLOR_BRIGHT_WHITE
-      button_delete:
-      - COLOR_BRIGHT_WHITE
-      - COLOR_RED
-      footer:
-      - COLOR_GREY
-      - -1
-    button_primary:
-    - COLOR_BLACK
-    - COLOR_BRIGHT_WHITE
-    title:
-    - COLOR_BRIGHT_WHITE
-    - -1
-    shadow:
-    - COLOR_GREY
-    - COLOR_BLACK
-    plugin:
-    - COLOR_YELLOW
-    - -1
-    divider:
+    background: COLOR_BLACK
+    footer:
     - COLOR_GREY
     - -1
     shortcut_key:
     - COLOR_YELLOW
     - -1
-    text:
-    - COLOR_BRIGHT_WHITE
-    - -1
-    background: COLOR_BLACK
-    button_cancel:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_BLACK
-    highlight:
-    - COLOR_BLACK
-    - COLOR_BRIGHT_WHITE
-    button_error:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_RED
-    scrollbar:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_GREY
     modals:
       backdrop:
       - COLOR_GREY
@@ -2739,31 +2660,182 @@ fall-tree:
       scrollbar:
       - COLOR_BRIGHT_WHITE
       - COLOR_GREY
-    accent:
+    plugin:
     - COLOR_YELLOW
     - -1
-    gutter:
-    - COLOR_BLACK
-    - -1
-    footer:
-    - COLOR_GREY
-    - -1
-    button_success:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_GREEN
     border:
     - COLOR_GREY
     - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_BRIGHT_WHITE
+    divider:
+    - COLOR_GREY
+    - -1
+    accent:
+    - COLOR_YELLOW
+    - -1
+    whitespace:
+    - COLOR_BLACK
+    - -1
+    scrollbar:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_GREY
+    button_cancel:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_BLACK
+    text:
+    - COLOR_BRIGHT_WHITE
+    - -1
+    title:
+    - COLOR_BRIGHT_WHITE
+    - -1
+    selection:
+    - COLOR_BLACK
+    - COLOR_BRIGHT_WHITE
+    button_error:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_RED
+    shadow:
+    - COLOR_GREY
+    - COLOR_BLACK
+    button_success:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_GREEN
+    highlight:
+    - COLOR_BLACK
+    - COLOR_BRIGHT_WHITE
     window_close_button:
     - COLOR_BRIGHT_RED
     - -1
-    whitespace:
-    - COLOR_BLACK
-    - -1
+    editor:
+      background: COLOR_BLACK
+      header:
+      - COLOR_BRIGHT_WHITE
+      - -1
+      tab_active:
+      - COLOR_BLACK
+      - COLOR_BRIGHT_WHITE
+      tab_inactive:
+      - COLOR_BRIGHT_WHITE
+      - -1
+      gutter:
+      - COLOR_BLACK
+      - -1
+      text:
+      - COLOR_BRIGHT_WHITE
+      - -1
+      selection:
+      - COLOR_BLACK
+      - COLOR_BRIGHT_WHITE
+      whitespace:
+      - COLOR_BLACK
+      - -1
+      status:
+      - COLOR_GREY
+      - -1
+      footer:
+      - COLOR_GREY
+      - -1
     help_text:
     - COLOR_YELLOW
     - -1
+    menu_editor:
+      background: COLOR_BLACK
+      header:
+      - COLOR_BRIGHT_WHITE
+      - -1
+      border:
+      - COLOR_GREY
+      - -1
+      text:
+      - COLOR_BRIGHT_WHITE
+      - -1
+      selection:
+      - COLOR_BLACK
+      - COLOR_BRIGHT_WHITE
+      button_save:
+      - COLOR_BLACK
+      - COLOR_BRIGHT_WHITE
+      button_delete:
+      - COLOR_BRIGHT_WHITE
+      - COLOR_RED
+      footer:
+      - COLOR_GREY
+      - -1
+    gutter:
+    - COLOR_BLACK
+    - -1
   '8':
+    text:
+    - COLOR_WHITE
+    - -1
+    plugin:
+    - COLOR_YELLOW
+    - -1
+    accent:
+    - COLOR_YELLOW
+    - -1
+    gutter:
+    - COLOR_BLACK
+    - -1
+    title:
+    - COLOR_WHITE
+    - -1
+    whitespace:
+    - COLOR_BLACK
+    - -1
+    background: COLOR_BLACK
+    highlight:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    button_success:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    button_error:
+    - COLOR_WHITE
+    - COLOR_RED
+    shortcut_key:
+    - COLOR_YELLOW
+    - -1
+    menu_editor:
+      background: COLOR_BLACK
+      header:
+      - COLOR_WHITE
+      - -1
+      border:
+      - COLOR_YELLOW
+      - -1
+      text:
+      - COLOR_WHITE
+      - -1
+      selection:
+      - COLOR_BLACK
+      - COLOR_WHITE
+      button_save:
+      - COLOR_BLACK
+      - COLOR_WHITE
+      button_delete:
+      - COLOR_WHITE
+      - COLOR_RED
+      footer:
+      - COLOR_YELLOW
+      - -1
+    scrollbar:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    footer:
+    - COLOR_YELLOW
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
     modals:
       backdrop:
       - COLOR_BLACK
@@ -2790,27 +2862,6 @@ fall-tree:
       scrollbar:
       - COLOR_WHITE
       - COLOR_BLACK
-    border:
-    - COLOR_YELLOW
-    - -1
-    button_success:
-    - COLOR_WHITE
-    - COLOR_GREEN
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
-    button_primary:
-    - COLOR_BLACK
-    - COLOR_WHITE
-    divider:
-    - COLOR_YELLOW
-    - -1
-    footer:
-    - COLOR_YELLOW
-    - -1
-    scrollbar:
-    - COLOR_WHITE
-    - COLOR_BLACK
     editor:
       background: COLOR_BLACK
       header:
@@ -2840,69 +2891,21 @@ fall-tree:
       footer:
       - COLOR_YELLOW
       - -1
-    title:
-    - COLOR_WHITE
-    - -1
-    whitespace:
-    - COLOR_BLACK
-    - -1
-    plugin:
-    - COLOR_YELLOW
-    - -1
-    highlight:
-    - COLOR_BLACK
-    - COLOR_WHITE
-    gutter:
-    - COLOR_BLACK
-    - -1
-    button_cancel:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    shortcut_key:
-    - COLOR_YELLOW
-    - -1
-    help_text:
-    - COLOR_YELLOW
-    - -1
-    button_error:
-    - COLOR_WHITE
-    - COLOR_RED
-    menu_editor:
-      background: COLOR_BLACK
-      header:
-      - COLOR_WHITE
-      - -1
-      border:
-      - COLOR_YELLOW
-      - -1
-      text:
-      - COLOR_WHITE
-      - -1
-      selection:
-      - COLOR_BLACK
-      - COLOR_WHITE
-      button_save:
-      - COLOR_BLACK
-      - COLOR_WHITE
-      button_delete:
-      - COLOR_WHITE
-      - COLOR_RED
-      footer:
-      - COLOR_YELLOW
-      - -1
-    text:
-    - COLOR_WHITE
-    - -1
     window_close_button:
     - COLOR_YELLOW
     - -1
-    accent:
+    border:
     - COLOR_YELLOW
     - -1
-    background: COLOR_BLACK
+    divider:
+    - COLOR_YELLOW
+    - -1
     selection:
     - COLOR_BLACK
     - COLOR_WHITE
+    help_text:
+    - COLOR_YELLOW
+    - -1
   background:
     enabled: true
     image: assets/wallpapers/fall-tree.jpg
@@ -2939,32 +2942,45 @@ gruvbox:
     char: ─
     length: '{window_width}'
   '256':
-    divider:
-    - COLOR_WHITE
+    whitespace:
+    - 243
     - -1
-    button_success:
+    button_primary:
     - 235
-    - 142
+    - 214
+    background: -1
+    button_error:
+    - 214
+    - 237
     title:
     - 214
     - -1
-    border:
-    - 142
+    window_close_button:
+    - 208
     - -1
     gutter:
     - 243
     - -1
+    text:
+    - 223
+    - -1
     selection:
     - 235
     - 214
-    button_primary:
-    - 235
-    - 214
-    plugin:
-    - 142
+    footer:
+    - 223
     - -1
-    window_close_button:
-    - 208
+    divider:
+    - COLOR_WHITE
+    - -1
+    button_cancel:
+    - 255
+    - 237
+    scrollbar:
+    - 214
+    - 237
+    border:
+    - 142
     - -1
     highlight:
     - 235
@@ -2975,152 +2991,139 @@ gruvbox:
     shadow:
     - 236
     - COLOR_BLACK
-    background: -1
-    help_text:
-    - 214
-    - -1
+    button_success:
+    - 235
+    - 142
     accent:
     - 142
     - -1
-    button_error:
+    help_text:
     - 214
-    - 237
-    scrollbar:
-    - 214
-    - 237
-    footer:
-    - 223
     - -1
-    whitespace:
-    - 243
-    - -1
-    button_cancel:
-    - 255
-    - 237
-    text:
-    - 223
+    plugin:
+    - 142
     - -1
   '16':
-    help_text:
-    - COLOR_YELLOW
-    - -1
-    button_primary:
-    - COLOR_BLACK
-    - COLOR_YELLOW
     shortcut_key:
     - COLOR_YELLOW
     - -1
-    button_success:
+    button_error:
+    - COLOR_YELLOW
     - COLOR_BLACK
-    - COLOR_GREEN
-    title:
+    help_text:
     - COLOR_YELLOW
     - -1
-    highlight:
-    - COLOR_BLACK
-    - COLOR_YELLOW
+    gutter:
+    - 8
+    - -1
     selection:
     - COLOR_WHITE
     - COLOR_YELLOW
+    highlight:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    scrollbar:
+    - COLOR_YELLOW
+    - COLOR_BLACK
+    button_success:
+    - COLOR_BLACK
+    - COLOR_GREEN
+    plugin:
+    - COLOR_GREEN
+    - -1
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    text:
+    - COLOR_WHITE
+    - -1
+    background: -1
+    shadow:
+    - 8
+    - COLOR_BLACK
     footer:
     - COLOR_WHITE
+    - -1
+    accent:
+    - COLOR_GREEN
+    - -1
+    whitespace:
+    - 8
     - -1
     border:
     - COLOR_GREEN
     - -1
-    button_error:
-    - COLOR_YELLOW
-    - COLOR_BLACK
-    scrollbar:
-    - COLOR_YELLOW
-    - COLOR_BLACK
-    button_cancel:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    background: -1
-    gutter:
-    - 8
-    - -1
-    accent:
-    - COLOR_GREEN
-    - -1
     divider:
     - COLOR_WHITE
     - -1
-    plugin:
-    - COLOR_GREEN
+    title:
+    - COLOR_YELLOW
     - -1
     window_close_button:
     - COLOR_BRIGHT_RED
     - -1
-    text:
-    - COLOR_WHITE
-    - -1
-    whitespace:
-    - 8
-    - -1
-    shadow:
-    - 8
+    button_primary:
     - COLOR_BLACK
-  '8':
-    window_close_button:
-    - COLOR_RED
-    - -1
-    accent:
-    - COLOR_GREEN
-    - -1
-    plugin:
-    - COLOR_GREEN
-    - -1
-    button_cancel:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    scrollbar:
     - COLOR_YELLOW
+  '8':
+    button_success:
     - COLOR_BLACK
+    - COLOR_GREEN
     help_text:
     - COLOR_YELLOW
     - -1
     shortcut_key:
     - COLOR_YELLOW
     - -1
-    selection:
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    footer:
     - COLOR_WHITE
+    - -1
+    title:
     - COLOR_YELLOW
+    - -1
     highlight:
     - COLOR_BLACK
     - COLOR_YELLOW
     button_error:
     - COLOR_YELLOW
     - COLOR_BLACK
+    plugin:
+    - COLOR_GREEN
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_YELLOW
+    divider:
+    - COLOR_WHITE
+    - -1
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    accent:
+    - COLOR_GREEN
+    - -1
     button_primary:
     - COLOR_BLACK
     - COLOR_YELLOW
-    title:
+    gutter:
+    - COLOR_GREEN
+    - -1
+    scrollbar:
     - COLOR_YELLOW
+    - COLOR_BLACK
+    window_close_button:
+    - COLOR_RED
+    - -1
+    background: -1
+    whitespace:
+    - COLOR_GREEN
     - -1
     text:
     - COLOR_WHITE
     - -1
-    divider:
-    - COLOR_WHITE
-    - -1
-    footer:
-    - COLOR_WHITE
-    - -1
-    whitespace:
-    - COLOR_GREEN
-    - -1
-    button_success:
-    - COLOR_BLACK
-    - COLOR_GREEN
-    gutter:
-    - COLOR_GREEN
-    - -1
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
-    background: -1
     border:
     - COLOR_GREEN
     - -1
@@ -3153,190 +3156,190 @@ happysun:
     char: ─
     length: '{window_width}'
   '256':
-    scrollbar:
-    - 190
-    - 236
-    plugin:
+    background: 0
+    shortcut_key:
     - 22
     - -1
-    divider:
+    plugin:
     - 22
     - -1
     text:
     - 255
     - -1
-    title:
-    - 190
-    - -1
     selection:
     - 16
     - 190
-    shortcut_key:
-    - 22
-    - -1
+    shadow:
+    - 236
+    - COLOR_BLACK
     gutter:
     - 19
     - -1
+    help_text:
+    - 22
+    - -1
+    footer:
+    - 22
+    - -1
+    divider:
+    - 22
+    - -1
+    button_cancel:
+    - 255
+    - 19
     button_error:
     - 255
     - 196
-    whitespace:
-    - 19
+    title:
+    - 190
     - -1
-    shadow:
-    - 236
-    - COLOR_BLACK
     highlight:
     - 16
     - 190
-    border:
-    - 22
-    - -1
-    footer:
-    - 22
-    - -1
-    button_success:
-    - 255
-    - 22
-    button_cancel:
-    - 255
-    - 19
     window_close_button:
     - 203
     - -1
-    help_text:
+    button_success:
+    - 255
     - 22
-    - -1
     accent:
     - 22
     - -1
     button_primary:
     - 16
     - 190
-    background: 0
+    scrollbar:
+    - 190
+    - 236
+    border:
+    - 22
+    - -1
+    whitespace:
+    - 19
+    - -1
   '16':
+    gutter:
+    - COLOR_BLUE
+    - -1
+    button_success:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_BLACK
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_BRIGHT_YELLOW
+    border:
+    - COLOR_BLACK
+    - -1
+    whitespace:
+    - COLOR_BLUE
+    - -1
+    help_text:
+    - COLOR_BLACK
+    - -1
+    accent:
+    - COLOR_BLACK
+    - -1
+    plugin:
+    - COLOR_BLACK
+    - -1
+    title:
+    - COLOR_BRIGHT_YELLOW
+    - -1
+    text:
+    - COLOR_BRIGHT_WHITE
+    - -1
+    button_error:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_RED
+    button_cancel:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_BLUE
+    scrollbar:
+    - COLOR_BRIGHT_YELLOW
+    - COLOR_GREY
+    footer:
+    - COLOR_BLACK
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_BRIGHT_YELLOW
     window_close_button:
     - COLOR_BRIGHT_RED
     - -1
-    border:
+    background: COLOR_BLACK
+    divider:
     - COLOR_BLACK
-    - -1
-    whitespace:
-    - COLOR_BLUE
     - -1
     shortcut_key:
     - COLOR_BLACK
     - -1
-    divider:
-    - COLOR_BLACK
-    - -1
-    background: COLOR_BLACK
     shadow:
     - COLOR_GREY
     - COLOR_BLACK
-    plugin:
+    selection:
     - COLOR_BLACK
-    - -1
+    - COLOR_BRIGHT_YELLOW
+  '8':
     highlight:
     - COLOR_BLACK
-    - COLOR_BRIGHT_YELLOW
-    button_primary:
-    - COLOR_BLACK
-    - COLOR_BRIGHT_YELLOW
-    scrollbar:
-    - COLOR_BRIGHT_YELLOW
-    - COLOR_GREY
-    text:
-    - COLOR_BRIGHT_WHITE
-    - -1
-    title:
-    - COLOR_BRIGHT_YELLOW
-    - -1
-    help_text:
-    - COLOR_BLACK
-    - -1
-    button_cancel:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_BLUE
-    gutter:
-    - COLOR_BLUE
-    - -1
-    footer:
-    - COLOR_BLACK
-    - -1
-    selection:
-    - COLOR_BLACK
-    - COLOR_BRIGHT_YELLOW
-    button_error:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_RED
-    button_success:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_BLACK
-    accent:
-    - COLOR_BLACK
-    - -1
-  '8':
-    background: COLOR_BLACK
-    footer:
-    - COLOR_BLACK
-    - -1
-    button_primary:
-    - COLOR_BLACK
     - COLOR_YELLOW
-    divider:
-    - COLOR_BLACK
-    - -1
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
-    selection:
-    - COLOR_BLACK
-    - COLOR_YELLOW
-    scrollbar:
-    - COLOR_YELLOW
-    - COLOR_BLACK
-    gutter:
-    - COLOR_BLUE
-    - -1
-    whitespace:
-    - COLOR_BLUE
-    - -1
-    text:
-    - COLOR_WHITE
-    - -1
     button_cancel:
     - COLOR_WHITE
     - COLOR_BLUE
-    plugin:
+    selection:
     - COLOR_BLACK
-    - -1
-    shortcut_key:
-    - COLOR_BLACK
-    - -1
-    button_error:
-    - COLOR_WHITE
-    - COLOR_RED
-    button_success:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    help_text:
-    - COLOR_BLACK
-    - -1
-    accent:
-    - COLOR_BLACK
-    - -1
+    - COLOR_YELLOW
     window_close_button:
     - COLOR_YELLOW
     - -1
-    highlight:
+    footer:
+    - COLOR_BLACK
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    scrollbar:
+    - COLOR_YELLOW
+    - COLOR_BLACK
+    accent:
+    - COLOR_BLACK
+    - -1
+    help_text:
+    - COLOR_BLACK
+    - -1
+    background: COLOR_BLACK
+    gutter:
+    - COLOR_BLUE
+    - -1
+    button_primary:
     - COLOR_BLACK
     - COLOR_YELLOW
-    border:
+    button_success:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    plugin:
+    - COLOR_BLACK
+    - -1
+    shortcut_key:
+    - COLOR_BLACK
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    whitespace:
+    - COLOR_BLUE
+    - -1
+    button_error:
+    - COLOR_WHITE
+    - COLOR_RED
+    divider:
     - COLOR_BLACK
     - -1
     title:
     - COLOR_YELLOW
+    - -1
+    border:
+    - COLOR_BLACK
     - -1
   background:
     enabled: true
@@ -3374,88 +3377,105 @@ hotdog_stand:
     char: '='
     length: '{window_width}'
   '256':
-    border:
-    - 226
-    - 196
     footer:
     - 226
     - 196
-    selection:
+    divider:
+    - COLOR_YELLOW
+    - -1
+    highlight:
     - 16
-    - 255
-    window_close_button:
+    - 226
+    shortcut_key:
     - 255
     - 196
+    gutter:
+    - 220
+    - 196
+    button_success:
+    - 16
+    - 226
     button_error:
     - 226
     - 235
     plugin:
     - 255
     - 196
-    title:
+    button_primary:
+    - 16
+    - 226
+    border:
     - 226
     - 196
-    shortcut_key:
-    - 255
-    - 196
-    button_cancel:
-    - 226
-    - 196
-    text:
-    - 226
-    - 196
+    shadow:
+    - 16
+    - 16
     accent:
     - 255
     - 196
-    whitespace:
-    - 130
-    - 196
-    highlight:
-    - 16
-    - 226
     scrollbar:
     - 226
     - 88
-    button_success:
-    - 16
+    whitespace:
+    - 130
+    - 196
+    title:
     - 226
-    shadow:
-    - 16
-    - 16
-    button_primary:
-    - 16
-    - 226
+    - 196
     help_text:
     - 226
     - 196
-    gutter:
-    - 220
+    window_close_button:
+    - 255
     - 196
-    divider:
-    - COLOR_YELLOW
-    - -1
     background: 196
+    text:
+    - 226
+    - 196
+    button_cancel:
+    - 226
+    - 196
+    selection:
+    - 16
+    - 255
   '16':
-    divider:
+    gutter:
     - COLOR_YELLOW
-    - -1
-    background: COLOR_RED
+    - COLOR_RED
+    selection:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    highlight:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    text:
+    - COLOR_YELLOW
+    - COLOR_RED
     plugin:
     - COLOR_WHITE
     - COLOR_RED
-    title:
-    - COLOR_YELLOW
-    - COLOR_RED
-    button_success:
-    - COLOR_BLACK
-    - COLOR_YELLOW
-    gutter:
+    footer:
     - COLOR_YELLOW
     - COLOR_RED
     border:
     - COLOR_YELLOW
     - COLOR_RED
-    button_primary:
+    divider:
+    - COLOR_YELLOW
+    - -1
+    accent:
+    - COLOR_WHITE
+    - COLOR_RED
+    window_close_button:
+    - COLOR_WHITE
+    - COLOR_RED
+    button_error:
+    - COLOR_YELLOW
+    - COLOR_BLACK
+    button_success:
     - COLOR_BLACK
     - COLOR_YELLOW
     shadow:
@@ -3464,92 +3484,60 @@ hotdog_stand:
     shortcut_key:
     - COLOR_WHITE
     - COLOR_RED
-    selection:
-    - COLOR_BLACK
-    - COLOR_WHITE
-    button_error:
-    - COLOR_YELLOW
-    - COLOR_BLACK
-    highlight:
-    - COLOR_BLACK
-    - COLOR_YELLOW
-    footer:
-    - COLOR_YELLOW
-    - COLOR_RED
     scrollbar:
     - COLOR_YELLOW
     - COLOR_RED
-    text:
+    whitespace:
     - COLOR_YELLOW
     - COLOR_RED
-    button_cancel:
+    title:
     - COLOR_YELLOW
     - COLOR_RED
     help_text:
     - COLOR_YELLOW
     - COLOR_RED
-    window_close_button:
-    - COLOR_WHITE
-    - COLOR_RED
-    accent:
-    - COLOR_WHITE
-    - COLOR_RED
-    whitespace:
+    button_cancel:
     - COLOR_YELLOW
     - COLOR_RED
+    background: COLOR_RED
   '8':
-    button_primary:
+    shadow:
     - COLOR_BLACK
-    - COLOR_YELLOW
-    highlight:
     - COLOR_BLACK
+    gutter:
     - COLOR_YELLOW
+    - COLOR_RED
     footer:
     - COLOR_YELLOW
     - COLOR_RED
-    button_cancel:
+    button_primary:
+    - COLOR_BLACK
     - COLOR_YELLOW
-    - COLOR_RED
-    background: COLOR_RED
-    window_close_button:
-    - COLOR_WHITE
-    - COLOR_RED
-    plugin:
-    - COLOR_WHITE
-    - COLOR_RED
-    help_text:
-    - COLOR_YELLOW
-    - COLOR_RED
-    shortcut_key:
-    - COLOR_WHITE
-    - COLOR_RED
-    scrollbar:
-    - COLOR_YELLOW
-    - COLOR_RED
-    border:
-    - COLOR_YELLOW
-    - COLOR_RED
-    divider:
-    - COLOR_YELLOW
-    - -1
     whitespace:
-    - COLOR_YELLOW
-    - COLOR_RED
-    gutter:
     - COLOR_YELLOW
     - COLOR_RED
     button_error:
     - COLOR_YELLOW
     - COLOR_BLACK
-    title:
+    background: COLOR_RED
+    highlight:
+    - COLOR_BLACK
     - COLOR_YELLOW
-    - COLOR_RED
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
+    divider:
+    - COLOR_YELLOW
+    - -1
     selection:
     - COLOR_BLACK
     - COLOR_WHITE
+    plugin:
+    - COLOR_WHITE
+    - COLOR_RED
+    border:
+    - COLOR_YELLOW
+    - COLOR_RED
+    help_text:
+    - COLOR_YELLOW
+    - COLOR_RED
     text:
     - COLOR_YELLOW
     - COLOR_RED
@@ -3558,6 +3546,21 @@ hotdog_stand:
     - COLOR_YELLOW
     accent:
     - COLOR_WHITE
+    - COLOR_RED
+    title:
+    - COLOR_YELLOW
+    - COLOR_RED
+    window_close_button:
+    - COLOR_WHITE
+    - COLOR_RED
+    shortcut_key:
+    - COLOR_WHITE
+    - COLOR_RED
+    scrollbar:
+    - COLOR_YELLOW
+    - COLOR_RED
+    button_cancel:
+    - COLOR_YELLOW
     - COLOR_RED
 industry:
   marquee:
@@ -3587,113 +3590,85 @@ industry:
     char: '{ascii:205}'
     length: '{window_width}'
   '256':
-    divider:
-    - 242
+    window_close_button:
+    - 203
     - 234
     border:
     - 242
     - 234
-    plugin:
-    - 67
+    divider:
+    - 242
     - 234
     accent:
     - 220
     - 234
-    button_success:
-    - 255
-    - 67
+    background: 234
     title:
     - 214
-    - 234
-    shortcut_key:
-    - 214
-    - 234
-    window_close_button:
-    - 203
-    - 234
-    text:
-    - 250
-    - 234
-    gutter:
-    - 240
     - 234
     shadow:
     - 233
     - COLOR_BLACK
-    button_error:
+    highlight:
+    - 232
     - 214
-    - 235
-    selection:
+    button_success:
     - 255
-    - 238
-    button_cancel:
-    - 255
-    - 238
+    - 67
     button_primary:
     - 232
     - 214
-    background: 234
+    plugin:
+    - 67
+    - 234
     scrollbar:
     - 220
     - 236
+    button_error:
+    - 214
+    - 235
+    text:
+    - 250
+    - 234
+    selection:
+    - 255
+    - 238
+    shortcut_key:
+    - 214
+    - 234
+    button_cancel:
+    - 255
+    - 238
     footer:
     - 242
     - 234
-    help_text:
-    - 220
+    gutter:
+    - 240
     - 234
     whitespace:
     - 240
     - 234
-    highlight:
-    - 232
-    - 214
+    help_text:
+    - 220
+    - 234
   '16':
-    button_error:
+    plugin:
+    - COLOR_GREEN
+    - -1
+    scrollbar:
     - COLOR_YELLOW
     - COLOR_BLACK
     text:
     - COLOR_WHITE
     - -1
-    button_primary:
-    - COLOR_BLACK
-    - COLOR_YELLOW
-    accent:
-    - COLOR_YELLOW
-    - -1
-    help_text:
-    - COLOR_YELLOW
-    - -1
-    scrollbar:
+    button_error:
     - COLOR_YELLOW
     - COLOR_BLACK
-    divider:
-    - COLOR_WHITE
-    - -1
     shadow:
     - 8
     - COLOR_BLACK
-    button_success:
-    - COLOR_WHITE
-    - 8
-    selection:
-    - COLOR_BLACK
-    - COLOR_YELLOW
-    plugin:
-    - COLOR_GREEN
-    - -1
-    shortcut_key:
-    - COLOR_YELLOW
-    - -1
     footer:
     - COLOR_WHITE
-    - -1
-    background: COLOR_BLACK
-    highlight:
-    - COLOR_BLACK
-    - COLOR_YELLOW
-    title:
-    - COLOR_YELLOW
     - -1
     window_close_button:
     - COLOR_BRIGHT_RED
@@ -3701,27 +3676,52 @@ industry:
     border:
     - COLOR_WHITE
     - -1
-    gutter:
-    - 8
+    shortcut_key:
+    - COLOR_YELLOW
     - -1
-    button_cancel:
-    - COLOR_WHITE
+    selection:
     - COLOR_BLACK
+    - COLOR_YELLOW
+    highlight:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    button_success:
+    - COLOR_WHITE
+    - 8
+    accent:
+    - COLOR_YELLOW
+    - -1
+    help_text:
+    - COLOR_YELLOW
+    - -1
+    background: COLOR_BLACK
     whitespace:
     - 8
     - -1
-  '8':
-    footer:
-    - COLOR_WHITE
+    gutter:
+    - 8
     - -1
-    button_cancel:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    text:
-    - COLOR_WHITE
+    title:
+    - COLOR_YELLOW
     - -1
     divider:
     - COLOR_WHITE
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+  '8':
+    plugin:
+    - COLOR_GREEN
+    - -1
+    shortcut_key:
+    - COLOR_YELLOW
+    - -1
+    title:
+    - COLOR_YELLOW
     - -1
     help_text:
     - COLOR_YELLOW
@@ -3729,26 +3729,36 @@ industry:
     button_error:
     - COLOR_YELLOW
     - COLOR_BLACK
-    border:
-    - COLOR_WHITE
-    - -1
-    button_primary:
-    - COLOR_BLACK
-    - COLOR_YELLOW
-    shortcut_key:
-    - COLOR_YELLOW
-    - -1
-    highlight:
-    - COLOR_BLACK
-    - COLOR_YELLOW
-    gutter:
-    - COLOR_WHITE
-    - -1
     selection:
     - COLOR_BLACK
     - COLOR_YELLOW
-    window_close_button:
-    - COLOR_RED
+    background: COLOR_BLACK
+    footer:
+    - COLOR_WHITE
+    - -1
+    divider:
+    - COLOR_WHITE
+    - -1
+    button_success:
+    - COLOR_WHITE
+    - 8
+    highlight:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    scrollbar:
+    - COLOR_YELLOW
+    - COLOR_BLACK
+    border:
+    - COLOR_WHITE
+    - -1
+    gutter:
+    - COLOR_WHITE
     - -1
     whitespace:
     - COLOR_WHITE
@@ -3756,22 +3766,15 @@ industry:
     accent:
     - COLOR_YELLOW
     - -1
-    title:
-    - COLOR_YELLOW
-    - -1
-    plugin:
-    - COLOR_GREEN
-    - -1
-    scrollbar:
-    - COLOR_YELLOW
-    - COLOR_BLACK
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
-    background: COLOR_BLACK
-    button_success:
+    text:
     - COLOR_WHITE
-    - 8
+    - -1
+    window_close_button:
+    - COLOR_RED
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_YELLOW
 lighthouse:
   marquee:
     char: •
@@ -3801,31 +3804,16 @@ lighthouse:
     char: ─
     length: '{window_width}'
   '256':
-    accent:
-    - 68
-    - -1
-    scrollbar:
-    - 152
-    - 236
-    title:
-    - 152
-    - -1
-    divider:
-    - 239
-    - -1
-    gutter:
-    - 136
-    - -1
-    background: COLOR_BLACK
+    button_success:
+    - 255
+    - 40
     footer:
     - 239
     - -1
-    window_close_button:
-    - 203
-    - -1
-    text:
-    - 255
-    - -1
+    background: COLOR_BLACK
+    highlight:
+    - 16
+    - 152
     editor:
       background: COLOR_BLACK
       header:
@@ -3855,59 +3843,27 @@ lighthouse:
       footer:
       - 239
       - -1
-    button_cancel:
-    - 255
-    - 237
+    title:
+    - 152
+    - -1
     button_error:
     - 255
     - 196
-    button_primary:
-    - 16
-    - 152
-    whitespace:
-    - 237
+    shadow:
+    - 236
+    - COLOR_BLACK
+    gutter:
+    - 136
     - -1
-    menu_editor:
-      background: -1
-      header:
-      - 152
-      - 67
-      border:
-      - 239
-      - -1
-      text:
-      - 255
-      - -1
-      selection:
-      - 16
-      - 152
-      button_save:
-      - 16
-      - 152
-      button_delete:
-      - 255
-      - 196
-      footer:
-      - 239
-      - -1
-    help_text:
-    - 0
-    - -1
-    shortcut_key:
+    accent:
     - 68
     - -1
     border:
     - 239
     - -1
-    plugin:
-    - 226
+    window_close_button:
+    - 203
     - -1
-    highlight:
-    - 16
-    - 152
-    button_success:
-    - 255
-    - 40
     modals:
       backdrop:
       - 236
@@ -3934,65 +3890,60 @@ lighthouse:
       scrollbar:
       - 152
       - 236
+    button_primary:
+    - 16
+    - 152
     selection:
     - 16
     - 152
-    shadow:
+    button_cancel:
+    - 255
+    - 237
+    scrollbar:
+    - 152
     - 236
-    - COLOR_BLACK
-  '16':
-    button_success:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_GREEN
+    menu_editor:
+      background: -1
+      header:
+      - 152
+      - 67
+      border:
+      - 239
+      - -1
+      text:
+      - 255
+      - -1
+      selection:
+      - 16
+      - 152
+      button_save:
+      - 16
+      - 152
+      button_delete:
+      - 255
+      - 196
+      footer:
+      - 239
+      - -1
     shortcut_key:
-    - COLOR_BRIGHT_BLUE
-    - -1
-    title:
-    - COLOR_WHITE
-    - -1
-    shadow:
-    - COLOR_GREY
-    - COLOR_BLACK
-    background: COLOR_BLACK
-    window_close_button:
-    - COLOR_BRIGHT_RED
-    - -1
-    help_text:
-    - COLOR_BLACK
-    - -1
-    divider:
-    - COLOR_GREY
-    - -1
-    highlight:
-    - COLOR_BLACK
-    - COLOR_WHITE
-    button_error:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_RED
-    footer:
-    - COLOR_GREY
+    - 68
     - -1
     whitespace:
-    - COLOR_GREY
+    - 237
     - -1
-    border:
-    - COLOR_GREY
+    divider:
+    - 239
     - -1
-    button_cancel:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_GREY
+    help_text:
+    - 0
+    - -1
     text:
-    - COLOR_BRIGHT_WHITE
+    - 255
     - -1
-    selection:
-    - COLOR_BLACK
-    - COLOR_WHITE
-    accent:
-    - COLOR_BRIGHT_BLUE
+    plugin:
+    - 226
     - -1
-    scrollbar:
-    - COLOR_WHITE
-    - COLOR_GREY
+  '16':
     modals:
       backdrop:
       - COLOR_GREY
@@ -4019,6 +3970,55 @@ lighthouse:
       scrollbar:
       - COLOR_WHITE
       - COLOR_GREY
+    footer:
+    - COLOR_GREY
+    - -1
+    plugin:
+    - COLOR_BRIGHT_YELLOW
+    - -1
+    button_success:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_GREEN
+    highlight:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    text:
+    - COLOR_BRIGHT_WHITE
+    - -1
+    selection:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    title:
+    - COLOR_WHITE
+    - -1
+    divider:
+    - COLOR_GREY
+    - -1
+    help_text:
+    - COLOR_BLACK
+    - -1
+    background: COLOR_BLACK
+    button_cancel:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_GREY
+    shortcut_key:
+    - COLOR_BRIGHT_BLUE
+    - -1
+    window_close_button:
+    - COLOR_BRIGHT_RED
+    - -1
+    border:
+    - COLOR_GREY
+    - -1
+    accent:
+    - COLOR_BRIGHT_BLUE
+    - -1
+    scrollbar:
+    - COLOR_WHITE
+    - COLOR_GREY
     editor:
       background: COLOR_BLACK
       header:
@@ -4048,12 +4048,6 @@ lighthouse:
       footer:
       - COLOR_GREY
       - -1
-    gutter:
-    - COLOR_YELLOW
-    - -1
-    plugin:
-    - COLOR_BRIGHT_YELLOW
-    - -1
     menu_editor:
       background: -1
       header:
@@ -4077,20 +4071,62 @@ lighthouse:
       footer:
       - COLOR_GREY
       - -1
+    whitespace:
+    - COLOR_GREY
+    - -1
+    gutter:
+    - COLOR_YELLOW
+    - -1
+    button_error:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_RED
+    shadow:
+    - COLOR_GREY
+    - COLOR_BLACK
+  '8':
     button_primary:
     - COLOR_BLACK
     - COLOR_WHITE
-  '8':
+    scrollbar:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    divider:
+    - COLOR_YELLOW
+    - -1
     background: COLOR_BLACK
+    plugin:
+    - COLOR_YELLOW
+    - -1
+    help_text:
+    - COLOR_BLACK
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    text:
+    - COLOR_WHITE
+    - -1
+    selection:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    footer:
+    - COLOR_YELLOW
+    - -1
+    button_error:
+    - COLOR_WHITE
+    - COLOR_RED
     border:
     - COLOR_YELLOW
     - -1
-    shortcut_key:
+    gutter:
+    - COLOR_YELLOW
+    - -1
+    accent:
     - COLOR_CYAN
     - -1
-    title:
+    button_success:
     - COLOR_WHITE
-    - -1
+    - COLOR_GREEN
     menu_editor:
       background: -1
       header:
@@ -4114,30 +4150,6 @@ lighthouse:
       footer:
       - COLOR_YELLOW
       - -1
-    footer:
-    - COLOR_YELLOW
-    - -1
-    help_text:
-    - COLOR_BLACK
-    - -1
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
-    button_success:
-    - COLOR_WHITE
-    - COLOR_GREEN
-    selection:
-    - COLOR_BLACK
-    - COLOR_WHITE
-    gutter:
-    - COLOR_YELLOW
-    - -1
-    button_cancel:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    button_error:
-    - COLOR_WHITE
-    - COLOR_RED
     modals:
       backdrop:
       - COLOR_BLACK
@@ -4164,33 +4176,24 @@ lighthouse:
       scrollbar:
       - COLOR_WHITE
       - COLOR_BLACK
-    accent:
-    - COLOR_CYAN
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    title:
+    - COLOR_WHITE
     - -1
-    scrollbar:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    highlight:
-    - COLOR_BLACK
-    - COLOR_WHITE
     whitespace:
     - COLOR_BLACK
-    - -1
-    plugin:
-    - COLOR_YELLOW
     - -1
     window_close_button:
     - COLOR_YELLOW
     - -1
-    divider:
-    - COLOR_YELLOW
-    - -1
-    text:
-    - COLOR_WHITE
-    - -1
-    button_primary:
+    shadow:
     - COLOR_BLACK
-    - COLOR_WHITE
+    - COLOR_BLACK
+    shortcut_key:
+    - COLOR_CYAN
+    - -1
     editor:
       background: COLOR_BLACK
       header:
@@ -4256,149 +4259,155 @@ matrix:
     char: '-'
     length: '{window_width}'
   '256':
-    scrollbar:
-    - 46
-    - 22
-    whitespace:
-    - 22
-    - -1
-    footer:
-    - 34
-    - -1
-    accent:
-    - 82
-    - -1
-    gutter:
-    - 22
-    - -1
-    button_error:
-    - 46
-    - 234
-    shadow:
-    - 236
-    - COLOR_BLACK
-    shortcut_key:
-    - 82
-    - -1
-    text:
-    - 46
-    - -1
-    button_success:
-    - COLOR_BLACK
-    - 46
-    help_text:
-    - 82
-    - -1
-    button_cancel:
-    - 46
-    - 234
-    selection:
-    - 255
-    - 22
-    border:
-    - 34
-    - -1
-    button_primary:
-    - COLOR_BLACK
-    - 46
-    divider:
-    - COLOR_GREEN
-    - -1
-    highlight:
-    - COLOR_BLACK
-    - 46
-    background: COLOR_BLACK
-    plugin:
-    - 22
-    - -1
-    title:
-    - 46
-    - -1
     window_close_button:
     - 196
     - -1
-  '16':
+    button_primary:
+    - COLOR_BLACK
+    - 46
+    button_error:
+    - 46
+    - 234
+    shortcut_key:
+    - 82
+    - -1
+    plugin:
+    - 22
+    - -1
+    button_success:
+    - COLOR_BLACK
+    - 46
+    highlight:
+    - COLOR_BLACK
+    - 46
+    accent:
+    - 82
+    - -1
+    help_text:
+    - 82
+    - -1
+    whitespace:
+    - 22
+    - -1
+    shadow:
+    - 236
+    - COLOR_BLACK
     footer:
+    - 34
+    - -1
+    background: COLOR_BLACK
+    selection:
+    - 255
+    - 22
+    scrollbar:
+    - 46
+    - 22
+    divider:
+    - COLOR_GREEN
+    - -1
+    text:
+    - 46
+    - -1
+    title:
+    - 46
+    - -1
+    button_cancel:
+    - 46
+    - 234
+    border:
+    - 34
+    - -1
+    gutter:
+    - 22
+    - -1
+  '16':
+    selection:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    highlight:
+    - COLOR_BLACK
+    - COLOR_GREEN
+    title:
+    - COLOR_GREEN
+    - -1
+    plugin:
+    - COLOR_GREEN
+    - -1
+    shortcut_key:
     - COLOR_GREEN
     - -1
     text:
     - COLOR_GREEN
     - -1
+    help_text:
+    - COLOR_GREEN
+    - -1
+    border:
+    - COLOR_GREEN
+    - -1
+    shadow:
+    - 8
+    - COLOR_BLACK
     button_primary:
     - COLOR_BLACK
     - COLOR_GREEN
     gutter:
     - 8
     - -1
-    button_cancel:
+    button_error:
     - COLOR_GREEN
     - COLOR_BLACK
-    help_text:
-    - COLOR_GREEN
-    - -1
-    selection:
-    - COLOR_WHITE
-    - COLOR_GREEN
     accent:
-    - COLOR_GREEN
-    - -1
-    shadow:
-    - 8
-    - COLOR_BLACK
-    plugin:
-    - COLOR_GREEN
-    - -1
-    button_error:
-    - COLOR_GREEN
-    - COLOR_BLACK
-    border:
-    - COLOR_GREEN
-    - -1
-    divider:
-    - COLOR_GREEN
-    - -1
-    button_success:
-    - COLOR_BLACK
-    - COLOR_GREEN
-    scrollbar:
-    - COLOR_GREEN
-    - COLOR_BLACK
-    window_close_button:
-    - COLOR_BRIGHT_RED
-    - -1
-    shortcut_key:
-    - COLOR_GREEN
-    - -1
-    title:
-    - COLOR_GREEN
-    - -1
-    background: COLOR_BLACK
-    whitespace:
-    - 8
-    - -1
-    highlight:
-    - COLOR_BLACK
-    - COLOR_GREEN
-  '8':
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
-    button_error:
-    - COLOR_GREEN
-    - COLOR_BLACK
-    whitespace:
-    - COLOR_GREEN
-    - -1
-    divider:
-    - COLOR_GREEN
-    - -1
-    gutter:
     - COLOR_GREEN
     - -1
     footer:
     - COLOR_GREEN
     - -1
+    divider:
+    - COLOR_GREEN
+    - -1
+    window_close_button:
+    - COLOR_BRIGHT_RED
+    - -1
+    button_cancel:
+    - COLOR_GREEN
+    - COLOR_BLACK
+    background: COLOR_BLACK
+    scrollbar:
+    - COLOR_GREEN
+    - COLOR_BLACK
+    whitespace:
+    - 8
+    - -1
+    button_success:
+    - COLOR_BLACK
+    - COLOR_GREEN
+  '8':
+    selection:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    text:
+    - COLOR_GREEN
+    - -1
+    plugin:
+    - COLOR_GREEN
+    - -1
     shortcut_key:
+    - COLOR_GREEN
+    - -1
+    scrollbar:
+    - COLOR_GREEN
+    - COLOR_BLACK
+    button_success:
+    - COLOR_BLACK
+    - COLOR_GREEN
+    whitespace:
+    - COLOR_GREEN
+    - -1
+    help_text:
+    - COLOR_GREEN
+    - -1
+    gutter:
     - COLOR_GREEN
     - -1
     window_close_button:
@@ -4407,40 +4416,34 @@ matrix:
     border:
     - COLOR_GREEN
     - -1
+    footer:
+    - COLOR_GREEN
+    - -1
     title:
     - COLOR_GREEN
     - -1
-    selection:
-    - COLOR_WHITE
-    - COLOR_GREEN
-    background: COLOR_BLACK
-    button_success:
-    - COLOR_BLACK
-    - COLOR_GREEN
     highlight:
     - COLOR_BLACK
     - COLOR_GREEN
-    button_cancel:
+    divider:
+    - COLOR_GREEN
+    - -1
+    button_error:
     - COLOR_GREEN
     - COLOR_BLACK
-    help_text:
-    - COLOR_GREEN
-    - -1
-    button_primary:
+    shadow:
     - COLOR_BLACK
-    - COLOR_GREEN
-    plugin:
-    - COLOR_GREEN
-    - -1
-    text:
-    - COLOR_GREEN
-    - -1
+    - COLOR_BLACK
     accent:
     - COLOR_GREEN
     - -1
-    scrollbar:
+    background: COLOR_BLACK
+    button_cancel:
     - COLOR_GREEN
     - COLOR_BLACK
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_GREEN
 monochrome:
   marquee:
     char: ' '
@@ -4469,149 +4472,134 @@ monochrome:
     char: ─
     length: '{window_width}'
   '256':
-    plugin:
-    - 245
-    - -1
-    background: COLOR_BLACK
-    border:
-    - 245
+    shortcut_key:
+    - 255
     - -1
     button_primary:
     - COLOR_BLACK
     - 255
-    highlight:
-    - COLOR_BLACK
-    - 255
-    shadow:
-    - 235
-    - COLOR_BLACK
-    gutter:
-    - 239
+    divider:
+    - COLOR_WHITE
     - -1
-    scrollbar:
-    - 250
-    - 238
-    button_cancel:
-    - 255
-    - 240
+    plugin:
+    - 245
+    - -1
     footer:
     - 245
+    - -1
+    window_close_button:
+    - 255
+    - -1
+    whitespace:
+    - 239
+    - -1
+    text:
+    - 252
     - -1
     button_success:
     - COLOR_BLACK
     - 255
-    window_close_button:
-    - 255
+    gutter:
+    - 239
     - -1
-    selection:
-    - 232
-    - 250
-    divider:
-    - COLOR_WHITE
-    - -1
-    button_error:
+    button_cancel:
     - 255
     - 240
     accent:
     - 248
     - -1
-    shortcut_key:
-    - 255
-    - -1
-    text:
-    - 252
-    - -1
-    title:
-    - 255
-    - -1
-    whitespace:
-    - 239
-    - -1
     help_text:
     - 250
     - -1
-  '16':
+    selection:
+    - 232
+    - 250
+    shadow:
+    - 235
+    - COLOR_BLACK
+    scrollbar:
+    - 250
+    - 238
+    background: COLOR_BLACK
     border:
-    - COLOR_WHITE
+    - 245
     - -1
-    text:
-    - COLOR_WHITE
+    highlight:
+    - COLOR_BLACK
+    - 255
+    button_error:
+    - 255
+    - 240
+    title:
+    - 255
     - -1
-    whitespace:
-    - 8
-    - -1
-    button_success:
+  '16':
+    button_primary:
     - COLOR_BLACK
     - COLOR_WHITE
     title:
     - COLOR_WHITE
     - -1
-    accent:
+    button_error:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_success:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    gutter:
+    - 8
+    - -1
+    help_text:
     - COLOR_WHITE
     - -1
+    background: COLOR_BLACK
+    scrollbar:
+    - COLOR_WHITE
+    - COLOR_BLACK
     highlight:
     - COLOR_BLACK
     - COLOR_WHITE
-    gutter:
+    shadow:
     - 8
+    - COLOR_BLACK
+    whitespace:
+    - 8
+    - -1
+    divider:
+    - COLOR_WHITE
+    - -1
+    border:
+    - COLOR_WHITE
+    - -1
+    shortcut_key:
+    - COLOR_WHITE
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    plugin:
+    - COLOR_WHITE
+    - -1
+    selection:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    accent:
+    - COLOR_WHITE
     - -1
     footer:
     - COLOR_WHITE
     - -1
-    background: COLOR_BLACK
-    divider:
-    - COLOR_WHITE
-    - -1
-    button_error:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    shortcut_key:
-    - COLOR_WHITE
-    - -1
-    shadow:
-    - 8
-    - COLOR_BLACK
-    selection:
-    - COLOR_BLACK
-    - COLOR_WHITE
-    help_text:
-    - COLOR_WHITE
-    - -1
-    scrollbar:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    button_cancel:
-    - COLOR_WHITE
-    - COLOR_BLACK
     window_close_button:
-    - COLOR_WHITE
-    - -1
-    button_primary:
-    - COLOR_BLACK
-    - COLOR_WHITE
-    plugin:
     - COLOR_WHITE
     - -1
   '8':
-    button_cancel:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    text:
+    footer:
     - COLOR_WHITE
     - -1
-    divider:
-    - COLOR_WHITE
-    - -1
-    accent:
-    - COLOR_WHITE
-    - -1
-    selection:
-    - COLOR_BLACK
-    - COLOR_WHITE
-    scrollbar:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    border:
+    gutter:
     - COLOR_WHITE
     - -1
     button_success:
@@ -4620,40 +4608,55 @@ monochrome:
     button_error:
     - COLOR_WHITE
     - COLOR_BLACK
-    highlight:
-    - COLOR_BLACK
-    - COLOR_WHITE
-    footer:
-    - COLOR_WHITE
-    - -1
-    shortcut_key:
-    - COLOR_WHITE
-    - -1
-    button_primary:
-    - COLOR_BLACK
-    - COLOR_WHITE
-    gutter:
-    - COLOR_WHITE
-    - -1
-    whitespace:
-    - COLOR_WHITE
-    - -1
-    background: COLOR_BLACK
     title:
     - COLOR_WHITE
     - -1
-    window_close_button:
-    - COLOR_WHITE
-    - -1
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
-    plugin:
+    text:
     - COLOR_WHITE
     - -1
     help_text:
     - COLOR_WHITE
     - -1
+    accent:
+    - COLOR_WHITE
+    - -1
+    background: COLOR_BLACK
+    shortcut_key:
+    - COLOR_WHITE
+    - -1
+    window_close_button:
+    - COLOR_WHITE
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    divider:
+    - COLOR_WHITE
+    - -1
+    border:
+    - COLOR_WHITE
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    scrollbar:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    whitespace:
+    - COLOR_WHITE
+    - -1
+    plugin:
+    - COLOR_WHITE
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    selection:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
 moonrise:
   marquee:
     char: •
@@ -4683,51 +4686,14 @@ moonrise:
     char: ─
     length: '{window_width}'
   '256':
-    text:
+    button_error:
     - 255
-    - -1
-    button_primary:
-    - 16
-    - 15
-    accent:
-    - 53
-    - -1
-    help_text:
-    - 127
-    - -1
-    plugin:
-    - 127
-    - -1
-    background: 0
-    whitespace:
-    - 238
-    - -1
-    border:
-    - 53
-    - -1
-    shortcut_key:
-    - 53
-    - -1
-    title:
-    - 53
-    - -1
+    - 196
     window_close_button:
     - 203
     - -1
-    footer:
-    - 15
-    - -1
-    selection:
-    - 15
-    - 19
-    button_success:
-    - 255
-    - 40
-    gutter:
-    - 238
-    - -1
-    divider:
-    - 127
+    accent:
+    - 53
     - -1
     button_cancel:
     - 255
@@ -4735,21 +4701,73 @@ moonrise:
     shadow:
     - 236
     - COLOR_BLACK
+    border:
+    - 53
+    - -1
+    footer:
+    - 15
+    - -1
+    button_primary:
+    - 16
+    - 15
+    button_success:
+    - 255
+    - 40
+    whitespace:
+    - 238
+    - -1
     scrollbar:
     - 128
     - 236
+    background: 0
+    help_text:
+    - 127
+    - -1
     highlight:
     - 16
     - 128
-    button_error:
+    selection:
+    - 15
+    - 19
+    title:
+    - 53
+    - -1
+    gutter:
+    - 238
+    - -1
+    divider:
+    - 127
+    - -1
+    shortcut_key:
+    - 53
+    - -1
+    plugin:
+    - 127
+    - -1
+    text:
     - 255
-    - 196
+    - -1
   '16':
+    plugin:
+    - COLOR_MAGENTA
+    - -1
+    scrollbar:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_GREY
+    button_success:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_GREEN
     border:
     - COLOR_BLACK
     - -1
-    shortcut_key:
+    shadow:
+    - COLOR_GREY
     - COLOR_BLACK
+    button_cancel:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_GREY
+    whitespace:
+    - COLOR_GREY
     - -1
     button_primary:
     - COLOR_BLACK
@@ -4757,117 +4775,102 @@ moonrise:
     text:
     - COLOR_BRIGHT_WHITE
     - -1
+    divider:
+    - COLOR_BRIGHT_WHITE
+    - -1
+    title:
+    - COLOR_BLACK
+    - -1
+    help_text:
+    - COLOR_MAGENTA
+    - -1
+    background: COLOR_BLACK
+    button_error:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_RED
     gutter:
     - COLOR_GREY
     - -1
-    accent:
-    - COLOR_BLACK
+    footer:
+    - COLOR_BRIGHT_WHITE
     - -1
     window_close_button:
     - COLOR_BRIGHT_RED
     - -1
-    footer:
-    - COLOR_BRIGHT_WHITE
-    - -1
-    button_error:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_RED
-    background: COLOR_BLACK
-    shadow:
-    - COLOR_GREY
-    - COLOR_BLACK
-    title:
-    - COLOR_BLACK
-    - -1
-    button_cancel:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_GREY
-    plugin:
-    - COLOR_MAGENTA
-    - -1
-    scrollbar:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_GREY
-    highlight:
-    - COLOR_BLACK
-    - COLOR_MAGENTA
-    button_success:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_GREEN
-    whitespace:
-    - COLOR_GREY
-    - -1
     selection:
     - COLOR_BRIGHT_WHITE
     - COLOR_BLUE
-    help_text:
-    - COLOR_MAGENTA
-    - -1
-    divider:
-    - COLOR_BRIGHT_WHITE
-    - -1
-  '8':
-    gutter:
-    - COLOR_BLACK
-    - -1
-    help_text:
-    - COLOR_MAGENTA
-    - -1
-    button_cancel:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    text:
-    - COLOR_WHITE
-    - -1
-    whitespace:
-    - COLOR_BLACK
-    - -1
-    divider:
-    - COLOR_WHITE
-    - -1
-    scrollbar:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    selection:
-    - COLOR_WHITE
-    - COLOR_BLUE
-    highlight:
-    - COLOR_BLACK
-    - COLOR_MAGENTA
     shortcut_key:
-    - COLOR_BLACK
-    - -1
-    title:
-    - COLOR_BLACK
-    - -1
-    plugin:
-    - COLOR_MAGENTA
-    - -1
-    window_close_button:
-    - COLOR_YELLOW
-    - -1
-    button_primary:
-    - COLOR_BLACK
-    - COLOR_WHITE
-    border:
     - COLOR_BLACK
     - -1
     accent:
     - COLOR_BLACK
     - -1
-    background: COLOR_BLACK
-    footer:
-    - COLOR_WHITE
-    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_MAGENTA
+  '8':
     shadow:
     - COLOR_BLACK
     - COLOR_BLACK
-    button_error:
+    button_cancel:
     - COLOR_WHITE
-    - COLOR_RED
+    - COLOR_BLACK
+    title:
+    - COLOR_BLACK
+    - -1
+    plugin:
+    - COLOR_MAGENTA
+    - -1
+    divider:
+    - COLOR_WHITE
+    - -1
     button_success:
     - COLOR_WHITE
     - COLOR_GREEN
+    button_error:
+    - COLOR_WHITE
+    - COLOR_RED
+    shortcut_key:
+    - COLOR_BLACK
+    - -1
+    window_close_button:
+    - COLOR_YELLOW
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_MAGENTA
+    accent:
+    - COLOR_BLACK
+    - -1
+    border:
+    - COLOR_BLACK
+    - -1
+    help_text:
+    - COLOR_MAGENTA
+    - -1
+    whitespace:
+    - COLOR_BLACK
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    footer:
+    - COLOR_WHITE
+    - -1
+    background: COLOR_BLACK
+    gutter:
+    - COLOR_BLACK
+    - -1
+    scrollbar:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_WHITE
   background:
     enabled: true
     image: assets/wallpapers/moonrise.png
@@ -4899,45 +4902,29 @@ morning-glory:
     char: ▌
     timeout: 2.0
   '256':
+    title:
+    - 52
+    - -1
     button_cancel:
     - 255
     - 235
     button_error:
     - 255
     - 196
-    toast_warning:
+    gutter:
+    - 235
+    - -1
+    accent:
     - 58
-    - -1
-    toast_error:
-    - 196
-    - -1
-    title:
-    - 52
-    - -1
-    scrollbar:
-    - 67
-    - 236
-    selection:
-    - '#a8b2c2'
-    - '#786bbb'
-    background: 234
-    toast_info:
-    - 67
-    - -1
-    plugin:
-    - '#150e0a'
     - -1
     whitespace:
     - 235
     - -1
-    shadow:
+    scrollbar:
+    - 67
     - 236
-    - 234
-    highlight:
-    - '#a8b2c2'
-    - '#786bbb'
-    border:
-    - '#2f4214'
+    text:
+    - 255
     - -1
     button_success:
     - 255
@@ -4945,174 +4932,190 @@ morning-glory:
     divider:
     - 240
     - -1
-    gutter:
-    - 235
+    background: 234
+    highlight:
+    - '#a8b2c2'
+    - '#786bbb'
+    help_text:
+    - '#2a3443'
+    - -1
+    plugin:
+    - '#150e0a'
+    - -1
+    shortcut_key:
+    - 58
+    - -1
+    selection:
+    - '#a8b2c2'
+    - '#786bbb'
+    shadow:
+    - 236
+    - 234
+    button_primary:
+    - 16
+    - 67
+    toast_warning:
+    - 58
+    - -1
+    toast_error:
+    - 196
+    - -1
+    toast_info:
+    - 67
+    - -1
+    highlight_text: '#a8b2c2'
+    window_close_button:
+    - 93
+    - -1
+    border:
+    - '#2f4214'
     - -1
     footer:
     - 240
     - -1
-    shortcut_key:
-    - 58
-    - -1
-    help_text:
-    - '#2a3443'
-    - -1
-    highlight_text: '#a8b2c2'
-    text:
-    - 255
-    - -1
-    accent:
-    - 58
-    - -1
-    window_close_button:
-    - 93
-    - -1
-    button_primary:
-    - 16
-    - 67
   '16':
-    button_cancel:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_BLACK
-    plugin:
-    - COLOR_BLACK
-    - -1
-    divider:
-    - COLOR_GREY
-    - -1
-    help_text:
-    - COLOR_BLUE
-    - -1
-    background: COLOR_BLACK
-    highlight:
-    - COLOR_WHITE
-    - COLOR_BRIGHT_BLUE
-    toast_warning:
-    - COLOR_YELLOW
-    - -1
-    accent:
-    - COLOR_YELLOW
-    - -1
-    button_error:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_BRIGHT_RED
-    border:
-    - COLOR_GREEN
-    - -1
-    button_primary:
-    - COLOR_BLACK
+    toast_info:
     - COLOR_BRIGHT_CYAN
-    selection:
-    - COLOR_WHITE
-    - COLOR_BRIGHT_BLUE
+    - -1
     whitespace:
     - COLOR_BLACK
     - -1
-    title:
+    button_cancel:
+    - COLOR_BRIGHT_WHITE
     - COLOR_BLACK
+    divider:
+    - COLOR_GREY
     - -1
     footer:
     - COLOR_GREY
     - -1
-    shadow:
+    button_primary:
     - COLOR_BLACK
-    - COLOR_BLACK
+    - COLOR_BRIGHT_CYAN
     button_success:
     - COLOR_BRIGHT_WHITE
     - COLOR_BRIGHT_GREEN
-    toast_error:
-    - COLOR_BRIGHT_RED
-    - -1
-    highlight_text: COLOR_WHITE
-    window_close_button:
-    - COLOR_BRIGHT_MAGENTA
-    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_BRIGHT_BLUE
     gutter:
     - COLOR_BLACK
-    - -1
-    text:
-    - COLOR_BRIGHT_WHITE
-    - -1
-    scrollbar:
-    - COLOR_BRIGHT_CYAN
-    - COLOR_BLACK
-    shortcut_key:
-    - COLOR_YELLOW
-    - -1
-    toast_info:
-    - COLOR_BRIGHT_CYAN
-    - -1
-  '8':
-    button_cancel:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    toast_warning:
-    - COLOR_YELLOW
-    - -1
-    footer:
-    - COLOR_BLACK
-    - -1
-    button_error:
-    - COLOR_WHITE
-    - COLOR_RED
-    toast_error:
-    - COLOR_RED
-    - -1
-    border:
-    - COLOR_GREEN
     - -1
     shadow:
     - COLOR_BLACK
     - COLOR_BLACK
-    shortcut_key:
+    button_error:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_BRIGHT_RED
+    toast_warning:
     - COLOR_YELLOW
     - -1
-    background: COLOR_BLACK
-    window_close_button:
-    - COLOR_MAGENTA
+    text:
+    - COLOR_BRIGHT_WHITE
     - -1
-    selection:
-    - COLOR_WHITE
-    - COLOR_BLUE
-    accent:
-    - COLOR_YELLOW
-    - -1
-    gutter:
-    - COLOR_BLACK
+    highlight_text: COLOR_WHITE
+    border:
+    - COLOR_GREEN
     - -1
     help_text:
     - COLOR_BLUE
     - -1
-    whitespace:
+    window_close_button:
+    - COLOR_BRIGHT_MAGENTA
+    - -1
+    highlight:
+    - COLOR_WHITE
+    - COLOR_BRIGHT_BLUE
+    title:
     - COLOR_BLACK
     - -1
     plugin:
     - COLOR_BLACK
     - -1
-    button_success:
-    - COLOR_WHITE
-    - COLOR_GREEN
-    title:
-    - COLOR_BLACK
+    accent:
+    - COLOR_YELLOW
     - -1
-    highlight_text: COLOR_WHITE
+    toast_error:
+    - COLOR_BRIGHT_RED
+    - -1
+    scrollbar:
+    - COLOR_BRIGHT_CYAN
+    - COLOR_BLACK
+    shortcut_key:
+    - COLOR_YELLOW
+    - -1
+    background: COLOR_BLACK
+  '8':
+    background: COLOR_BLACK
+    toast_warning:
+    - COLOR_YELLOW
+    - -1
+    help_text:
+    - COLOR_BLUE
+    - -1
+    window_close_button:
+    - COLOR_MAGENTA
+    - -1
+    button_error:
+    - COLOR_WHITE
+    - COLOR_RED
+    text:
+    - COLOR_WHITE
+    - -1
+    shortcut_key:
+    - COLOR_YELLOW
+    - -1
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
     scrollbar:
     - COLOR_CYAN
     - COLOR_BLACK
-    divider:
+    highlight_text: COLOR_WHITE
+    footer:
+    - COLOR_BLACK
+    - -1
+    toast_error:
+    - COLOR_RED
+    - -1
+    accent:
+    - COLOR_YELLOW
+    - -1
+    button_success:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    plugin:
+    - COLOR_BLACK
+    - -1
+    whitespace:
     - COLOR_BLACK
     - -1
     button_primary:
     - COLOR_BLACK
     - COLOR_CYAN
+    title:
+    - COLOR_BLACK
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    divider:
+    - COLOR_BLACK
+    - -1
     highlight:
     - COLOR_WHITE
     - COLOR_BLUE
-    text:
-    - COLOR_WHITE
+    gutter:
+    - COLOR_BLACK
     - -1
     toast_info:
     - COLOR_CYAN
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    border:
+    - COLOR_GREEN
     - -1
   background:
     enabled: true
@@ -5151,44 +5154,33 @@ mountain:
     char: ─
     length: '{window_width}'
   '256':
-    text:
-    - 252
+    whitespace:
+    - 239
     - -1
-    background: '#102030'
-    highlight:
-    - '#607070'
-    - '#103040'
-    button_error:
+    window_close_button:
     - 255
-    - 240
-    button_success:
-    - COLOR_BLACK
-    - 255
-    editor:
-      background: 236
-    footer:
-    - 245
-    - -1
-    scrollbar:
-    - '#507060'
     - -1
     shadow:
     - 235
     - COLOR_BLACK
-    whitespace:
-    - 239
-    - -1
-    shortcut_key:
+    modals:
+      background: 236
+    menu_editor:
+      background: 236
+    button_success:
+    - COLOR_BLACK
     - 255
-    - -1
-    plugin:
-    - 245
-    - -1
+    button_error:
+    - 255
+    - 240
     title:
     - 255
     - -1
     border:
     - 245
+    - -1
+    shortcut_key:
+    - 255
     - -1
     selection:
     - '#607070'
@@ -5196,155 +5188,166 @@ mountain:
     divider:
     - '#406060'
     - -1
-    accent:
-    - 248
+    footer:
+    - 245
     - -1
     button_cancel:
     - 255
     - 240
-    button_primary:
-    - COLOR_BLACK
-    - 255
-    modals:
+    editor:
       background: 236
-    highlight_text: '#607070'
-    help_text:
-    - 250
+    highlight:
+    - '#607070'
+    - '#103040'
+    scrollbar:
+    - '#507060'
     - -1
-    window_close_button:
-    - 255
-    - -1
-    menu_editor:
-      background: 236
     gutter:
     - 15
     - -1
+    help_text:
+    - 250
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - 255
+    accent:
+    - 248
+    - -1
+    plugin:
+    - 245
+    - -1
+    background: '#102030'
+    text:
+    - 252
+    - -1
+    highlight_text: '#607070'
   '16':
-    button_success:
-    - COLOR_BLACK
+    title:
     - COLOR_WHITE
+    - -1
     window_close_button:
     - COLOR_WHITE
     - -1
+    button_success:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    help_text:
+    - COLOR_WHITE
+    - -1
+    divider:
+    - COLOR_CYAN
+    - -1
+    whitespace:
+    - 8
+    - -1
+    selection:
+    - COLOR_GREY
+    - COLOR_CYAN
+    shadow:
+    - 8
+    - COLOR_BLACK
+    button_error:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    gutter:
+    - 8
+    - -1
+    shortcut_key:
+    - COLOR_WHITE
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    accent:
+    - COLOR_WHITE
+    - -1
+    plugin:
+    - COLOR_WHITE
+    - -1
+    footer:
+    - COLOR_WHITE
+    - -1
+    highlight:
+    - COLOR_GREY
+    - COLOR_CYAN
     background: COLOR_BLUE
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    border:
+    - COLOR_WHITE
+    - -1
     scrollbar:
     - COLOR_GREEN
     - -1
-    plugin:
-    - COLOR_WHITE
-    - -1
-    gutter:
-    - 8
-    - -1
-    button_error:
-    - COLOR_WHITE
-    - COLOR_BLACK
     highlight_text: COLOR_GREY
-    border:
+    text:
     - COLOR_WHITE
+    - -1
+  '8':
+    footer:
+    - COLOR_WHITE
+    - -1
+    selection:
+    - COLOR_BLACK
+    - COLOR_CYAN
+    divider:
+    - COLOR_CYAN
     - -1
     button_cancel:
     - COLOR_WHITE
     - COLOR_BLACK
-    shadow:
-    - 8
-    - COLOR_BLACK
-    highlight:
-    - COLOR_GREY
-    - COLOR_CYAN
-    shortcut_key:
-    - COLOR_WHITE
-    - -1
-    whitespace:
-    - 8
-    - -1
-    accent:
-    - COLOR_WHITE
-    - -1
-    button_primary:
-    - COLOR_BLACK
-    - COLOR_WHITE
-    footer:
-    - COLOR_WHITE
-    - -1
-    divider:
-    - COLOR_CYAN
-    - -1
     help_text:
     - COLOR_WHITE
     - -1
-    title:
-    - COLOR_WHITE
+    scrollbar:
+    - COLOR_GREEN
     - -1
-    text:
-    - COLOR_WHITE
-    - -1
-    selection:
-    - COLOR_GREY
-    - COLOR_CYAN
-  '8':
-    whitespace:
-    - COLOR_WHITE
-    - -1
-    help_text:
-    - COLOR_WHITE
-    - -1
-    highlight:
-    - COLOR_BLACK
-    - COLOR_CYAN
-    shortcut_key:
-    - COLOR_WHITE
-    - -1
-    title:
+    border:
     - COLOR_WHITE
     - -1
     window_close_button:
     - COLOR_WHITE
     - -1
-    button_error:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    plugin:
-    - COLOR_WHITE
-    - -1
-    button_cancel:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    scrollbar:
-    - COLOR_GREEN
-    - -1
     accent:
-    - COLOR_WHITE
-    - -1
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
-    button_primary:
-    - COLOR_BLACK
-    - COLOR_WHITE
-    text:
-    - COLOR_WHITE
-    - -1
-    gutter:
-    - COLOR_WHITE
-    - -1
-    selection:
-    - COLOR_BLACK
-    - COLOR_CYAN
-    button_success:
-    - COLOR_BLACK
-    - COLOR_WHITE
-    background: COLOR_BLACK
-    footer:
-    - COLOR_WHITE
-    - -1
-    divider:
-    - COLOR_CYAN
-    - -1
-    border:
     - COLOR_WHITE
     - -1
     highlight_text: COLOR_BLACK
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    text:
+    - COLOR_WHITE
+    - -1
+    plugin:
+    - COLOR_WHITE
+    - -1
+    button_success:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    button_error:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    title:
+    - COLOR_WHITE
+    - -1
+    whitespace:
+    - COLOR_WHITE
+    - -1
+    shortcut_key:
+    - COLOR_WHITE
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    gutter:
+    - COLOR_WHITE
+    - -1
+    background: COLOR_BLACK
+    highlight:
+    - COLOR_BLACK
+    - COLOR_CYAN
   background:
     enabled: true
     image: assets/wallpapers/mountain.png
@@ -5382,201 +5385,201 @@ nightscape:
     char: ─
     length: '{window_width}'
   '256':
-    text:
-    - 255
+    background: 53
+    footer:
+    - 61
     - -1
+    button_primary:
+    - 16
+    - 189
+    border:
+    - 61
+    - -1
+    plugin:
+    - 177
+    - -1
+    divider:
+    - 61
+    - -1
+    title:
+    - 189
+    - 54
+    button_cancel:
+    - 255
+    - 54
+    button_success:
+    - 255
+    - 40
     editor:
       background: 133
       footer:
       - 54
       - -1
-    button_error:
-    - 255
-    - 196
-    scrollbar:
-    - 189
-    - 236
-    accent:
-    - 177
-    - -1
-    highlight:
-    - 16
-    - 189
-    help_text:
-    - 177
-    - -1
-    shortcut_key:
-    - 177
-    - -1
-    button_primary:
-    - 16
-    - 189
-    gutter:
-    - 54
-    - -1
-    footer:
-    - 61
-    - -1
-    button_cancel:
-    - 255
-    - 54
-    border:
-    - 61
-    - -1
-    selection:
-    - 16
-    - 189
-    button_success:
-    - 255
-    - 40
     menu_editor:
       background: 133
       footer:
       - 54
       - -1
-    plugin:
+    text:
+    - 255
+    - -1
+    scrollbar:
+    - 189
+    - 236
+    shortcut_key:
     - 177
     - -1
-    title:
+    selection:
+    - 16
     - 189
-    - 54
-    background: 53
-    shadow:
-    - 236
-    - COLOR_BLACK
-    divider:
-    - 61
+    accent:
+    - 177
     - -1
-    window_close_button:
-    - 15
+    help_text:
+    - 177
     - -1
     whitespace:
     - 54
     - -1
-  '16':
+    button_error:
+    - 255
+    - 196
+    gutter:
+    - 54
+    - -1
+    highlight:
+    - 16
+    - 189
     shadow:
-    - COLOR_GREY
+    - 236
     - COLOR_BLACK
-    footer:
-    - COLOR_BLUE
+    window_close_button:
+    - 15
     - -1
-    button_cancel:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_BLUE
-    text:
-    - COLOR_BRIGHT_WHITE
-    - -1
-    help_text:
-    - COLOR_BRIGHT_MAGENTA
-    - -1
+  '16':
     gutter:
     - COLOR_BLUE
     - -1
-    button_error:
+    title:
     - COLOR_BRIGHT_WHITE
-    - COLOR_RED
-    scrollbar:
-    - COLOR_BRIGHT_WHITE
+    - -1
+    shadow:
     - COLOR_GREY
+    - COLOR_BLACK
     highlight:
-    - COLOR_BLACK
-    - COLOR_BRIGHT_WHITE
-    selection:
-    - COLOR_BLACK
-    - COLOR_BRIGHT_WHITE
-    border:
-    - COLOR_BLUE
-    - -1
-    divider:
-    - COLOR_BLUE
-    - -1
-    plugin:
-    - COLOR_BRIGHT_MAGENTA
-    - -1
-    button_success:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_GREEN
-    background: COLOR_BLACK
-    button_primary:
     - COLOR_BLACK
     - COLOR_BRIGHT_WHITE
     accent:
     - COLOR_BRIGHT_MAGENTA
     - -1
-    whitespace:
+    footer:
     - COLOR_BLUE
-    - -1
-    shortcut_key:
-    - COLOR_BRIGHT_MAGENTA
     - -1
     window_close_button:
     - COLOR_BRIGHT_RED
     - -1
-    title:
+    scrollbar:
     - COLOR_BRIGHT_WHITE
-    - -1
-  '8':
+    - COLOR_GREY
     help_text:
-    - COLOR_WHITE
+    - COLOR_BRIGHT_MAGENTA
     - -1
-    footer:
-    - COLOR_BLUE
-    - -1
-    highlight:
+    button_primary:
     - COLOR_BLACK
-    - COLOR_WHITE
-    selection:
-    - COLOR_BLACK
-    - COLOR_WHITE
-    whitespace:
+    - COLOR_BRIGHT_WHITE
+    background: COLOR_BLACK
+    border:
     - COLOR_BLUE
-    - -1
-    accent:
-    - COLOR_WHITE
     - -1
     plugin:
-    - COLOR_WHITE
+    - COLOR_BRIGHT_MAGENTA
     - -1
+    text:
+    - COLOR_BRIGHT_WHITE
+    - -1
+    button_cancel:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_BLUE
+    selection:
+    - COLOR_BLACK
+    - COLOR_BRIGHT_WHITE
     divider:
     - COLOR_BLUE
     - -1
-    button_cancel:
-    - COLOR_WHITE
+    button_success:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_GREEN
+    whitespace:
     - COLOR_BLUE
+    - -1
+    button_error:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_RED
+    shortcut_key:
+    - COLOR_BRIGHT_MAGENTA
+    - -1
+  '8':
+    gutter:
+    - COLOR_BLUE
+    - -1
+    scrollbar:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    help_text:
+    - COLOR_WHITE
+    - -1
+    background: COLOR_BLACK
+    whitespace:
+    - COLOR_BLUE
+    - -1
     button_error:
     - COLOR_WHITE
     - COLOR_RED
     title:
     - COLOR_WHITE
     - -1
-    gutter:
-    - COLOR_BLUE
-    - -1
-    text:
+    button_primary:
+    - COLOR_BLACK
     - COLOR_WHITE
-    - -1
-    border:
+    button_cancel:
+    - COLOR_WHITE
     - COLOR_BLUE
-    - -1
     window_close_button:
     - COLOR_YELLOW
+    - -1
+    selection:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    divider:
+    - COLOR_BLUE
+    - -1
+    plugin:
+    - COLOR_WHITE
     - -1
     shortcut_key:
     - COLOR_WHITE
     - -1
-    scrollbar:
+    text:
     - COLOR_WHITE
+    - -1
+    accent:
+    - COLOR_WHITE
+    - -1
+    highlight:
     - COLOR_BLACK
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
+    - COLOR_WHITE
     button_success:
     - COLOR_WHITE
     - COLOR_GREEN
-    button_primary:
+    shadow:
     - COLOR_BLACK
-    - COLOR_WHITE
-    background: COLOR_BLACK
+    - COLOR_BLACK
+    footer:
+    - COLOR_BLUE
+    - -1
+    border:
+    - COLOR_BLUE
+    - -1
   background:
     enabled: true
     image: assets/wallpapers/nightscape.png
@@ -5616,188 +5619,188 @@ nord:
     whitespace:
     - 239
     - -1
+    shortcut_key:
+    - 111
+    - -1
+    divider:
+    - COLOR_WHITE
+    - -1
+    selection:
+    - 255
+    - 60
+    accent:
+    - 60
+    - -1
+    scrollbar:
+    - 60
+    - 236
+    border:
+    - 60
+    - -1
+    plugin:
+    - 146
+    - -1
     highlight:
     - COLOR_BLACK
     - 111
-    window_close_button:
-    - 203
-    - -1
-    help_text:
-    - 111
-    - -1
-    button_error:
-    - 255
-    - 239
-    text:
-    - 255
-    - -1
-    shadow:
-    - 236
-    - COLOR_BLACK
-    button_primary:
-    - 255
-    - 60
     footer:
     - 255
     - -1
     gutter:
     - 239
     - -1
-    selection:
-    - 255
-    - 60
-    button_cancel:
-    - 255
-    - 111
-    scrollbar:
-    - 60
-    - 236
-    plugin:
-    - 146
+    window_close_button:
+    - 203
     - -1
-    accent:
-    - 60
-    - -1
-    background: COLOR_BLACK
     title:
     - 111
     - -1
-    border:
-    - 60
-    - -1
-    divider:
-    - COLOR_WHITE
-    - -1
-    shortcut_key:
+    button_cancel:
+    - 255
     - 111
+    button_primary:
+    - 255
+    - 60
+    help_text:
+    - 111
+    - -1
+    background: COLOR_BLACK
+    shadow:
+    - 236
+    - COLOR_BLACK
+    button_error:
+    - 255
+    - 239
+    text:
+    - 255
     - -1
     button_success:
     - 255
     - 108
   '16':
-    window_close_button:
-    - COLOR_BRIGHT_RED
-    - -1
-    help_text:
-    - COLOR_CYAN
-    - -1
-    gutter:
-    - 8
-    - -1
     text:
-    - COLOR_WHITE
-    - -1
-    button_error:
-    - COLOR_WHITE
-    - COLOR_BLUE
-    title:
-    - COLOR_CYAN
-    - -1
-    background: COLOR_BLACK
-    button_success:
-    - COLOR_WHITE
-    - COLOR_GREEN
-    selection:
-    - COLOR_WHITE
-    - COLOR_BLUE
-    shadow:
-    - 8
-    - COLOR_BLACK
-    plugin:
-    - COLOR_CYAN
-    - -1
-    highlight:
-    - COLOR_BLACK
-    - COLOR_CYAN
-    scrollbar:
-    - COLOR_CYAN
-    - COLOR_BLACK
-    divider:
-    - COLOR_WHITE
-    - -1
-    whitespace:
-    - 8
-    - -1
-    border:
-    - COLOR_BLUE
-    - -1
-    shortcut_key:
-    - COLOR_CYAN
-    - -1
-    footer:
     - COLOR_WHITE
     - -1
     button_primary:
     - COLOR_WHITE
     - COLOR_CYAN
-    button_cancel:
-    - COLOR_WHITE
-    - COLOR_BLACK
     accent:
     - COLOR_BLUE
     - -1
-  '8':
+    help_text:
+    - COLOR_CYAN
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_CYAN
+    gutter:
+    - 8
+    - -1
+    scrollbar:
+    - COLOR_CYAN
+    - COLOR_BLACK
+    shadow:
+    - 8
+    - COLOR_BLACK
+    selection:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    button_error:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    whitespace:
+    - 8
+    - -1
+    title:
+    - COLOR_CYAN
+    - -1
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
     divider:
+    - COLOR_WHITE
+    - -1
+    background: COLOR_BLACK
+    footer:
     - COLOR_WHITE
     - -1
     plugin:
     - COLOR_CYAN
     - -1
-    footer:
-    - COLOR_WHITE
+    border:
+    - COLOR_BLUE
     - -1
+    button_success:
+    - COLOR_WHITE
+    - COLOR_GREEN
     shortcut_key:
     - COLOR_CYAN
     - -1
-    gutter:
-    - COLOR_BLUE
+    window_close_button:
+    - COLOR_BRIGHT_RED
     - -1
+  '8':
     accent:
     - COLOR_BLUE
     - -1
     selection:
     - COLOR_WHITE
     - COLOR_BLUE
-    button_cancel:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    title:
+    scrollbar:
     - COLOR_CYAN
+    - COLOR_BLACK
+    button_primary:
+    - COLOR_WHITE
+    - COLOR_CYAN
+    divider:
+    - COLOR_WHITE
     - -1
-    border:
+    whitespace:
     - COLOR_BLUE
     - -1
-    highlight:
-    - COLOR_BLACK
+    shortcut_key:
     - COLOR_CYAN
-    help_text:
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    title:
     - COLOR_CYAN
     - -1
     button_success:
     - COLOR_WHITE
     - COLOR_GREEN
-    whitespace:
-    - COLOR_BLUE
+    help_text:
+    - COLOR_CYAN
     - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_CYAN
     button_error:
     - COLOR_WHITE
     - COLOR_BLUE
-    background: COLOR_BLACK
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
-    scrollbar:
-    - COLOR_CYAN
-    - COLOR_BLACK
+    footer:
+    - COLOR_WHITE
+    - -1
     text:
     - COLOR_WHITE
+    - -1
+    gutter:
+    - COLOR_BLUE
+    - -1
+    border:
+    - COLOR_BLUE
+    - -1
+    background: COLOR_BLACK
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    plugin:
+    - COLOR_CYAN
     - -1
     window_close_button:
     - COLOR_RED
     - -1
-    button_primary:
-    - COLOR_WHITE
-    - COLOR_CYAN
 pacman:
   marquee:
     char: •
@@ -5831,59 +5834,22 @@ pacman:
     char: '{ascii:205}'
     length: '{screen_width}'
   '256':
-    button_primary:
-    - COLOR_BLACK
-    - 226
-    background: COLOR_BLACK
-    highlight:
-    - COLOR_BLACK
-    - 226
     title:
     - 226
+    - -1
+    footer:
+    - COLOR_GREY
     - -1
     shadow:
     - 236
     - COLOR_BLACK
-    footer:
-    - COLOR_GREY
-    - -1
-    plugin:
-    - 255
-    - -1
-    selection:
-    - 255
-    - 21
     text:
     - 255
-    - -1
-    accent:
-    - 51
-    - -1
-    window_close_button:
-    - 196
     - -1
     shortcut_key:
     - 205
     - -1
-    button_cancel:
-    - 255
-    - 21
-    scrollbar:
-    - 226
-    - 235
-    button_success:
-    - COLOR_BLACK
-    - 51
-    divider:
-    - 207
-    - -1
-    border:
-    - 21
-    - -1
-    whitespace:
-    - 239
-    - -1
-    button_error:
+    selection:
     - 255
     - 21
     gutter:
@@ -5892,130 +5858,167 @@ pacman:
     help_text:
     - 51
     - -1
-  '16':
-    footer:
-    - COLOR_BLUE
+    button_cancel:
+    - 255
+    - 21
+    accent:
+    - 51
     - -1
+    background: COLOR_BLACK
+    plugin:
+    - 255
+    - -1
+    button_error:
+    - 255
+    - 21
+    divider:
+    - 207
+    - -1
+    button_success:
+    - COLOR_BLACK
+    - 51
     whitespace:
-    - 8
-    - -1
-    highlight:
-    - COLOR_BLACK
-    - COLOR_YELLOW
-    shadow:
-    - 8
-    - COLOR_BLACK
-    border:
-    - COLOR_BLUE
-    - -1
-    gutter:
-    - COLOR_RED
-    - -1
-    help_text:
-    - COLOR_CYAN
+    - 239
     - -1
     button_primary:
     - COLOR_BLACK
-    - COLOR_YELLOW
-    background: COLOR_BLACK
-    accent:
-    - COLOR_CYAN
-    - -1
-    title:
-    - COLOR_YELLOW
-    - -1
-    selection:
-    - COLOR_WHITE
-    - COLOR_BLUE
-    button_error:
-    - COLOR_WHITE
-    - COLOR_BLUE
+    - 226
     scrollbar:
-    - COLOR_YELLOW
+    - 226
+    - 235
+    highlight:
     - COLOR_BLACK
-    divider:
-    - 13
+    - 226
+    window_close_button:
+    - 196
     - -1
-    plugin:
+    border:
+    - 21
+    - -1
+  '16':
+    border:
+    - COLOR_BLUE
+    - -1
+    text:
     - COLOR_WHITE
     - -1
     window_close_button:
     - COLOR_BRIGHT_RED
     - -1
-    button_cancel:
-    - COLOR_WHITE
-    - COLOR_BLUE
-    shortcut_key:
-    - COLOR_MAGENTA
-    - -1
-    text:
-    - COLOR_WHITE
-    - -1
-    button_success:
-    - COLOR_BLACK
-    - COLOR_CYAN
-  '8':
-    shortcut_key:
-    - COLOR_MAGENTA
-    - -1
-    text:
-    - COLOR_WHITE
-    - -1
-    help_text:
-    - COLOR_CYAN
-    - -1
-    button_cancel:
-    - COLOR_WHITE
-    - COLOR_BLUE
-    footer:
-    - COLOR_BLUE
-    - -1
-    button_primary:
-    - COLOR_BLACK
-    - COLOR_YELLOW
-    window_close_button:
-    - COLOR_RED
-    - -1
-    plugin:
-    - COLOR_WHITE
-    - -1
-    accent:
-    - COLOR_CYAN
-    - -1
-    border:
-    - COLOR_BLUE
-    - -1
-    button_error:
-    - COLOR_WHITE
-    - COLOR_BLUE
-    button_success:
-    - COLOR_BLACK
-    - COLOR_CYAN
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
-    highlight:
-    - COLOR_BLACK
-    - COLOR_YELLOW
-    gutter:
-    - COLOR_RED
-    - -1
-    background: COLOR_BLACK
-    whitespace:
-    - COLOR_BLUE
-    - -1
-    selection:
-    - COLOR_WHITE
-    - COLOR_BLUE
     scrollbar:
     - COLOR_YELLOW
     - COLOR_BLACK
     title:
     - COLOR_YELLOW
     - -1
+    button_success:
+    - COLOR_BLACK
+    - COLOR_CYAN
+    shadow:
+    - 8
+    - COLOR_BLACK
+    help_text:
+    - COLOR_CYAN
+    - -1
+    whitespace:
+    - 8
+    - -1
+    divider:
+    - 13
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    button_error:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    gutter:
+    - COLOR_RED
+    - -1
+    background: COLOR_BLACK
+    accent:
+    - COLOR_CYAN
+    - -1
+    plugin:
+    - COLOR_WHITE
+    - -1
+    footer:
+    - COLOR_BLUE
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    highlight:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    shortcut_key:
+    - COLOR_MAGENTA
+    - -1
+  '8':
+    help_text:
+    - COLOR_CYAN
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    border:
+    - COLOR_BLUE
+    - -1
+    window_close_button:
+    - COLOR_RED
+    - -1
     divider:
     - 5
     - -1
+    accent:
+    - COLOR_CYAN
+    - -1
+    gutter:
+    - COLOR_RED
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    footer:
+    - COLOR_BLUE
+    - -1
+    background: COLOR_BLACK
+    button_success:
+    - COLOR_BLACK
+    - COLOR_CYAN
+    whitespace:
+    - COLOR_BLUE
+    - -1
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    shortcut_key:
+    - COLOR_MAGENTA
+    - -1
+    plugin:
+    - COLOR_WHITE
+    - -1
+    title:
+    - COLOR_YELLOW
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    button_error:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    text:
+    - COLOR_WHITE
+    - -1
+    scrollbar:
+    - COLOR_YELLOW
+    - COLOR_BLACK
+    highlight:
+    - COLOR_BLACK
+    - COLOR_YELLOW
 pinetree:
   marquee:
     char: •
@@ -6045,156 +6048,177 @@ pinetree:
     char: ─
     length: '{window_width}'
   '256':
-    footer:
-    - 22
-    - -1
-    selection:
-    - 16
-    - 253
-    accent:
-    - 22
-    - -1
-    divider:
-    - 94
+    shortcut_key:
+    - 238
     - -1
     button_error:
     - 255
     - 196
-    shortcut_key:
-    - 238
-    - -1
-    plugin:
-    - 94
-    - -1
     button_cancel:
     - 255
     - 233
+    border:
+    - 94
+    - -1
+    scrollbar:
+    - 22
+    - 236
+    text:
+    - 246
+    - -1
     shadow:
     - 236
     - COLOR_BLACK
     whitespace:
     - 233
     - -1
-    window_close_button:
-    - 112
+    divider:
+    - 94
+    - -1
+    title:
+    - 253
     - -1
     button_success:
     - 255
     - 22
-    title:
-    - 253
-    - -1
-    highlight:
-    - 7
-    - 22
-    scrollbar:
-    - 22
-    - 236
-    gutter:
-    - 8
-    - -1
-    help_text:
-    - 58
-    - -1
-    border:
+    plugin:
     - 94
     - -1
-    text:
-    - 246
+    footer:
+    - 22
     - -1
     button_primary:
     - 16
     - 253
+    highlight:
+    - 7
+    - 22
     background: 0
-  '16':
-    scrollbar:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_GREY
-    button_primary:
-    - COLOR_BLACK
-    - COLOR_BRIGHT_WHITE
-    window_close_button:
-    - COLOR_BRIGHT_GREEN
+    help_text:
+    - 58
     - -1
-    gutter:
-    - COLOR_GREY
+    accent:
+    - 22
+    - -1
+    window_close_button:
+    - 112
     - -1
     selection:
-    - COLOR_BLACK
-    - COLOR_BRIGHT_WHITE
-    shortcut_key:
-    - COLOR_GREY
+    - 16
+    - 253
+    gutter:
+    - 8
     - -1
-    highlight:
-    - COLOR_WHITE
+  '16':
+    accent:
     - COLOR_BLACK
-    border:
-    - COLOR_YELLOW
-    - -1
-    divider:
-    - COLOR_YELLOW
     - -1
     footer:
     - COLOR_BLACK
     - -1
-    button_error:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_RED
+    help_text:
+    - COLOR_BLACK
+    - -1
     title:
     - COLOR_BRIGHT_WHITE
     - -1
-    button_cancel:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_BLACK
-    plugin:
+    border:
     - COLOR_YELLOW
     - -1
-    shadow:
-    - COLOR_GREY
-    - COLOR_BLACK
-    text:
-    - COLOR_WHITE
-    - -1
-    accent:
-    - COLOR_BLACK
-    - -1
-    background: COLOR_BLACK
     button_success:
     - COLOR_BRIGHT_WHITE
     - COLOR_BLACK
-    help_text:
+    button_primary:
     - COLOR_BLACK
+    - COLOR_BRIGHT_WHITE
+    highlight:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    shortcut_key:
+    - COLOR_GREY
     - -1
     whitespace:
     - COLOR_BLACK
     - -1
-  '8':
-    background: COLOR_BLACK
+    button_cancel:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_BLACK
+    window_close_button:
+    - COLOR_BRIGHT_GREEN
+    - -1
+    divider:
+    - COLOR_YELLOW
+    - -1
+    plugin:
+    - COLOR_YELLOW
+    - -1
+    scrollbar:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_GREY
     selection:
     - COLOR_BLACK
-    - COLOR_WHITE
+    - COLOR_BRIGHT_WHITE
+    background: COLOR_BLACK
+    gutter:
+    - COLOR_GREY
+    - -1
     text:
     - COLOR_WHITE
     - -1
-    highlight:
+    shadow:
+    - COLOR_GREY
+    - COLOR_BLACK
+    button_error:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_RED
+  '8':
+    whitespace:
+    - COLOR_BLACK
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    button_success:
     - COLOR_WHITE
     - COLOR_BLACK
     shadow:
     - COLOR_BLACK
     - COLOR_BLACK
-    footer:
-    - COLOR_BLACK
-    - -1
     window_close_button:
     - COLOR_GREEN
     - -1
     scrollbar:
     - COLOR_WHITE
     - COLOR_BLACK
-    whitespace:
+    text:
+    - COLOR_WHITE
+    - -1
+    divider:
+    - COLOR_YELLOW
+    - -1
+    help_text:
     - COLOR_BLACK
     - -1
+    footer:
+    - COLOR_BLACK
+    - -1
+    selection:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    button_error:
+    - COLOR_WHITE
+    - COLOR_RED
+    shortcut_key:
+    - COLOR_BLACK
+    - -1
+    title:
+    - COLOR_WHITE
+    - -1
+    background: COLOR_BLACK
     gutter:
+    - COLOR_YELLOW
+    - -1
+    plugin:
     - COLOR_YELLOW
     - -1
     button_cancel:
@@ -6203,33 +6227,12 @@ pinetree:
     border:
     - COLOR_YELLOW
     - -1
-    divider:
-    - COLOR_YELLOW
-    - -1
-    shortcut_key:
-    - COLOR_BLACK
-    - -1
-    button_success:
+    highlight:
     - COLOR_WHITE
     - COLOR_BLACK
-    plugin:
-    - COLOR_YELLOW
-    - -1
     accent:
     - COLOR_BLACK
     - -1
-    title:
-    - COLOR_WHITE
-    - -1
-    help_text:
-    - COLOR_BLACK
-    - -1
-    button_error:
-    - COLOR_WHITE
-    - COLOR_RED
-    button_primary:
-    - COLOR_BLACK
-    - COLOR_WHITE
   background:
     enabled: true
     image: assets/wallpapers/pinetree.png
@@ -6261,166 +6264,172 @@ portman-1:
     char: ▌
     timeout: 2.0
   '256':
-    button_cancel:
-    - 255
-    - 234
-    gutter:
-    - '#8793ab'
-    - -1
-    button_primary:
-    - 16
-    - 110
-    text:
-    - 255
-    - -1
-    divider:
-    - 240
-    - -1
-    shortcut_key:
-    - 146
-    - -1
-    plugin:
-    - '#1d1d19'
-    - -1
-    footer:
-    - 240
-    - -1
-    border:
-    - 240
-    - -1
-    highlight_text: '#a8b5ce'
-    help_text:
-    - '#8d96aa'
-    - -1
-    background: '#26251f'
-    button_error:
-    - 255
-    - 95
-    whitespace:
-    - 234
-    - -1
-    toast_error:
-    - 95
-    - -1
-    button_success:
-    - 255
-    - 40
-    highlight:
-    - '#a8b5ce'
-    - '#563b2b'
     selection:
     - '#a8b5ce'
     - '#563b2b'
-    toast_warning:
-    - 58
-    - -1
-    scrollbar:
-    - 110
-    - 236
-    title:
-    - 110
-    - -1
-    window_close_button:
-    - 203
+    text:
+    - 255
     - -1
     shadow:
     - 236
     - 233
-    toast_info:
+    highlight_text: '#a8b5ce'
+    title:
     - 110
+    - -1
+    scrollbar:
+    - 110
+    - 236
+    divider:
+    - 240
     - -1
     accent:
     - 146
     - -1
-  '16':
     footer:
-    - COLOR_GREY
+    - 240
+    - -1
+    shortcut_key:
+    - 146
+    - -1
+    button_cancel:
+    - 255
+    - 234
+    button_error:
+    - 255
+    - 95
+    toast_info:
+    - 110
     - -1
     whitespace:
-    - COLOR_BLACK
+    - 234
     - -1
+    background: '#26251f'
+    gutter:
+    - '#8793ab'
+    - -1
+    toast_error:
+    - 95
+    - -1
+    highlight:
+    - '#a8b5ce'
+    - '#563b2b'
+    border:
+    - 240
+    - -1
+    window_close_button:
+    - 203
+    - -1
+    toast_warning:
+    - 58
+    - -1
+    help_text:
+    - '#8d96aa'
+    - -1
+    button_primary:
+    - 16
+    - 110
+    button_success:
+    - 255
+    - 40
+    plugin:
+    - '#1d1d19'
+    - -1
+  '16':
     divider:
     - COLOR_GREY
     - -1
-    text:
-    - COLOR_BRIGHT_WHITE
-    - -1
-    scrollbar:
-    - COLOR_BRIGHT_BLUE
-    - COLOR_BLACK
-    help_text:
-    - COLOR_GREY
-    - -1
-    button_error:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_RED
     toast_info:
     - COLOR_BRIGHT_BLUE
     - -1
-    highlight_text: COLOR_BRIGHT_BLUE
-    shortcut_key:
-    - COLOR_WHITE
-    - -1
-    gutter:
-    - COLOR_BRIGHT_BLUE
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    window_close_button:
+    - COLOR_BRIGHT_RED
     - -1
     border:
     - COLOR_GREY
     - -1
-    background: COLOR_YELLOW
-    window_close_button:
-    - COLOR_BRIGHT_RED
-    - -1
-    button_cancel:
-    - COLOR_BRIGHT_WHITE
+    plugin:
     - COLOR_BLACK
+    - -1
     accent:
     - COLOR_WHITE
     - -1
-    selection:
-    - COLOR_BRIGHT_BLUE
-    - COLOR_YELLOW
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
-    toast_warning:
-    - COLOR_YELLOW
+    toast_error:
+    - COLOR_RED
     - -1
-    highlight:
+    title:
+    - COLOR_BRIGHT_BLUE
+    - -1
+    gutter:
+    - COLOR_BRIGHT_BLUE
+    - -1
+    text:
+    - COLOR_BRIGHT_WHITE
+    - -1
+    whitespace:
+    - COLOR_BLACK
+    - -1
+    selection:
     - COLOR_BRIGHT_BLUE
     - COLOR_YELLOW
     button_success:
     - COLOR_BRIGHT_WHITE
     - COLOR_BRIGHT_GREEN
+    scrollbar:
+    - COLOR_BRIGHT_BLUE
+    - COLOR_BLACK
+    button_error:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_RED
+    toast_warning:
+    - COLOR_YELLOW
+    - -1
+    highlight:
+    - COLOR_BRIGHT_BLUE
+    - COLOR_YELLOW
+    button_cancel:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_BLACK
+    help_text:
+    - COLOR_GREY
+    - -1
     button_primary:
     - COLOR_BLACK
     - COLOR_BRIGHT_BLUE
+    highlight_text: COLOR_BRIGHT_BLUE
+    footer:
+    - COLOR_GREY
+    - -1
+    background: COLOR_YELLOW
+    shortcut_key:
+    - COLOR_WHITE
+    - -1
+  '8':
     toast_error:
     - COLOR_RED
     - -1
     title:
-    - COLOR_BRIGHT_BLUE
+    - COLOR_BLUE
     - -1
     plugin:
-    - COLOR_BLACK
-    - -1
-  '8':
-    button_cancel:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    button_success:
-    - COLOR_WHITE
-    - COLOR_GREEN
-    border:
     - COLOR_BLACK
     - -1
     scrollbar:
     - COLOR_BLUE
     - COLOR_BLACK
-    plugin:
+    highlight:
+    - COLOR_BLUE
+    - COLOR_YELLOW
+    shortcut_key:
+    - COLOR_WHITE
+    - -1
+    border:
     - COLOR_BLACK
     - -1
-    whitespace:
+    divider:
     - COLOR_BLACK
     - -1
     gutter:
@@ -6429,53 +6438,47 @@ portman-1:
     footer:
     - COLOR_BLACK
     - -1
-    button_error:
-    - COLOR_WHITE
-    - COLOR_RED
-    button_primary:
-    - COLOR_BLACK
-    - COLOR_BLUE
-    background: COLOR_YELLOW
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
-    toast_info:
-    - COLOR_BLUE
-    - -1
-    accent:
-    - COLOR_WHITE
-    - -1
-    text:
-    - COLOR_WHITE
-    - -1
-    shortcut_key:
-    - COLOR_WHITE
-    - -1
-    divider:
-    - COLOR_BLACK
-    - -1
-    title:
-    - COLOR_BLUE
-    - -1
-    toast_error:
+    window_close_button:
     - COLOR_RED
     - -1
     selection:
     - COLOR_BLUE
     - COLOR_YELLOW
-    highlight:
+    whitespace:
+    - COLOR_BLACK
+    - -1
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    button_success:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    text:
+    - COLOR_WHITE
+    - -1
+    highlight_text: COLOR_BLUE
+    toast_info:
     - COLOR_BLUE
-    - COLOR_YELLOW
-    help_text:
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_BLUE
+    background: COLOR_YELLOW
+    accent:
     - COLOR_WHITE
     - -1
     toast_warning:
     - COLOR_YELLOW
     - -1
-    window_close_button:
+    button_error:
+    - COLOR_WHITE
     - COLOR_RED
+    help_text:
+    - COLOR_WHITE
     - -1
-    highlight_text: COLOR_BLUE
   background:
     enabled: true
     image: assets/wallpapers/portman.jpg
@@ -6507,217 +6510,217 @@ portman-2:
     char: ▌
     timeout: 2.0
   '256':
-    divider:
-    - 240
-    - -1
-    toast_info:
-    - 94
-    - -1
-    text:
-    - 255
-    - -1
-    window_close_button:
-    - '#a98b3c'
-    - -1
-    footer:
-    - 240
+    plugin:
+    - '#a2adb4'
     - -1
     toast_error:
     - 95
     - -1
-    background: '#36332b'
-    border:
-    - 240
-    - -1
-    shadow:
-    - 236
-    - 234
-    whitespace:
-    - 235
-    - -1
-    title:
-    - 94
-    - -1
-    shortcut_key:
-    - '#2d2b25'
-    - -1
-    highlight:
-    - 255
-    - 94
-    selection:
-    - 255
-    - 94
     button_error:
     - 255
     - 95
     button_success:
     - 255
     - 40
-    gutter:
-    - '#a78938'
-    - -1
-    button_cancel:
+    text:
     - 255
-    - 235
-    toast_warning:
-    - 101
-    - -1
-    help_text:
-    - '#a6b2b7'
     - -1
     scrollbar:
     - 94
     - 236
-    accent:
-    - 101
+    selection:
+    - 255
+    - 94
+    toast_info:
+    - 94
     - -1
-    plugin:
-    - '#a2adb4'
+    help_text:
+    - '#a6b2b7'
+    - -1
+    title:
+    - 94
+    - -1
+    whitespace:
+    - 235
+    - -1
+    button_cancel:
+    - 255
+    - 235
+    shadow:
+    - 236
+    - 234
+    gutter:
+    - '#a78938'
     - -1
     button_primary:
     - 255
     - 94
-  '16':
-    divider:
-    - COLOR_GREY
+    accent:
+    - 101
+    - -1
+    shortcut_key:
+    - '#2d2b25'
+    - -1
+    window_close_button:
+    - '#a98b3c'
+    - -1
+    border:
+    - 240
     - -1
     footer:
-    - COLOR_GREY
+    - 240
+    - -1
+    toast_warning:
+    - 101
+    - -1
+    background: '#36332b'
+    divider:
+    - 240
     - -1
     highlight:
-    - COLOR_BRIGHT_WHITE
+    - 255
+    - 94
+  '16':
+    title:
     - COLOR_YELLOW
-    button_primary:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_YELLOW
-    toast_warning:
-    - COLOR_BRIGHT_YELLOW
     - -1
-    accent:
-    - COLOR_BRIGHT_YELLOW
-    - -1
-    plugin:
-    - COLOR_WHITE
-    - -1
+    background: COLOR_YELLOW
     window_close_button:
     - COLOR_BRIGHT_YELLOW
     - -1
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
-    help_text:
-    - COLOR_WHITE
-    - -1
-    shortcut_key:
-    - COLOR_BLACK
+    button_primary:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_YELLOW
+    gutter:
+    - COLOR_BRIGHT_YELLOW
     - -1
     scrollbar:
     - COLOR_YELLOW
     - COLOR_BLACK
-    text:
-    - COLOR_BRIGHT_WHITE
-    - -1
-    background: COLOR_YELLOW
-    gutter:
-    - COLOR_BRIGHT_YELLOW
-    - -1
-    toast_info:
-    - COLOR_YELLOW
-    - -1
-    title:
-    - COLOR_YELLOW
+    toast_error:
+    - COLOR_RED
     - -1
     button_success:
     - COLOR_BRIGHT_WHITE
     - COLOR_BRIGHT_GREEN
-    selection:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_YELLOW
-    border:
-    - COLOR_GREY
-    - -1
-    toast_error:
-    - COLOR_RED
-    - -1
-    button_error:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_RED
-    whitespace:
-    - COLOR_BLACK
-    - -1
-    button_cancel:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_BLACK
-  '8':
-    divider:
-    - COLOR_BLACK
-    - -1
-    window_close_button:
-    - COLOR_YELLOW
-    - -1
-    gutter:
-    - COLOR_YELLOW
-    - -1
-    button_error:
-    - COLOR_WHITE
-    - COLOR_RED
-    toast_info:
-    - COLOR_YELLOW
-    - -1
-    button_primary:
-    - COLOR_WHITE
-    - COLOR_YELLOW
-    button_cancel:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    toast_error:
-    - COLOR_RED
-    - -1
-    background: COLOR_YELLOW
-    border:
-    - COLOR_BLACK
-    - -1
-    button_success:
-    - COLOR_WHITE
-    - COLOR_GREEN
-    shortcut_key:
-    - COLOR_BLACK
-    - -1
     help_text:
     - COLOR_WHITE
     - -1
-    highlight:
-    - COLOR_WHITE
-    - COLOR_YELLOW
-    scrollbar:
-    - COLOR_YELLOW
+    border:
+    - COLOR_GREY
+    - -1
+    divider:
+    - COLOR_GREY
+    - -1
+    shortcut_key:
     - COLOR_BLACK
+    - -1
+    selection:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_YELLOW
     footer:
-    - COLOR_BLACK
+    - COLOR_GREY
     - -1
     whitespace:
     - COLOR_BLACK
     - -1
-    accent:
+    text:
+    - COLOR_BRIGHT_WHITE
+    - -1
+    button_cancel:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_BLACK
+    toast_info:
     - COLOR_YELLOW
     - -1
+    button_error:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_RED
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
     toast_warning:
+    - COLOR_BRIGHT_YELLOW
+    - -1
+    highlight:
+    - COLOR_BRIGHT_WHITE
     - COLOR_YELLOW
+    plugin:
+    - COLOR_WHITE
+    - -1
+    accent:
+    - COLOR_BRIGHT_YELLOW
+    - -1
+  '8':
+    footer:
+    - COLOR_BLACK
+    - -1
+    title:
+    - COLOR_YELLOW
+    - -1
+    divider:
+    - COLOR_BLACK
+    - -1
+    border:
+    - COLOR_BLACK
     - -1
     plugin:
     - COLOR_WHITE
     - -1
+    help_text:
+    - COLOR_WHITE
+    - -1
+    accent:
+    - COLOR_YELLOW
+    - -1
+    button_error:
+    - COLOR_WHITE
+    - COLOR_RED
     shadow:
     - COLOR_BLACK
     - COLOR_BLACK
+    toast_error:
+    - COLOR_RED
+    - -1
+    toast_info:
+    - COLOR_YELLOW
+    - -1
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    background: COLOR_YELLOW
+    shortcut_key:
+    - COLOR_BLACK
+    - -1
     text:
     - COLOR_WHITE
     - -1
+    gutter:
+    - COLOR_YELLOW
+    - -1
+    window_close_button:
+    - COLOR_YELLOW
+    - -1
+    scrollbar:
+    - COLOR_YELLOW
+    - COLOR_BLACK
     selection:
     - COLOR_WHITE
     - COLOR_YELLOW
-    title:
+    highlight:
+    - COLOR_WHITE
     - COLOR_YELLOW
+    toast_warning:
+    - COLOR_YELLOW
+    - -1
+    button_success:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    button_primary:
+    - COLOR_WHITE
+    - COLOR_YELLOW
+    whitespace:
+    - COLOR_BLACK
     - -1
   background:
     enabled: true
@@ -6756,190 +6759,190 @@ qbasic:
     char: '{ascii:196}'
     length: '{window_width}'
   '256':
-    button_error:
-    - COLOR_WHITE
-    - 51
-    button_cancel:
-    - COLOR_WHITE
-    - 51
-    gutter:
-    - 51
-    - 19
-    selection:
-    - COLOR_BLACK
-    - COLOR_WHITE
-    button_primary:
-    - COLOR_WHITE
-    - 51
-    whitespace:
-    - 60
-    - 19
     window_close_button:
     - 203
     - 19
-    help_text:
-    - 51
-    - 19
-    plugin:
-    - 226
-    - 19
-    shadow:
-    - 22
-    - 17
-    divider:
-    - 51
-    - 19
-    footer:
-    - 255
-    - 19
-    title:
-    - 226
-    - 19
-    background: 19
     text:
     - 255
     - 19
-    button_success:
+    button_cancel:
     - COLOR_WHITE
     - 51
-    shortcut_key:
-    - 226
-    - 19
-    accent:
+    selection:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    divider:
     - 51
     - 19
-    border:
-    - 51
+    background: 19
+    whitespace:
+    - 60
     - 19
-    scrollbar:
+    button_error:
+    - COLOR_WHITE
     - 51
-    - 19
     highlight:
     - 16
     - 51
-  '16':
+    shadow:
+    - 22
+    - 17
+    button_success:
+    - COLOR_WHITE
+    - 51
+    button_primary:
+    - COLOR_WHITE
+    - 51
+    shortcut_key:
+    - 226
+    - 19
     footer:
-    - COLOR_WHITE
-    - COLOR_BLUE
-    selection:
-    - COLOR_BLACK
-    - COLOR_WHITE
+    - 255
+    - 19
+    border:
+    - 51
+    - 19
+    plugin:
+    - 226
+    - 19
+    help_text:
+    - 51
+    - 19
     accent:
+    - 51
+    - 19
+    scrollbar:
+    - 51
+    - 19
+    title:
+    - 226
+    - 19
+    gutter:
+    - 51
+    - 19
+  '16':
+    border:
     - COLOR_CYAN
     - COLOR_BLUE
     background: COLOR_BLUE
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
-    divider:
+    plugin:
+    - COLOR_YELLOW
+    - COLOR_BLUE
+    accent:
     - COLOR_CYAN
     - COLOR_BLUE
     help_text:
     - COLOR_CYAN
     - COLOR_BLUE
-    plugin:
-    - COLOR_YELLOW
-    - COLOR_BLUE
-    button_success:
-    - COLOR_WHITE
-    - COLOR_YELLOW
     button_primary:
     - COLOR_WHITE
-    - COLOR_BLUE
-    scrollbar:
-    - COLOR_CYAN
-    - COLOR_BLUE
-    button_cancel:
-    - COLOR_BLACK
-    - COLOR_WHITE
-    window_close_button:
-    - COLOR_BRIGHT_RED
-    - COLOR_BLUE
-    whitespace:
-    - COLOR_CYAN
     - COLOR_BLUE
     shortcut_key:
     - COLOR_YELLOW
     - COLOR_BLUE
-    gutter:
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    button_success:
+    - COLOR_WHITE
+    - COLOR_YELLOW
+    footer:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    window_close_button:
+    - COLOR_BRIGHT_RED
+    - COLOR_BLUE
+    scrollbar:
     - COLOR_CYAN
     - COLOR_BLUE
-    highlight:
-    - COLOR_BLACK
+    divider:
     - COLOR_CYAN
-    button_error:
-    - COLOR_WHITE
+    - COLOR_BLUE
+    title:
+    - COLOR_YELLOW
     - COLOR_BLUE
     text:
     - COLOR_WHITE
     - COLOR_BLUE
-    border:
-    - COLOR_CYAN
-    - COLOR_BLUE
-    title:
-    - COLOR_YELLOW
-    - COLOR_BLUE
-  '8':
-    title:
-    - COLOR_YELLOW
-    - COLOR_BLUE
-    footer:
-    - COLOR_WHITE
-    - COLOR_BLUE
-    whitespace:
-    - COLOR_CYAN
-    - COLOR_BLUE
-    background: COLOR_BLUE
-    selection:
-    - COLOR_BLACK
-    - COLOR_WHITE
-    button_primary:
-    - COLOR_WHITE
-    - COLOR_BLUE
-    plugin:
-    - COLOR_YELLOW
-    - COLOR_BLUE
-    help_text:
-    - COLOR_CYAN
-    - COLOR_BLUE
     highlight:
     - COLOR_BLACK
     - COLOR_CYAN
-    button_success:
+    whitespace:
+    - COLOR_CYAN
+    - COLOR_BLUE
+    button_error:
     - COLOR_WHITE
-    - COLOR_YELLOW
+    - COLOR_BLUE
+    selection:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    button_cancel:
+    - COLOR_BLACK
+    - COLOR_WHITE
     gutter:
     - COLOR_CYAN
     - COLOR_BLUE
-    scrollbar:
+  '8':
+    gutter:
+    - COLOR_CYAN
+    - COLOR_BLUE
+    title:
+    - COLOR_YELLOW
+    - COLOR_BLUE
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    accent:
+    - COLOR_CYAN
+    - COLOR_BLUE
+    border:
     - COLOR_CYAN
     - COLOR_BLUE
     window_close_button:
     - COLOR_RED
     - COLOR_BLUE
+    button_error:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    plugin:
+    - COLOR_YELLOW
+    - COLOR_BLUE
+    whitespace:
+    - COLOR_CYAN
+    - COLOR_BLUE
+    button_success:
+    - COLOR_WHITE
+    - COLOR_YELLOW
+    help_text:
+    - COLOR_CYAN
+    - COLOR_BLUE
+    scrollbar:
+    - COLOR_CYAN
+    - COLOR_BLUE
+    highlight:
+    - COLOR_BLACK
+    - COLOR_CYAN
     button_cancel:
     - COLOR_BLACK
     - COLOR_WHITE
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
     shortcut_key:
     - COLOR_YELLOW
     - COLOR_BLUE
+    background: COLOR_BLUE
     text:
     - COLOR_WHITE
     - COLOR_BLUE
-    accent:
-    - COLOR_CYAN
-    - COLOR_BLUE
-    button_error:
+    button_primary:
     - COLOR_WHITE
     - COLOR_BLUE
     divider:
     - COLOR_CYAN
     - COLOR_BLUE
-    border:
-    - COLOR_CYAN
+    selection:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    footer:
+    - COLOR_WHITE
     - COLOR_BLUE
 redgyle:
   marquee:
@@ -6970,138 +6973,141 @@ redgyle:
     char: ─
     length: '{window_width}'
   '256':
+    text:
+    - 255
+    - -1
+    shadow:
+    - 236
+    - COLOR_BLACK
+    accent:
+    - 131
+    - -1
+    shortcut_key:
+    - 131
+    - -1
+    footer:
+    - 131
+    - -1
+    button_primary:
+    - 255
+    - 131
+    background: 1
     scrollbar:
     - 131
     - 236
-    highlight:
-    - 255
-    - 131
-    gutter:
+    whitespace:
     - 238
+    - -1
+    plugin:
+    - 131
+    - -1
+    window_close_button:
+    - 203
     - -1
     button_error:
     - 255
     - 1
-    background: 1
-    text:
-    - 255
+    title:
+    - 131
     - -1
-    button_cancel:
-    - 255
-    - 238
+    divider:
+    - 131
+    - -1
     button_success:
     - 255
     - 40
-    plugin:
+    highlight:
+    - 255
     - 131
-    - -1
-    whitespace:
+    button_cancel:
+    - 255
     - 238
-    - -1
-    accent:
-    - 131
-    - -1
-    shadow:
-    - 236
-    - COLOR_BLACK
-    help_text:
-    - 131
-    - -1
-    footer:
-    - 131
-    - -1
-    title:
-    - 131
-    - -1
-    shortcut_key:
-    - 131
-    - -1
     selection:
     - 255
     - 131
-    button_primary:
-    - 255
-    - 131
-    window_close_button:
-    - 203
+    gutter:
+    - 238
     - -1
     border:
     - 131
     - -1
-    divider:
+    help_text:
     - 131
     - -1
   '16':
+    selection:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_YELLOW
+    background: COLOR_RED
+    button_error:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_RED
     divider:
+    - COLOR_YELLOW
+    - -1
+    button_cancel:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_GREY
+    gutter:
+    - COLOR_GREY
+    - -1
+    button_primary:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_YELLOW
+    button_success:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_GREEN
+    border:
     - COLOR_YELLOW
     - -1
     scrollbar:
     - COLOR_YELLOW
     - COLOR_GREY
-    border:
-    - COLOR_YELLOW
-    - -1
-    background: COLOR_RED
-    button_primary:
+    highlight:
     - COLOR_BRIGHT_WHITE
     - COLOR_YELLOW
-    gutter:
-    - COLOR_GREY
-    - -1
     plugin:
     - COLOR_YELLOW
     - -1
-    button_error:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_RED
+    shortcut_key:
+    - COLOR_YELLOW
+    - -1
+    accent:
+    - COLOR_YELLOW
+    - -1
+    shadow:
+    - COLOR_GREY
+    - COLOR_BLACK
+    title:
+    - COLOR_YELLOW
+    - -1
+    footer:
+    - COLOR_YELLOW
+    - -1
+    whitespace:
+    - COLOR_GREY
+    - -1
+    help_text:
+    - COLOR_YELLOW
+    - -1
     window_close_button:
     - COLOR_BRIGHT_RED
     - -1
-    whitespace:
-    - COLOR_GREY
-    - -1
-    accent:
-    - COLOR_YELLOW
-    - -1
-    button_cancel:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_GREY
-    button_success:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_GREEN
-    selection:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_YELLOW
-    shortcut_key:
-    - COLOR_YELLOW
-    - -1
-    shadow:
-    - COLOR_GREY
-    - COLOR_BLACK
-    title:
-    - COLOR_YELLOW
-    - -1
-    footer:
-    - COLOR_YELLOW
-    - -1
     text:
     - COLOR_BRIGHT_WHITE
-    - -1
-    highlight:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_YELLOW
-    help_text:
-    - COLOR_YELLOW
     - -1
   '8':
-    window_close_button:
+    background: COLOR_RED
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    whitespace:
+    - COLOR_BLACK
+    - -1
+    footer:
     - COLOR_YELLOW
     - -1
     title:
-    - COLOR_YELLOW
-    - -1
-    background: COLOR_RED
-    border:
     - COLOR_YELLOW
     - -1
     accent:
@@ -7109,52 +7115,49 @@ redgyle:
     - -1
     shortcut_key:
     - COLOR_YELLOW
-    - -1
-    button_success:
-    - COLOR_WHITE
-    - COLOR_GREEN
-    help_text:
-    - COLOR_YELLOW
-    - -1
-    highlight:
-    - COLOR_WHITE
-    - COLOR_YELLOW
-    button_error:
-    - COLOR_WHITE
-    - COLOR_RED
-    button_cancel:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    scrollbar:
-    - COLOR_YELLOW
-    - COLOR_BLACK
-    divider:
-    - COLOR_YELLOW
-    - -1
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
-    text:
-    - COLOR_WHITE
-    - -1
-    footer:
-    - COLOR_YELLOW
-    - -1
-    gutter:
-    - COLOR_BLACK
     - -1
     plugin:
     - COLOR_YELLOW
     - -1
-    whitespace:
-    - COLOR_BLACK
+    border:
+    - COLOR_YELLOW
     - -1
+    help_text:
+    - COLOR_YELLOW
+    - -1
+    button_error:
+    - COLOR_WHITE
+    - COLOR_RED
     button_primary:
     - COLOR_WHITE
     - COLOR_YELLOW
+    button_success:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    gutter:
+    - COLOR_BLACK
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    scrollbar:
+    - COLOR_YELLOW
+    - COLOR_BLACK
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
     selection:
     - COLOR_WHITE
     - COLOR_YELLOW
+    divider:
+    - COLOR_YELLOW
+    - -1
+    highlight:
+    - COLOR_WHITE
+    - COLOR_YELLOW
+    window_close_button:
+    - COLOR_YELLOW
+    - -1
   background:
     enabled: true
     image: assets/wallpapers/redgyle-tile.png
@@ -7191,191 +7194,191 @@ rose_pine:
     char: ─
     length: '{window_width}'
   '256':
+    accent:
+    - 116
+    - -1
+    footer:
+    - 109
+    - -1
+    button_error:
+    - 234
+    - 203
+    border:
+    - 109
+    - -1
+    divider:
+    - 60
+    - -1
     button_primary:
     - 234
     - 175
+    help_text:
+    - 116
+    - -1
+    button_success:
+    - 234
+    - 109
+    whitespace:
+    - 109
+    - -1
     highlight:
     - 234
     - 175
     selection:
     - 251
     - 60
-    whitespace:
-    - 109
+    text:
+    - 251
     - -1
-    gutter:
-    - 109
-    - -1
-    title:
-    - 175
+    plugin:
+    - 183
     - -1
     button_cancel:
     - 251
     - 60
-    window_close_button:
-    - 203
-    - -1
-    button_error:
-    - 234
-    - 203
-    divider:
-    - 60
-    - -1
-    text:
-    - 251
-    - -1
-    help_text:
-    - 116
-    - -1
-    border:
-    - 109
-    - -1
-    shortcut_key:
-    - 221
-    - -1
-    accent:
-    - 116
-    - -1
-    background: 234
-    shadow:
-    - 233
-    - 233
-    plugin:
-    - 183
-    - -1
-    button_success:
-    - 234
-    - 109
-    footer:
+    gutter:
     - 109
     - -1
     scrollbar:
     - 175
     - 236
-  '16':
-    shortcut_key:
-    - COLOR_YELLOW
-    - -1
-    button_success:
-    - COLOR_BLACK
-    - COLOR_GREEN
-    button_error:
-    - COLOR_WHITE
-    - COLOR_RED
-    divider:
-    - COLOR_BLUE
-    - -1
-    scrollbar:
-    - COLOR_MAGENTA
-    - COLOR_BLACK
-    border:
-    - COLOR_CYAN
-    - -1
-    plugin:
-    - COLOR_MAGENTA
-    - -1
-    text:
-    - COLOR_WHITE
-    - -1
+    shadow:
+    - 233
+    - 233
     title:
-    - COLOR_MAGENTA
+    - 175
     - -1
+    window_close_button:
+    - 203
+    - -1
+    shortcut_key:
+    - 221
+    - -1
+    background: 234
+  '16':
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
     window_close_button:
     - COLOR_BRIGHT_RED
     - -1
-    gutter:
-    - 8
-    - -1
-    button_cancel:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    selection:
-    - COLOR_WHITE
-    - COLOR_MAGENTA
-    background: COLOR_BLACK
     help_text:
     - COLOR_CYAN
     - -1
-    accent:
-    - COLOR_CYAN
+    whitespace:
+    - 8
     - -1
-    button_primary:
+    divider:
+    - COLOR_BLUE
+    - -1
+    highlight:
     - COLOR_BLACK
     - COLOR_MAGENTA
+    gutter:
+    - 8
+    - -1
     shadow:
     - 8
     - COLOR_BLACK
     footer:
     - COLOR_CYAN
     - -1
-    whitespace:
-    - 8
-    - -1
-    highlight:
-    - COLOR_BLACK
+    scrollbar:
     - COLOR_MAGENTA
-  '8':
-    window_close_button:
+    - COLOR_BLACK
+    background: COLOR_BLACK
+    title:
+    - COLOR_MAGENTA
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_MAGENTA
+    button_error:
+    - COLOR_WHITE
     - COLOR_RED
+    button_success:
+    - COLOR_BLACK
+    - COLOR_GREEN
+    shortcut_key:
+    - COLOR_YELLOW
     - -1
     button_primary:
     - COLOR_BLACK
     - COLOR_MAGENTA
-    divider:
-    - COLOR_BLUE
+    accent:
+    - COLOR_CYAN
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    plugin:
+    - COLOR_MAGENTA
+    - -1
+    border:
+    - COLOR_CYAN
+    - -1
+  '8':
+    accent:
+    - COLOR_CYAN
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    scrollbar:
+    - COLOR_MAGENTA
+    - COLOR_BLACK
+    whitespace:
+    - COLOR_CYAN
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    shortcut_key:
+    - COLOR_YELLOW
     - -1
     background: COLOR_BLACK
-    accent:
+    gutter:
+    - COLOR_CYAN
+    - -1
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    border:
     - COLOR_CYAN
     - -1
     button_error:
     - COLOR_WHITE
     - COLOR_RED
-    title:
-    - COLOR_MAGENTA
-    - -1
-    shortcut_key:
-    - COLOR_YELLOW
-    - -1
-    plugin:
-    - COLOR_MAGENTA
-    - -1
-    button_cancel:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    text:
-    - COLOR_WHITE
-    - -1
     button_success:
     - COLOR_BLACK
     - COLOR_GREEN
-    help_text:
-    - COLOR_CYAN
-    - -1
     footer:
     - COLOR_CYAN
     - -1
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
     highlight:
     - COLOR_BLACK
     - COLOR_MAGENTA
-    border:
+    plugin:
+    - COLOR_MAGENTA
+    - -1
+    title:
+    - COLOR_MAGENTA
+    - -1
+    help_text:
     - COLOR_CYAN
     - -1
-    gutter:
-    - COLOR_CYAN
-    - -1
-    whitespace:
-    - COLOR_CYAN
-    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_MAGENTA
     selection:
     - COLOR_WHITE
     - COLOR_MAGENTA
-    scrollbar:
-    - COLOR_MAGENTA
-    - COLOR_BLACK
+    divider:
+    - COLOR_BLUE
+    - -1
+    window_close_button:
+    - COLOR_RED
+    - -1
 skagway:
   marquee:
     char: •
@@ -7405,110 +7408,49 @@ skagway:
     char: ─
     length: '{window_width}'
   '256':
-    background: COLOR_BLACK
-    shortcut_key:
-    - 110
+    divider:
+    - 239
     - -1
-    scrollbar:
-    - 251
-    - 236
-    button_error:
+    text:
     - 255
-    - 196
-    menu_editor:
-      background: COLOR_BLACK
-      header:
-      - 251
-      - -1
-      border:
-      - 239
-      - -1
-      text:
-      - 255
-      - -1
-      selection:
-      - 16
-      - 251
-      button_save:
-      - 16
-      - 251
-      button_delete:
-      - 255
-      - 196
-      footer:
-      - 239
-      - -1
-    shadow:
-    - 236
-    - COLOR_BLACK
-    title:
-    - 251
-    - -1
-    whitespace:
-    - 241
     - -1
     plugin:
     - 110
     - -1
-    editor:
-      background: COLOR_BLACK
-      header:
-      - 251
-      - -1
-      tab_active:
-      - 16
-      - 251
-      tab_inactive:
-      - 255
-      - -1
-      gutter:
-      - 241
-      - -1
-      text:
-      - 255
-      - -1
-      selection:
-      - 16
-      - 251
-      whitespace:
-      - 241
-      - -1
-      status:
-      - 239
-      - -1
-      footer:
-      - 239
-      - -1
-    button_primary:
-    - 16
-    - 251
+    whitespace:
+    - 241
+    - -1
+    help_text:
+    - 110
+    - -1
     button_cancel:
     - 255
     - 241
-    window_close_button:
-    - 203
-    - -1
-    highlight:
-    - 16
-    - 251
-    accent:
-    - 110
-    - -1
-    button_success:
-    - 255
-    - 40
     selection:
     - 16
     - 251
-    divider:
+    footer:
     - 239
+    - -1
+    gutter:
+    - 233
+    - -1
+    shortcut_key:
+    - 110
     - -1
     border:
     - 239
     - -1
-    footer:
-    - 239
+    button_success:
+    - 255
+    - 40
+    background: COLOR_BLACK
+    title:
+    - 251
     - -1
+    highlight:
+    - 16
+    - 251
     modals:
       backdrop:
       - 236
@@ -7535,20 +7477,118 @@ skagway:
       scrollbar:
       - 251
       - 236
-    text:
-    - 255
+    shadow:
+    - 236
+    - COLOR_BLACK
+    editor:
+      background: COLOR_BLACK
+      header:
+      - 251
+      - -1
+      tab_active:
+      - 16
+      - 251
+      tab_inactive:
+      - 255
+      - -1
+      gutter:
+      - 241
+      - -1
+      text:
+      - 255
+      - -1
+      selection:
+      - 16
+      - 251
+      whitespace:
+      - 241
+      - -1
+      status:
+      - 239
+      - -1
+      footer:
+      - 239
+      - -1
+    window_close_button:
+    - 203
     - -1
-    gutter:
-    - 233
-    - -1
-    help_text:
+    menu_editor:
+      background: COLOR_BLACK
+      header:
+      - 251
+      - -1
+      border:
+      - 239
+      - -1
+      text:
+      - 255
+      - -1
+      selection:
+      - 16
+      - 251
+      button_save:
+      - 16
+      - 251
+      button_delete:
+      - 255
+      - 196
+      footer:
+      - 239
+      - -1
+    accent:
     - 110
     - -1
+    button_primary:
+    - 16
+    - 251
+    button_error:
+    - 255
+    - 196
+    scrollbar:
+    - 251
+    - 236
   '16':
+    divider:
+    - COLOR_GREY
+    - -1
+    title:
+    - COLOR_WHITE
+    - -1
     shadow:
     - COLOR_GREY
     - COLOR_BLACK
+    shortcut_key:
+    - COLOR_WHITE
+    - -1
     border:
+    - COLOR_GREY
+    - -1
+    window_close_button:
+    - COLOR_BRIGHT_RED
+    - -1
+    background: COLOR_BLACK
+    help_text:
+    - COLOR_WHITE
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    whitespace:
+    - COLOR_GREY
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    button_cancel:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_GREY
+    scrollbar:
+    - COLOR_WHITE
+    - COLOR_GREY
+    button_error:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_RED
+    gutter:
     - COLOR_GREY
     - -1
     editor:
@@ -7580,16 +7620,38 @@ skagway:
       footer:
       - COLOR_GREY
       - -1
-    window_close_button:
-    - COLOR_BRIGHT_RED
-    - -1
-    highlight:
+    menu_editor:
+      background: COLOR_BLACK
+      header:
+      - COLOR_WHITE
+      - -1
+      border:
+      - COLOR_GREY
+      - -1
+      text:
+      - COLOR_BRIGHT_WHITE
+      - -1
+      selection:
+      - COLOR_BLACK
+      - COLOR_WHITE
+      button_save:
+      - COLOR_BLACK
+      - COLOR_WHITE
+      button_delete:
+      - COLOR_BRIGHT_WHITE
+      - COLOR_RED
+      footer:
+      - COLOR_GREY
+      - -1
+    selection:
     - COLOR_BLACK
     - COLOR_WHITE
-    title:
+    text:
+    - COLOR_BRIGHT_WHITE
+    - -1
+    plugin:
     - COLOR_WHITE
     - -1
-    background: COLOR_BLACK
     modals:
       backdrop:
       - COLOR_GREY
@@ -7616,182 +7678,41 @@ skagway:
       scrollbar:
       - COLOR_WHITE
       - COLOR_GREY
-    button_error:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_RED
-    scrollbar:
-    - COLOR_WHITE
-    - COLOR_GREY
-    text:
-    - COLOR_BRIGHT_WHITE
-    - -1
     footer:
     - COLOR_GREY
     - -1
-    gutter:
-    - COLOR_GREY
-    - -1
-    plugin:
-    - COLOR_WHITE
-    - -1
-    divider:
-    - COLOR_GREY
-    - -1
-    shortcut_key:
-    - COLOR_WHITE
-    - -1
-    button_primary:
-    - COLOR_BLACK
-    - COLOR_WHITE
-    button_cancel:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_GREY
     button_success:
     - COLOR_BRIGHT_WHITE
     - COLOR_GREEN
-    whitespace:
-    - COLOR_GREY
-    - -1
-    help_text:
-    - COLOR_WHITE
-    - -1
-    selection:
-    - COLOR_BLACK
-    - COLOR_WHITE
     accent:
     - COLOR_WHITE
     - -1
-    menu_editor:
-      background: COLOR_BLACK
-      header:
-      - COLOR_WHITE
-      - -1
-      border:
-      - COLOR_GREY
-      - -1
-      text:
-      - COLOR_BRIGHT_WHITE
-      - -1
-      selection:
-      - COLOR_BLACK
-      - COLOR_WHITE
-      button_save:
-      - COLOR_BLACK
-      - COLOR_WHITE
-      button_delete:
-      - COLOR_BRIGHT_WHITE
-      - COLOR_RED
-      footer:
-      - COLOR_GREY
-      - -1
   '8':
     highlight:
     - COLOR_BLACK
     - COLOR_WHITE
-    whitespace:
-    - COLOR_YELLOW
-    - -1
-    text:
+    scrollbar:
     - COLOR_WHITE
-    - -1
-    menu_editor:
-      background: COLOR_BLACK
-      header:
-      - COLOR_WHITE
-      - -1
-      border:
-      - COLOR_YELLOW
-      - -1
-      text:
-      - COLOR_WHITE
-      - -1
-      selection:
-      - COLOR_BLACK
-      - COLOR_WHITE
-      button_save:
-      - COLOR_BLACK
-      - COLOR_WHITE
-      button_delete:
-      - COLOR_WHITE
-      - COLOR_RED
-      footer:
-      - COLOR_YELLOW
-      - -1
-    modals:
-      backdrop:
-      - COLOR_BLACK
-      - COLOR_BLACK
-      background: COLOR_BLACK
-      border:
-      - COLOR_YELLOW
-      - -1
-      title:
-      - COLOR_WHITE
-      - -1
-      text:
-      - COLOR_WHITE
-      - -1
-      button_confirm:
-      - COLOR_WHITE
-      - COLOR_GREEN
-      button_cancel:
-      - COLOR_WHITE
-      - COLOR_YELLOW
-      button_danger:
-      - COLOR_WHITE
-      - COLOR_RED
-      scrollbar:
-      - COLOR_WHITE
-      - COLOR_BLACK
-    shortcut_key:
-    - COLOR_WHITE
-    - -1
-    gutter:
+    - COLOR_BLACK
+    window_close_button:
     - COLOR_YELLOW
     - -1
     shadow:
     - COLOR_BLACK
     - COLOR_BLACK
-    accent:
-    - COLOR_WHITE
-    - -1
-    button_cancel:
-    - COLOR_WHITE
-    - COLOR_YELLOW
-    title:
-    - COLOR_WHITE
-    - -1
     divider:
-    - COLOR_YELLOW
-    - -1
-    button_success:
-    - COLOR_WHITE
-    - COLOR_GREEN
-    window_close_button:
-    - COLOR_YELLOW
-    - -1
-    button_error:
-    - COLOR_WHITE
-    - COLOR_RED
-    scrollbar:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    help_text:
-    - COLOR_WHITE
-    - -1
-    selection:
-    - COLOR_BLACK
-    - COLOR_WHITE
-    border:
     - COLOR_YELLOW
     - -1
     button_primary:
     - COLOR_BLACK
     - COLOR_WHITE
-    background: COLOR_BLACK
-    plugin:
-    - COLOR_WHITE
+    footer:
+    - COLOR_YELLOW
     - -1
+    border:
+    - COLOR_YELLOW
+    - -1
+    background: COLOR_BLACK
     editor:
       background: COLOR_BLACK
       header:
@@ -7821,8 +7742,90 @@ skagway:
       footer:
       - COLOR_YELLOW
       - -1
-    footer:
+    shortcut_key:
+    - COLOR_WHITE
+    - -1
+    modals:
+      backdrop:
+      - COLOR_BLACK
+      - COLOR_BLACK
+      background: COLOR_BLACK
+      border:
+      - COLOR_YELLOW
+      - -1
+      title:
+      - COLOR_WHITE
+      - -1
+      text:
+      - COLOR_WHITE
+      - -1
+      button_confirm:
+      - COLOR_WHITE
+      - COLOR_GREEN
+      button_cancel:
+      - COLOR_WHITE
+      - COLOR_YELLOW
+      button_danger:
+      - COLOR_WHITE
+      - COLOR_RED
+      scrollbar:
+      - COLOR_WHITE
+      - COLOR_BLACK
+    plugin:
+    - COLOR_WHITE
+    - -1
+    menu_editor:
+      background: COLOR_BLACK
+      header:
+      - COLOR_WHITE
+      - -1
+      border:
+      - COLOR_YELLOW
+      - -1
+      text:
+      - COLOR_WHITE
+      - -1
+      selection:
+      - COLOR_BLACK
+      - COLOR_WHITE
+      button_save:
+      - COLOR_BLACK
+      - COLOR_WHITE
+      button_delete:
+      - COLOR_WHITE
+      - COLOR_RED
+      footer:
+      - COLOR_YELLOW
+      - -1
+    button_cancel:
+    - COLOR_WHITE
     - COLOR_YELLOW
+    text:
+    - COLOR_WHITE
+    - -1
+    selection:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    button_error:
+    - COLOR_WHITE
+    - COLOR_RED
+    help_text:
+    - COLOR_WHITE
+    - -1
+    button_success:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    title:
+    - COLOR_WHITE
+    - -1
+    whitespace:
+    - COLOR_YELLOW
+    - -1
+    gutter:
+    - COLOR_YELLOW
+    - -1
+    accent:
+    - COLOR_WHITE
     - -1
   background:
     enabled: true
@@ -7860,30 +7863,33 @@ synthwave:
     char: '~'
     length: '{window_width}'
   '256':
+    border:
+    - 129
+    - -1
+    shadow:
+    - 234
+    - COLOR_BLACK
+    gutter:
+    - 238
+    - -1
+    divider:
+    - 129
+    - -1
     button_error:
     - 255
     - 93
+    background: COLOR_BLACK
+    title:
+    - 207
+    - -1
     button_primary:
     - 255
     - 201
-    shortcut_key:
-    - 214
-    - -1
     footer:
     - 129
     - -1
-    accent:
-    - 51
-    - -1
-    highlight:
-    - COLOR_BLACK
-    - 201
-    scrollbar:
-    - 201
-    - 236
-    background: COLOR_BLACK
-    divider:
-    - 129
+    plugin:
+    - 207
     - -1
     whitespace:
     - 238
@@ -7891,158 +7897,155 @@ synthwave:
     button_success:
     - COLOR_BLACK
     - 51
-    selection:
-    - 255
-    - 129
-    help_text:
-    - 51
-    - -1
-    shadow:
-    - 234
-    - COLOR_BLACK
-    window_close_button:
-    - 207
-    - -1
-    gutter:
-    - 238
-    - -1
-    border:
-    - 129
-    - -1
+    scrollbar:
+    - 201
+    - 236
     button_cancel:
     - 255
     - 93
-    title:
-    - 207
+    highlight:
+    - COLOR_BLACK
+    - 201
+    shortcut_key:
+    - 214
     - -1
+    help_text:
+    - 51
+    - -1
+    selection:
+    - 255
+    - 129
     text:
     - 255
     - -1
-    plugin:
+    window_close_button:
     - 207
     - -1
+    accent:
+    - 51
+    - -1
   '16':
+    shortcut_key:
+    - COLOR_YELLOW
+    - -1
+    scrollbar:
+    - COLOR_MAGENTA
+    - COLOR_BLACK
+    title:
+    - COLOR_MAGENTA
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    plugin:
+    - COLOR_MAGENTA
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_MAGENTA
+    shadow:
+    - 8
+    - COLOR_BLACK
+    background: COLOR_BLACK
+    accent:
+    - COLOR_CYAN
+    - -1
+    button_primary:
+    - COLOR_WHITE
+    - COLOR_MAGENTA
     footer:
     - COLOR_BLUE
     - -1
+    window_close_button:
+    - COLOR_BRIGHT_RED
+    - -1
+    button_error:
+    - COLOR_WHITE
+    - COLOR_BLUE
     whitespace:
     - 8
     - -1
     button_success:
     - COLOR_BLACK
     - COLOR_CYAN
-    scrollbar:
-    - COLOR_MAGENTA
-    - COLOR_BLACK
-    accent:
-    - COLOR_CYAN
-    - -1
-    window_close_button:
-    - COLOR_BRIGHT_RED
-    - -1
-    selection:
-    - COLOR_WHITE
+    border:
     - COLOR_BLUE
-    button_primary:
-    - COLOR_WHITE
-    - COLOR_MAGENTA
+    - -1
+    gutter:
+    - 8
+    - -1
+    divider:
+    - COLOR_BLUE
+    - -1
     text:
     - COLOR_WHITE
     - -1
+    help_text:
+    - COLOR_CYAN
+    - -1
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLUE
+  '8':
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLUE
     highlight:
     - COLOR_BLACK
     - COLOR_MAGENTA
-    button_error:
-    - COLOR_WHITE
+    border:
     - COLOR_BLUE
-    background: COLOR_BLACK
-    title:
-    - COLOR_MAGENTA
     - -1
-    divider:
+    scrollbar:
+    - COLOR_MAGENTA
+    - COLOR_BLACK
+    button_success:
+    - COLOR_BLACK
+    - COLOR_CYAN
+    gutter:
     - COLOR_BLUE
     - -1
     shortcut_key:
     - COLOR_YELLOW
     - -1
-    help_text:
-    - COLOR_CYAN
-    - -1
-    border:
-    - COLOR_BLUE
-    - -1
-    button_cancel:
-    - COLOR_WHITE
-    - COLOR_BLUE
-    shadow:
-    - 8
-    - COLOR_BLACK
-    gutter:
-    - 8
-    - -1
-    plugin:
+    background: COLOR_BLACK
+    title:
     - COLOR_MAGENTA
     - -1
-  '8':
-    background: COLOR_BLACK
-    footer:
-    - COLOR_BLUE
-    - -1
-    gutter:
-    - COLOR_BLUE
-    - -1
-    button_success:
-    - COLOR_BLACK
-    - COLOR_CYAN
     button_error:
-    - COLOR_WHITE
-    - COLOR_BLUE
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
-    selection:
     - COLOR_WHITE
     - COLOR_BLUE
     window_close_button:
     - COLOR_RED
     - -1
-    text:
-    - COLOR_WHITE
-    - -1
-    scrollbar:
+    plugin:
     - COLOR_MAGENTA
-    - COLOR_BLACK
-    divider:
-    - COLOR_BLUE
-    - -1
-    whitespace:
-    - COLOR_BLUE
-    - -1
-    accent:
-    - COLOR_CYAN
-    - -1
-    button_cancel:
-    - COLOR_WHITE
-    - COLOR_BLUE
-    shortcut_key:
-    - COLOR_YELLOW
     - -1
     help_text:
     - COLOR_CYAN
     - -1
-    highlight:
-    - COLOR_BLACK
-    - COLOR_MAGENTA
-    plugin:
-    - COLOR_MAGENTA
+    accent:
+    - COLOR_CYAN
     - -1
     button_primary:
     - COLOR_WHITE
     - COLOR_MAGENTA
-    title:
-    - COLOR_MAGENTA
+    divider:
+    - COLOR_BLUE
     - -1
-    border:
+    selection:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    whitespace:
+    - COLOR_BLUE
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    text:
+    - COLOR_WHITE
+    - -1
+    footer:
     - COLOR_BLUE
     - -1
 tangyle:
@@ -8074,191 +8077,191 @@ tangyle:
     char: ─
     length: '{window_width}'
   '256':
+    divider:
+    - 58
+    - -1
+    footer:
+    - 58
+    - -1
+    title:
+    - 136
+    - -1
+    scrollbar:
+    - 136
+    - 236
+    highlight:
+    - 255
+    - 136
+    shortcut_key:
+    - 58
+    - -1
+    background: '#211a06'
+    button_error:
+    - 255
+    - 196
+    help_text:
+    - 58
+    - -1
+    shadow:
+    - 236
+    - COLOR_BLACK
+    accent:
+    - 58
+    - -1
+    selection:
+    - 255
+    - 136
+    gutter:
+    - 238
+    - -1
+    whitespace:
+    - 238
+    - -1
+    text:
+    - 255
+    - -1
     plugin:
     - 58
     - -1
-    accent:
+    border:
     - 58
     - -1
     button_success:
     - 255
     - 40
-    highlight:
-    - 255
-    - 136
-    border:
-    - 58
-    - -1
-    gutter:
-    - 238
-    - -1
-    button_error:
-    - 255
-    - 196
-    divider:
-    - 58
-    - -1
-    selection:
-    - 255
-    - 136
-    text:
-    - 255
-    - -1
-    footer:
-    - 58
-    - -1
-    shortcut_key:
-    - 58
-    - -1
-    scrollbar:
-    - 136
-    - 236
-    shadow:
-    - 236
-    - COLOR_BLACK
     button_primary:
     - 255
     - 136
-    whitespace:
-    - 238
-    - -1
-    help_text:
-    - 58
+    window_close_button:
+    - 227
     - -1
     button_cancel:
     - 255
     - 238
-    background: '#211a06'
-    title:
-    - 136
-    - -1
-    window_close_button:
-    - 227
-    - -1
   '16':
-    button_error:
+    border:
+    - COLOR_BLACK
+    - -1
+    button_primary:
     - COLOR_BRIGHT_WHITE
-    - COLOR_RED
-    whitespace:
-    - COLOR_GREY
+    - COLOR_YELLOW
+    title:
+    - COLOR_YELLOW
     - -1
     accent:
     - COLOR_BLACK
     - -1
-    text:
-    - COLOR_BRIGHT_WHITE
-    - -1
-    button_cancel:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_GREY
-    highlight:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_YELLOW
-    button_primary:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_YELLOW
-    help_text:
+    footer:
     - COLOR_BLACK
-    - -1
-    gutter:
-    - COLOR_GREY
     - -1
     scrollbar:
     - COLOR_YELLOW
     - COLOR_GREY
-    shortcut_key:
-    - COLOR_BLACK
-    - -1
     shadow:
     - COLOR_GREY
     - COLOR_BLACK
-    selection:
+    highlight:
     - COLOR_BRIGHT_WHITE
     - COLOR_YELLOW
-    title:
-    - COLOR_YELLOW
-    - -1
-    button_success:
+    button_cancel:
     - COLOR_BRIGHT_WHITE
-    - COLOR_GREEN
-    footer:
-    - COLOR_BLACK
+    - COLOR_GREY
+    text:
+    - COLOR_BRIGHT_WHITE
     - -1
     window_close_button:
     - COLOR_BRIGHT_YELLOW
     - -1
+    help_text:
+    - COLOR_BLACK
+    - -1
+    gutter:
+    - COLOR_GREY
+    - -1
+    shortcut_key:
+    - COLOR_BLACK
+    - -1
     plugin:
     - COLOR_BLACK
     - -1
+    button_success:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_GREEN
+    background: COLOR_BLACK
+    button_error:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_RED
     divider:
     - COLOR_BLACK
     - -1
+    selection:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_YELLOW
+    whitespace:
+    - COLOR_GREY
+    - -1
+  '8':
+    highlight:
+    - COLOR_WHITE
+    - COLOR_YELLOW
+    accent:
+    - COLOR_BLACK
+    - -1
+    footer:
+    - COLOR_BLACK
+    - -1
+    gutter:
+    - COLOR_BLACK
+    - -1
+    whitespace:
+    - COLOR_BLACK
+    - -1
+    button_success:
+    - COLOR_WHITE
+    - COLOR_GREEN
     border:
     - COLOR_BLACK
     - -1
+    button_primary:
+    - COLOR_WHITE
+    - COLOR_YELLOW
+    scrollbar:
+    - COLOR_YELLOW
+    - COLOR_BLACK
     background: COLOR_BLACK
-  '8':
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    shortcut_key:
+    - COLOR_BLACK
+    - -1
     window_close_button:
     - COLOR_YELLOW
     - -1
     help_text:
     - COLOR_BLACK
     - -1
-    footer:
+    shadow:
     - COLOR_BLACK
-    - -1
-    accent:
     - COLOR_BLACK
+    title:
+    - COLOR_YELLOW
     - -1
-    background: COLOR_BLACK
-    border:
-    - COLOR_BLACK
-    - -1
-    button_cancel:
+    text:
     - COLOR_WHITE
-    - COLOR_BLACK
+    - -1
     button_error:
     - COLOR_WHITE
     - COLOR_RED
+    plugin:
+    - COLOR_BLACK
+    - -1
     divider:
     - COLOR_BLACK
     - -1
     selection:
     - COLOR_WHITE
     - COLOR_YELLOW
-    plugin:
-    - COLOR_BLACK
-    - -1
-    shortcut_key:
-    - COLOR_BLACK
-    - -1
-    button_primary:
-    - COLOR_WHITE
-    - COLOR_YELLOW
-    title:
-    - COLOR_YELLOW
-    - -1
-    whitespace:
-    - COLOR_BLACK
-    - -1
-    scrollbar:
-    - COLOR_YELLOW
-    - COLOR_BLACK
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
-    text:
-    - COLOR_WHITE
-    - -1
-    highlight:
-    - COLOR_WHITE
-    - COLOR_YELLOW
-    gutter:
-    - COLOR_BLACK
-    - -1
-    button_success:
-    - COLOR_WHITE
-    - COLOR_GREEN
   background:
     enabled: true
     image: assets/wallpapers/tangyle-tile.png
@@ -8295,178 +8298,165 @@ tokyo_night:
     char: ─
     length: '{window_width}'
   '256':
-    help_text:
-    - 117
-    - -1
-    plugin:
-    - 183
-    - -1
     button_cancel:
     - 250
     - 60
-    button_primary:
+    highlight:
     - 234
     - 111
     gutter:
     - 66
     - -1
-    highlight:
+    button_primary:
     - 234
     - 111
-    selection:
-    - 250
-    - 60
-    background: 234
-    window_close_button:
-    - 210
-    - -1
-    text:
-    - 250
+    footer:
+    - 66
     - -1
     shadow:
     - 233
     - 233
-    divider:
-    - 60
+    shortcut_key:
+    - 111
     - -1
-    button_success:
-    - 234
-    - 149
-    border:
-    - 66
-    - -1
-    whitespace:
-    - 66
+    title:
+    - 111
     - -1
     button_error:
     - 234
     - 210
-    title:
-    - 111
-    - -1
     accent:
     - 117
-    - -1
-    footer:
-    - 66
-    - -1
-    shortcut_key:
-    - 111
     - -1
     scrollbar:
     - 117
     - 236
-  '16':
-    scrollbar:
-    - COLOR_CYAN
-    - COLOR_BLACK
     button_success:
-    - COLOR_BLACK
-    - COLOR_GREEN
-    text:
-    - COLOR_WHITE
+    - 234
+    - 149
+    window_close_button:
+    - 210
     - -1
-    background: COLOR_BLACK
+    text:
+    - 250
+    - -1
+    help_text:
+    - 117
+    - -1
+    divider:
+    - 60
+    - -1
+    plugin:
+    - 183
+    - -1
+    border:
+    - 66
+    - -1
+    whitespace:
+    - 66
+    - -1
+    background: 234
+    selection:
+    - 250
+    - 60
+  '16':
+    title:
+    - COLOR_BLUE
+    - -1
     shadow:
     - 8
-    - COLOR_BLACK
-    footer:
-    - COLOR_WHITE
-    - -1
-    button_cancel:
-    - COLOR_WHITE
     - COLOR_BLACK
     button_primary:
     - COLOR_BLACK
     - COLOR_BLUE
-    highlight:
-    - COLOR_BLACK
-    - COLOR_BLUE
-    button_error:
+    selection:
     - COLOR_WHITE
-    - COLOR_RED
-    divider:
     - COLOR_BLUE
+    button_success:
+    - COLOR_BLACK
+    - COLOR_GREEN
+    border:
+    - COLOR_BLUE
+    - -1
+    help_text:
+    - COLOR_CYAN
+    - -1
+    footer:
+    - COLOR_WHITE
+    - -1
+    shortcut_key:
+    - COLOR_BLUE
+    - -1
+    text:
+    - COLOR_WHITE
     - -1
     whitespace:
     - 8
     - -1
-    title:
-    - COLOR_BLUE
-    - -1
-    gutter:
-    - 8
-    - -1
-    border:
-    - COLOR_BLUE
-    - -1
+    background: COLOR_BLACK
     window_close_button:
     - COLOR_BRIGHT_RED
     - -1
-    shortcut_key:
-    - COLOR_BLUE
-    - -1
     accent:
     - COLOR_CYAN
-    - -1
-    plugin:
-    - COLOR_MAGENTA
-    - -1
-    help_text:
-    - COLOR_CYAN
-    - -1
-    selection:
-    - COLOR_WHITE
-    - COLOR_BLUE
-  '8':
-    button_cancel:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    text:
-    - COLOR_WHITE
     - -1
     button_error:
     - COLOR_WHITE
     - COLOR_RED
-    window_close_button:
-    - COLOR_RED
+    plugin:
+    - COLOR_MAGENTA
     - -1
+    gutter:
+    - 8
+    - -1
+    divider:
+    - COLOR_BLUE
+    - -1
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    scrollbar:
+    - COLOR_CYAN
+    - COLOR_BLACK
     highlight:
     - COLOR_BLACK
     - COLOR_BLUE
-    help_text:
-    - COLOR_CYAN
+  '8':
+    whitespace:
+    - COLOR_BLUE
     - -1
     title:
     - COLOR_BLUE
     - -1
-    button_success:
-    - COLOR_BLACK
-    - COLOR_GREEN
-    gutter:
-    - COLOR_BLUE
-    - -1
-    selection:
+    button_error:
     - COLOR_WHITE
-    - COLOR_BLUE
-    divider:
+    - COLOR_RED
+    border:
     - COLOR_BLUE
     - -1
     shadow:
     - COLOR_BLACK
     - COLOR_BLACK
+    gutter:
+    - COLOR_BLUE
+    - -1
+    button_success:
+    - COLOR_BLACK
+    - COLOR_GREEN
+    plugin:
+    - COLOR_MAGENTA
+    - -1
     scrollbar:
     - COLOR_CYAN
     - COLOR_BLACK
-    background: COLOR_BLACK
-    border:
-    - COLOR_BLUE
-    - -1
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
     shortcut_key:
     - COLOR_BLUE
     - -1
-    whitespace:
-    - COLOR_BLUE
+    window_close_button:
+    - COLOR_RED
     - -1
     button_primary:
     - COLOR_BLACK
@@ -8474,12 +8464,25 @@ tokyo_night:
     footer:
     - COLOR_WHITE
     - -1
+    background: COLOR_BLACK
+    divider:
+    - COLOR_BLUE
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    help_text:
+    - COLOR_CYAN
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
     accent:
     - COLOR_CYAN
     - -1
-    plugin:
-    - COLOR_MAGENTA
-    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_BLUE
 twilight:
   marquee:
     char: '~'
@@ -8509,12 +8512,8 @@ twilight:
     char: ─
     length: '{window_width}'
   '256':
-    border:
-    - 61
-    - -1
-    background: 233
-    accent:
-    - 110
+    window_close_button:
+    - 203
     - -1
     button_primary:
     - 255
@@ -8522,165 +8521,166 @@ twilight:
     shadow:
     - 234
     - COLOR_BLACK
-    highlight:
+    selection:
     - 255
     - 61
+    text:
+    - 253
+    - -1
+    border:
+    - 61
+    - -1
     whitespace:
     - 238
+    - -1
+    help_text:
+    - 110
+    - -1
+    divider:
+    - 61
+    - -1
+    button_error:
+    - 255
+    - 131
+    shortcut_key:
+    - 183
     - -1
     footer:
     - 118
     - -1
+    button_success:
+    - 255
+    - 65
+    background: 233
     plugin:
     - 147
-    - -1
-    text:
-    - 253
     - -1
     title:
     - 153
     - -1
-    window_close_button:
-    - 203
+    button_cancel:
+    - 253
+    - 238
+    gutter:
+    - 103
     - -1
     scrollbar:
     - 61
     - 235
-    divider:
+    highlight:
+    - 255
     - 61
-    - -1
-    button_cancel:
-    - 253
-    - 238
-    help_text:
+    accent:
     - 110
     - -1
-    gutter:
-    - 103
-    - -1
-    selection:
-    - 255
-    - 61
-    button_error:
-    - 255
-    - 131
-    button_success:
-    - 255
-    - 65
-    shortcut_key:
-    - 183
-    - -1
   '16':
-    button_success:
+    button_cancel:
     - COLOR_WHITE
-    - COLOR_GREEN
-    footer:
+    - COLOR_BLACK
+    scrollbar:
     - COLOR_BLUE
+    - COLOR_BLACK
+    title:
+    - COLOR_CYAN
+    - -1
+    button_error:
+    - COLOR_WHITE
+    - COLOR_RED
+    divider:
+    - COLOR_BLUE
+    - -1
+    gutter:
+    - 8
+    - -1
+    accent:
+    - COLOR_CYAN
+    - -1
+    highlight:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    shortcut_key:
+    - COLOR_MAGENTA
+    - -1
+    button_primary:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    whitespace:
+    - 8
     - -1
     window_close_button:
     - COLOR_BRIGHT_RED
     - -1
-    text:
+    button_success:
     - COLOR_WHITE
-    - -1
-    background: COLOR_BLACK
+    - COLOR_GREEN
     plugin:
     - COLOR_MAGENTA
-    - -1
-    shortcut_key:
-    - COLOR_MAGENTA
-    - -1
-    highlight:
-    - COLOR_WHITE
-    - COLOR_BLUE
-    button_primary:
-    - COLOR_WHITE
-    - COLOR_BLUE
-    gutter:
-    - 8
-    - -1
-    title:
-    - COLOR_CYAN
     - -1
     help_text:
     - COLOR_CYAN
     - -1
+    text:
+    - COLOR_WHITE
+    - -1
     selection:
     - COLOR_WHITE
     - COLOR_BLUE
-    divider:
-    - COLOR_BLUE
-    - -1
-    button_cancel:
-    - COLOR_WHITE
-    - COLOR_BLACK
-    border:
-    - COLOR_BLUE
-    - -1
-    whitespace:
-    - 8
-    - -1
-    accent:
-    - COLOR_CYAN
-    - -1
-    shadow:
-    - 8
-    - COLOR_BLACK
-    button_error:
-    - COLOR_WHITE
-    - COLOR_RED
-    scrollbar:
-    - COLOR_BLUE
-    - COLOR_BLACK
-  '8':
-    highlight:
-    - COLOR_WHITE
-    - COLOR_BLUE
-    divider:
+    footer:
     - COLOR_BLUE
     - -1
     background: COLOR_BLACK
-    gutter:
-    - COLOR_BLUE
-    - -1
     shadow:
+    - 8
     - COLOR_BLACK
-    - COLOR_BLACK
-    plugin:
-    - COLOR_MAGENTA
-    - -1
     border:
     - COLOR_BLUE
     - -1
-    button_error:
+  '8':
+    selection:
     - COLOR_WHITE
-    - COLOR_RED
-    title:
-    - COLOR_CYAN
-    - -1
-    footer:
     - COLOR_BLUE
+    text:
+    - COLOR_WHITE
     - -1
     button_success:
     - COLOR_WHITE
     - COLOR_GREEN
-    window_close_button:
-    - COLOR_RED
-    - -1
-    accent:
-    - COLOR_CYAN
-    - -1
-    whitespace:
+    footer:
     - COLOR_BLUE
-    - -1
-    text:
-    - COLOR_WHITE
     - -1
     help_text:
     - COLOR_CYAN
     - -1
+    scrollbar:
+    - COLOR_BLUE
+    - COLOR_BLACK
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    accent:
+    - COLOR_CYAN
+    - -1
+    plugin:
+    - COLOR_MAGENTA
+    - -1
+    highlight:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    background: COLOR_BLACK
     shortcut_key:
     - COLOR_MAGENTA
+    - -1
+    title:
+    - COLOR_CYAN
+    - -1
+    border:
+    - COLOR_BLUE
+    - -1
+    gutter:
+    - COLOR_BLUE
+    - -1
+    divider:
+    - COLOR_BLUE
     - -1
     button_cancel:
     - COLOR_WHITE
@@ -8688,12 +8688,15 @@ twilight:
     button_primary:
     - COLOR_WHITE
     - COLOR_BLUE
-    scrollbar:
+    window_close_button:
+    - COLOR_RED
+    - -1
+    whitespace:
     - COLOR_BLUE
-    - COLOR_BLACK
-    selection:
+    - -1
+    button_error:
     - COLOR_WHITE
-    - COLOR_BLUE
+    - COLOR_RED
   background:
     enabled: true
     image: assets/wallpapers/twilight.png
@@ -8725,218 +8728,218 @@ weave:
     char: ▌
     timeout: 2.0
   '256':
-    shortcut_key:
-    - 243
-    - -1
-    whitespace:
-    - 238
-    - -1
-    shadow:
-    - 236
-    - 16
-    text:
+    button_error:
     - 255
+    - 196
+    footer:
+    - 237
     - -1
     button_primary:
     - 16
     - 188
+    scrollbar:
+    - 188
+    - 236
+    selection:
+    - 16
+    - 188
+    shortcut_key:
+    - 243
+    - -1
     toast_warning:
     - 214
     - -1
+    button_cancel:
+    - 255
+    - 238
     gutter:
     - '#040405'
     - -1
-    footer:
-    - 237
+    shadow:
+    - 236
+    - 16
+    background: 243
+    help_text:
+    - '#040405'
     - -1
     divider:
     - 237
     - -1
-    background: 243
-    selection:
-    - 16
-    - 188
-    window_close_button:
-    - 233
+    accent:
+    - 243
     - -1
-    toast_error:
-    - 196
-    - -1
-    title:
-    - 188
-    - -1
-    button_success:
-    - 255
-    - 40
-    toast_info:
-    - 188
-    - -1
-    scrollbar:
-    - 188
-    - 236
-    highlight:
-    - 16
-    - 188
     plugin:
     - '#181919'
-    - -1
-    help_text:
-    - '#040405'
     - -1
     border:
     - 232
     - -1
-    button_error:
+    highlight:
+    - 16
+    - 188
+    button_success:
     - 255
+    - 40
+    window_close_button:
+    - 233
+    - -1
+    title:
+    - 188
+    - -1
+    toast_error:
     - 196
-    accent:
-    - 243
     - -1
-    button_cancel:
-    - 255
+    toast_info:
+    - 188
+    - -1
+    whitespace:
     - 238
-  '16':
-    toast_warning:
-    - COLOR_BRIGHT_YELLOW
     - -1
+    text:
+    - 255
+    - -1
+  '16':
+    whitespace:
+    - COLOR_BLACK
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_BRIGHT_WHITE
     selection:
     - COLOR_BLACK
     - COLOR_BRIGHT_WHITE
-    title:
-    - COLOR_BRIGHT_WHITE
-    - -1
-    accent:
-    - COLOR_GREY
-    - -1
-    background: COLOR_GREY
-    footer:
-    - COLOR_BLACK
-    - -1
-    text:
-    - COLOR_BRIGHT_WHITE
-    - -1
     gutter:
     - COLOR_BLACK
     - -1
-    divider:
+    shortcut_key:
+    - COLOR_GREY
+    - -1
+    help_text:
     - COLOR_BLACK
     - -1
-    button_cancel:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_BLACK
-    toast_info:
-    - COLOR_BRIGHT_WHITE
+    toast_warning:
+    - COLOR_BRIGHT_YELLOW
+    - -1
+    toast_error:
+    - COLOR_BRIGHT_RED
     - -1
     scrollbar:
     - COLOR_BRIGHT_WHITE
     - COLOR_BLACK
-    border:
-    - COLOR_BLACK
+    accent:
+    - COLOR_GREY
     - -1
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
-    button_error:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_BRIGHT_RED
-    plugin:
+    divider:
     - COLOR_BLACK
     - -1
     highlight:
     - COLOR_BLACK
     - COLOR_BRIGHT_WHITE
+    button_success:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_BRIGHT_GREEN
+    toast_info:
+    - COLOR_BRIGHT_WHITE
+    - -1
+    text:
+    - COLOR_BRIGHT_WHITE
+    - -1
+    button_error:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_BRIGHT_RED
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    footer:
+    - COLOR_BLACK
+    - -1
+    window_close_button:
+    - COLOR_BLACK
+    - -1
+    title:
+    - COLOR_BRIGHT_WHITE
+    - -1
+    button_cancel:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_BLACK
+    plugin:
+    - COLOR_BLACK
+    - -1
+    border:
+    - COLOR_BLACK
+    - -1
+    background: COLOR_GREY
+  '8':
+    footer:
+    - COLOR_BLACK
+    - -1
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    border:
+    - COLOR_BLACK
+    - -1
+    title:
+    - COLOR_WHITE
+    - -1
+    gutter:
+    - COLOR_BLACK
+    - -1
+    background: COLOR_WHITE
     whitespace:
     - COLOR_BLACK
     - -1
     window_close_button:
     - COLOR_BLACK
     - -1
-    shortcut_key:
-    - COLOR_GREY
-    - -1
-    button_success:
-    - COLOR_BRIGHT_WHITE
-    - COLOR_BRIGHT_GREEN
     help_text:
     - COLOR_BLACK
     - -1
-    toast_error:
-    - COLOR_BRIGHT_RED
-    - -1
+    selection:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    button_error:
+    - COLOR_WHITE
+    - COLOR_RED
     button_primary:
     - COLOR_BLACK
-    - COLOR_BRIGHT_WHITE
-  '8':
-    gutter:
+    - COLOR_WHITE
+    toast_warning:
+    - COLOR_YELLOW
+    - -1
+    plugin:
     - COLOR_BLACK
     - -1
-    toast_info:
+    text:
     - COLOR_WHITE
-    - -1
-    highlight:
-    - COLOR_BLACK
-    - COLOR_WHITE
-    title:
-    - COLOR_WHITE
-    - -1
-    footer:
-    - COLOR_BLACK
     - -1
     button_success:
     - COLOR_WHITE
     - COLOR_GREEN
-    scrollbar:
+    accent:
     - COLOR_WHITE
-    - COLOR_BLACK
-    toast_error:
-    - COLOR_RED
     - -1
     divider:
     - COLOR_BLACK
     - -1
-    accent:
-    - COLOR_WHITE
-    - -1
-    border:
-    - COLOR_BLACK
-    - -1
-    text:
-    - COLOR_WHITE
-    - -1
-    plugin:
-    - COLOR_BLACK
-    - -1
-    window_close_button:
-    - COLOR_BLACK
-    - -1
-    button_primary:
+    highlight:
     - COLOR_BLACK
     - COLOR_WHITE
-    shadow:
-    - COLOR_BLACK
-    - COLOR_BLACK
-    selection:
-    - COLOR_BLACK
-    - COLOR_WHITE
-    whitespace:
-    - COLOR_BLACK
-    - -1
-    button_error:
-    - COLOR_WHITE
+    toast_error:
     - COLOR_RED
-    button_cancel:
+    - -1
+    scrollbar:
     - COLOR_WHITE
     - COLOR_BLACK
-    toast_warning:
-    - COLOR_YELLOW
-    - -1
-    help_text:
-    - COLOR_BLACK
+    toast_info:
+    - COLOR_WHITE
     - -1
     shortcut_key:
     - COLOR_WHITE
     - -1
-    background: COLOR_WHITE
   background:
     enabled: true
     image: assets/wallpapers/weave-tile-32.png

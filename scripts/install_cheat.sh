@@ -2,7 +2,8 @@
 # ==============================================================================
 # SCRIPT: install_cheat.sh
 # DESCRIPTION: Clones a private Github repository of cheatsheets into a local
-#              directory. Uses get_api_key.sh to securely fetch the Git PAT.
+#              directory. Uses get_api_key.sh to securely fetch the Git PAT
+#              from a local network pc.
 # USAGE:       install_cheat.sh
 # OPTIONS:     None.
 # ==============================================================================

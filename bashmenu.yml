@@ -4,8 +4,8 @@
 # '{app.<key>}' namespace (e.g. {app.theme}, {app.settings.tabstop}, {app.user.postal_code}),
 # or shorthand shortcuts ({theme}, {user.<key>}, {settings.<key>}).
 # ==============================================================================
-version: '0.0.2'
-theme: canopy
+version: '0.0.1'
+theme: alaska-train
 user:
   example_boolean: true
   example_filepath: '{bashmenu_dir}'
@@ -20,12 +20,13 @@ settings:
   help_gutter_delay: 2.0
   tab_to_spaces: true
   tabstop: 4
-  show_menu_shortcuts: false
+  show_menu_shortcuts: true
   use_nerd_fonts: true
   nerd_font_width: auto
   status_gutter: '| Theme: {theme} | {user} | Battery: {battery} ({battery_stat}) | {user.localip} | [b]{date_time_24_short}[/b]'
   inactivity_timeout:
     milliseconds: 300000
+    command: kcchase --keyboard
   refresh_interval: 10
   pager_editor: vim
   plugins:
