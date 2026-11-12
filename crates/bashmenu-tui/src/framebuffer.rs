@@ -308,7 +308,7 @@ pub fn render_ratatui_buffer_to_slice(
     }
 }
 
-/// Checks whether a Linux framebuffer device exists and is accessible.
+/// Checks whether a Linux framebuffer device exists on the system.
 pub fn is_framebuffer_available() -> bool {
     #[cfg(target_os = "linux")]
     {
@@ -321,14 +321,210 @@ pub fn is_framebuffer_available() -> bool {
     }
 }
 
-/// Checks whether the current `$TERM` represents a Linux virtual console.
-pub fn is_linux_console() -> bool {
-    if let Ok(term) = std::env::var("TERM") {
-        let t = term.trim().to_ascii_lowercase();
+/// Checks whether the Linux framebuffer device exists but fails to open due to
+/// insufficient user permissions (`EACCES` / `PermissionDenied`, e.g. user not
+/// in the `video` group).
+pub fn is_framebuffer_permission_denied() -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        let fb_path = std::env::var("FRAMEBUFFER").unwrap_or_else(|_| "/dev/fb0".to_string());
+        if !Path::new(&fb_path).exists() {
+            return false;
+        }
+        match std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&fb_path)
+        {
+            Ok(_) => false,
+            Err(e) => e.kind() == std::io::ErrorKind::PermissionDenied,
+        }
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        false
+    }
+}
+
+/// Interactively prompts the user (when attached to a TTY) to grant `video`
+/// group membership and immediate `/dev/fb0` ACL access via `sudo` or `doas`.
+/// Returns `true` if `/dev/fb0` becomes accessible.
+pub fn ensure_framebuffer_access_interactive() -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        use std::io::{self, Write};
+
+        if !is_framebuffer_permission_denied() {
+            return is_framebuffer_available();
+        }
+        if std::env::var("BASHMENU_NONINTERACTIVE").as_deref() == Ok("1") {
+            return false;
+        }
+        let is_tty = unsafe {
+            libc::isatty(libc::STDIN_FILENO) == 1 && libc::isatty(libc::STDOUT_FILENO) == 1
+        };
+        if !is_tty {
+            return false;
+        }
+
+        let fb_path = std::env::var("FRAMEBUFFER").unwrap_or_else(|_| "/dev/fb0".to_string());
+        let user = std::env::var("USER")
+            .or_else(|_| std::env::var("LOGNAME"))
+            .unwrap_or_default();
+        if user.is_empty() {
+            return false;
+        }
+
+        let priv_cmd = if Path::new("/usr/bin/sudo").exists() || Path::new("/bin/sudo").exists() {
+            "sudo"
+        } else if Path::new("/usr/bin/doas").exists() || Path::new("/bin/doas").exists() {
+            "doas"
+        } else {
+            return false;
+        };
+
+        let _ = writeln!(
+            io::stderr(),
+            "\n  [!] Linux framebuffer ({}) permission denied for user '{}'.",
+            fb_path,
+            user
+        );
+        let _ = writeln!(
+            io::stderr(),
+            "      TrueColor & photo-grade console graphics require 'video' group / ACL access."
+        );
+        let _ = write!(
+            io::stderr(),
+            "  [?] Grant '{}' access now via {}? [Y/n]: ",
+            fb_path,
+            priv_cmd
+        );
+        let _ = io::stderr().flush();
+
+        let mut reply = String::new();
+        if io::stdin().read_line(&mut reply).is_err() {
+            return false;
+        }
+        let trimmed = reply.trim().to_ascii_lowercase();
+        if !trimmed.is_empty() && trimmed != "y" && trimmed != "yes" {
+            return false;
+        }
+
+        let script = r#"
+usermod -aG video "$1" 2>/dev/null || true
+if [ -d /etc/udev/rules.d ]; then
+    printf 'SUBSYSTEM=="graphics", KERNEL=="fb[0-9]*", TAG+="uaccess", GROUP="video", MODE="0660"\n' > /etc/udev/rules.d/70-bashmenu-fb.rules 2>/dev/null || true
+    udevadm control --reload-rules 2>/dev/null || true
+    udevadm trigger --subsystem-match=graphics 2>/dev/null || true
+fi
+if command -v setfacl >/dev/null 2>&1; then
+    setfacl -m "u:$1:rw" "$2" 2>/dev/null || chmod 0666 "$2" 2>/dev/null || true
+else
+    chmod 0666 "$2" 2>/dev/null || true
+fi
+"#;
+        let _ = std::process::Command::new(priv_cmd)
+            .args(["sh", "-c", script, "--", &user, &fb_path])
+            .status();
+
+        !is_framebuffer_permission_denied()
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        false
+    }
+}
+
+/// Pure helper evaluating `(is_desktop_terminal, is_linux_console)` from
+/// environment variables without mutating global state.
+pub fn evaluate_console_env(
+    term: Option<&str>,
+    xdg_session_type: Option<&str>,
+    display: Option<&str>,
+    wayland_display: Option<&str>,
+    force_fb: bool,
+    fb_disable: bool,
+) -> (bool, bool) {
+    if force_fb {
+        return (false, true);
+    }
+    let is_desktop = if let Some(session_type) = xdg_session_type {
+        let st = session_type.trim().to_ascii_lowercase();
+        if st == "x11" || st == "wayland" {
+            true
+        } else if st == "tty" {
+            false
+        } else {
+            display.map(|v| !v.trim().is_empty()).unwrap_or(false)
+                || wayland_display
+                    .map(|v| !v.trim().is_empty())
+                    .unwrap_or(false)
+        }
+    } else if display.map(|v| !v.trim().is_empty()).unwrap_or(false)
+        || wayland_display
+            .map(|v| !v.trim().is_empty())
+            .unwrap_or(false)
+    {
+        true
+    } else if let Some(t_raw) = term {
+        let t = t_raw.trim().to_ascii_lowercase();
+        !t.is_empty() && t != "linux" && t != "console" && !t.starts_with("linux-")
+    } else {
+        false
+    };
+
+    if fb_disable {
+        return (is_desktop, false);
+    }
+
+    let term_is_linux = if let Some(t_raw) = term {
+        let t = t_raw.trim().to_ascii_lowercase();
         t == "linux" || t == "console" || t.starts_with("linux-")
     } else {
         false
-    }
+    };
+
+    (is_desktop, term_is_linux && !is_desktop)
+}
+
+/// Checks whether the current process is running inside a desktop GUI terminal
+/// emulator window (X11/Wayland) rather than a raw Linux virtual console.
+pub fn is_desktop_terminal() -> bool {
+    let term = std::env::var("TERM").ok();
+    let xdg = std::env::var("XDG_SESSION_TYPE").ok();
+    let disp = std::env::var("DISPLAY").ok();
+    let wayland = std::env::var("WAYLAND_DISPLAY").ok();
+    let force_fb = std::env::var("BASHMENU_FORCE_FB").as_deref() == Ok("1");
+    let fb_disable = std::env::var("BASHMENU_FB_DISABLE").as_deref() == Ok("1");
+    evaluate_console_env(
+        term.as_deref(),
+        xdg.as_deref(),
+        disp.as_deref(),
+        wayland.as_deref(),
+        force_fb,
+        fb_disable,
+    )
+    .0
+}
+
+/// Checks whether the current `$TERM` and session represent a bare Linux
+/// virtual console (and not a desktop GUI terminal emulator).
+pub fn is_linux_console() -> bool {
+    let term = std::env::var("TERM").ok();
+    let xdg = std::env::var("XDG_SESSION_TYPE").ok();
+    let disp = std::env::var("DISPLAY").ok();
+    let wayland = std::env::var("WAYLAND_DISPLAY").ok();
+    let force_fb = std::env::var("BASHMENU_FORCE_FB").as_deref() == Ok("1");
+    let fb_disable = std::env::var("BASHMENU_FB_DISABLE").as_deref() == Ok("1");
+    evaluate_console_env(
+        term.as_deref(),
+        xdg.as_deref(),
+        disp.as_deref(),
+        wayland.as_deref(),
+        force_fb,
+        fb_disable,
+    )
+    .1
 }
 
 #[cfg(target_os = "linux")]
@@ -639,6 +835,32 @@ impl FramebufferDevice {
         self.wallpaper_key = Some(key);
     }
 
+    /// Flushes `self.backbuffer` into `/dev/fb0` via both memory-mapped video
+    /// RAM and `pwrite()` so DRM shadow-buffered drivers (`i915drmfb`,
+    /// `simpledrm`, `amdgpudrmfb`, `virtio_gpu`) trigger dirty-damage updates.
+    #[cfg(target_os = "linux")]
+    fn flush_backbuffer(&mut self) {
+        use std::os::unix::io::AsRawFd;
+
+        if self.mmap_ptr.is_null() || self.smem_len == 0 {
+            return;
+        }
+        let copy_len = self.smem_len.min(self.backbuffer.len());
+        if copy_len == 0 {
+            return;
+        }
+        let target_slice = unsafe { std::slice::from_raw_parts_mut(self.mmap_ptr, self.smem_len) };
+        target_slice[..copy_len].copy_from_slice(&self.backbuffer[..copy_len]);
+        let _ = unsafe {
+            libc::pwrite(
+                self._file.as_raw_fd(),
+                self.backbuffer.as_ptr() as *const libc::c_void,
+                copy_len,
+                0,
+            )
+        };
+    }
+
     /// Renders a Ratatui [`Buffer`] into the off-screen backbuffer and flushes
     /// it atomically to `/dev/fb0` video memory.
     pub fn render_buffer(&mut self, buf: &Buffer, default_bg: Color) {
@@ -665,10 +887,7 @@ impl FramebufferDevice {
                 self.green_offset,
                 self.blue_offset,
             );
-            let target_slice =
-                unsafe { std::slice::from_raw_parts_mut(self.mmap_ptr, self.smem_len) };
-            let copy_len = target_slice.len().min(self.backbuffer.len());
-            target_slice[..copy_len].copy_from_slice(&self.backbuffer[..copy_len]);
+            self.flush_backbuffer();
         }
         #[cfg(not(target_os = "linux"))]
         {
@@ -683,11 +902,9 @@ impl FramebufferDevice {
             if self.mmap_ptr.is_null() || self.smem_len == 0 {
                 return;
             }
-            let target_slice =
-                unsafe { std::slice::from_raw_parts_mut(self.mmap_ptr, self.smem_len) };
             blit_rgb_to_buffer(
                 img,
-                target_slice,
+                &mut self.backbuffer,
                 self.width,
                 self.height,
                 self.line_length,
@@ -696,6 +913,7 @@ impl FramebufferDevice {
                 self.green_offset,
                 self.blue_offset,
             );
+            self.flush_backbuffer();
         }
         #[cfg(not(target_os = "linux"))]
         {
@@ -720,11 +938,10 @@ impl FramebufferDevice {
             if self.mmap_ptr.is_null() || self.smem_len == 0 {
                 return;
             }
-            let target = unsafe { std::slice::from_raw_parts_mut(self.mmap_ptr, self.smem_len) };
             for y in 0..self.height {
                 for x in 0..self.width {
                     write_pixel_to_slice(
-                        target,
+                        &mut self.backbuffer,
                         x,
                         y,
                         self.width,
@@ -740,6 +957,7 @@ impl FramebufferDevice {
                     );
                 }
             }
+            self.flush_backbuffer();
         }
         #[cfg(not(target_os = "linux"))]
         {
@@ -856,5 +1074,45 @@ mod tests {
         let wp_idx = (8 * 16 + 12) * 4;
         let wp_px = u32::from_ne_bytes(fb_out[wp_idx..wp_idx + 4].try_into().unwrap());
         assert_eq!(wp_px, format_pixel_32(10, 200, 30, 16, 8, 0));
+    }
+
+    #[test]
+    fn test_evaluate_console_env_desktop_and_linux_vt_guards() {
+        // 1. GNOME Terminal on X11 desktop -> desktop=true, linux_console=false
+        assert_eq!(
+            evaluate_console_env(
+                Some("xterm-256color"),
+                Some("x11"),
+                Some(":0"),
+                None,
+                false,
+                false
+            ),
+            (true, false)
+        );
+
+        // 2. Spoofed TERM=linux inside X11 desktop -> desktop=true, linux_console=false
+        assert_eq!(
+            evaluate_console_env(Some("linux"), Some("x11"), Some(":0"), None, false, false),
+            (true, false)
+        );
+
+        // 3. Real Linux VT (Ctrl+Alt+F2, XDG_SESSION_TYPE=tty, TERM=linux) -> desktop=false, linux_console=true
+        assert_eq!(
+            evaluate_console_env(Some("linux"), Some("tty"), None, None, false, false),
+            (false, true)
+        );
+
+        // 4. Minimal Debian console without systemd/XDG vars -> desktop=false, linux_console=true
+        assert_eq!(
+            evaluate_console_env(Some("linux"), None, None, None, false, false),
+            (false, true)
+        );
+
+        // 5. Explicit BASHMENU_FB_DISABLE=1 disables linux_console
+        assert_eq!(
+            evaluate_console_env(Some("linux"), Some("tty"), None, None, false, true),
+            (false, false)
+        );
     }
 }

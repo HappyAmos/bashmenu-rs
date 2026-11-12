@@ -72,8 +72,27 @@ pub struct TerminalGuard {
 }
 
 impl TerminalGuard {
-    /// Initializes terminal in raw mode, on alternate screen with mouse.
+    /// Initializes terminal in raw mode, on alternate screen with mouse,
+    /// automatically attaching `/dev/fb0` when running on a Linux virtual console.
     pub fn init() -> io::Result<Self> {
+        let fb = if std::env::var("BASHMENU_FB_DISABLE").as_deref() != Ok("1")
+            && crate::framebuffer::is_linux_console()
+            && crate::framebuffer::is_framebuffer_available()
+        {
+            let opened = FramebufferDevice::open();
+            if opened.is_some() && std::env::var("BASHMENU_COLOR_TIER").is_err() {
+                std::env::set_var("BASHMENU_COLOR_TIER", "truecolor");
+            }
+            opened
+        } else {
+            None
+        };
+        Self::init_with_framebuffer(fb)
+    }
+
+    /// Initializes terminal in raw mode with an explicitly provided optional
+    /// [`FramebufferDevice`].
+    pub fn init_with_framebuffer(fb_device: Option<FramebufferDevice>) -> io::Result<Self> {
         let keep_alt_on_drop = std::env::var("BASHMENU_CHILD_ALT").as_deref() == Ok("1");
         enable_raw_mode()?;
         let mut stdout = BufWriter::new(io::stdout());
@@ -96,6 +115,9 @@ impl TerminalGuard {
         if keep_alt_on_drop {
             guard.request_clear();
         }
+        if fb_device.is_some() {
+            guard.set_framebuffer(fb_device);
+        }
         Ok(guard)
     }
 
@@ -106,6 +128,16 @@ impl TerminalGuard {
     /// output.
     pub fn set_framebuffer(&mut self, fb: Option<FramebufferDevice>) {
         let active = fb.is_some();
+        self.suppress_stdout.store(false, Ordering::Relaxed);
+        if active {
+            let _ = self
+                .terminal
+                .backend_mut()
+                .write_all(b"\x1b[?25l\x1b[?1c\x1b[0m\x1b[2J\x1b[H");
+        } else if self.fb_device.is_some() {
+            let _ = self.terminal.backend_mut().write_all(b"\x1b[?0c");
+        }
+        let _ = self.terminal.backend_mut().flush();
         self.fb_device = fb;
         self.suppress_stdout.store(active, Ordering::Relaxed);
     }
@@ -895,6 +927,9 @@ impl TerminalGuard {
             fb.clear(0, 0, 0);
         }
         self.suppress_stdout.store(false, Ordering::Relaxed);
+        if had_fb {
+            let _ = self.terminal.backend_mut().write_all(b"\x1b[?0c");
+        }
 
         disable_raw_mode()?;
         execute!(self.terminal.backend_mut(), DisableMouseCapture, Show)?;
@@ -918,6 +953,12 @@ impl TerminalGuard {
             EnableMouseCapture,
             Hide
         )?;
+        if had_fb {
+            let _ = self
+                .terminal
+                .backend_mut()
+                .write_all(b"\x1b[?25l\x1b[?1c\x1b[0m\x1b[2J\x1b[H");
+        }
         let _ = self.terminal.backend_mut().flush();
         self.suppress_stdout.store(had_fb, Ordering::Relaxed);
         Self::drain_stale_events();
@@ -937,6 +978,9 @@ impl TerminalGuard {
             fb.clear(0, 0, 0);
         }
         self.suppress_stdout.store(false, Ordering::Relaxed);
+        if had_fb {
+            let _ = self.terminal.backend_mut().write_all(b"\x1b[?0c");
+        }
 
         // 1. Leave alternate screen and restore normal terminal state
         disable_raw_mode()?;
@@ -960,6 +1004,12 @@ impl TerminalGuard {
             EnableMouseCapture,
             Hide
         )?;
+        if had_fb {
+            let _ = self
+                .terminal
+                .backend_mut()
+                .write_all(b"\x1b[?25l\x1b[?1c\x1b[0m\x1b[2J\x1b[H");
+        }
         let _ = self.terminal.backend_mut().flush();
         self.suppress_stdout.store(had_fb, Ordering::Relaxed);
         Self::drain_stale_events();
@@ -1042,10 +1092,14 @@ impl TerminalGuard {
 impl Drop for TerminalGuard {
     /// Restores terminal raw mode, cursor visibility, and alternate screen.
     fn drop(&mut self) {
+        let had_fb = self.fb_device.is_some();
         if let Some(ref mut fb) = self.fb_device {
             fb.clear(0, 0, 0);
         }
         self.suppress_stdout.store(false, Ordering::Relaxed);
+        if had_fb {
+            let _ = self.terminal.backend_mut().write_all(b"\x1b[?0c");
+        }
 
         if self.keep_alt_on_drop {
             let _ = execute!(self.terminal.backend_mut(), DisableMouseCapture);

@@ -26,7 +26,8 @@ pub use bbcode::{
 pub use borders::ResolvedWindowBorders;
 pub use clipboard::{base64_encode, get_clipboard_text, set_clipboard_text};
 pub use framebuffer::{
-    blit_rgb_to_buffer, format_pixel_16, format_pixel_32, is_framebuffer_available,
+    blit_rgb_to_buffer, ensure_framebuffer_access_interactive, format_pixel_16, format_pixel_32,
+    is_desktop_terminal, is_framebuffer_available, is_framebuffer_permission_denied,
     is_linux_console, render_ratatui_buffer_to_slice, write_pixel_to_slice, FramebufferDevice,
 };
 pub use gutter::{

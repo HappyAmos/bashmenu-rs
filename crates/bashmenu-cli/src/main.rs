@@ -333,16 +333,30 @@ fn main() -> Result<()> {
         }
     };
 
-    // Direct Linux Framebuffer (/dev/fb0) detection & setup
+    // Direct Linux Framebuffer (/dev/fb0) detection, desktop terminal guard, & setup
     let fb_mode = config.settings.framebuffer.as_deref().unwrap_or("auto");
+    let on_linux_console = bashmenu_tui::is_linux_console();
+    let in_desktop_term = bashmenu_tui::is_desktop_terminal();
+    let force_fb = std::env::var("BASHMENU_FORCE_FB").as_deref() == Ok("1")
+        || (fb_mode == "true" && !in_desktop_term);
     let use_fb_image_mode = cli.image || fb_mode == "image";
-    let want_fb = fb_mode == "true"
-        || fb_mode == "image"
-        || (fb_mode != "false"
-            && is_framebuffer_available()
-            && (cli.image || bashmenu_tui::is_linux_console()));
+    let want_fb =
+        fb_mode != "false" && is_framebuffer_available() && (force_fb || on_linux_console);
+
+    let mut fb_perm_denied = false;
     let mut fb_device = if want_fb {
-        FramebufferDevice::open()
+        if let Some(fb) = FramebufferDevice::open() {
+            Some(fb)
+        } else if bashmenu_tui::is_framebuffer_permission_denied() {
+            if bashmenu_tui::ensure_framebuffer_access_interactive() {
+                FramebufferDevice::open()
+            } else {
+                fb_perm_denied = true;
+                None
+            }
+        } else {
+            None
+        }
     } else {
         None
     };
@@ -351,7 +365,8 @@ fn main() -> Result<()> {
         std::env::set_var("BASHMENU_COLOR_TIER", "truecolor");
     }
 
-    let mut use_nerd = config.settings.use_nerd_fonts.unwrap_or(false);
+    let mut use_nerd =
+        config.settings.use_nerd_fonts.unwrap_or(false) && !on_linux_console && fb_device.is_none();
     let active_theme = themes.get(&config.theme);
     let mut styles = if let Some(t) = active_theme {
         ResolvedThemeStyles::from_theme(t, use_nerd)
@@ -388,7 +403,10 @@ fn main() -> Result<()> {
     plugin_engine.trigger_refresh(&config, false);
 
     // 6. Initialize Terminal Guard
-    let mut guard = TerminalGuard::init()?;
+    if let Some(ref mut fb) = fb_device {
+        fb.set_image_mode(use_fb_image_mode);
+    }
+    let mut guard = TerminalGuard::init_with_framebuffer(fb_device)?;
     let mut menu_view = MenuView::new(menu, styles.clone(), use_nerd, status_gutter)
         .with_config(config.clone())
         .with_shortcuts(shortcuts_cfg.shortcuts.clone());
@@ -404,15 +422,26 @@ fn main() -> Result<()> {
     let mut last_interaction = Instant::now();
     let mut toast_rack = ToastRack::new();
 
-    if let Some(ref mut fb) = fb_device {
+    if let Some(fb) = guard.framebuffer_mut() {
         fb.set_image_mode(use_fb_image_mode);
         if use_fb_image_mode {
             fb.set_wallpaper(initial_wallpaper.as_ref(), styles.background);
             menu_view.set_framebuffer_image_mode(true);
         }
+    } else if fb_perm_denied {
+        toast_rack.add(ToastNotification::new(
+            "Cannot open /dev/fb0 (permission denied). Run 'sudo usermod -aG video $USER' or './install.sh' for TrueColor console graphics.".to_string(),
+            Some("Warning: Framebuffer Permission".to_string()),
+            6.0,
+        ));
+    } else if use_fb_image_mode && in_desktop_term {
+        toast_rack.add(ToastNotification::new(
+            "Full-resolution image mode (-i) requires a Linux console (/dev/fb0); using TrueColor character mode in desktop terminal.".to_string(),
+            Some("Desktop Terminal Mode".to_string()),
+            4.5,
+        ));
     }
     guard.set_default_bg(styles.background);
-    guard.set_framebuffer(fb_device);
 
     // 7. Interactive Event Loop
     let mut need_redraw = true;
@@ -1320,7 +1349,9 @@ fn main() -> Result<()> {
                             let _ = save_config(&config_path, &config);
                             menu_view.set_config(config.clone());
                             if key_path == "settings.use_nerd_fonts" {
-                                let unf = config.settings.use_nerd_fonts.unwrap_or(false);
+                                let unf = config.settings.use_nerd_fonts.unwrap_or(false)
+                                    && !on_linux_console
+                                    && !guard.has_framebuffer();
                                 use_nerd = unf;
                                 menu_view.set_use_nerd_fonts(unf);
                                 if let Some(t) = themes.get(&config.theme) {
@@ -1424,11 +1455,12 @@ fn main() -> Result<()> {
                             {
                                 let fb_m = config.settings.framebuffer.as_deref().unwrap_or("auto");
                                 let use_img = cli.image || fb_m == "image";
-                                let want_fb = fb_m == "true"
-                                    || fb_m == "image"
-                                    || (fb_m != "false"
-                                        && is_framebuffer_available()
-                                        && (cli.image || bashmenu_tui::is_linux_console()));
+                                let force_fb_now = std::env::var("BASHMENU_FORCE_FB").as_deref()
+                                    == Ok("1")
+                                    || (fb_m == "true" && !in_desktop_term);
+                                let want_fb = fb_m != "false"
+                                    && is_framebuffer_available()
+                                    && (force_fb_now || on_linux_console);
                                 if want_fb {
                                     if !guard.has_framebuffer() {
                                         if let Some(mut new_fb) = FramebufferDevice::open() {
@@ -1438,6 +1470,12 @@ fn main() -> Result<()> {
                                             new_fb
                                                 .set_wallpaper(wp_cfg.as_ref(), styles.background);
                                             guard.set_framebuffer(Some(new_fb));
+                                        } else if bashmenu_tui::is_framebuffer_permission_denied() {
+                                            toast_rack.add(ToastNotification::new(
+                                                "Cannot open /dev/fb0 (permission denied). Run 'sudo usermod -aG video $USER' or './install.sh'.".to_string(),
+                                                Some("Warning: Framebuffer Permission".to_string()),
+                                                5.0,
+                                            ));
                                         }
                                     } else if let Some(fb) = guard.framebuffer_mut() {
                                         fb.set_image_mode(use_img);
@@ -1452,6 +1490,13 @@ fn main() -> Result<()> {
                                     guard.set_framebuffer(None);
                                     menu_view.set_framebuffer_image_mode(false);
                                     guard.request_clear();
+                                    if (fb_m == "true" || fb_m == "image") && in_desktop_term {
+                                        toast_rack.add(ToastNotification::new(
+                                            "Saved framebuffer setting for Linux console (/dev/fb0); desktop terminal remains in TrueColor character mode.".to_string(),
+                                            Some("Desktop Terminal Guard".to_string()),
+                                            4.5,
+                                        ));
+                                    }
                                 }
                             }
                         }
@@ -1834,7 +1879,9 @@ fn main() -> Result<()> {
                             if let Ok(new_config) = load_config(&config_path) {
                                 config = new_config;
                             }
-                            use_nerd = config.settings.use_nerd_fonts.unwrap_or(false);
+                            use_nerd = config.settings.use_nerd_fonts.unwrap_or(false)
+                                && !on_linux_console
+                                && !guard.has_framebuffer();
                             menu_view.set_use_nerd_fonts(use_nerd);
                             menu_view.set_config(config.clone());
                             menu_view.set_show_shortcuts(

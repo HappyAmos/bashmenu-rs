@@ -187,6 +187,77 @@ if [ -f "$SCRIPT_DIR/bashmenu.1" ]; then
     fi
 fi
 
+# Configure Linux framebuffer (/dev/fb0) permissions (video group + uaccess ACL)
+OS_CHECK="$(uname -s 2>/dev/null || echo "Unknown")"
+if [ "$OS_CHECK" = "Linux" ] && [ -e /dev/fb0 ]; then
+    TARGET_USER="${SUDO_USER:-${USER:-$(id -un 2>/dev/null || echo "")}}"
+    IN_VIDEO_GROUP=false
+    if [ -n "$TARGET_USER" ] && id -nG "$TARGET_USER" 2>/dev/null | tr ' ' '\n' | grep -qx "video"; then
+        IN_VIDEO_GROUP=true
+    fi
+    if [ "$IN_VIDEO_GROUP" = "true" ] && [ -r /dev/fb0 ] && [ -w /dev/fb0 ]; then
+        echo "  [+] Linux framebuffer (/dev/fb0) access verified for '$TARGET_USER'"
+    elif [ -n "$TARGET_USER" ]; then
+        echo ""
+        echo "==> Configuring Linux framebuffer (/dev/fb0) for console TrueColor & image mode..."
+        PRIV_CMD=""
+        if [ "$(id -u)" = "0" ]; then
+            PRIV_CMD=""
+        elif command -v sudo >/dev/null 2>&1; then
+            PRIV_CMD="sudo"
+        elif command -v doas >/dev/null 2>&1; then
+            PRIV_CMD="doas"
+        fi
+
+        DO_FB_SETUP=false
+        if [ "$(id -u)" = "0" ]; then
+            DO_FB_SETUP=true
+        elif [ -n "$PRIV_CMD" ] && [ "$PRIV_CMD" = "sudo" ] && sudo -n true 2>/dev/null; then
+            DO_FB_SETUP=true
+        elif [ -n "$PRIV_CMD" ] && [ -t 0 ]; then
+            printf "  [?] Grant '%s' access to /dev/fb0 ('video' group + ACL) via %s? [Y/n]: " "$TARGET_USER" "$PRIV_CMD"
+            read -r fb_reply
+            case "$fb_reply" in
+                ""|[yY]|[yY][eE][sS]) DO_FB_SETUP=true ;;
+            esac
+        fi
+
+        if [ "$DO_FB_SETUP" = "true" ]; then
+            # shellcheck disable=SC2016
+            FB_SETUP_SCRIPT='
+                if getent group video >/dev/null 2>&1; then
+                    usermod -aG video "$1" 2>/dev/null || true
+                fi
+                if [ -d /etc/udev/rules.d ]; then
+                    printf "SUBSYSTEM==\"graphics\", KERNEL==\"fb[0-9]*\", TAG+=\"uaccess\", GROUP=\"video\", MODE=\"0660\"\n" > /etc/udev/rules.d/70-bashmenu-fb.rules 2>/dev/null || true
+                    udevadm control --reload-rules 2>/dev/null || true
+                    udevadm trigger --subsystem-match=graphics 2>/dev/null || true
+                fi
+                if command -v setfacl >/dev/null 2>&1; then
+                    setfacl -m "u:$1:rw" /dev/fb0 2>/dev/null || chmod 0666 /dev/fb0 2>/dev/null || true
+                else
+                    chmod 0666 /dev/fb0 2>/dev/null || true
+                fi
+            '
+            if [ -n "$PRIV_CMD" ]; then
+                if $PRIV_CMD sh -c "$FB_SETUP_SCRIPT" -- "$TARGET_USER"; then
+                    echo "  [+] Added '$TARGET_USER' to 'video' group and enabled immediate /dev/fb0 access"
+                else
+                    echo "  [!] Could not update /dev/fb0 permissions automatically."
+                    echo "      Run: sudo usermod -aG video $TARGET_USER && sudo setfacl -m u:$TARGET_USER:rw /dev/fb0"
+                fi
+            else
+                sh -c "$FB_SETUP_SCRIPT" -- "$TARGET_USER"
+                echo "  [+] Added '$TARGET_USER' to 'video' group and enabled immediate /dev/fb0 access"
+            fi
+        else
+            echo "  [!] Notice: '$TARGET_USER' does not currently have write access to /dev/fb0."
+            echo "      To enable TrueColor & photo backgrounds on Linux virtual consoles (tty1-tty6), run:"
+            echo "      sudo usermod -aG video $TARGET_USER && sudo setfacl -m u:$TARGET_USER:rw /dev/fb0"
+        fi
+    fi
+fi
+
 # Verify PATH
 case ":$PATH:" in
     *":$BIN_DIR:"*) ;;
