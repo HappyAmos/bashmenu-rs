@@ -29,12 +29,12 @@ use bashmenu_core::{
     PluginEngine, ShortcutsConfig, ToastNotification,
 };
 use bashmenu_tui::{
-    install_panic_hook, is_framebuffer_available, ConfirmChoice, ConfirmModal, FilePickerModal,
-    FramebufferDevice, HelpModal, InputModal, MenuAction, MenuView, MessageModal, ModalAnimation,
-    NoteConflictChoice, NoteConflictModal, NoteEditorAction, NoteEditorModal, NoteViewerAction,
-    NoteViewerModal, RadioModal, ResolvedThemeStyles, ShortcutDispatchResult, ShortcutDispatcher,
-    StreamOutputAction, StreamOutputModal, TerminalGuard, ThemePickerModal, ToastRack,
-    ToggleChoice, ToggleModal, TransitionEffect, TransitionSpeed,
+    install_panic_hook, is_framebuffer_available, ColorTier, ConfirmChoice, ConfirmModal,
+    FilePickerModal, FramebufferDevice, HelpModal, InputModal, MenuAction, MenuView, MessageModal,
+    ModalAnimation, NoteConflictChoice, NoteConflictModal, NoteEditorAction, NoteEditorModal,
+    NoteViewerAction, NoteViewerModal, RadioModal, ResolvedThemeStyles, ShortcutDispatchResult,
+    ShortcutDispatcher, StreamOutputAction, StreamOutputModal, TerminalGuard, ThemePickerModal,
+    ToastRack, ToggleChoice, ToggleModal, TransitionEffect, TransitionSpeed,
 };
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode};
@@ -375,16 +375,31 @@ fn main() -> Result<()> {
         ResolvedThemeStyles::default().with_toast_timeout(config.settings.toast_timeout)
     };
 
+    let active_color_mode = match styles.tier {
+        ColorTier::Color8 => "3-bit (8 color)",
+        ColorTier::Color16 => "16 color",
+        ColorTier::Color256 => "256 color",
+        ColorTier::TrueColor => "truecolor",
+    };
+    let active_tty_mode = if fb_device.is_some() || on_linux_console {
+        "virtual console (tty)".to_string()
+    } else {
+        bashmenu_core::detect_tty_mode()
+    };
+
     // 4. Macro Context & Status Gutter
     macro_rules! make_macro_ctx {
         ($cfg:expr) => {
-            MacroContext::new($cfg).with_paths(
-                config_path.clone(),
-                menu_path.clone(),
-                themes_path.clone(),
-                shortcuts_path.clone(),
-                cheat_path.clone(),
-            )
+            MacroContext::new($cfg)
+                .with_paths(
+                    config_path.clone(),
+                    menu_path.clone(),
+                    themes_path.clone(),
+                    shortcuts_path.clone(),
+                    cheat_path.clone(),
+                )
+                .with_color_mode(active_color_mode)
+                .with_tty_mode(active_tty_mode.clone())
         };
     }
     let status_gutter = {

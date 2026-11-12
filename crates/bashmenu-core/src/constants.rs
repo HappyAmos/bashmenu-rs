@@ -37,6 +37,11 @@ pub const PLACEHOLDER_HELP_TEXT: &str = "\
 {notebooks}                  │ Alias for {notebooks_dir}
 {shortcuts_file}             │ Custom keyboard shortcuts file path (shortcuts.yml)
 {shortcuts}                  │ Alias for {shortcuts_file}
+{bashmenu_yml}               │ Full path to currently loaded bashmenu.yml
+{bashmenu_mnu}               │ Full path to currently loaded bashmenu.mnu
+{bashmenu_themes}            │ Full path to currently loaded bashmenu.themes
+{shortcuts_yml}              │ Full path to currently loaded shortcuts.yml
+{cheat_yml}                  │ Full path to currently loaded cheat.yml
 {bashrc}                     │ Path to ~/.bashrc profile file
 {bash_aliases}               │ Path to ~/.bash_aliases file
 {zshrc}                      │ Path to ~/.zshrc configuration file
@@ -63,6 +68,8 @@ pub const PLACEHOLDER_HELP_TEXT: &str = "\
 {user-mode}                  │ Privilege level (User or Root)
 {version}                    │ Application release version (from Cargo.toml)
 {theme}                      │ Active color theme name (or {app.theme})
+{color_mode}                 │ Current terminal color mode (e.g. truecolor, 256 color)
+{tty_mode}                   │ Current TTY mode (e.g. virtual console (tty), pty)
 
 ── Date & Time Placeholders ──
 {date_time_12}               │ Timestamp 12-hr format (YYYY-MM-DD HH:MM:SS AM/PM)

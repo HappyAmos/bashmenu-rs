@@ -991,3 +991,10 @@
 - [x] Updated tests in `crates/bashmenu-core/tests/macro_engine_test.rs` (`test_env_placeholder_resolution`) and `crates/bashmenu-cli/tests/audit_items_test.rs` (`test_env_environment_info_modal_formatting`).
 - [x] Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass with zero warnings.
 
+## Add Config Path, `{color_mode}`, and `{tty_mode}` Expanding Placeholders
+- [x] Added `{bashmenu_yml}`, `{bashmenu_mnu}`, `{bashmenu_themes}`, `{shortcuts_yml}`, `{cheat_yml}`, `{color_mode}`, and `{tty_mode}` placeholders to `crates/bashmenu-core/src/macro_engine.rs` (plus `evaluate_color_mode`, `detect_color_mode`, `evaluate_tty_mode`, `detect_tty_mode`, and `MacroContext::with_color_mode` / `MacroContext::with_tty_mode`).
+- [x] Re-exported the new detection helpers in `crates/bashmenu-core/src/lib.rs` and wired `active_color_mode` and `active_tty_mode` into `make_macro_ctx!` in `crates/bashmenu-cli/src/main.rs`.
+- [x] Documented all 7 placeholders in `crates/bashmenu-core/src/constants.rs`, `bashmenu.md`, and `bashmenu.1`.
+- [x] Added `test_config_file_color_and_tty_placeholders` in `crates/bashmenu-core/tests/macro_engine_test.rs`.
+- [x] Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass with zero warnings.
+

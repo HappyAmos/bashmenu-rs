@@ -446,3 +446,109 @@ fn test_resolve_workspace_version_from_cargo_toml() {
     let _ = std::fs::remove_dir_all(&td);
     assert_eq!(ver, "2.5.0");
 }
+
+#[test]
+fn test_config_file_color_and_tty_placeholders() {
+    let config = BashMenuConfig::default();
+
+    let td = std::env::temp_dir().join(format!(
+        "bashmenu_env_items_test_{}_{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&td).unwrap();
+    let cfg_path = td.join("bashmenu.yml");
+    let mnu_path = td.join("bashmenu.mnu");
+    let thm_path = td.join("bashmenu.themes");
+    let shc_path = td.join("shortcuts.yml");
+    let cht_path = td.join("cheat.yml");
+
+    std::fs::write(&cfg_path, "version: 1.0\n").unwrap();
+    std::fs::write(&mnu_path, "items: []\n").unwrap();
+    std::fs::write(&thm_path, "themes: {}\n").unwrap();
+    std::fs::write(&shc_path, "shortcuts: []\n").unwrap();
+    std::fs::write(&cht_path, "cheats: []\n").unwrap();
+
+    let ctx = MacroContext::new(&config)
+        .with_paths(
+            cfg_path.clone(),
+            mnu_path.clone(),
+            thm_path.clone(),
+            shc_path.clone(),
+            cht_path.clone(),
+        )
+        .with_color_mode("256 color")
+        .with_tty_mode("pty");
+
+    assert_eq!(
+        interpolate_placeholders("{bashmenu_yml}", &ctx),
+        full_file_location(&cfg_path)
+    );
+    assert_eq!(
+        interpolate_placeholders("{bashmenu_mnu}", &ctx),
+        full_file_location(&mnu_path)
+    );
+    assert_eq!(
+        interpolate_placeholders("{bashmenu_themes}", &ctx),
+        full_file_location(&thm_path)
+    );
+    assert_eq!(
+        interpolate_placeholders("{shortcuts_yml}", &ctx),
+        full_file_location(&shc_path)
+    );
+    assert_eq!(
+        interpolate_placeholders("{cheat_yml}", &ctx),
+        full_file_location(&cht_path)
+    );
+    assert_eq!(interpolate_placeholders("{color_mode}", &ctx), "256 color");
+    assert_eq!(interpolate_placeholders("{tty_mode}", &ctx), "pty");
+
+    let _ = std::fs::remove_dir_all(&td);
+
+    // Verify pure color mode evaluator
+    assert_eq!(
+        bashmenu_core::evaluate_color_mode(Some("8"), None, None),
+        "3-bit (8 color)"
+    );
+    assert_eq!(
+        bashmenu_core::evaluate_color_mode(None, Some("linux"), Some("truecolor")),
+        "3-bit (8 color)"
+    );
+    assert_eq!(
+        bashmenu_core::evaluate_color_mode(None, Some("linux-16color"), None),
+        "16 color"
+    );
+    assert_eq!(
+        bashmenu_core::evaluate_color_mode(None, Some("xterm-256color"), None),
+        "256 color"
+    );
+    assert_eq!(
+        bashmenu_core::evaluate_color_mode(None, Some("xterm-256color"), Some("truecolor")),
+        "truecolor"
+    );
+
+    // Verify pure TTY mode evaluator
+    assert_eq!(
+        bashmenu_core::evaluate_tty_mode(Some("/dev/tty1"), None, None, None, None, false),
+        "virtual console (tty)"
+    );
+    assert_eq!(
+        bashmenu_core::evaluate_tty_mode(Some("/dev/pts/3"), None, None, None, None, false),
+        "pty"
+    );
+    assert_eq!(
+        bashmenu_core::evaluate_tty_mode(Some("/dev/ttyS0"), None, None, None, None, false),
+        "serial console (tty)"
+    );
+    assert_eq!(
+        bashmenu_core::evaluate_tty_mode(None, Some("linux"), Some("tty"), None, None, false),
+        "virtual console (tty)"
+    );
+    assert_eq!(
+        bashmenu_core::evaluate_tty_mode(None, Some("xterm"), Some("wayland"), None, None, false),
+        "pty"
+    );
+}

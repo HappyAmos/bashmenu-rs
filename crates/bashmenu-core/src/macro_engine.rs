@@ -35,6 +35,10 @@ pub struct MacroContext<'a> {
     pub shortcuts_path: Option<PathBuf>,
     /// Full path to active cheat.yml file (if explicitly known)
     pub cheat_path: Option<PathBuf>,
+    /// Explicit terminal color mode label override (e.g. "truecolor", "256 color")
+    pub color_mode: Option<String>,
+    /// Explicit TTY mode label override (e.g. "virtual console (tty)", "pty")
+    pub tty_mode: Option<String>,
     /// Application release version from Cargo.toml workspace.package.version
     pub version: String,
     /// Terminal viewport width
@@ -99,6 +103,8 @@ impl<'a> MacroContext<'a> {
             themes_path: None,
             shortcuts_path: None,
             cheat_path: None,
+            color_mode: None,
+            tty_mode: None,
             version,
             window_width: 80,
             window_height: 24,
@@ -132,6 +138,18 @@ impl<'a> MacroContext<'a> {
         self.themes_path = Some(themes_path);
         self.shortcuts_path = Some(shortcuts_path);
         self.cheat_path = Some(cheat_path);
+        self
+    }
+
+    /// Sets an explicit terminal color mode label for `{color_mode}`.
+    pub fn with_color_mode(mut self, color_mode: impl Into<String>) -> Self {
+        self.color_mode = Some(color_mode.into());
+        self
+    }
+
+    /// Sets an explicit TTY mode label for `{tty_mode}`.
+    pub fn with_tty_mode(mut self, tty_mode: impl Into<String>) -> Self {
+        self.tty_mode = Some(tty_mode.into());
         self
     }
 
@@ -238,6 +256,180 @@ impl<'a> MacroContext<'a> {
             full_file_location(&cht),
         )
     }
+}
+
+/// Evaluates the human-readable terminal color mode label from environment variables.
+pub fn evaluate_color_mode(
+    color_tier_override: Option<&str>,
+    term: Option<&str>,
+    colorterm: Option<&str>,
+) -> &'static str {
+    if let Some(tier) = color_tier_override {
+        match tier.trim().to_ascii_lowercase().as_str() {
+            "8" | "color8" | "basic" => return "3-bit (8 color)",
+            "16" | "color16" => return "16 color",
+            "256" | "color256" => return "256 color",
+            "truecolor" | "24bit" | "rgb" => return "truecolor",
+            _ => {}
+        }
+    }
+
+    if let Some(t_raw) = term {
+        let t = t_raw.trim().to_ascii_lowercase();
+        if t == "linux" || t == "console" {
+            return "3-bit (8 color)";
+        }
+        if t == "linux-16color" {
+            return "16 color";
+        }
+    }
+
+    if let Some(ct_raw) = colorterm {
+        let ct = ct_raw.trim().to_ascii_lowercase();
+        if ct == "truecolor" || ct == "24bit" {
+            return "truecolor";
+        }
+    }
+
+    if let Some(t_raw) = term {
+        let t = t_raw.trim().to_ascii_lowercase();
+        if t == "vt100" || t == "vt102" || t == "dumb" {
+            return "3-bit (8 color)";
+        }
+        if t.contains("16color") {
+            return "16 color";
+        }
+        if t.contains("kitty")
+            || t.contains("alacritty")
+            || t.contains("ghostty")
+            || t.contains("foot")
+            || t.contains("wezterm")
+        {
+            return "truecolor";
+        }
+        if t.contains("256color") {
+            return "256 color";
+        }
+    }
+
+    "truecolor"
+}
+
+/// Detects the active terminal color mode label for `{color_mode}`.
+pub fn detect_color_mode() -> String {
+    let override_var = std::env::var("BASHMENU_COLOR_TIER").ok();
+    let term = std::env::var("TERM").ok();
+    let colorterm = std::env::var("COLORTERM").ok();
+    evaluate_color_mode(
+        override_var.as_deref(),
+        term.as_deref(),
+        colorterm.as_deref(),
+    )
+    .to_string()
+}
+
+/// Evaluates the human-readable TTY mode label from TTY device path and environment variables.
+pub fn evaluate_tty_mode(
+    tty_path: Option<&str>,
+    term: Option<&str>,
+    xdg_session_type: Option<&str>,
+    display: Option<&str>,
+    wayland_display: Option<&str>,
+    force_fb: bool,
+) -> &'static str {
+    if force_fb {
+        return "virtual console (tty)";
+    }
+
+    if let Some(path) = tty_path {
+        if path.starts_with("/dev/pts/") {
+            return "pty";
+        }
+        if let Some(suffix) = path.strip_prefix("/dev/tty") {
+            if !suffix.is_empty() && suffix.chars().all(|c| c.is_ascii_digit()) {
+                return "virtual console (tty)";
+            }
+            if suffix.starts_with('S') || suffix.starts_with("AMA") || suffix.starts_with("USB") {
+                return "serial console (tty)";
+            }
+        }
+        if path == "/dev/console" {
+            return "system console";
+        }
+    }
+
+    if let Some(st_raw) = xdg_session_type {
+        let st = st_raw.trim().to_ascii_lowercase();
+        if st == "x11" || st == "wayland" {
+            return "pty";
+        }
+        if st == "tty" {
+            return "virtual console (tty)";
+        }
+    }
+
+    if display.map(|v| !v.trim().is_empty()).unwrap_or(false)
+        || wayland_display
+            .map(|v| !v.trim().is_empty())
+            .unwrap_or(false)
+    {
+        return "pty";
+    }
+
+    if let Some(t_raw) = term {
+        let t = t_raw.trim().to_ascii_lowercase();
+        if t == "linux" || t == "console" || t.starts_with("linux-") {
+            return "virtual console (tty)";
+        }
+        if !t.is_empty() {
+            return "pty";
+        }
+    }
+
+    "non-tty"
+}
+
+/// Detects the active TTY mode label for `{tty_mode}`.
+pub fn detect_tty_mode() -> String {
+    #[cfg(unix)]
+    let tty_path: Option<String> = {
+        let fd = if unsafe { libc::isatty(libc::STDIN_FILENO) } == 1 {
+            Some(libc::STDIN_FILENO)
+        } else if unsafe { libc::isatty(libc::STDOUT_FILENO) } == 1 {
+            Some(libc::STDOUT_FILENO)
+        } else {
+            None
+        };
+        fd.and_then(|f| {
+            let ptr = unsafe { libc::ttyname(f) };
+            if ptr.is_null() {
+                None
+            } else {
+                unsafe { std::ffi::CStr::from_ptr(ptr) }
+                    .to_str()
+                    .ok()
+                    .map(|s| s.to_string())
+            }
+        })
+    };
+    #[cfg(not(unix))]
+    let tty_path: Option<String> = None;
+
+    let term = std::env::var("TERM").ok();
+    let xdg = std::env::var("XDG_SESSION_TYPE").ok();
+    let disp = std::env::var("DISPLAY").ok();
+    let wayland = std::env::var("WAYLAND_DISPLAY").ok();
+    let force_fb = std::env::var("BASHMENU_FORCE_FB").as_deref() == Ok("1");
+
+    evaluate_tty_mode(
+        tty_path.as_deref(),
+        term.as_deref(),
+        xdg.as_deref(),
+        disp.as_deref(),
+        wayland.as_deref(),
+        force_fb,
+    )
+    .to_string()
 }
 
 /// Extracts workspace.package.version from Cargo.toml if available,
@@ -1379,6 +1571,41 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
         let env_info = ctx.format_env_info();
         direct_map.insert("{env}", env_info.clone());
         direct_map.insert("{environment}", env_info);
+    }
+    if res.contains("{bashmenu_yml}") {
+        direct_map.insert(
+            "{bashmenu_yml}",
+            full_file_location(&ctx.resolve_config_path()),
+        );
+    }
+    if res.contains("{bashmenu_mnu}") {
+        direct_map.insert(
+            "{bashmenu_mnu}",
+            full_file_location(&ctx.resolve_menu_path()),
+        );
+    }
+    if res.contains("{bashmenu_themes}") {
+        direct_map.insert(
+            "{bashmenu_themes}",
+            full_file_location(&ctx.resolve_themes_path()),
+        );
+    }
+    if res.contains("{shortcuts_yml}") {
+        direct_map.insert(
+            "{shortcuts_yml}",
+            full_file_location(&ctx.resolve_shortcuts_path()),
+        );
+    }
+    if res.contains("{cheat_yml}") {
+        direct_map.insert("{cheat_yml}", full_file_location(&ctx.resolve_cheat_path()));
+    }
+    if res.contains("{color_mode}") {
+        let cm = ctx.color_mode.clone().unwrap_or_else(detect_color_mode);
+        direct_map.insert("{color_mode}", cm);
+    }
+    if res.contains("{tty_mode}") {
+        let tm = ctx.tty_mode.clone().unwrap_or_else(detect_tty_mode);
+        direct_map.insert("{tty_mode}", tm);
     }
     if res.contains("{theme}") || res.contains("{app.theme}") {
         direct_map.insert("{theme}", ctx.config.theme.clone());

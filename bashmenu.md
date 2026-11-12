@@ -1009,6 +1009,13 @@ These variables are dynamically resolved using active configuration and environm
 | `{command:shell_cmd}` | Dynamic shell command execution placeholder. Runs `shell_cmd` via system shell, sanitizes and strips trailing whitespace/newlines, and replaces the tag with the command output (supports nested braces, 30.0s cache, and 3.0s execution timeout). |
 | `{toast:SECONDS:"Message"}` / `{toast:"Message"}` | Configurable non-blocking toast notification directive. Displays a brief floating toast notification on the bottom-right corner for specified seconds (defaults to 1-2 seconds if omitted) and resolves to an empty string. Supports double quotes, single quotes, or unquoted strings (e.g. `{toast: 2: "Saved"}` or `{toast: "Done"}`). |
 | `{env}` / `{environment}` | Displays an environment overview table modal showing active file locations for `bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `cheat.yml`, and application version. Can also be interpolated inline as a Markdown table. |
+| `{bashmenu_yml}` | Full canonical path to the currently loaded `bashmenu.yml` configuration file. |
+| `{bashmenu_mnu}` | Full canonical path to the currently loaded `bashmenu.mnu` menu definition file. |
+| `{bashmenu_themes}` | Full canonical path to the currently loaded `bashmenu.themes` theme palette file. |
+| `{shortcuts_yml}` | Full canonical path to the currently loaded `shortcuts.yml` keyboard shortcuts file. |
+| `{cheat_yml}` | Full canonical path to the currently loaded `cheat.yml` cheatsheet file. |
+| `{color_mode}` | Current terminal color depth mode (e.g., `3-bit (8 color)`, `16 color`, `256 color`, `truecolor`). |
+| `{tty_mode}` | Current TTY session mode (e.g., `virtual console (tty)`, `pty`, `serial console (tty)`). |
 
 ### 6.3 Nerd Fonts & Emoji Adaptive Resolution
 The application resolves icons dynamically according to terminal features and
