@@ -77,6 +77,10 @@ struct Cli {
     /// Load configuration files from the repository root directory
     #[arg(short, long)]
     repo: bool,
+
+    /// Render full-resolution TrueColor background images directly via framebuffer
+    #[arg(short, long)]
+    image: bool,
 }
 
 /// Active popup modal dialog currently being presented in the main menu loop.
@@ -329,6 +333,24 @@ fn main() -> Result<()> {
         }
     };
 
+    // Direct Linux Framebuffer (/dev/fb0) detection & setup
+    let fb_mode = config.settings.framebuffer.as_deref().unwrap_or("auto");
+    let use_fb_image_mode = cli.image || fb_mode == "image";
+    let want_fb = fb_mode == "true"
+        || fb_mode == "image"
+        || (fb_mode != "false"
+            && is_framebuffer_available()
+            && (cli.image || bashmenu_tui::is_linux_console()));
+    let mut fb_device = if want_fb {
+        FramebufferDevice::open()
+    } else {
+        None
+    };
+
+    if (fb_device.is_some() || cli.image) && std::env::var("BASHMENU_COLOR_TIER").is_err() {
+        std::env::set_var("BASHMENU_COLOR_TIER", "truecolor");
+    }
+
     let mut use_nerd = config.settings.use_nerd_fonts.unwrap_or(false);
     let active_theme = themes.get(&config.theme);
     let mut styles = if let Some(t) = active_theme {
@@ -382,27 +404,15 @@ fn main() -> Result<()> {
     let mut last_interaction = Instant::now();
     let mut toast_rack = ToastRack::new();
 
-    // Direct Linux Framebuffer (/dev/fb0) setup (Option 2)
-    let fb_mode = config.settings.framebuffer.as_deref().unwrap_or("auto");
-    let mut fb_device = if fb_mode == "true"
-        || (fb_mode == "auto"
-            && is_framebuffer_available()
-            && std::env::var("TERM")
-                .map(|t| t == "linux" || t == "console")
-                .unwrap_or(false))
-    {
-        FramebufferDevice::open()
-    } else {
-        None
-    };
-
-    if let (Some(ref mut fb), Some(ref wp)) = (&mut fb_device, &initial_wallpaper) {
-        if let Some(ref img_path_str) = wp.image {
-            if let Some(p) = bashmenu_tui::wallpaper::resolve_wallpaper_path(img_path_str) {
-                fb.blit_file(&p);
-            }
+    if let Some(ref mut fb) = fb_device {
+        fb.set_image_mode(use_fb_image_mode);
+        if use_fb_image_mode {
+            fb.set_wallpaper(initial_wallpaper.as_ref(), styles.background);
+            menu_view.set_framebuffer_image_mode(true);
         }
     }
+    guard.set_default_bg(styles.background);
+    guard.set_framebuffer(fb_device);
 
     // 7. Interactive Event Loop
     let mut need_redraw = true;
@@ -723,7 +733,11 @@ fn main() -> Result<()> {
                                 styles = ResolvedThemeStyles::from_theme(t, use_nerd)
                                     .with_toast_timeout(config.settings.toast_timeout);
                                 menu_view.set_styles(styles.clone());
+                                guard.set_default_bg(styles.background);
                                 let wp_config = config.resolve_wallpaper(Some(t));
+                                if let Some(fb) = guard.framebuffer_mut() {
+                                    fb.set_wallpaper(wp_config.as_ref(), styles.background);
+                                }
                                 menu_view.set_wallpaper(wp_config);
                             }
                         }
@@ -1405,6 +1419,41 @@ fn main() -> Result<()> {
                             config.set_value(key_path.as_str(), serde_yml::Value::String(selected));
                             let _ = save_config(&config_path, &config);
                             menu_view.set_config(config.clone());
+                            if key_path == "settings.framebuffer"
+                                || key_path == "app.settings.framebuffer"
+                            {
+                                let fb_m = config.settings.framebuffer.as_deref().unwrap_or("auto");
+                                let use_img = cli.image || fb_m == "image";
+                                let want_fb = fb_m == "true"
+                                    || fb_m == "image"
+                                    || (fb_m != "false"
+                                        && is_framebuffer_available()
+                                        && (cli.image || bashmenu_tui::is_linux_console()));
+                                if want_fb {
+                                    if !guard.has_framebuffer() {
+                                        if let Some(mut new_fb) = FramebufferDevice::open() {
+                                            new_fb.set_image_mode(use_img);
+                                            let wp_cfg =
+                                                config.resolve_wallpaper(themes.get(&config.theme));
+                                            new_fb
+                                                .set_wallpaper(wp_cfg.as_ref(), styles.background);
+                                            guard.set_framebuffer(Some(new_fb));
+                                        }
+                                    } else if let Some(fb) = guard.framebuffer_mut() {
+                                        fb.set_image_mode(use_img);
+                                        let wp_cfg =
+                                            config.resolve_wallpaper(themes.get(&config.theme));
+                                        fb.set_wallpaper(wp_cfg.as_ref(), styles.background);
+                                    }
+                                    menu_view.set_framebuffer_image_mode(
+                                        guard.has_framebuffer() && use_img,
+                                    );
+                                } else {
+                                    guard.set_framebuffer(None);
+                                    menu_view.set_framebuffer_image_mode(false);
+                                    guard.request_clear();
+                                }
+                            }
                         }
                         active_modal = ActiveModal::None;
                     }
@@ -1815,8 +1864,12 @@ fn main() -> Result<()> {
                                     .with_toast_timeout(config.settings.toast_timeout)
                             };
                             menu_view.set_styles(styles.clone());
+                            guard.set_default_bg(styles.background);
 
                             let wp_config = config.resolve_wallpaper(active_theme);
+                            if let Some(fb) = guard.framebuffer_mut() {
+                                fb.set_wallpaper(wp_config.as_ref(), styles.background);
+                            }
                             menu_view.set_wallpaper(wp_config);
 
                             let mut ctx = make_macro_ctx!(&config);

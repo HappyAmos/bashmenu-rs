@@ -35,6 +35,9 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
   - Test suites and fallback resolution must point directly to the project root default files.
 - **Repository Root CLI Argument Invariant (`--repo` / `-r`):**
   - Passing `--repo` or `-r` to `bashmenu` forces loading `bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, and `shortcuts.yml` directly from the repository root directory (`resolve_dev_dir`) rather than user config or current working directory.
+- **Direct Linux Framebuffer TrueColor & Full-Resolution Image Mode (`--image` / `-i`):**
+  - When `/dev/fb0` is active (`FramebufferDevice::open()`), `TerminalGuard` suppresses `stdout` cell writes and renders Ratatui's `Buffer` in 24-bit TrueColor directly to `/dev/fb0`.
+  - Default mode renders text-based character-block wallpapers (`WallpaperCompositor`) in TrueColor; passing `--image` / `-i` (or `settings.framebuffer: image`) renders the full-resolution pixel wallpaper onto `/dev/fb0` with the TrueColor menu composited on top.
 - **Environment Overview Macro (`{which}`) & Application Version (`{version}`) Invariant:**
   - `{version}` and the Version row in `{which}` must resolve from root `Cargo.toml` `workspace.package.version` (with `env!("CARGO_PKG_VERSION")` fallback).
   - `{app.version}` is removed and blocked in `resolve_config_dot_path` to prevent confusion with config schema versions.

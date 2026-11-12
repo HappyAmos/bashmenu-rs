@@ -138,6 +138,11 @@ fn test_bashmenu_repo_flag_in_help_and_parsing() {
         "Help output must document -r, --repo flag: {}",
         stdout
     );
+    assert!(
+        stdout.contains("-i, --image"),
+        "Help output must document -i, --image flag: {}",
+        stdout
+    );
 }
 
 #[test]

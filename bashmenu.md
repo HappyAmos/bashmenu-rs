@@ -78,6 +78,7 @@ HA Bash Menu is comprised of modular scripts and configuration files:
 | `--theme <NAME>` | `-t` | Override active theme name. |
 | `--shortcuts <FILE>` | `-s` | Explicit path to keyboard shortcuts file (default: `~/.config/bashmenu/shortcuts.yml`). |
 | `--repo` | `-r` | Load configuration files (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`) from repository root directory. |
+| `--image` | `-i` | Render full-resolution TrueColor background images directly via the Linux framebuffer (`/dev/fb0`) instead of character-block translation. |
 | `--local` | | Load and save configuration files in current working directory. |
 
 ---
@@ -517,14 +518,15 @@ external emulators.
 
 ```yaml
 settings:
-  framebuffer: auto   # Options: auto, true, false
+  framebuffer: auto   # Options: auto, image, true, false
 ```
 
 | Value | Behavior |
 | :--- | :--- |
-| `auto` | Automatically enables framebuffer graphics when running on Linux VT (`TERM=linux` / `console`) with accessible `/dev/fb0`. |
-| `true` | Enforces direct framebuffer rendering. |
-| `false` | Disables framebuffer rendering and uses terminal character cells only. |
+| `auto` | Automatically enables TrueColor framebuffer rendering when running on Linux VT (`TERM=linux` / `console`) with accessible `/dev/fb0`, using text-based character-block wallpaper translation by default. |
+| `image` | Enables full-resolution native pixel wallpaper rendering on `/dev/fb0` (equivalent to passing `--image` / `-i`). |
+| `true` | Enforces direct framebuffer character and TUI rendering. |
+| `false` | Disables framebuffer rendering and uses standard terminal character cells only. |
 
 ### 4.2 Menu Structure (`bashmenu.mnu`)
 The menu structure is defined as a hierarchical list of dictionaries under

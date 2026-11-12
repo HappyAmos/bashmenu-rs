@@ -965,3 +965,18 @@
   - `cargo clippy --workspace --all-targets -- -D warnings` passed (zero compiler warnings/errors).
   - `cargo test --workspace` passed (100% test pass across all 9 crates).
   - `shellcheck *.sh scripts/*.sh` passed (clean exit 0).
+
+## Phase 39: Native TrueColor Linux Framebuffer (`/dev/fb0`) TUI Renderer & `-i` / `--image` Full-Resolution Wallpaper Mode
+- [x] Framebuffer Font & Procedural Glyph Rasterizer (`crates/bashmenu-tui/src/fb_font.rs`):
+  - Implemented self-contained 8x16 bitmap font covering printable ASCII and common UI symbols (`►`, `•`, `…`, `✕`, `✓`, `⚙`, `ℹ`, `★`, etc.) with bold thickening and underline support.
+  - Implemented resolution-independent procedural pixel-exact rendering (`draw_procedural_glyph`) for Unicode Block Elements (`U+2580..=U+259F`: `▀`, `▄`, `█`, `▌`, `▐`, `░`, `▒`, `▓`, quadrant blocks `▖..=▟`) and Box-Drawing (`U+2500..=U+257F`: light, heavy, double, rounded, and dashed borders).
+- [x] Dual-Mode Framebuffer Compositor (`crates/bashmenu-tui/src/framebuffer.rs`, `crates/bashmenu-tui/src/terminal.rs`, `crates/bashmenu-tui/src/menu_view.rs`):
+  - Implemented `render_ratatui_buffer_to_slice` and `FramebufferDevice::render_buffer` with an off-screen RAM backbuffer for tear-free 32-bit/24-bit/16-bit TrueColor rendering directly to `/dev/fb0`.
+  - Wrapped `Stdout` in `TerminalOutput` with atomic `suppress_stdout` inside `TerminalGuard` so `fbcon` never overwrites `/dev/fb0` with 8-color VT character cells while framebuffer rendering is active, and cleanly restores/clears `/dev/fb0` on `suspend`, `suspend_keep_alt`, and `Drop`.
+  - Default mode renders text-based character-block wallpapers (`WallpaperCompositor`) and menu UI in 24-bit TrueColor.
+  - Full-resolution image mode (`-i` / `--image` CLI flag or `settings.framebuffer: image`) pre-scales and opacity-blends the wallpaper at native framebuffer pixel resolution and composites the TrueColor TUI on top (`MenuView::set_framebuffer_image_mode(true)`).
+- [x] CLI & Documentation Parity (`crates/bashmenu-cli/src/main.rs`, `bashmenu.sh`, `bashmenu.mnu`, `bashmenu.md`, `bashmenu.1`):
+  - Added `-i` / `--image` CLI flag to `bashmenu` and documented in `bashmenu.sh`, `bashmenu.md`, `bashmenu.1`, `.agents/rules/invariants.md`, and `.agents/skills/bashmenu-rs-developer/SKILL.md`.
+  - Added unit and integration tests in `crates/bashmenu-tui/src/framebuffer.rs`, `crates/bashmenu-tui/tests/transition_test.rs`, and `crates/bashmenu-cli/tests/audit_items_test.rs`.
+  - Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, and `shellcheck *.sh scripts/*.sh` pass with zero warnings.
+

@@ -109,6 +109,7 @@ case "${1:-}" in
         echo "  -c, --config <FILE> Path to config file (default: bashmenu.yml)"
         echo "  -t, --theme <NAME>  Override active theme"
         echo "  -r, --repo          Load configs from repository root"
+        echo "  -i, --image         Render full-resolution TrueColor background images via framebuffer"
         echo "  --local             Load configs from current working directory"
         exit 0
         ;;

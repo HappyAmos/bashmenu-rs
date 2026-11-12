@@ -101,6 +101,9 @@ pub struct MenuView {
     pub config: BashMenuConfig,
     /// Background wallpaper compositor for full-window backdrop rendering
     wallpaper: Option<WallpaperCompositor>,
+    /// When true, skips character-block wallpaper compositing so full-resolution
+    /// framebuffer pixel wallpapers shine through transparent cells
+    framebuffer_image_mode: bool,
     /// Marquee scroll offset and pause tracker for long selected item labels
     marquee_tracker: MarqueeTracker,
     /// Configured shortcuts from the shortcut manager
@@ -140,6 +143,7 @@ impl MenuView {
             plugin_rows: Vec::new(),
             config,
             wallpaper: None,
+            framebuffer_image_mode: false,
             marquee_tracker: MarqueeTracker::new(4),
             shortcuts: Vec::new(),
             gutter_hover: HelpGutterHover::with_duration(hover_duration),
@@ -183,6 +187,16 @@ impl MenuView {
     /// Forces a full reload of the background wallpaper image from disk
     pub fn reload_wallpaper(&mut self, config: Option<WallpaperConfig>) {
         self.wallpaper = config.map(WallpaperCompositor::new);
+    }
+
+    /// Enables or disables full-resolution framebuffer pixel wallpaper mode (`-i` / `--image`).
+    pub fn set_framebuffer_image_mode(&mut self, enabled: bool) {
+        self.framebuffer_image_mode = enabled;
+    }
+
+    /// Returns whether full-resolution framebuffer pixel wallpaper mode (`-i` / `--image`) is active.
+    pub fn is_framebuffer_image_mode(&self) -> bool {
+        self.framebuffer_image_mode
     }
 
     /// Updates configuration
@@ -1649,7 +1663,23 @@ impl MenuView {
         buf.set_string(area.x, bot_y, &bot_line, border_style);
 
         // 8. Composite background wallpaper if active
-        if let Some(compositor) = &mut self.wallpaper {
+        if self.framebuffer_image_mode {
+            if self
+                .wallpaper
+                .as_ref()
+                .map(|w| w.config.enabled && w.config.image.is_some())
+                .unwrap_or(false)
+            {
+                for y in area.top()..area.bottom() {
+                    for x in area.left()..area.right() {
+                        let cell = &mut buf[(x, y)];
+                        if cell.bg == self.styles.background {
+                            cell.bg = Color::Reset;
+                        }
+                    }
+                }
+            }
+        } else if let Some(compositor) = &mut self.wallpaper {
             compositor.color_tier = Some(self.styles.tier);
             if let Some(grid) = compositor.get_grid(
                 area.width as usize,

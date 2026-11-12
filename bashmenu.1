@@ -8,6 +8,7 @@ bashmenu \- lightweight Ratatui TUI menu engine and settings manager
 [\fB\-t\fR \fItheme\fR]
 [\fB\-s\fR \fIshortcuts\fR]
 [\fB\-r\fR|\fB\-\-repo\fR]
+[\fB\-i\fR|\fB\-\-image\fR]
 [\fB\-\-local\fR]
 .br
 .B bashmenu.sh
@@ -444,7 +445,9 @@ Modal animation playback speed is configured via
 (fast, normal, slow, or milliseconds; default: fast).
 Direct Linux framebuffer hardware graphics on /dev/fb0 are configured via
 .I settings.framebuffer
-(auto, true, false).
+(auto, image, true, false) or at launch via the
+.B \-i, \-\-image
+flag for full-resolution pixel wallpapers.
 Stationary mouse hover expansion delay for the help gutter is configured via
 .I settings.help_gutter_delay
 in seconds (default: 4.0; setting to 0 disables delay for instant expansion). When expanded, the help gutter dynamically increases row count to display all hidden shortcuts without affecting the fixed status gutter top border or visible menu items.

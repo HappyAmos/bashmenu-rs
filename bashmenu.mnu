@@ -606,9 +606,11 @@ items:
                 alt_buffer: true
                 key: settings.framebuffer
                 options:
-                - label: Auto (Detect /dev/fb0 on Linux console)
+                - label: Auto (Detect /dev/fb0 on Linux console, character wallpaper)
                   value: auto
-                - label: Enabled (Force direct framebuffer rendering)
+                - label: Full-Resolution Image (Native pixel wallpaper on /dev/fb0)
+                  value: image
+                - label: Enabled (Force direct framebuffer character rendering)
                   value: 'true'
                 - label: Disabled (Standard terminal TUI rendering)
                   value: 'false'

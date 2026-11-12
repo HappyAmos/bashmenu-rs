@@ -580,7 +580,7 @@ impl WallpaperCompositor {
 }
 
 /// Scales an RGB image to target dimensions according to the specified scaling mode.
-fn scale_image(
+pub fn scale_image(
     img: &RgbImage,
     target_w: u32,
     target_h: u32,

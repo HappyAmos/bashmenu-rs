@@ -11,18 +11,62 @@ use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier};
 use ratatui::{Frame, Terminal};
 use std::io::{self, BufWriter, Stdout, Write};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
+use crate::framebuffer::FramebufferDevice;
 use crate::modals::render_animated_modal_frame;
 use crate::style::ResolvedThemeStyles;
 use crate::transition::{
     dim_color, interpolate_zoom_rect, TransitionEffect, TransitionSpeed, BAYER_4X4,
 };
 
+/// Buffered terminal stdout wrapper that can suppress ANSI cell writes when
+/// direct Linux framebuffer (`/dev/fb0`) rendering is active.
+pub struct TerminalOutput {
+    stdout: BufWriter<Stdout>,
+    suppress_stdout: Arc<AtomicBool>,
+}
+
+impl TerminalOutput {
+    /// Creates a new `TerminalOutput` wrapping standard output.
+    pub fn new(stdout: BufWriter<Stdout>, suppress_stdout: Arc<AtomicBool>) -> Self {
+        Self {
+            stdout,
+            suppress_stdout,
+        }
+    }
+}
+
+impl Write for TerminalOutput {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        if self.suppress_stdout.load(Ordering::Relaxed) {
+            Ok(buf.len())
+        } else {
+            self.stdout.write(buf)
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        if self.suppress_stdout.load(Ordering::Relaxed) {
+            Ok(())
+        } else {
+            self.stdout.flush()
+        }
+    }
+}
+
 /// RAII guard managing terminal state (raw mode, alternate screen, mouse).
 pub struct TerminalGuard {
     /// Underlying ratatui terminal instance wrapping buffered stdout
-    terminal: Terminal<CrosstermBackend<BufWriter<Stdout>>>,
+    terminal: Terminal<CrosstermBackend<TerminalOutput>>,
+    /// Atomic flag suppressing stdout writes while framebuffer rendering is active
+    suppress_stdout: Arc<AtomicBool>,
+    /// Optional direct Linux framebuffer (`/dev/fb0`) renderer
+    fb_device: Option<FramebufferDevice>,
+    /// Default theme background color used by framebuffer compositor
+    default_bg: Color,
     /// When true, drop keeps alternate screen buffer (used for child TUIs)
     keep_alt_on_drop: bool,
 }
@@ -38,10 +82,15 @@ impl TerminalGuard {
         } else {
             execute!(stdout, EnterAlternateScreen, EnableMouseCapture, Hide)?;
         }
-        let backend = CrosstermBackend::new(stdout);
+        let _ = stdout.flush();
+        let suppress_stdout = Arc::new(AtomicBool::new(false));
+        let backend = CrosstermBackend::new(TerminalOutput::new(stdout, suppress_stdout.clone()));
         let terminal = Terminal::new(backend)?;
         let mut guard = Self {
             terminal,
+            suppress_stdout,
+            fb_device: None,
+            default_bg: Color::Black,
             keep_alt_on_drop,
         };
         if keep_alt_on_drop {
@@ -50,8 +99,34 @@ impl TerminalGuard {
         Ok(guard)
     }
 
+    /// Attaches or detaches a direct Linux framebuffer (`/dev/fb0`) device.
+    ///
+    /// When attached, ANSI cell writes to `stdout` are suppressed so the
+    /// kernel's 8-color `fbcon` driver does not overwrite TrueColor `/dev/fb0`
+    /// output.
+    pub fn set_framebuffer(&mut self, fb: Option<FramebufferDevice>) {
+        let active = fb.is_some();
+        self.fb_device = fb;
+        self.suppress_stdout.store(active, Ordering::Relaxed);
+    }
+
+    /// Returns a mutable reference to the attached framebuffer device, if any.
+    pub fn framebuffer_mut(&mut self) -> Option<&mut FramebufferDevice> {
+        self.fb_device.as_mut()
+    }
+
+    /// Returns whether a direct Linux framebuffer device is currently active.
+    pub fn has_framebuffer(&self) -> bool {
+        self.fb_device.is_some()
+    }
+
+    /// Updates the default theme background color used by framebuffer rendering.
+    pub fn set_default_bg(&mut self, bg: Color) {
+        self.default_bg = bg;
+    }
+
     /// Access mutable reference to underlying Ratatui terminal
-    pub fn terminal_mut(&mut self) -> &mut Terminal<CrosstermBackend<BufWriter<Stdout>>> {
+    pub fn terminal_mut(&mut self) -> &mut Terminal<CrosstermBackend<TerminalOutput>> {
         &mut self.terminal
     }
 
@@ -67,14 +142,31 @@ impl TerminalGuard {
 
     /// Renders a frame wrapped in DEC Mode 2026 Synchronized Output
     /// (`\x1b[?2026h` ... `\x1b[?2026l`) to prevent tearing or flicker.
+    /// When a Linux framebuffer device is attached, composites the Ratatui
+    /// buffer directly into `/dev/fb0` in 24-bit TrueColor.
     pub fn draw<F>(&mut self, render_callback: F) -> io::Result<()>
     where
         F: FnOnce(&mut Frame<'_>),
     {
-        let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
-        let res = self.terminal.draw(render_callback).map(|_| ());
-        let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
-        let _ = self.terminal.backend_mut().flush();
+        let has_fb = self.fb_device.is_some();
+        if !has_fb {
+            let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
+        }
+        let fb_opt = self.fb_device.as_mut();
+        let default_bg = self.default_bg;
+        let res = self
+            .terminal
+            .draw(|f| {
+                render_callback(f);
+                if let Some(fb) = fb_opt {
+                    fb.render_buffer(f.buffer_mut(), default_bg);
+                }
+            })
+            .map(|_| ());
+        if !has_fb {
+            let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
+            let _ = self.terminal.backend_mut().flush();
+        }
         res
     }
 
@@ -100,7 +192,11 @@ impl TerminalGuard {
         match effect {
             TransitionEffect::None | TransitionEffect::Instant => self.draw(|f| render_callback(f)),
             TransitionEffect::Fade => {
-                let tier = crate::style::ColorTier::detect();
+                let tier = if self.fb_device.is_some() {
+                    crate::style::ColorTier::TrueColor
+                } else {
+                    crate::style::ColorTier::detect()
+                };
                 if tier == crate::style::ColorTier::Color8
                     || tier == crate::style::ColorTier::Color16
                 {
@@ -110,8 +206,7 @@ impl TerminalGuard {
                     for step in 1..=steps {
                         let fraction = step as f32 / steps as f32;
                         let threshold = (fraction * 16.0).round() as u8;
-                        let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
-                        let _ = self.terminal.draw(|f| {
+                        let _ = self.draw(|f| {
                             render_callback(f);
                             if step < steps {
                                 let buf = f.buffer_mut();
@@ -129,8 +224,6 @@ impl TerminalGuard {
                                 }
                             }
                         });
-                        let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
-                        let _ = self.terminal.backend_mut().flush();
                         if step < steps {
                             std::thread::sleep(delay);
                         }
@@ -143,8 +236,7 @@ impl TerminalGuard {
                 let steps = 5;
                 for step in 1..=steps {
                     let factor = (step as f32) / (steps as f32);
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
-                    let _ = self.terminal.draw(|f| {
+                    let _ = self.draw(|f| {
                         render_callback(f);
                         if step < steps {
                             let buf = f.buffer_mut();
@@ -152,13 +244,13 @@ impl TerminalGuard {
                                 for x in 0..size.width {
                                     let cell = &mut buf[(x, y)];
                                     cell.fg = dim_color(cell.fg, factor);
-                                    cell.bg = dim_color(cell.bg, factor);
+                                    if cell.bg != Color::Reset {
+                                        cell.bg = dim_color(cell.bg, factor);
+                                    }
                                 }
                             }
                         }
                     });
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
-                    let _ = self.terminal.backend_mut().flush();
                     if step < steps {
                         std::thread::sleep(delay);
                     }
@@ -174,8 +266,7 @@ impl TerminalGuard {
                     let visible_width = ((size.width as f32) * fraction).round() as u16;
                     let left_bound = (size.width.saturating_sub(visible_width)) / 2;
                     let right_bound = left_bound + visible_width;
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
-                    let _ = self.terminal.draw(|f| {
+                    let _ = self.draw(|f| {
                         render_callback(f);
                         if step < steps {
                             let buf = f.buffer_mut();
@@ -192,8 +283,6 @@ impl TerminalGuard {
                             }
                         }
                     });
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
-                    let _ = self.terminal.backend_mut().flush();
                     if step < steps {
                         std::thread::sleep(delay);
                     }
@@ -207,8 +296,7 @@ impl TerminalGuard {
                 for step in 1..=steps {
                     let fraction = step as f32 / steps as f32;
                     let threshold = (fraction * 16.0).round() as u8;
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
-                    let _ = self.terminal.draw(|f| {
+                    let _ = self.draw(|f| {
                         render_callback(f);
                         if step < steps {
                             let buf = f.buffer_mut();
@@ -226,8 +314,6 @@ impl TerminalGuard {
                             }
                         }
                     });
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
-                    let _ = self.terminal.backend_mut().flush();
                     if step < steps {
                         std::thread::sleep(delay);
                     }
@@ -239,8 +325,7 @@ impl TerminalGuard {
                 let delay = speed.step_delay_in();
                 let steps = 6;
                 for step in 1..=steps {
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
-                    let _ = self.terminal.draw(|f| {
+                    let _ = self.draw(|f| {
                         render_callback(f);
                         if step < steps {
                             let buf = f.buffer_mut();
@@ -279,8 +364,6 @@ impl TerminalGuard {
                             }
                         }
                     });
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
-                    let _ = self.terminal.backend_mut().flush();
                     if step < steps {
                         std::thread::sleep(delay);
                     }
@@ -294,8 +377,7 @@ impl TerminalGuard {
                 for step in 1..=steps {
                     let fraction = step as f32 / steps as f32;
                     let offset = ((1.0 - fraction) * size.width as f32).round() as u16;
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
-                    let _ = self.terminal.draw(|f| {
+                    let _ = self.draw(|f| {
                         render_callback(f);
                         if step < steps && offset > 0 {
                             let buf = f.buffer_mut();
@@ -315,8 +397,6 @@ impl TerminalGuard {
                             }
                         }
                     });
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
-                    let _ = self.terminal.backend_mut().flush();
                     if step < steps {
                         std::thread::sleep(delay);
                     }
@@ -330,8 +410,7 @@ impl TerminalGuard {
                 for step in 1..=steps {
                     let fraction = step as f32 / steps as f32;
                     let offset = ((1.0 - fraction) * size.width as f32).round() as u16;
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
-                    let _ = self.terminal.draw(|f| {
+                    let _ = self.draw(|f| {
                         render_callback(f);
                         if step < steps && offset > 0 {
                             let buf = f.buffer_mut();
@@ -351,8 +430,6 @@ impl TerminalGuard {
                             }
                         }
                     });
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
-                    let _ = self.terminal.backend_mut().flush();
                     if step < steps {
                         std::thread::sleep(delay);
                     }
@@ -367,8 +444,7 @@ impl TerminalGuard {
                 for step in 1..=steps {
                     let fraction = step as f32 / steps as f32;
                     let visible_per_slat = (slat_size as f32 * fraction).ceil() as u16;
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
-                    let _ = self.terminal.draw(|f| {
+                    let _ = self.draw(|f| {
                         render_callback(f);
                         if step < steps {
                             let buf = f.buffer_mut();
@@ -385,8 +461,6 @@ impl TerminalGuard {
                             }
                         }
                     });
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
-                    let _ = self.terminal.backend_mut().flush();
                     if step < steps {
                         std::thread::sleep(delay);
                     }
@@ -403,8 +477,7 @@ impl TerminalGuard {
                     let fraction = step as f32 / steps as f32;
                     let rx = ((size.width as f32 / 2.0) * fraction).round() as u16;
                     let ry = ((size.height as f32 / 2.0) * fraction).round() as u16;
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
-                    let _ = self.terminal.draw(|f| {
+                    let _ = self.draw(|f| {
                         render_callback(f);
                         if step < steps {
                             let buf = f.buffer_mut();
@@ -423,8 +496,6 @@ impl TerminalGuard {
                             }
                         }
                     });
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
-                    let _ = self.terminal.backend_mut().flush();
                     if step < steps {
                         std::thread::sleep(delay);
                     }
@@ -438,8 +509,7 @@ impl TerminalGuard {
                 for step in 1..=steps {
                     let fraction = step as f32 / steps as f32;
                     let visible_height = ((size.height as f32) * fraction).round() as u16;
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
-                    let _ = self.terminal.draw(|f| {
+                    let _ = self.draw(|f| {
                         render_callback(f);
                         if step < steps {
                             let buf = f.buffer_mut();
@@ -454,8 +524,6 @@ impl TerminalGuard {
                             }
                         }
                     });
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
-                    let _ = self.terminal.backend_mut().flush();
                     if step < steps {
                         std::thread::sleep(delay);
                     }
@@ -487,7 +555,11 @@ impl TerminalGuard {
         match effect {
             TransitionEffect::None | TransitionEffect::Instant => Ok(()),
             TransitionEffect::Fade => {
-                let tier = crate::style::ColorTier::detect();
+                let tier = if self.fb_device.is_some() {
+                    crate::style::ColorTier::TrueColor
+                } else {
+                    crate::style::ColorTier::detect()
+                };
                 if tier == crate::style::ColorTier::Color8
                     || tier == crate::style::ColorTier::Color16
                 {
@@ -497,8 +569,7 @@ impl TerminalGuard {
                     for step in (0..steps).rev() {
                         let fraction = step as f32 / steps as f32;
                         let threshold = (fraction * 16.0).round() as u8;
-                        let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
-                        let _ = self.terminal.draw(|f| {
+                        let _ = self.draw(|f| {
                             render_callback(f);
                             let buf = f.buffer_mut();
                             for y in 0..size.height {
@@ -514,8 +585,6 @@ impl TerminalGuard {
                                 }
                             }
                         });
-                        let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
-                        let _ = self.terminal.backend_mut().flush();
                         std::thread::sleep(delay);
                     }
                     return Ok(());
@@ -526,8 +595,7 @@ impl TerminalGuard {
                 let steps = 5;
                 for step in (0..steps).rev() {
                     let factor = (step as f32) / (steps as f32);
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
-                    let _ = self.terminal.draw(|f| {
+                    let _ = self.draw(|f| {
                         render_callback(f);
                         let buf = f.buffer_mut();
                         for y in 0..size.height {
@@ -540,13 +608,13 @@ impl TerminalGuard {
                                     cell.modifier = Modifier::empty();
                                 } else {
                                     cell.fg = dim_color(cell.fg, factor);
-                                    cell.bg = dim_color(cell.bg, factor);
+                                    if cell.bg != Color::Reset {
+                                        cell.bg = dim_color(cell.bg, factor);
+                                    }
                                 }
                             }
                         }
                     });
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
-                    let _ = self.terminal.backend_mut().flush();
                     std::thread::sleep(delay);
                 }
                 Ok(())
@@ -560,8 +628,7 @@ impl TerminalGuard {
                     let visible_width = ((size.width as f32) * fraction).round() as u16;
                     let left_bound = (size.width.saturating_sub(visible_width)) / 2;
                     let right_bound = left_bound + visible_width;
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
-                    let _ = self.terminal.draw(|f| {
+                    let _ = self.draw(|f| {
                         render_callback(f);
                         let buf = f.buffer_mut();
                         for y in 0..size.height {
@@ -576,8 +643,6 @@ impl TerminalGuard {
                             }
                         }
                     });
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
-                    let _ = self.terminal.backend_mut().flush();
                     std::thread::sleep(delay);
                 }
                 Ok(())
@@ -589,8 +654,7 @@ impl TerminalGuard {
                 for step in (0..steps).rev() {
                     let fraction = step as f32 / steps as f32;
                     let threshold = (fraction * 16.0).round() as u8;
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
-                    let _ = self.terminal.draw(|f| {
+                    let _ = self.draw(|f| {
                         render_callback(f);
                         let buf = f.buffer_mut();
                         for y in 0..size.height {
@@ -606,8 +670,6 @@ impl TerminalGuard {
                             }
                         }
                     });
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
-                    let _ = self.terminal.backend_mut().flush();
                     std::thread::sleep(delay);
                 }
                 Ok(())
@@ -617,8 +679,7 @@ impl TerminalGuard {
                 let delay = speed.step_delay_out();
                 let steps = 6;
                 for step in (0..steps).rev() {
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
-                    let _ = self.terminal.draw(|f| {
+                    let _ = self.draw(|f| {
                         render_callback(f);
                         let buf = f.buffer_mut();
                         if step == 0 {
@@ -663,8 +724,6 @@ impl TerminalGuard {
                             }
                         }
                     });
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
-                    let _ = self.terminal.backend_mut().flush();
                     std::thread::sleep(delay);
                 }
                 Ok(())
@@ -676,8 +735,7 @@ impl TerminalGuard {
                 for step in (0..steps).rev() {
                     let shift =
                         (((steps - step) as f32 / steps as f32) * size.width as f32).round() as u16;
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
-                    let _ = self.terminal.draw(|f| {
+                    let _ = self.draw(|f| {
                         render_callback(f);
                         let buf = f.buffer_mut();
                         for y in 0..size.height {
@@ -695,8 +753,6 @@ impl TerminalGuard {
                             }
                         }
                     });
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
-                    let _ = self.terminal.backend_mut().flush();
                     std::thread::sleep(delay);
                 }
                 Ok(())
@@ -708,8 +764,7 @@ impl TerminalGuard {
                 for step in (0..steps).rev() {
                     let shift =
                         (((steps - step) as f32 / steps as f32) * size.width as f32).round() as u16;
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
-                    let _ = self.terminal.draw(|f| {
+                    let _ = self.draw(|f| {
                         render_callback(f);
                         let buf = f.buffer_mut();
                         for y in 0..size.height {
@@ -727,8 +782,6 @@ impl TerminalGuard {
                             }
                         }
                     });
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
-                    let _ = self.terminal.backend_mut().flush();
                     std::thread::sleep(delay);
                 }
                 Ok(())
@@ -741,8 +794,7 @@ impl TerminalGuard {
                 for step in (0..steps).rev() {
                     let fraction = step as f32 / steps as f32;
                     let visible_per_slat = (slat_size as f32 * fraction).floor() as u16;
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
-                    let _ = self.terminal.draw(|f| {
+                    let _ = self.draw(|f| {
                         render_callback(f);
                         let buf = f.buffer_mut();
                         for y in 0..size.height {
@@ -757,8 +809,6 @@ impl TerminalGuard {
                             }
                         }
                     });
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
-                    let _ = self.terminal.backend_mut().flush();
                     std::thread::sleep(delay);
                 }
                 Ok(())
@@ -773,8 +823,7 @@ impl TerminalGuard {
                     let fraction = step as f32 / steps as f32;
                     let rx = ((size.width as f32 / 2.0) * fraction).round() as u16;
                     let ry = ((size.height as f32 / 2.0) * fraction).round() as u16;
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
-                    let _ = self.terminal.draw(|f| {
+                    let _ = self.draw(|f| {
                         render_callback(f);
                         let buf = f.buffer_mut();
                         for y in 0..size.height {
@@ -791,8 +840,6 @@ impl TerminalGuard {
                             }
                         }
                     });
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
-                    let _ = self.terminal.backend_mut().flush();
                     std::thread::sleep(delay);
                 }
                 Ok(())
@@ -804,8 +851,7 @@ impl TerminalGuard {
                 for step in (0..steps).rev() {
                     let fraction = step as f32 / steps as f32;
                     let visible_height = ((size.height as f32) * fraction).round() as u16;
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
-                    let _ = self.terminal.draw(|f| {
+                    let _ = self.draw(|f| {
                         render_callback(f);
                         let buf = f.buffer_mut();
                         for y in 0..size.height {
@@ -820,8 +866,6 @@ impl TerminalGuard {
                             }
                         }
                     });
-                    let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
-                    let _ = self.terminal.backend_mut().flush();
                     std::thread::sleep(delay);
                 }
                 Ok(())
@@ -846,6 +890,12 @@ impl TerminalGuard {
     where
         F: FnOnce() -> io::Result<R>,
     {
+        let had_fb = self.fb_device.is_some();
+        if let Some(ref mut fb) = self.fb_device {
+            fb.clear(0, 0, 0);
+        }
+        self.suppress_stdout.store(false, Ordering::Relaxed);
+
         disable_raw_mode()?;
         execute!(self.terminal.backend_mut(), DisableMouseCapture, Show)?;
         let _ = self.terminal.backend_mut().flush();
@@ -868,6 +918,8 @@ impl TerminalGuard {
             EnableMouseCapture,
             Hide
         )?;
+        let _ = self.terminal.backend_mut().flush();
+        self.suppress_stdout.store(had_fb, Ordering::Relaxed);
         Self::drain_stale_events();
         self.request_clear();
 
@@ -880,6 +932,12 @@ impl TerminalGuard {
     where
         F: FnOnce() -> io::Result<R>,
     {
+        let had_fb = self.fb_device.is_some();
+        if let Some(ref mut fb) = self.fb_device {
+            fb.clear(0, 0, 0);
+        }
+        self.suppress_stdout.store(false, Ordering::Relaxed);
+
         // 1. Leave alternate screen and restore normal terminal state
         disable_raw_mode()?;
         execute!(
@@ -902,6 +960,8 @@ impl TerminalGuard {
             EnableMouseCapture,
             Hide
         )?;
+        let _ = self.terminal.backend_mut().flush();
+        self.suppress_stdout.store(had_fb, Ordering::Relaxed);
         Self::drain_stale_events();
         self.request_clear();
 
@@ -933,13 +993,10 @@ impl TerminalGuard {
 
         for factor in factors {
             let intermediate_rect = interpolate_zoom_rect(anchor, target_rect, factor, viewport);
-            let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
-            let _ = self.terminal.draw(|f| {
+            let _ = self.draw(|f| {
                 render_background(f);
                 render_animated_modal_frame(viewport, intermediate_rect, styles, f.buffer_mut());
             });
-            let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
-            let _ = self.terminal.backend_mut().flush();
             std::thread::sleep(delay);
         }
 
@@ -971,13 +1028,10 @@ impl TerminalGuard {
 
         for factor in factors {
             let intermediate_rect = interpolate_zoom_rect(anchor, source_rect, factor, viewport);
-            let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026h\x1b[0m");
-            let _ = self.terminal.draw(|f| {
+            let _ = self.draw(|f| {
                 render_background(f);
                 render_animated_modal_frame(viewport, intermediate_rect, styles, f.buffer_mut());
             });
-            let _ = self.terminal.backend_mut().write_all(b"\x1b[?2026l");
-            let _ = self.terminal.backend_mut().flush();
             std::thread::sleep(delay);
         }
 
@@ -988,6 +1042,11 @@ impl TerminalGuard {
 impl Drop for TerminalGuard {
     /// Restores terminal raw mode, cursor visibility, and alternate screen.
     fn drop(&mut self) {
+        if let Some(ref mut fb) = self.fb_device {
+            fb.clear(0, 0, 0);
+        }
+        self.suppress_stdout.store(false, Ordering::Relaxed);
+
         if self.keep_alt_on_drop {
             let _ = execute!(self.terminal.backend_mut(), DisableMouseCapture);
         } else {

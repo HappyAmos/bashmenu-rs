@@ -4,6 +4,7 @@ pub mod ansi;
 pub mod bbcode;
 pub mod borders;
 pub mod clipboard;
+pub mod fb_font;
 pub mod framebuffer;
 pub mod gutter;
 pub mod marquee;
@@ -25,7 +26,8 @@ pub use bbcode::{
 pub use borders::ResolvedWindowBorders;
 pub use clipboard::{base64_encode, get_clipboard_text, set_clipboard_text};
 pub use framebuffer::{
-    format_pixel_16, format_pixel_32, is_framebuffer_available, FramebufferDevice,
+    blit_rgb_to_buffer, format_pixel_16, format_pixel_32, is_framebuffer_available,
+    is_linux_console, render_ratatui_buffer_to_slice, write_pixel_to_slice, FramebufferDevice,
 };
 pub use gutter::{
     format_spread_gutter_line, gutter_text_width, has_hidden_gutter_text, parse_help_tokens,
@@ -49,7 +51,7 @@ pub use style::{
     downsample_color_to_tier, parse_color_value, parse_color_value_with_tier, parse_style_pair,
     parse_style_pair_with_tier, ColorTier, ResolvedThemeStyles,
 };
-pub use terminal::{ensure_terminal_sane, TerminalGuard};
+pub use terminal::{ensure_terminal_sane, TerminalGuard, TerminalOutput};
 pub use text_input::TextInput;
 pub use toast::{ActiveToast, ToastRack};
 pub use transition::{

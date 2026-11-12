@@ -189,3 +189,95 @@ fn test_is_framebuffer_available_safe_call() {
     // Should execute safely without panicking in any environment
     let _ = is_framebuffer_available();
 }
+
+#[test]
+fn test_framebuffer_default_character_and_image_mode_rendering() {
+    use bashmenu_core::{load_menu, WallpaperConfig};
+    use bashmenu_tui::framebuffer::render_ratatui_buffer_to_slice;
+    use bashmenu_tui::{MenuView, ResolvedThemeStyles};
+    use ratatui::buffer::Buffer;
+
+    let repo_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
+    std::env::set_var("BASHMENU_DIR", &repo_root);
+    let menu_path = repo_root.join("bashmenu.mnu");
+    let schema = load_menu(&menu_path).expect("bashmenu.mnu must load");
+
+    let styles = ResolvedThemeStyles {
+        background: Color::Rgb(15, 20, 30),
+        ..Default::default()
+    };
+
+    let wp_cfg = WallpaperConfig {
+        enabled: true,
+        image: Some("assets/wallpapers/alaska-mountain.png".to_string()),
+        opacity: 0.85,
+        scaling: "cover".to_string(),
+        clustering: 0,
+        quantization: 1,
+        mode: Some("halfblock".to_string()),
+    };
+
+    let area = Rect::new(0, 0, 80, 24);
+
+    // 1. Default Mode: character-block wallpaper translation
+    let mut view_char = MenuView::new(schema.clone(), styles.clone(), false, String::new());
+    view_char.set_wallpaper(Some(wp_cfg.clone()));
+    assert!(!view_char.is_framebuffer_image_mode());
+
+    let mut buf_char = Buffer::empty(area);
+    view_char.render(area, &mut buf_char);
+    // Padding cells at top-left (0, 0) should be converted to halfblock or colored cell
+    assert_ne!(buf_char[(0, 0)].bg, Color::Reset);
+
+    // 2. Full-Resolution Image Mode (-i / --image): background cells marked Color::Reset
+    let mut view_img = MenuView::new(schema, styles.clone(), false, String::new());
+    view_img.set_wallpaper(Some(wp_cfg));
+    view_img.set_framebuffer_image_mode(true);
+    assert!(view_img.is_framebuffer_image_mode());
+
+    let mut buf_img = Buffer::empty(area);
+    view_img.render(area, &mut buf_img);
+    assert_eq!(buf_img[(0, 0)].bg, Color::Reset);
+
+    // Render into a 160x48 32-bit framebuffer slice over a green full-res wallpaper
+    let fb_w = 160u32;
+    let fb_h = 48u32;
+    let stride = fb_w * 4;
+    let mut wp_img = RgbImage::new(fb_w, fb_h);
+    for y in 0..fb_h {
+        for x in 0..fb_w {
+            wp_img.put_pixel(x, y, image::Rgb([12, 210, 45]));
+        }
+    }
+    let mut wp_bytes = vec![0u8; (fb_h * stride) as usize];
+    bashmenu_tui::framebuffer::blit_rgb_to_buffer(
+        &wp_img,
+        &mut wp_bytes,
+        fb_w,
+        fb_h,
+        stride,
+        32,
+        16,
+        8,
+        0,
+    );
+
+    let mut target_fb = vec![0u8; (fb_h * stride) as usize];
+    render_ratatui_buffer_to_slice(
+        &buf_img,
+        styles.background,
+        Some(&wp_bytes),
+        &mut target_fb,
+        fb_w,
+        fb_h,
+        stride,
+        32,
+        16,
+        8,
+        0,
+    );
+
+    // Pixel (0, 0) corresponds to transparent margin cell (0, 0) -> preserves full-res wallpaper
+    let px0 = u32::from_ne_bytes(target_fb[0..4].try_into().unwrap());
+    assert_eq!(px0, format_pixel_32(12, 210, 45, 16, 8, 0));
+}
