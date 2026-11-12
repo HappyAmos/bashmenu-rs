@@ -983,3 +983,11 @@
   - Added unit and integration tests in `crates/bashmenu-tui/src/framebuffer.rs`, `crates/bashmenu-tui/tests/transition_test.rs`, and `crates/bashmenu-cli/tests/audit_items_test.rs`.
   - Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, and `shellcheck *.sh scripts/*.sh` pass with zero warnings.
 
+## Rename `{which}` Macro to `{env}` / `{environment}`
+- [x] Renamed `{which}` macro to `{env}` and `{environment}` in `crates/bashmenu-core/src/macro_engine.rs` (`format_which_info` -> `format_env_info`, interpolation for `{env}` and `{environment}` without conflicting with `{env:VAR}`).
+- [x] Updated menu item and shortcut interception in `crates/bashmenu-cli/src/main.rs` to match `{env}`, `{environment}`, and item types `"env"` / `"environment"`.
+- [x] Updated `shortcuts.yml` entry `<leader> w` description from `Which Version` to `Environment Info` and updated `action`/`script` to `{env}`.
+- [x] Updated documentation and reference tables in `crates/bashmenu-core/src/constants.rs`, `bashmenu.md`, `bashmenu.1`, `.agents/rules/invariants.md`, and `.agents/skills/bashmenu-rs-developer/SKILL.md`.
+- [x] Updated tests in `crates/bashmenu-core/tests/macro_engine_test.rs` (`test_env_placeholder_resolution`) and `crates/bashmenu-cli/tests/audit_items_test.rs` (`test_env_environment_info_modal_formatting`).
+- [x] Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass with zero warnings.
+

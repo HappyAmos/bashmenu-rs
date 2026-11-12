@@ -2114,37 +2114,37 @@ fn main() -> Result<()> {
                             ctx.window_height = size.height as usize;
                             ctx.screen_width = size.width as usize;
 
-                            let has_which = item
+                            let has_env = item
                                 .action
                                 .as_deref()
-                                .map(|s| s.contains("{which}"))
+                                .map(|s| s.contains("{env}") || s.contains("{environment}"))
                                 .unwrap_or(false)
                                 || item
                                     .command
                                     .as_deref()
-                                    .map(|s| s.contains("{which}"))
+                                    .map(|s| s.contains("{env}") || s.contains("{environment}"))
                                     .unwrap_or(false)
                                 || item
                                     .script
                                     .as_deref()
-                                    .map(|s| s.contains("{which}"))
+                                    .map(|s| s.contains("{env}") || s.contains("{environment}"))
                                     .unwrap_or(false)
                                 || item
                                     .message()
-                                    .map(|s| s.contains("{which}"))
+                                    .map(|s| s.contains("{env}") || s.contains("{environment}"))
                                     .unwrap_or(false)
                                 || item
                                     .prompt
                                     .as_deref()
-                                    .map(|s| s.contains("{which}"))
+                                    .map(|s| s.contains("{env}") || s.contains("{environment}"))
                                     .unwrap_or(false)
-                                || matches!(item.r#type, MenuItemType::Other(ref s) if s == "which");
+                                || matches!(item.r#type, MenuItemType::Other(ref s) if s == "env" || s == "environment");
 
-                            if has_which {
-                                let which_info = ctx.format_which_info();
+                            if has_env {
+                                let env_info = ctx.format_env_info();
                                 active_modal = ActiveModal::Message(MessageModal::new(
                                     "Current Bashmenu Environment",
-                                    which_info,
+                                    env_info,
                                 ));
                             } else if item.r#type == MenuItemType::Toggle
                                 || matches!(item.r#type, MenuItemType::Other(ref s) if s == "toggle" || s == "config_toggle")

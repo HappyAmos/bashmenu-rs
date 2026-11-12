@@ -38,10 +38,10 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
 - **Direct Linux Framebuffer TrueColor & Full-Resolution Image Mode (`--image` / `-i`):**
   - When `/dev/fb0` is active (`FramebufferDevice::open()`), `TerminalGuard` suppresses `stdout` cell writes and renders Ratatui's `Buffer` in 24-bit TrueColor directly to `/dev/fb0`.
   - Default mode renders text-based character-block wallpapers (`WallpaperCompositor`) in TrueColor; passing `--image` / `-i` (or `settings.framebuffer: image`) renders the full-resolution pixel wallpaper onto `/dev/fb0` with the TrueColor menu composited on top.
-- **Environment Overview Macro (`{which}`) & Application Version (`{version}`) Invariant:**
-  - `{version}` and the Version row in `{which}` must resolve from root `Cargo.toml` `workspace.package.version` (with `env!("CARGO_PKG_VERSION")` fallback).
+- **Environment Overview Macro (`{env}` / `{environment}`) & Application Version (`{version}`) Invariant:**
+  - `{version}` and the Version row in `{env}` / `{environment}` must resolve from root `Cargo.toml` `workspace.package.version` (with `env!("CARGO_PKG_VERSION")` fallback).
   - `{app.version}` is removed and blocked in `resolve_config_dot_path` to prevent confusion with config schema versions.
-  - The `{which}` macro resolves to a formatted Markdown table reporting the application release version and canonical paths of `bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, and `cheat.yml`.
+  - The `{env}` / `{environment}` macro resolves to a formatted Markdown table reporting the application release version and canonical paths of `bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, and `cheat.yml`.
   - `MessageModal` automatically renders markdown tables (`|`) with box borders and headings (`##`) with BBCode styling.
   - When encountered in menu item actions, commands, scripts, messages, prompts, or item types, `bashmenu` intercepts the action and displays an interactive `MessageModal` with the environment overview table.
 - **Configuration Header Preservation Invariant (`bashmenu.yml`):**

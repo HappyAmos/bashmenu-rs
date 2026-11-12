@@ -118,7 +118,7 @@ impl<'a> MacroContext<'a> {
         self.with_version(version)
     }
 
-    /// Sets explicit file paths for environment inspection ({which}).
+    /// Sets explicit file paths for environment inspection ({env}/{environment}).
     pub fn with_paths(
         mut self,
         config_path: PathBuf,
@@ -220,8 +220,8 @@ impl<'a> MacroContext<'a> {
         })
     }
 
-    /// Formats the `{which}` environment overview table.
-    pub fn format_which_info(&self) -> String {
+    /// Formats the `{env}` / `{environment}` environment overview table.
+    pub fn format_env_info(&self) -> String {
         let cfg = self.resolve_config_path();
         let mnu = self.resolve_menu_path();
         let thm = self.resolve_themes_path();
@@ -1375,8 +1375,10 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
     if res.contains("{version}") {
         direct_map.insert("{version}", ctx.version.clone());
     }
-    if res.contains("{which}") {
-        direct_map.insert("{which}", ctx.format_which_info());
+    if res.contains("{env}") || res.contains("{environment}") {
+        let env_info = ctx.format_env_info();
+        direct_map.insert("{env}", env_info.clone());
+        direct_map.insert("{environment}", env_info);
     }
     if res.contains("{theme}") || res.contains("{app.theme}") {
         direct_map.insert("{theme}", ctx.config.theme.clone());

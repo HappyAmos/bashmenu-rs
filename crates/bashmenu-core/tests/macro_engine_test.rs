@@ -358,14 +358,14 @@ fn test_file_and_dir_picker_macros_and_modifiers() {
 }
 
 #[test]
-fn test_which_placeholder_resolution() {
+fn test_env_placeholder_resolution() {
     let config = BashMenuConfig {
         version: "1.2.3".to_string(),
         ..Default::default()
     };
 
     let td = std::env::temp_dir().join(format!(
-        "bashmenu_which_test_{}_{}",
+        "bashmenu_env_test_{}_{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -395,9 +395,11 @@ fn test_which_placeholder_resolution() {
         )
         .with_app_version("1.2.3");
 
-    let output = interpolate_placeholders("Inspect:\n{which}", &ctx);
+    let output = interpolate_placeholders("Inspect:\n{env}", &ctx);
+    let output_long = interpolate_placeholders("Inspect:\n{environment}", &ctx);
     let _ = std::fs::remove_dir_all(&td);
 
+    assert_eq!(output, output_long);
     assert_eq!(interpolate_placeholders("{version}", &ctx), "1.2.3");
     // {app.version} was removed to prevent confusion: it must not resolve
     assert_eq!(

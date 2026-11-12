@@ -22,10 +22,10 @@ shortcuts:
   quiet: true
   alt_buffer: false
 - key: <leader> w
-  description: Which Version
+  description: Environment Info
   type: script
-  action: '{which}'
-  script: '{which}'
+  action: '{env}'
+  script: '{env}'
   execution_mode: console
   quiet: false
   alt_buffer: true
