@@ -1005,3 +1005,11 @@
 - [x] Updated `.agents/rules/invariants.md`, `.agents/skills/bashmenu-rs-developer/SKILL.md`, `crates/bashmenu-core/tests/macro_engine_test.rs`, and `crates/bashmenu-cli/tests/audit_items_test.rs`.
 - [x] Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass with zero warnings.
 
+## Add `{info:<path>}` Markdown Popup Macro with Frontmatter `width` / `height` Percentages
+- [x] Added `MarkdownFrontmatter` (`title`, `width`, `height` percentage), `parse_markdown_frontmatter_full`, `find_info_macro_span`, `extract_info_macro_path`, `MacroContext::render_env_about_full`, and `MacroContext::render_info_file` (supporting nested placeholders and `~` tilde expansion) in `crates/bashmenu-core/src/macro_engine.rs` and re-exported in `crates/bashmenu-core/src/lib.rs`.
+- [x] Wired `{info:<path>}` inline expansion in `interpolate_placeholders` and interactive popup modal interception in `crates/bashmenu-cli/src/main.rs` (for both `{env}` and `{info:<path>}`).
+- [x] Added `width_percent` and `height_percent` overrides (`MessageModal::with_dimensions`) in `crates/bashmenu-tui/src/modals/message.rs`.
+- [x] Documented `{info:<path>}` and frontmatter `title`, `width`, and `height` in `crates/bashmenu-core/src/constants.rs`, `bashmenu.md`, and `bashmenu.1`.
+- [x] Added `test_info_macro_and_frontmatter_dimensions` in `crates/bashmenu-core/tests/macro_engine_test.rs` and `test_message_modal_percentage_dimensions` in `crates/bashmenu-tui/tests/modals_test.rs`.
+- [x] Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass with zero warnings.
+

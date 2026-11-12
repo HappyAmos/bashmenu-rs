@@ -2155,10 +2155,55 @@ fn main() -> Result<()> {
                                     .unwrap_or(false)
                                 || matches!(item.r#type, MenuItemType::Other(ref s) if s == "env" || s == "environment");
 
+                            let info_macro_path = item
+                                .action
+                                .as_deref()
+                                .and_then(bashmenu_core::extract_info_macro_path)
+                                .or_else(|| {
+                                    item.command
+                                        .as_deref()
+                                        .and_then(bashmenu_core::extract_info_macro_path)
+                                })
+                                .or_else(|| {
+                                    item.script
+                                        .as_deref()
+                                        .and_then(bashmenu_core::extract_info_macro_path)
+                                })
+                                .or_else(|| {
+                                    item.message()
+                                        .and_then(bashmenu_core::extract_info_macro_path)
+                                })
+                                .or_else(|| {
+                                    item.prompt
+                                        .as_deref()
+                                        .and_then(bashmenu_core::extract_info_macro_path)
+                                });
+
                             if has_env {
-                                let (env_title, env_info) = ctx.render_env_about();
-                                active_modal =
-                                    ActiveModal::Message(MessageModal::new(env_title, env_info));
+                                let (fm, env_info) = ctx.render_env_about_full();
+                                let env_title = fm
+                                    .title
+                                    .unwrap_or_else(|| "Current Bashmenu Environment".to_string());
+                                active_modal = ActiveModal::Message(
+                                    MessageModal::new(env_title, env_info)
+                                        .with_dimensions(fm.width, fm.height),
+                                );
+                            } else if let Some(info_path) = info_macro_path {
+                                match ctx.render_info_file(&info_path) {
+                                    Ok((fm, body)) => {
+                                        let title = fm.title.unwrap_or_else(|| "Info".to_string());
+                                        active_modal = ActiveModal::Message(
+                                            MessageModal::new(title, body)
+                                                .with_dimensions(fm.width, fm.height),
+                                        );
+                                    }
+                                    Err(err) => {
+                                        active_modal = ActiveModal::Message(MessageModal::new(
+                                            "Info Error",
+                                            err,
+                                        ));
+                                    }
+                                }
                             } else if item.r#type == MenuItemType::Toggle
                                 || matches!(item.r#type, MenuItemType::Other(ref s) if s == "toggle" || s == "config_toggle")
                             {

@@ -2027,3 +2027,12 @@ fn test_all_modals_close_button_and_footer_clickable() {
         assert_eq!(res, Some(None));
     }
 }
+
+#[test]
+fn test_message_modal_percentage_dimensions() {
+    let area = Rect::new(0, 0, 100, 40);
+    let modal = MessageModal::new("Custom Info", "Hello world").with_dimensions(Some(80), Some(60));
+    let (w, h) = modal.dialog_dimensions(area);
+    assert_eq!(w, 80);
+    assert_eq!(h, 24);
+}

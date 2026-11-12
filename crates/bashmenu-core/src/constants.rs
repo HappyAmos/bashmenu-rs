@@ -96,6 +96,7 @@ pub const PLACEHOLDER_HELP_TEXT: &str = "\
 {nf:<char>:<hex>:<emoji>}    │ Adaptive Nerd Font / Unicode / Emoji glyph
 {app.<key.path>}             │ Configuration key in bashmenu.yml (e.g. {app.theme})
 {env} / {environment}        │ Environment inspection modal / overview table
+{info:<path>}                │ Renders Markdown file with YAML frontmatter (title, width, height)
 {<key.path>}                 │ Refers to nested key in bashmenu.yml (e.g. {user.postal_code})
 ";
 

@@ -570,3 +570,58 @@ fn test_config_file_color_and_tty_placeholders() {
         "pty"
     );
 }
+
+#[test]
+fn test_info_macro_and_frontmatter_dimensions() {
+    let (fm, body) = bashmenu_core::parse_markdown_frontmatter_full(
+        "---\ntitle: System Overview ({version})\nwidth: 80\nheight: \"60%\"\n---\n| Key | Val |\n| --- | --- |\n| Ver | {version} |\n",
+    );
+    assert_eq!(fm.title.as_deref(), Some("System Overview ({version})"));
+    assert_eq!(fm.width, Some(80));
+    assert_eq!(fm.height, Some(60));
+    assert!(body.starts_with("| Key | Val |"));
+
+    assert_eq!(
+        bashmenu_core::extract_info_macro_path("run {info:{bashmenu_dir}/info.md} now").as_deref(),
+        Some("{bashmenu_dir}/info.md")
+    );
+    assert_eq!(
+        bashmenu_core::extract_info_macro_path("{info:~/.config/bashmenu/info.md}").as_deref(),
+        Some("~/.config/bashmenu/info.md")
+    );
+
+    let td = std::env::temp_dir().join(format!(
+        "bashmenu_info_macro_test_{}_{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&td).unwrap();
+    let info_file = td.join("info.md");
+    std::fs::write(
+        &info_file,
+        "---\ntitle: Custom Info {version}\nwidth: 75\nheight: 50\n---\n| Field | Value |\n| --- | --- |\n| Mode | {color_mode} |\n",
+    )
+    .unwrap();
+
+    let config = BashMenuConfig::default();
+    let mut ctx = MacroContext::new(&config)
+        .with_app_version("9.9.9")
+        .with_color_mode("256 color");
+    ctx.bashmenu_dir = td.clone();
+
+    let (rendered_fm, rendered_body) = ctx
+        .render_info_file("{bashmenu_dir}/info.md")
+        .expect("info.md should render");
+    assert_eq!(rendered_fm.title.as_deref(), Some("Custom Info 9.9.9"));
+    assert_eq!(rendered_fm.width, Some(75));
+    assert_eq!(rendered_fm.height, Some(50));
+    assert!(rendered_body.contains("| Mode | 256 color |"));
+
+    let inline = interpolate_placeholders("{info:{bashmenu_dir}/info.md}", &ctx);
+    assert_eq!(inline, rendered_body);
+
+    let _ = std::fs::remove_dir_all(&td);
+}

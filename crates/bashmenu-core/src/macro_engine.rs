@@ -252,19 +252,83 @@ impl<'a> MacroContext<'a> {
 
     /// Loads `assets/about.md` (with compile-time fallback), extracts the YAML
     /// frontmatter `title`, and expands all macro placeholders in the Markdown body.
-    /// Returns `(title, rendered_body)`.
-    pub fn render_env_about(&self) -> (String, String) {
+    /// Loads `assets/about.md` (with compile-time fallback), parses YAML
+    /// frontmatter (`title`, `width`, `height`), and expands all macro
+    /// placeholders in the title and Markdown body.
+    pub fn render_env_about_full(&self) -> (MarkdownFrontmatter, String) {
         const DEFAULT_ABOUT_MD: &str = include_str!("../../../assets/about.md");
         let raw = self
             .resolve_about_md_path()
             .and_then(|p| std::fs::read_to_string(p).ok())
             .unwrap_or_else(|| DEFAULT_ABOUT_MD.to_string());
 
-        let (fm_title, body) = parse_markdown_frontmatter(&raw);
-        let raw_title = fm_title.unwrap_or_else(|| "Current Bashmenu Environment".to_string());
-        let title = interpolate_placeholders(&raw_title, self);
+        let (mut fm, body) = parse_markdown_frontmatter_full(&raw);
+        let raw_title = fm
+            .title
+            .unwrap_or_else(|| "Current Bashmenu Environment".to_string());
+        fm.title = Some(interpolate_placeholders(&raw_title, self));
         let rendered_body = interpolate_placeholders(body, self);
-        (title, rendered_body)
+        (fm, rendered_body)
+    }
+
+    /// Loads `assets/about.md` (with compile-time fallback), extracts the YAML
+    /// frontmatter `title`, and expands all macro placeholders in the Markdown body.
+    /// Returns `(title, rendered_body)`.
+    pub fn render_env_about(&self) -> (String, String) {
+        let (fm, body) = self.render_env_about_full();
+        (
+            fm.title
+                .unwrap_or_else(|| "Current Bashmenu Environment".to_string()),
+            body,
+        )
+    }
+
+    /// Loads a user-specified Markdown file with optional YAML frontmatter
+    /// (`title`, `width`, `height`), expands placeholders and `~` in `path_expr`,
+    /// and interpolates placeholders in both the title and Markdown body.
+    pub fn render_info_file(
+        &self,
+        path_expr: &str,
+    ) -> Result<(MarkdownFrontmatter, String), String> {
+        let expanded_expr = interpolate_placeholders(path_expr.trim(), self);
+        let candidate = expand_tilde_path(&expanded_expr, &self.home_dir);
+        let resolved = if candidate.is_absolute() || candidate.is_file() {
+            candidate
+        } else {
+            let in_bm = self.bashmenu_dir.join(&candidate);
+            if in_bm.is_file() {
+                in_bm
+            } else {
+                let in_dev = self.dev_dir.join(&candidate);
+                if in_dev.is_file() {
+                    in_dev
+                } else {
+                    candidate
+                }
+            }
+        };
+
+        let raw = std::fs::read_to_string(&resolved).map_err(|e| {
+            format!(
+                "Failed to read info markdown file '{}': {}",
+                resolved.display(),
+                e
+            )
+        })?;
+
+        let (mut fm, body) = parse_markdown_frontmatter_full(&raw);
+        if let Some(ref t) = fm.title {
+            fm.title = Some(interpolate_placeholders(t, self));
+        } else {
+            let fallback_title = resolved
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("Info")
+                .to_string();
+            fm.title = Some(fallback_title);
+        }
+        let rendered_body = interpolate_placeholders(body, self);
+        Ok((fm, rendered_body))
     }
 
     /// Formats the `{env}` / `{environment}` environment overview table.
@@ -273,39 +337,109 @@ impl<'a> MacroContext<'a> {
     }
 }
 
+/// Parsed YAML frontmatter metadata from a Markdown popup definition file.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct MarkdownFrontmatter {
+    /// Optional popup window title (`title:` in frontmatter)
+    pub title: Option<String>,
+    /// Optional popup window width in percent of terminal width (`width:` in frontmatter)
+    pub width: Option<u16>,
+    /// Optional popup window height in percent of terminal height (`height:` in frontmatter)
+    pub height: Option<u16>,
+}
+
+/// Parses a percentage value (`80`, `"80"`, `"80%"`) from a YAML value, clamped to `1..=100`.
+fn parse_percent_value(val: &serde_yml::Value) -> Option<u16> {
+    if let Some(n) = val.as_u64() {
+        return Some((n as u16).clamp(1, 100));
+    }
+    if let Some(n) = val.as_i64() {
+        if n > 0 {
+            return Some((n as u16).clamp(1, 100));
+        }
+    }
+    if let Some(s) = val.as_str() {
+        let cleaned = s.trim().trim_end_matches('%').trim();
+        if let Ok(n) = cleaned.parse::<u16>() {
+            if n > 0 {
+                return Some(n.clamp(1, 100));
+            }
+        }
+    }
+    None
+}
+
 /// Parses optional YAML frontmatter (`--- ... ---`) at the top of a Markdown
-/// document, returning `(title, remaining_markdown_body)`.
-pub fn parse_markdown_frontmatter(raw: &str) -> (Option<String>, &str) {
+/// document, returning `(MarkdownFrontmatter, remaining_markdown_body)`.
+pub fn parse_markdown_frontmatter_full(raw: &str) -> (MarkdownFrontmatter, &str) {
     let trimmed = raw.strip_prefix('\u{feff}').unwrap_or(raw);
     let after_open = if let Some(rest) = trimmed.strip_prefix("---\r\n") {
         rest
     } else if let Some(rest) = trimmed.strip_prefix("---\n") {
         rest
     } else {
-        return (None, raw);
+        return (MarkdownFrontmatter::default(), raw);
     };
 
-    // Find closing `---` on its own line
     let mut offset = 0;
     for line in after_open.split_inclusive('\n') {
         let line_no_nl = line.trim_end_matches(['\r', '\n']);
         if line_no_nl == "---" {
             let yaml_block = &after_open[..offset];
             let body = &after_open[offset + line.len()..];
-            let title = serde_yml::from_str::<serde_yml::Value>(yaml_block)
-                .ok()
-                .and_then(|val| {
-                    val.get("title")
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.trim().to_string())
-                })
-                .filter(|s| !s.is_empty());
-            return (title, body.trim_start_matches(['\r', '\n']));
+            let mut fm = MarkdownFrontmatter::default();
+            if let Ok(val) = serde_yml::from_str::<serde_yml::Value>(yaml_block) {
+                fm.title = val
+                    .get("title")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty());
+                fm.width = val.get("width").and_then(parse_percent_value);
+                fm.height = val.get("height").and_then(parse_percent_value);
+            }
+            return (fm, body.trim_start_matches(['\r', '\n']));
         }
         offset += line.len();
     }
 
-    (None, raw)
+    (MarkdownFrontmatter::default(), raw)
+}
+
+/// Parses optional YAML frontmatter (`--- ... ---`) at the top of a Markdown
+/// document, returning `(title, remaining_markdown_body)`.
+pub fn parse_markdown_frontmatter(raw: &str) -> (Option<String>, &str) {
+    let (fm, body) = parse_markdown_frontmatter_full(raw);
+    (fm.title, body)
+}
+
+/// Finds the byte span `(start, end, inner_path)` of the first `{info:<path>}`
+/// macro in `text`, supporting nested `{...}` placeholders inside `<path>`.
+pub fn find_info_macro_span(text: &str) -> Option<(usize, usize, String)> {
+    let start = text.find("{info:")?;
+    let content_start = start + "{info:".len();
+    let mut depth = 1usize;
+    for (rel_idx, ch) in text[content_start..].char_indices() {
+        match ch {
+            '{' => depth += 1,
+            '}' => {
+                depth -= 1;
+                if depth == 0 {
+                    let end = content_start + rel_idx + 1;
+                    let inner = text[content_start..content_start + rel_idx]
+                        .trim()
+                        .to_string();
+                    return Some((start, end, inner));
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// Extracts the inner path expression from the first `{info:<path>}` macro in `text`.
+pub fn extract_info_macro_path(text: &str) -> Option<String> {
+    find_info_macro_span(text).map(|(_, _, p)| p)
 }
 
 /// Evaluates the human-readable terminal color mode label from environment variables.
@@ -1729,6 +1863,22 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
                 }
             })
             .to_string();
+    }
+
+    // 6.5. Info markdown file macro: {info:<path>}
+    if res.contains("{info:") {
+        let mut guard = 0usize;
+        while guard < 16 {
+            let Some((start, end, path_expr)) = find_info_macro_span(&res) else {
+                break;
+            };
+            let replacement = match ctx.render_info_file(&path_expr) {
+                Ok((_, body)) => body,
+                Err(err) => format!("[info error: {}]", err),
+            };
+            res.replace_range(start..end, &replacement);
+            guard += 1;
+        }
     }
 
     // 7. Command substitution: {command:<cmd>} with 30s TTL caching

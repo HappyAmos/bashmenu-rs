@@ -694,6 +694,9 @@ Configurable non-blocking toast notification directive. Displays a floating toas
 .B {env}, {environment}
 Environment inspection directive. Displays an environment overview table modal showing active file locations for bashmenu.yml, bashmenu.mnu, bashmenu.themes, shortcuts.yml, cheat.yml, and application version. Can also be interpolated inline as a Markdown table.
 .TP
+.B {info:<path>}
+User-defined Markdown popup directive (e.g., {info:{bashmenu_dir}/info.md} or {info:~/.config/bashmenu/info.md}). Parses optional YAML frontmatter keys (title, width as a percentage of window width, and height as a percentage of window height), expands placeholders in the title and Markdown body, and renders the content in a popup modal.
+.TP
 .B {bashmenu_yml}, {bashmenu_mnu}, {bashmenu_themes}, {shortcuts_yml}, {cheat_yml}
 Full canonical paths to the currently loaded configuration, menu, theme, shortcuts, and cheatsheet YAML files.
 .TP

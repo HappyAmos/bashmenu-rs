@@ -14,6 +14,10 @@ pub struct MessageModal {
     pub title: String,
     /// Alert or information message body
     pub message: String,
+    /// Optional window width as percentage of terminal width (1..=100)
+    pub width_percent: Option<u16>,
+    /// Optional window height as percentage of terminal height (1..=100)
+    pub height_percent: Option<u16>,
 }
 
 impl MessageModal {
@@ -22,7 +26,20 @@ impl MessageModal {
         Self {
             title: title.into(),
             message: message.into(),
+            width_percent: None,
+            height_percent: None,
         }
+    }
+
+    /// Sets optional percentage-based width and height overrides (1..=100).
+    pub fn with_dimensions(
+        mut self,
+        width_percent: Option<u16>,
+        height_percent: Option<u16>,
+    ) -> Self {
+        self.width_percent = width_percent.map(|w| w.clamp(1, 100));
+        self.height_percent = height_percent.map(|h| h.clamp(1, 100));
+        self
     }
 
     /// Handles keyboard input. Returns `true` when dismissed.
@@ -40,22 +57,39 @@ impl MessageModal {
 
     /// Returns the target dialog dimensions for this modal.
     pub fn dialog_dimensions(&self, area: Rect) -> (u16, u16) {
-        let max_w = (area.width.saturating_sub(4)).clamp(20, 96);
-        let avail_inner_w = max_w.saturating_sub(4) as usize;
-        let lines = parse_markdown_message_lines(&self.message, avail_inner_w, None);
-        let max_line_w = lines
-            .iter()
-            .map(|l| {
-                l.spans
-                    .iter()
-                    .map(|s| unicode_width::UnicodeWidthStr::width(s.content.as_ref()))
-                    .sum::<usize>()
-            })
-            .max()
-            .unwrap_or(20);
-        let dialog_w = (max_line_w as u16 + 6).min(max_w).max(20.min(max_w));
+        let max_w = if self.width_percent.is_some() {
+            area.width.saturating_sub(4).max(20.min(area.width))
+        } else {
+            (area.width.saturating_sub(4)).clamp(20, 96)
+        };
+        let dialog_w = if let Some(wp) = self.width_percent {
+            let target_w = ((area.width as u32 * wp.clamp(1, 100) as u32) / 100) as u16;
+            target_w.clamp(20.min(max_w), max_w)
+        } else {
+            let avail_inner_w = max_w.saturating_sub(4) as usize;
+            let lines = parse_markdown_message_lines(&self.message, avail_inner_w, None);
+            let max_line_w = lines
+                .iter()
+                .map(|l| {
+                    l.spans
+                        .iter()
+                        .map(|s| unicode_width::UnicodeWidthStr::width(s.content.as_ref()))
+                        .sum::<usize>()
+                })
+                .max()
+                .unwrap_or(20);
+            (max_line_w as u16 + 6).min(max_w).max(20.min(max_w))
+        };
+
         let max_h = area.height.saturating_sub(2);
-        let dialog_h = (lines.len() as u16 + 5).min(max_h).max(8.min(max_h));
+        let dialog_h = if let Some(hp) = self.height_percent {
+            let target_h = ((area.height as u32 * hp.clamp(1, 100) as u32) / 100) as u16;
+            target_h.clamp(8.min(max_h), max_h)
+        } else {
+            let avail_inner_w = dialog_w.saturating_sub(6) as usize;
+            let lines = parse_markdown_message_lines(&self.message, avail_inner_w, None);
+            (lines.len() as u16 + 5).min(max_h).max(8.min(max_h))
+        };
         (dialog_w, dialog_h)
     }
 
