@@ -2156,11 +2156,9 @@ fn main() -> Result<()> {
                                 || matches!(item.r#type, MenuItemType::Other(ref s) if s == "env" || s == "environment");
 
                             if has_env {
-                                let env_info = ctx.format_env_info();
-                                active_modal = ActiveModal::Message(MessageModal::new(
-                                    "Current Bashmenu Environment",
-                                    env_info,
-                                ));
+                                let (env_title, env_info) = ctx.render_env_about();
+                                active_modal =
+                                    ActiveModal::Message(MessageModal::new(env_title, env_info));
                             } else if item.r#type == MenuItemType::Toggle
                                 || matches!(item.r#type, MenuItemType::Other(ref s) if s == "toggle" || s == "config_toggle")
                             {

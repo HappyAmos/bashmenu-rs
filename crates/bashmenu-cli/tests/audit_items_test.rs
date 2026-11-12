@@ -155,15 +155,19 @@ fn test_env_environment_info_modal_formatting() {
     let cht_path = repo_root.join("cheat.yml");
 
     let config = bashmenu_core::load_config(&yml_path).expect("bashmenu.yml must load");
-    let ctx = bashmenu_core::MacroContext::new(&config).with_paths(
-        yml_path.clone(),
-        mnu_path.clone(),
-        thm_path.clone(),
-        shc_path.clone(),
-        cht_path.clone(),
-    );
+    let ctx = bashmenu_core::MacroContext::new(&config)
+        .with_paths(
+            yml_path.clone(),
+            mnu_path.clone(),
+            thm_path.clone(),
+            shc_path.clone(),
+            cht_path.clone(),
+        )
+        .with_color_mode("truecolor")
+        .with_tty_mode("pty");
 
-    let env_text = ctx.format_env_info();
+    let (env_title, env_text) = ctx.render_env_about();
+    assert_eq!(env_title, "Current Bashmenu Environment");
     assert_eq!(
         bashmenu_core::interpolate_placeholders("{version}", &ctx),
         ctx.version
@@ -173,32 +177,34 @@ fn test_env_environment_info_modal_formatting() {
         bashmenu_core::interpolate_placeholders("{app.version}", &ctx),
         "{app.version}"
     );
-    assert!(env_text.contains("## Current Bashmenu Environment:"));
-    assert!(env_text.contains("| [b]Information[/b] | [b]Truth[/b] |"));
-    assert!(env_text.contains(&format!("| [b]Version:[/b] | {} |", ctx.version)));
+    assert!(!env_text.contains("title:"));
+    assert!(env_text.contains("| Information | Value |"));
+    assert!(env_text.contains(&format!("| Version | {} |", ctx.version)));
+    assert!(env_text.contains("| Color Mode | truecolor |"));
+    assert!(env_text.contains("| TTY Mode | pty |"));
     assert!(env_text.contains(&format!(
-        "| [b]bashmenu.yml:[/b] | {} |",
+        "| bashmenu.yml | {} |",
         bashmenu_core::full_file_location(&yml_path)
     )));
     assert!(env_text.contains(&format!(
-        "| [b]bashmenu.mnu:[/b] | {} |",
+        "| bashmenu.mnu | {} |",
         bashmenu_core::full_file_location(&mnu_path)
     )));
     assert!(env_text.contains(&format!(
-        "| [b]bashmenu.themes:[/b] | {} |",
+        "| bashmenu.themes | {} |",
         bashmenu_core::full_file_location(&thm_path)
     )));
     assert!(env_text.contains(&format!(
-        "| [b]shortcuts.yml:[/b] | {} |",
+        "| shortcuts.yml | {} |",
         bashmenu_core::full_file_location(&shc_path)
     )));
     assert!(env_text.contains(&format!(
-        "| [b]cheat.yml:[/b] | {} |",
+        "| cheat.yml | {} |",
         bashmenu_core::full_file_location(&cht_path)
     )));
 
     // Verify modal dimensions and wrapped formatting does not split table rows
-    let (w, h) = bashmenu_tui::modals::MessageModal::new("Current Bashmenu Environment", &env_text)
+    let (w, h) = bashmenu_tui::modals::MessageModal::new(env_title, &env_text)
         .dialog_dimensions(ratatui::layout::Rect::new(0, 0, 100, 30));
     assert!(
         w >= 70,

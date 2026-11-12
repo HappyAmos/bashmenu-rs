@@ -238,24 +238,74 @@ impl<'a> MacroContext<'a> {
         })
     }
 
+    /// Resolves the path to `assets/about.md` if present on disk.
+    pub fn resolve_about_md_path(&self) -> Option<PathBuf> {
+        let candidates = [
+            self.dev_dir.join("assets/about.md"),
+            self.bashmenu_dir.join("assets/about.md"),
+            PathBuf::from("assets/about.md"),
+            PathBuf::from("/usr/local/share/bashmenu/assets/about.md"),
+            PathBuf::from("/opt/bashmenu/assets/about.md"),
+        ];
+        candidates.into_iter().find(|p| p.is_file())
+    }
+
+    /// Loads `assets/about.md` (with compile-time fallback), extracts the YAML
+    /// frontmatter `title`, and expands all macro placeholders in the Markdown body.
+    /// Returns `(title, rendered_body)`.
+    pub fn render_env_about(&self) -> (String, String) {
+        const DEFAULT_ABOUT_MD: &str = include_str!("../../../assets/about.md");
+        let raw = self
+            .resolve_about_md_path()
+            .and_then(|p| std::fs::read_to_string(p).ok())
+            .unwrap_or_else(|| DEFAULT_ABOUT_MD.to_string());
+
+        let (fm_title, body) = parse_markdown_frontmatter(&raw);
+        let raw_title = fm_title.unwrap_or_else(|| "Current Bashmenu Environment".to_string());
+        let title = interpolate_placeholders(&raw_title, self);
+        let rendered_body = interpolate_placeholders(body, self);
+        (title, rendered_body)
+    }
+
     /// Formats the `{env}` / `{environment}` environment overview table.
     pub fn format_env_info(&self) -> String {
-        let cfg = self.resolve_config_path();
-        let mnu = self.resolve_menu_path();
-        let thm = self.resolve_themes_path();
-        let shc = self.resolve_shortcuts_path();
-        let cht = self.resolve_cheat_path();
-
-        format!(
-            "## Current Bashmenu Environment:\n| [b]Information[/b] | [b]Truth[/b] |\n| [b]Version:[/b] | {} |\n| [b]bashmenu.yml:[/b] | {} |\n| [b]bashmenu.mnu:[/b] | {} |\n| [b]bashmenu.themes:[/b] | {} |\n| [b]shortcuts.yml:[/b] | {} |\n| [b]cheat.yml:[/b] | {} |",
-            self.version,
-            full_file_location(&cfg),
-            full_file_location(&mnu),
-            full_file_location(&thm),
-            full_file_location(&shc),
-            full_file_location(&cht),
-        )
+        self.render_env_about().1
     }
+}
+
+/// Parses optional YAML frontmatter (`--- ... ---`) at the top of a Markdown
+/// document, returning `(title, remaining_markdown_body)`.
+pub fn parse_markdown_frontmatter(raw: &str) -> (Option<String>, &str) {
+    let trimmed = raw.strip_prefix('\u{feff}').unwrap_or(raw);
+    let after_open = if let Some(rest) = trimmed.strip_prefix("---\r\n") {
+        rest
+    } else if let Some(rest) = trimmed.strip_prefix("---\n") {
+        rest
+    } else {
+        return (None, raw);
+    };
+
+    // Find closing `---` on its own line
+    let mut offset = 0;
+    for line in after_open.split_inclusive('\n') {
+        let line_no_nl = line.trim_end_matches(['\r', '\n']);
+        if line_no_nl == "---" {
+            let yaml_block = &after_open[..offset];
+            let body = &after_open[offset + line.len()..];
+            let title = serde_yml::from_str::<serde_yml::Value>(yaml_block)
+                .ok()
+                .and_then(|val| {
+                    val.get("title")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.trim().to_string())
+                })
+                .filter(|s| !s.is_empty());
+            return (title, body.trim_start_matches(['\r', '\n']));
+        }
+        offset += line.len();
+    }
+
+    (None, raw)
 }
 
 /// Evaluates the human-readable terminal color mode label from environment variables.

@@ -41,7 +41,7 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
 - **Environment Overview Macro (`{env}` / `{environment}`) & Application Version (`{version}`) Invariant:**
   - `{version}` and the Version row in `{env}` / `{environment}` must resolve from root `Cargo.toml` `workspace.package.version` (with `env!("CARGO_PKG_VERSION")` fallback).
   - `{app.version}` is removed and blocked in `resolve_config_dot_path` to prevent confusion with config schema versions.
-  - The `{env}` / `{environment}` macro resolves to a formatted Markdown table reporting the application release version and canonical paths of `bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, and `cheat.yml`.
+  - The `{env}` / `{environment}` macro loads `assets/about.md` (with compile-time fallback), extracts the YAML frontmatter `title` as the modal window title, and interpolates all expanding placeholders in the Markdown body (`{version}`, `{color_mode}`, `{tty_mode}`, `{bashmenu_yml}`, `{bashmenu_mnu}`, `{bashmenu_themes}`, `{shortcuts_yml}`, `{cheat_yml}`).
   - `MessageModal` automatically renders markdown tables (`|`) with box borders and headings (`##`) with BBCode styling.
   - When encountered in menu item actions, commands, scripts, messages, prompts, or item types, `bashmenu` intercepts the action and displays an interactive `MessageModal` with the environment overview table.
 - **Configuration Header Preservation Invariant (`bashmenu.yml`):**

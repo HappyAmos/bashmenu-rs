@@ -393,42 +393,60 @@ fn test_env_placeholder_resolution() {
             shc_path.clone(),
             cht_path.clone(),
         )
-        .with_app_version("1.2.3");
+        .with_app_version("1.2.3")
+        .with_color_mode("truecolor")
+        .with_tty_mode("pty");
 
+    let (title, rendered_body) = ctx.render_env_about();
     let output = interpolate_placeholders("Inspect:\n{env}", &ctx);
     let output_long = interpolate_placeholders("Inspect:\n{environment}", &ctx);
     let _ = std::fs::remove_dir_all(&td);
 
+    assert_eq!(title, "Current Bashmenu Environment");
     assert_eq!(output, output_long);
+    assert_eq!(output, format!("Inspect:\n{}", rendered_body));
+    assert!(!rendered_body.contains("title:"));
     assert_eq!(interpolate_placeholders("{version}", &ctx), "1.2.3");
     // {app.version} was removed to prevent confusion: it must not resolve
     assert_eq!(
         interpolate_placeholders("{app.version}", &ctx),
         "{app.version}"
     );
-    assert!(output.contains("## Current Bashmenu Environment:"));
-    assert!(output.contains("| [b]Information[/b] | [b]Truth[/b] |"));
-    assert!(output.contains("| [b]Version:[/b] | 1.2.3 |"));
+    assert!(output.contains("| Information | Value |"));
+    assert!(output.contains("| Version | 1.2.3 |"));
+    assert!(output.contains("| Color Mode | truecolor |"));
+    assert!(output.contains("| TTY Mode | pty |"));
     assert!(output.contains(&format!(
-        "| [b]bashmenu.yml:[/b] | {} |",
+        "| bashmenu.yml | {} |",
         full_file_location(&cfg_path)
     )));
     assert!(output.contains(&format!(
-        "| [b]bashmenu.mnu:[/b] | {} |",
+        "| bashmenu.mnu | {} |",
         full_file_location(&mnu_path)
     )));
     assert!(output.contains(&format!(
-        "| [b]bashmenu.themes:[/b] | {} |",
+        "| bashmenu.themes | {} |",
         full_file_location(&thm_path)
     )));
     assert!(output.contains(&format!(
-        "| [b]shortcuts.yml:[/b] | {} |",
+        "| shortcuts.yml | {} |",
         full_file_location(&shc_path)
     )));
     assert!(output.contains(&format!(
-        "| [b]cheat.yml:[/b] | {} |",
+        "| cheat.yml | {} |",
         full_file_location(&cht_path)
     )));
+
+    // Verify frontmatter parser behavior
+    let (fm_t, fm_b) = bashmenu_core::parse_markdown_frontmatter(
+        "---\ntitle: Custom About Title\n---\n# Heading\nBody",
+    );
+    assert_eq!(fm_t.as_deref(), Some("Custom About Title"));
+    assert_eq!(fm_b, "# Heading\nBody");
+
+    let (no_t, no_b) = bashmenu_core::parse_markdown_frontmatter("# Just Markdown");
+    assert_eq!(no_t, None);
+    assert_eq!(no_b, "# Just Markdown");
 }
 
 #[test]

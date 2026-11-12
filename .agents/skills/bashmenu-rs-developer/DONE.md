@@ -998,3 +998,10 @@
 - [x] Added `test_config_file_color_and_tty_placeholders` in `crates/bashmenu-core/tests/macro_engine_test.rs`.
 - [x] Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass with zero warnings.
 
+## Load `{env}` Macro Content from `assets/about.md` with YAML Frontmatter
+- [x] Fixed `{bashmenu_themes }` typo to `{bashmenu_themes}` in `assets/about.md`.
+- [x] Added `parse_markdown_frontmatter`, `MacroContext::resolve_about_md_path`, and `MacroContext::render_env_about` in `crates/bashmenu-core/src/macro_engine.rs` (with compile-time `include_str!("../../../assets/about.md")` fallback) and updated `MacroContext::format_env_info` to render the Markdown body.
+- [x] Updated `crates/bashmenu-cli/src/main.rs` `{env}` / `{environment}` modal interception to use `ctx.render_env_about()` for both the YAML frontmatter `title` and the interpolated Markdown body.
+- [x] Updated `.agents/rules/invariants.md`, `.agents/skills/bashmenu-rs-developer/SKILL.md`, `crates/bashmenu-core/tests/macro_engine_test.rs`, and `crates/bashmenu-cli/tests/audit_items_test.rs`.
+- [x] Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass with zero warnings.
+
