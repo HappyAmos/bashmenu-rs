@@ -991,12 +991,24 @@
 - [x] Updated tests in `crates/bashmenu-core/tests/macro_engine_test.rs` (`test_env_placeholder_resolution`) and `crates/bashmenu-cli/tests/audit_items_test.rs` (`test_env_environment_info_modal_formatting`).
 - [x] Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass with zero warnings.
 
+## Fix GitHub Actions CI Clippy Failures (Rust 1.100)
+- [x] Fixed `clippy::needless_bool` in `crates/bashmenu-core/src/menu.rs` (`is_streaming`) and `crates/bashmenu-tui/src/modals/help.rs` (`handle_mouse`).
+- [x] Fixed `clippy::needless_nonzero_get` in `crates/bashmenu-tui/src/wallpaper.rs` (`div.get()` -> `div`).
+- [x] Fixed `clippy::needless_range_loop` in `crates/bashedit-cli/src/lib.rs` (`cut.extend(...)`).
+- [x] Verified GitHub Actions `Rust Application` workflow run `43338151588` completed with `success` (Formatting, Workspace Check, Tests, Clippy, and Shellcheck all passed).
+
 ## Add Config Path, `{color_mode}`, and `{tty_mode}` Expanding Placeholders
 - [x] Added `{bashmenu_yml}`, `{bashmenu_mnu}`, `{bashmenu_themes}`, `{shortcuts_yml}`, `{cheat_yml}`, `{color_mode}`, and `{tty_mode}` placeholders to `crates/bashmenu-core/src/macro_engine.rs` (plus `evaluate_color_mode`, `detect_color_mode`, `evaluate_tty_mode`, `detect_tty_mode`, and `MacroContext::with_color_mode` / `MacroContext::with_tty_mode`).
 - [x] Re-exported the new detection helpers in `crates/bashmenu-core/src/lib.rs` and wired `active_color_mode` and `active_tty_mode` into `make_macro_ctx!` in `crates/bashmenu-cli/src/main.rs`.
 - [x] Documented all 7 placeholders in `crates/bashmenu-core/src/constants.rs`, `bashmenu.md`, and `bashmenu.1`.
 - [x] Added `test_config_file_color_and_tty_placeholders` in `crates/bashmenu-core/tests/macro_engine_test.rs`.
 - [x] Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass with zero warnings.
+
+## Fix GitHub Actions CI Clippy Failures (Rust 1.100)
+- [x] Fixed `clippy::needless_bool` in `crates/bashmenu-core/src/menu.rs` (`is_streaming`) and `crates/bashmenu-tui/src/modals/help.rs` (`handle_mouse`).
+- [x] Fixed `clippy::needless_nonzero_get` in `crates/bashmenu-tui/src/wallpaper.rs` (`div.get()` -> `div`).
+- [x] Fixed `clippy::needless_range_loop` in `crates/bashedit-cli/src/lib.rs` (`cut.extend(...)`).
+- [x] Verified GitHub Actions `Rust Application` workflow run `43338151588` completed with `success` (Formatting, Workspace Check, Tests, Clippy, and Shellcheck all passed).
 
 ## Load `{env}` Macro Content from `assets/about.md` with YAML Frontmatter
 - [x] Fixed `{bashmenu_themes }` typo to `{bashmenu_themes}` in `assets/about.md`.
@@ -1005,6 +1017,12 @@
 - [x] Updated `.agents/rules/invariants.md`, `.agents/skills/bashmenu-rs-developer/SKILL.md`, `crates/bashmenu-core/tests/macro_engine_test.rs`, and `crates/bashmenu-cli/tests/audit_items_test.rs`.
 - [x] Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass with zero warnings.
 
+## Fix GitHub Actions CI Clippy Failures (Rust 1.100)
+- [x] Fixed `clippy::needless_bool` in `crates/bashmenu-core/src/menu.rs` (`is_streaming`) and `crates/bashmenu-tui/src/modals/help.rs` (`handle_mouse`).
+- [x] Fixed `clippy::needless_nonzero_get` in `crates/bashmenu-tui/src/wallpaper.rs` (`div.get()` -> `div`).
+- [x] Fixed `clippy::needless_range_loop` in `crates/bashedit-cli/src/lib.rs` (`cut.extend(...)`).
+- [x] Verified GitHub Actions `Rust Application` workflow run `43338151588` completed with `success` (Formatting, Workspace Check, Tests, Clippy, and Shellcheck all passed).
+
 ## Add `{info:<path>}` Markdown Popup Macro with Frontmatter `width` / `height` Percentages
 - [x] Added `MarkdownFrontmatter` (`title`, `width`, `height` percentage), `parse_markdown_frontmatter_full`, `find_info_macro_span`, `extract_info_macro_path`, `MacroContext::render_env_about_full`, and `MacroContext::render_info_file` (supporting nested placeholders and `~` tilde expansion) in `crates/bashmenu-core/src/macro_engine.rs` and re-exported in `crates/bashmenu-core/src/lib.rs`.
 - [x] Wired `{info:<path>}` inline expansion in `interpolate_placeholders` and interactive popup modal interception in `crates/bashmenu-cli/src/main.rs` (for both `{env}` and `{info:<path>}`).
@@ -1012,4 +1030,10 @@
 - [x] Documented `{info:<path>}` and frontmatter `title`, `width`, and `height` in `crates/bashmenu-core/src/constants.rs`, `bashmenu.md`, and `bashmenu.1`.
 - [x] Added `test_info_macro_and_frontmatter_dimensions` in `crates/bashmenu-core/tests/macro_engine_test.rs` and `test_message_modal_percentage_dimensions` in `crates/bashmenu-tui/tests/modals_test.rs`.
 - [x] Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass with zero warnings.
+
+## Fix GitHub Actions CI Clippy Failures (Rust 1.100)
+- [x] Fixed `clippy::needless_bool` in `crates/bashmenu-core/src/menu.rs` (`is_streaming`) and `crates/bashmenu-tui/src/modals/help.rs` (`handle_mouse`).
+- [x] Fixed `clippy::needless_nonzero_get` in `crates/bashmenu-tui/src/wallpaper.rs` (`div.get()` -> `div`).
+- [x] Fixed `clippy::needless_range_loop` in `crates/bashedit-cli/src/lib.rs` (`cut.extend(...)`).
+- [x] Verified GitHub Actions `Rust Application` workflow run `43338151588` completed with `success` (Formatting, Workspace Check, Tests, Clippy, and Shellcheck all passed).
 
