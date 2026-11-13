@@ -483,17 +483,17 @@ impl WallpaperCompositor {
                     } else {
                         let fg_col = match std::num::NonZeroU16::new(fg_count) {
                             Some(div) => Color::Rgb(
-                                (fg_sum.0 / div.get()) as u8,
-                                (fg_sum.1 / div.get()) as u8,
-                                (fg_sum.2 / div.get()) as u8,
+                                (fg_sum.0 / div) as u8,
+                                (fg_sum.1 / div) as u8,
+                                (fg_sum.2 / div) as u8,
                             ),
                             None => raw_avg_bg,
                         };
                         let bg_col = match std::num::NonZeroU16::new(bg_count) {
                             Some(div) => Color::Rgb(
-                                (bg_sum.0 / div.get()) as u8,
-                                (bg_sum.1 / div.get()) as u8,
-                                (bg_sum.2 / div.get()) as u8,
+                                (bg_sum.0 / div) as u8,
+                                (bg_sum.1 / div) as u8,
+                                (bg_sum.2 / div) as u8,
                             ),
                             None => raw_avg_bg,
                         };
