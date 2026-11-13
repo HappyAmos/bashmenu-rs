@@ -356,9 +356,7 @@ impl EditorBuffer {
                 let mut cut = Vec::new();
                 let start_part: String = self.lines[sy].chars().skip(sx).collect();
                 cut.push(start_part);
-                for r in (sy + 1)..ey {
-                    cut.push(self.lines[r].clone());
-                }
+                cut.extend(self.lines[(sy + 1)..ey].iter().cloned());
                 let end_part: String = self.lines[ey].chars().take(ex).collect();
                 cut.push(end_part);
                 *cutbuffer = cut;
