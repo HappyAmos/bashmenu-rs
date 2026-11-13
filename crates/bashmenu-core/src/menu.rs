@@ -525,10 +525,7 @@ impl MenuItem {
                 return true;
             }
         }
-        if self.interactive == Some(false) {
-            return true;
-        }
-        false
+        self.interactive == Some(false)
     }
 
     /// Whether visual transitions should occur when switching to or from

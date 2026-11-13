@@ -103,10 +103,7 @@ impl HelpModal {
                 let footer_lines = wrap_footer_tokens(&footer_tokens, max_footer_w);
                 let footer_h = footer_lines.len().max(1);
                 let footer_start_y = inner.y + inner.height.saturating_sub(1 + footer_h as u16);
-                if mouse.row >= footer_start_y && mouse.row < inner.y + inner.height {
-                    return true;
-                }
-                false
+                mouse.row >= footer_start_y && mouse.row < inner.y + inner.height
             }
             _ => false,
         }
