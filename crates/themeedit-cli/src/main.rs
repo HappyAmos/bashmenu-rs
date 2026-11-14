@@ -5,7 +5,7 @@
 //! Main Menu, Text Editor, Popup Windows, and Visual Menu Editor.
 
 use anyhow::Result;
-use bashmenu_core::{ToastNotification, ToastSeverity};
+use bashmenu_core::{ToastNotification, ToastSeverity, ToastStyle};
 use bashmenu_tui::{
     install_panic_hook, AsciiGridModal, BackgroundConfigAction, BackgroundConfigModal,
     BackgroundFocus, ColorPickerModal, ConfirmModal, FilePickerModal, InputModal,
@@ -22,7 +22,7 @@ use std::time::Duration;
 use themeedit_cli::{
     default_wallpaper_dir, extract_preview_cell_color, extract_preview_color_at, format_color_code,
     get_token_preview_spans, relativize_wallpaper_path, render_preview_pane, render_root_frame,
-    PreviewMode, ThemeEditorState, TokenKind, TreeRow,
+    toast_preview_boxes, PreviewMode, ThemeEditorState, TokenKind, TreeRow,
 };
 
 /// Command-line argument configuration for the Theme Editor (`themeedit`).
@@ -77,6 +77,8 @@ enum ActiveModal {
     NewTheme(InputModal),
     /// Delete theme confirmation dialog.
     ConfirmDelete(ConfirmModal),
+    /// Derive theme colors confirmation dialog.
+    ConfirmDerive(ConfirmModal),
     /// Unsaved changes exit confirmation dialog.
     ConfirmExit(ConfirmModal),
     /// Background wallpaper configuration modal dialog.
@@ -88,6 +90,51 @@ enum ActiveModal {
 /// Visual flash highlight entry: (start time instant, list of
 /// `(x, y, length)` spans).
 type FlashHighlight = (std::time::Instant, Vec<(u16, u16, u16)>);
+
+/// Triggers confirmation dialog or diagnostic toast for deriving theme colors from wallpaper.
+fn trigger_derive_colors(
+    state: &ThemeEditorState,
+    active_modal: &mut ActiveModal,
+    toast_rack: &mut ToastRack,
+) {
+    let img_opt = state
+        .current_theme
+        .wallpaper_config()
+        .and_then(|wp| wp.image)
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+
+    if let Some(img_str) = img_opt {
+        if let Some(path) = bashmenu_tui::resolve_wallpaper_path(&img_str) {
+            let fname = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or(&img_str)
+                .to_string();
+            *active_modal = ActiveModal::ConfirmDerive(ConfirmModal::new(
+                "Derive Theme Colors",
+                format!(
+                    "Deriving colors from wallpaper '{}' will overwrite current color settings for theme '{}'. Proceed?",
+                    fname, state.current_name
+                ),
+            ));
+        } else {
+            toast_rack.add(ToastNotification {
+                title: Some("Derive Theme Colors".to_string()),
+                message: format!("Wallpaper image file not found: {}", img_str),
+                severity: ToastSeverity::Warning,
+                timeout_secs: 3.0,
+            });
+        }
+    } else {
+        toast_rack.add(ToastNotification {
+            title: Some("Derive Theme Colors".to_string()),
+            message: "No background wallpaper image configured on this theme".to_string(),
+            severity: ToastSeverity::Warning,
+            timeout_secs: 3.0,
+        });
+    }
+}
 
 /// Entry point for the theme editor TUI application (`themeedit`).
 fn main() -> Result<()> {
@@ -420,6 +467,9 @@ fn main() -> Result<()> {
                         modal.render(area, &preview_styles, buf);
                     }
                     ActiveModal::ConfirmDelete(modal) => {
+                        modal.render(area, &preview_styles, buf);
+                    }
+                    ActiveModal::ConfirmDerive(modal) => {
                         modal.render(area, &preview_styles, buf);
                     }
                     ActiveModal::ConfirmExit(modal) => {
@@ -778,6 +828,65 @@ fn main() -> Result<()> {
                     }
                     _ => {}
                 },
+                ActiveModal::ConfirmDerive(modal) => match ev {
+                    Event::Key(k) => {
+                        if let Some(choice) = modal.handle_key(k.code) {
+                            if choice.is_yes() {
+                                match state.derive_colors_from_wallpaper() {
+                                    Ok(fname) => {
+                                        toast_rack.add(ToastNotification {
+                                            title: Some("Derive Theme Colors".to_string()),
+                                            message: format!(
+                                                "Derived theme colors from '{}'",
+                                                fname
+                                            ),
+                                            severity: ToastSeverity::Information,
+                                            timeout_secs: 2.5,
+                                        });
+                                    }
+                                    Err(err) => {
+                                        toast_rack.add(ToastNotification {
+                                            title: Some("Derive Theme Colors".to_string()),
+                                            message: err,
+                                            severity: ToastSeverity::Warning,
+                                            timeout_secs: 3.0,
+                                        });
+                                    }
+                                }
+                            }
+                            active_modal = ActiveModal::None;
+                        }
+                    }
+                    Event::Mouse(m) => {
+                        if let Some(choice) = modal.handle_mouse(m, area) {
+                            if choice.is_yes() {
+                                match state.derive_colors_from_wallpaper() {
+                                    Ok(fname) => {
+                                        toast_rack.add(ToastNotification {
+                                            title: Some("Derive Theme Colors".to_string()),
+                                            message: format!(
+                                                "Derived theme colors from '{}'",
+                                                fname
+                                            ),
+                                            severity: ToastSeverity::Information,
+                                            timeout_secs: 2.5,
+                                        });
+                                    }
+                                    Err(err) => {
+                                        toast_rack.add(ToastNotification {
+                                            title: Some("Derive Theme Colors".to_string()),
+                                            message: err,
+                                            severity: ToastSeverity::Warning,
+                                            timeout_secs: 3.0,
+                                        });
+                                    }
+                                }
+                            }
+                            active_modal = ActiveModal::None;
+                        }
+                    }
+                    _ => {}
+                },
                 ActiveModal::ConfirmExit(modal) => match ev {
                     Event::Key(k) => {
                         if let Some(choice) = modal.handle_key(k.code) {
@@ -1039,13 +1148,16 @@ fn main() -> Result<()> {
                                     && m.row >= right_area.y
                                     && m.row < right_area.y + right_area.height
                                 {
-                                    if let Some((key, fy, fx_start, fx_end)) = hit_test_preview(
-                                        m.column,
-                                        m.row,
-                                        right_area,
-                                        state.preview_mode,
-                                        preview_styles.divider_is_screen_width,
-                                    ) {
+                                    if let Some((key, fy, fx_start, fx_end)) =
+                                        hit_test_preview_with_style(
+                                            m.column,
+                                            m.row,
+                                            right_area,
+                                            state.preview_mode,
+                                            preview_styles.divider_is_screen_width,
+                                            preview_styles.toast_style,
+                                        )
+                                    {
                                         let color_str = extract_preview_color_at(
                                             &preview_buffer,
                                             m.column,
@@ -1073,6 +1185,33 @@ fn main() -> Result<()> {
                                         need_redraw = true;
                                     }
                                     continue;
+                                }
+
+                                // 4. Click on bottom gutter bar items
+                                if m.row == footer_y
+                                    && m.column >= area.x + 2
+                                    && m.column < area.x + area.width - 2
+                                {
+                                    let rel_col = (m.column - (area.x + 2)) as usize;
+                                    let bottom_avail_w = area.width.saturating_sub(4) as usize;
+                                    let (_, ranges) = bashmenu_tui::spread_gutter_line_layout(
+                                        &bottom_items,
+                                        bottom_avail_w,
+                                    );
+                                    if let Some(idx) = ranges
+                                        .iter()
+                                        .position(|&(s, e)| rel_col >= s && rel_col < e)
+                                    {
+                                        if idx == 0 {
+                                            // [F5] Derive
+                                            trigger_derive_colors(
+                                                &state,
+                                                &mut active_modal,
+                                                &mut toast_rack,
+                                            );
+                                            continue;
+                                        }
+                                    }
                                 }
                             }
 
@@ -1266,28 +1405,12 @@ fn main() -> Result<()> {
 
                             match k.code {
                                 KeyCode::F(5) => {
-                                    // F5 auto-derives theme colors from configured wallpaper image
-                                    match state.derive_colors_from_wallpaper() {
-                                        Ok(fname) => {
-                                            toast_rack.add(ToastNotification {
-                                                title: Some("Derive Theme Colors".to_string()),
-                                                message: format!(
-                                                    "Derived theme colors from '{}'",
-                                                    fname
-                                                ),
-                                                severity: ToastSeverity::Information,
-                                                timeout_secs: 2.5,
-                                            });
-                                        }
-                                        Err(err) => {
-                                            toast_rack.add(ToastNotification {
-                                                title: Some("Derive Theme Colors".to_string()),
-                                                message: err,
-                                                severity: ToastSeverity::Warning,
-                                                timeout_secs: 3.0,
-                                            });
-                                        }
-                                    }
+                                    // F5 confirms auto-derivation of theme colors from wallpaper
+                                    trigger_derive_colors(
+                                        &state,
+                                        &mut active_modal,
+                                        &mut toast_rack,
+                                    );
                                 }
                                 KeyCode::F(6) => {
                                     // F6 creates new theme
@@ -1672,6 +1795,9 @@ fn open_selected_token_picker(state: &mut ThemeEditorState, active_modal: &mut A
         TokenKind::MarqueeGap => {
             state.cycle_marquee_gap();
         }
+        TokenKind::ToastStyle => {
+            state.toggle_toast_style();
+        }
         TokenKind::ToastChar => {
             *active_modal = ActiveModal::AsciiPicker(
                 "toast_char".to_string(),
@@ -1682,13 +1808,26 @@ fn open_selected_token_picker(state: &mut ThemeEditorState, active_modal: &mut A
 }
 
 /// Maps mouse coordinates within the preview area to a theme token key and highlight span.
-/// Returns `Some((token_key, x, y, width))` if a clickable theme element was hit.
+/// Returns `Some((token_key, y, x_start, x_end))` if a clickable theme element was hit.
+#[cfg_attr(not(test), allow(dead_code))]
 fn hit_test_preview(
     col: u16,
     row: u16,
     right_area: Rect,
     mode: PreviewMode,
+    is_screen_width: bool,
+) -> Option<(&'static str, u16, u16, u16)> {
+    hit_test_preview_with_style(col, row, right_area, mode, is_screen_width, ToastStyle::Bar)
+}
+
+/// Maps mouse coordinates within the preview area, aware of the active toast layout style.
+fn hit_test_preview_with_style(
+    col: u16,
+    row: u16,
+    right_area: Rect,
+    mode: PreviewMode,
     _is_screen_width: bool,
+    toast_style: ToastStyle,
 ) -> Option<(&'static str, u16, u16, u16)> {
     let w = right_area.width as usize;
     let avail_both = (w.saturating_sub(6)).max(4);
@@ -2099,100 +2238,152 @@ fn hit_test_preview(
             Some(("background", row, p_inner_x, p_inner_x + p_avail_w))
         }
         PreviewMode::Toast => {
-            let toast_w = (p_avail_w.saturating_sub(6)).clamp(28, 48);
-            let toast_x = right_area.x + right_area.width.saturating_sub(toast_w + 3);
-            let bot_y = right_area.y + right_area.height.saturating_sub(3);
-            let t3_y = bot_y.saturating_sub(3);
-            let t2_y = t3_y.saturating_sub(3);
-            let t1_y = t2_y.saturating_sub(3);
+            let (toast_x, toast_w, boxes) = toast_preview_boxes(right_area, toast_style);
             let summary_y = right_area.y + right_area.height - 2;
 
             if row == summary_y {
+                if col < p_inner_x + 16 {
+                    return Some((
+                        "toast_style",
+                        row,
+                        p_inner_x,
+                        (p_inner_x + 15).min(p_inner_x + p_avail_w),
+                    ));
+                }
                 return Some(("toast_char", row, p_inner_x, p_inner_x + p_avail_w));
             }
 
-            // Check Toast 1 (Info)
-            if row == t1_y || row == t1_y + 1 {
-                if col >= toast_x && col < toast_x + 2 {
-                    return Some(("toast_char", row, toast_x, toast_x + 2));
+            let metas = [
+                ("toast_info", 11_u16, 27_u16),
+                ("toast_warning", 7_u16, 29_u16),
+                ("toast_error", 5_u16, 30_u16),
+            ];
+            if toast_style == ToastStyle::Framed {
+                for ((ty, th), (kind_key, title_len, msg_len)) in boxes.into_iter().zip(metas) {
+                    if row >= ty && row < ty + th && col >= toast_x && col < toast_x + toast_w {
+                        if row == ty
+                            || row == ty + th.saturating_sub(1)
+                            || col == toast_x
+                            || col == toast_x + toast_w.saturating_sub(1)
+                        {
+                            return Some((kind_key, row, toast_x, toast_x + toast_w));
+                        }
+                        let title_y = ty + 1;
+                        let msg_y = ty + 2;
+                        if row == title_y {
+                            let title_end =
+                                (toast_x + 2 + title_len).min(toast_x + toast_w.saturating_sub(2));
+                            if col >= toast_x + 2 && col < title_end {
+                                return Some((kind_key, row, toast_x + 2, title_end));
+                            }
+                        } else if row == msg_y {
+                            let msg_end =
+                                (toast_x + 2 + msg_len).min(toast_x + toast_w.saturating_sub(2));
+                            if col >= toast_x + 2 && col < msg_end {
+                                return Some(("text", row, toast_x + 2, msg_end));
+                            }
+                        }
+                        return Some((
+                            "background",
+                            row,
+                            toast_x + 1,
+                            toast_x + toast_w.saturating_sub(1),
+                        ));
+                    }
                 }
-                if col >= toast_x + 2 && col < toast_x + toast_w {
-                    if row == t1_y {
-                        return Some(("toast_info", row, toast_x + 2, toast_x + toast_w));
-                    } else {
-                        return Some(("text", row, toast_x + 2, toast_x + toast_w));
+            } else {
+                for ((ty, _th), (kind_key, title_len, msg_len)) in boxes.into_iter().zip(metas) {
+                    if (row == ty || row == ty + 1) && col >= toast_x && col < toast_x + toast_w {
+                        if col < toast_x + 2 {
+                            return Some(("toast_char", row, toast_x, toast_x + 2));
+                        }
+                        if row == ty {
+                            let title_end = (toast_x + 2 + title_len).min(toast_x + toast_w);
+                            if col < title_end {
+                                return Some((kind_key, row, toast_x + 2, title_end));
+                            }
+                        } else {
+                            let msg_end = (toast_x + 2 + msg_len).min(toast_x + toast_w);
+                            if col < msg_end {
+                                return Some(("text", row, toast_x + 2, msg_end));
+                            }
+                        }
+                        return Some(("background", row, toast_x + 1, toast_x + toast_w));
                     }
                 }
             }
 
-            // Check Toast 2 (Warning)
-            if row == t2_y || row == t2_y + 1 {
-                if col >= toast_x && col < toast_x + 2 {
-                    return Some(("toast_char", row, toast_x, toast_x + 2));
-                }
-                if col >= toast_x + 2 && col < toast_x + toast_w {
-                    if row == t2_y {
-                        return Some(("toast_warning", row, toast_x + 2, toast_x + toast_w));
-                    } else {
-                        return Some(("text", row, toast_x + 2, toast_x + toast_w));
-                    }
-                }
+            // Outer frame & canvas display base menu backdrop, not toast tokens.
+            None
+        }
+        PreviewMode::ThemeEditor => {
+            let bot_y = right_area.y + right_area.height.saturating_sub(1);
+            let footer_y = bot_y.saturating_sub(1);
+            let div_y = footer_y.saturating_sub(1);
+            let close_x = right_area.x + right_area.width.saturating_sub(4);
+            if row == right_area.y && col >= close_x && col < close_x + 3 {
+                return Some(("window_close_button", row, close_x, close_x + 3));
             }
-
-            // Check Toast 3 (Error)
-            if row == t3_y || row == t3_y + 1 {
-                if col >= toast_x && col < toast_x + 2 {
-                    return Some(("toast_char", row, toast_x, toast_x + 2));
-                }
-                if col >= toast_x + 2 && col < toast_x + toast_w {
-                    if row == t3_y {
-                        return Some(("toast_error", row, toast_x + 2, toast_x + toast_w));
-                    } else {
-                        return Some(("text", row, toast_x + 2, toast_x + toast_w));
-                    }
-                }
+            if row == div_y {
+                return Some(("divider", row, p_inner_x, p_inner_x + p_avail_w));
             }
-
-            // Outer borders
-            if row == right_area.y {
-                if col == right_area.x {
-                    return Some(("border_top_left", row, col, col + 1));
-                }
-                if col == right_area.x + right_area.width - 1 {
-                    return Some(("border_top_right", row, col, col + 1));
-                }
-                return Some((
-                    "border_horizontal",
-                    row,
-                    right_area.x + 1,
-                    right_area.x + right_area.width - 1,
-                ));
-            }
-            if row == right_area.y + right_area.height - 1 {
-                if col == right_area.x {
-                    return Some(("border_bottom_left", row, col, col + 1));
-                }
-                if col == right_area.x + right_area.width - 1 {
-                    return Some(("border_bottom_right", row, col, col + 1));
-                }
-                return Some((
-                    "border_horizontal",
-                    row,
-                    right_area.x + 1,
-                    right_area.x + right_area.width - 1,
-                ));
-            }
-            if col == right_area.x || col == right_area.x + right_area.width - 1 {
-                return Some(("border_vertical", row, col, col + 1));
-            }
-
-            if row == p_inner_y {
-                return Some(("accent", row, p_inner_x, p_inner_x + p_avail_w));
-            }
-            if row == p_inner_y + 1 {
+            if row == footer_y {
                 return Some(("help_text", row, p_inner_x, p_inner_x + p_avail_w));
             }
 
+            let body_h = div_y.saturating_sub(p_inner_y);
+            let left_w = ((p_avail_w as usize * 48) / 100).max(16) as u16;
+            let right_w = p_avail_w.saturating_sub(left_w + 1);
+            if body_h >= 4 && right_w >= 10 {
+                let tree_rect = Rect::new(p_inner_x, p_inner_y, left_w, body_h);
+                let sample_rect = Rect::new(p_inner_x + left_w + 1, p_inner_y, right_w, body_h);
+                if row == p_inner_y {
+                    let tree_title_end =
+                        (tree_rect.x + 12).min(tree_rect.right().saturating_sub(1));
+                    if col > tree_rect.x && col < tree_title_end {
+                        return Some(("title", row, tree_rect.x + 1, tree_title_end));
+                    }
+                    let sample_title_end =
+                        (sample_rect.x + 18).min(sample_rect.right().saturating_sub(1));
+                    if col > sample_rect.x && col < sample_title_end {
+                        return Some(("title", row, sample_rect.x + 1, sample_title_end));
+                    }
+                }
+                if row > p_inner_y && row < tree_rect.bottom().saturating_sub(1) {
+                    if col > tree_rect.x && col < tree_rect.right().saturating_sub(1) {
+                        if row == p_inner_y + 1 {
+                            return Some((
+                                "accent",
+                                row,
+                                tree_rect.x + 2,
+                                tree_rect.right().saturating_sub(2),
+                            ));
+                        }
+                        if row == p_inner_y + 2 {
+                            return Some((
+                                "highlight",
+                                row,
+                                tree_rect.x + 1,
+                                tree_rect.right().saturating_sub(1),
+                            ));
+                        }
+                        return Some((
+                            "text",
+                            row,
+                            tree_rect.x + 2,
+                            tree_rect.right().saturating_sub(2),
+                        ));
+                    }
+                    if col > sample_rect.x && col < sample_rect.right().saturating_sub(1) {
+                        return Some((
+                            "text",
+                            row,
+                            sample_rect.x + 2,
+                            sample_rect.right().saturating_sub(2),
+                        ));
+                    }
+                }
+            }
             Some((
                 "background",
                 row,
@@ -2200,5 +2391,250 @@ fn hit_test_preview(
                 right_area.x + right_area.width.saturating_sub(1),
             ))
         }
+        PreviewMode::ShortcutEditor => {
+            let bot_y = right_area.y + right_area.height.saturating_sub(1);
+            let footer_y = bot_y.saturating_sub(1);
+            let div_y = footer_y.saturating_sub(1);
+            if row == div_y {
+                return Some(("divider", row, p_inner_x, p_inner_x + p_avail_w));
+            }
+            if row == footer_y {
+                return Some(("help_text", row, p_inner_x, p_inner_x + p_avail_w));
+            }
+
+            let list_h = div_y.saturating_sub(p_inner_y).max(3);
+            let left_w = p_avail_w / 2;
+            let right_w = p_avail_w.saturating_sub(left_w);
+            let list_rect = Rect::new(p_inner_x, p_inner_y, left_w, list_h);
+            let insp_rect = Rect::new(p_inner_x + left_w, p_inner_y, right_w, list_h);
+
+            if row == p_inner_y {
+                let left_title_end = (list_rect.x + 24).min(list_rect.right().saturating_sub(1));
+                if col > list_rect.x && col < left_title_end {
+                    return Some(("title", row, list_rect.x + 1, left_title_end));
+                }
+                let right_title_end = (insp_rect.x + 24).min(insp_rect.right().saturating_sub(1));
+                if col > insp_rect.x && col < right_title_end {
+                    return Some(("title", row, insp_rect.x + 1, right_title_end));
+                }
+            }
+            if row > p_inner_y && row < list_rect.bottom().saturating_sub(1) {
+                if col > list_rect.x && col < list_rect.right().saturating_sub(1) {
+                    if row == p_inner_y + 1 {
+                        return Some((
+                            "highlight",
+                            row,
+                            list_rect.x + 1,
+                            list_rect.right().saturating_sub(1),
+                        ));
+                    }
+                    if col > list_rect.x && col < list_rect.x + 10 {
+                        return Some(("shortcut_key", row, list_rect.x + 1, list_rect.x + 10));
+                    }
+                    return Some((
+                        "text",
+                        row,
+                        list_rect.x + 10,
+                        list_rect.right().saturating_sub(1),
+                    ));
+                }
+                if col > insp_rect.x && col < insp_rect.right().saturating_sub(1) {
+                    if row == p_inner_y + 1 {
+                        return Some((
+                            "accent",
+                            row,
+                            insp_rect.x + 2,
+                            insp_rect.right().saturating_sub(2),
+                        ));
+                    }
+                    if row == p_inner_y + 3 {
+                        return Some((
+                            "shortcut_key",
+                            row,
+                            insp_rect.x + 2,
+                            insp_rect.right().saturating_sub(2),
+                        ));
+                    }
+                    if row == p_inner_y + 5 {
+                        return Some((
+                            "help_text",
+                            row,
+                            insp_rect.x + 2,
+                            insp_rect.right().saturating_sub(2),
+                        ));
+                    }
+                    return Some((
+                        "text",
+                        row,
+                        insp_rect.x + 2,
+                        insp_rect.right().saturating_sub(2),
+                    ));
+                }
+            }
+            Some((
+                "background",
+                row,
+                right_area.x + 1,
+                right_area.x + right_area.width.saturating_sub(1),
+            ))
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_hit_test_preview_toast_shortcuts_and_theme_editor() {
+        let right_area = Rect::new(40, 1, 80, 22);
+        let p_inner_x = right_area.x + 2;
+        let p_inner_y = right_area.y + 2;
+        let p_avail_w = right_area.width.saturating_sub(4);
+
+        // 1. Toast tab: empty background area inside toast box -> "background"
+        let toast_w = (p_avail_w.saturating_sub(6)).clamp(28, 48);
+        let toast_x = right_area.x + right_area.width.saturating_sub(toast_w + 3);
+        let bot_y = right_area.y + right_area.height.saturating_sub(3);
+        let t3_y = bot_y.saturating_sub(3);
+        let t2_y = t3_y.saturating_sub(3);
+        let t1_y = t2_y.saturating_sub(3);
+
+        assert_eq!(
+            hit_test_preview(toast_x, t1_y, right_area, PreviewMode::Toast, false).map(|r| r.0),
+            Some("toast_char")
+        );
+        assert_eq!(
+            hit_test_preview(toast_x + 3, t1_y, right_area, PreviewMode::Toast, false).map(|r| r.0),
+            Some("toast_info")
+        );
+        assert_eq!(
+            hit_test_preview(toast_x + 3, t2_y, right_area, PreviewMode::Toast, false).map(|r| r.0),
+            Some("toast_warning")
+        );
+        assert_eq!(
+            hit_test_preview(toast_x + 3, t3_y, right_area, PreviewMode::Toast, false).map(|r| r.0),
+            Some("toast_error")
+        );
+        assert_eq!(
+            hit_test_preview(toast_x + 4, t1_y + 1, right_area, PreviewMode::Toast, false)
+                .map(|r| r.0),
+            Some("text")
+        );
+        assert_eq!(
+            hit_test_preview(
+                toast_x + toast_w - 2,
+                t1_y,
+                right_area,
+                PreviewMode::Toast,
+                false
+            )
+            .map(|r| r.0),
+            Some("background")
+        );
+        assert_eq!(
+            hit_test_preview(
+                toast_x + toast_w - 2,
+                t3_y + 1,
+                right_area,
+                PreviewMode::Toast,
+                false
+            )
+            .map(|r| r.0),
+            Some("background")
+        );
+
+        // 2. Shortcuts tab: title headers -> "title", descriptions -> "text", inspector -> fields
+        let left_w = p_avail_w / 2;
+        assert_eq!(
+            hit_test_preview(
+                p_inner_x + 5,
+                p_inner_y,
+                right_area,
+                PreviewMode::ShortcutEditor,
+                false
+            )
+            .map(|r| r.0),
+            Some("title")
+        );
+        assert_eq!(
+            hit_test_preview(
+                p_inner_x + left_w + 5,
+                p_inner_y,
+                right_area,
+                PreviewMode::ShortcutEditor,
+                false
+            )
+            .map(|r| r.0),
+            Some("title")
+        );
+        assert_eq!(
+            hit_test_preview(
+                p_inner_x + 3,
+                p_inner_y + 2,
+                right_area,
+                PreviewMode::ShortcutEditor,
+                false
+            )
+            .map(|r| r.0),
+            Some("shortcut_key")
+        );
+        assert_eq!(
+            hit_test_preview(
+                p_inner_x + 15,
+                p_inner_y + 2,
+                right_area,
+                PreviewMode::ShortcutEditor,
+                false
+            )
+            .map(|r| r.0),
+            Some("text")
+        );
+        assert_eq!(
+            hit_test_preview(
+                p_inner_x + left_w + 5,
+                p_inner_y + 1,
+                right_area,
+                PreviewMode::ShortcutEditor,
+                false
+            )
+            .map(|r| r.0),
+            Some("accent")
+        );
+        assert_eq!(
+            hit_test_preview(
+                p_inner_x + left_w + 5,
+                p_inner_y + 2,
+                right_area,
+                PreviewMode::ShortcutEditor,
+                false
+            )
+            .map(|r| r.0),
+            Some("text")
+        );
+
+        // 3. ThemeEdit tab: title headers -> "title", unselected tree rows -> "text"
+        assert_eq!(
+            hit_test_preview(
+                p_inner_x + 4,
+                p_inner_y,
+                right_area,
+                PreviewMode::ThemeEditor,
+                false
+            )
+            .map(|r| r.0),
+            Some("title")
+        );
+        assert_eq!(
+            hit_test_preview(
+                p_inner_x + 6,
+                p_inner_y + 4,
+                right_area,
+                PreviewMode::ThemeEditor,
+                false
+            )
+            .map(|r| r.0),
+            Some("text")
+        );
     }
 }

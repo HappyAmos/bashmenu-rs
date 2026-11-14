@@ -110,7 +110,21 @@ fn test_themeedit_preview_mode_cycling() {
     assert_eq!(state.preview_mode.title(), "Toast Notifications");
 
     state.preview_mode = state.preview_mode.next();
+    assert_eq!(state.preview_mode, PreviewMode::ThemeEditor);
+    assert_eq!(state.preview_mode.title(), "Theme Editor");
+
+    state.preview_mode = state.preview_mode.next();
+    assert_eq!(state.preview_mode, PreviewMode::ShortcutEditor);
+    assert_eq!(state.preview_mode.title(), "Shortcuts Editor");
+
+    state.preview_mode = state.preview_mode.next();
     assert_eq!(state.preview_mode, PreviewMode::Menu);
+
+    // Reverse cycling via prev()
+    state.preview_mode = state.preview_mode.prev();
+    assert_eq!(state.preview_mode, PreviewMode::ShortcutEditor);
+    state.preview_mode = state.preview_mode.prev();
+    assert_eq!(state.preview_mode, PreviewMode::ThemeEditor);
 }
 
 #[test]
@@ -2149,4 +2163,561 @@ fn test_themeedit_shadow_color_token_and_preview() {
     let def_theme = ThemeEditorState::create_default_theme();
     let def_c256 = def_theme.colors_256.as_ref().unwrap();
     assert!(def_c256.contains_key("shadow"));
+}
+
+#[test]
+fn test_themeedit_activity_override_and_inherit_reset() {
+    use bashmenu_tui::ThemeActivity;
+    use ratatui::style::Color;
+    use themeedit_cli::PreviewMode;
+
+    let tmp_dir = std::env::temp_dir().join(format!("themeedit_override_{}", std::process::id()));
+    let _ = fs::create_dir_all(&tmp_dir);
+    let tmp_file = tmp_dir.join("bashmenu.themes");
+    fs::copy(get_fixture_path("bashmenu.themes"), &tmp_file).unwrap();
+
+    let mut state = ThemeEditorState::new(tmp_file.clone(), Some("dracula".to_string()));
+    let base_help_before = state
+        .current_theme
+        .colors_256
+        .as_ref()
+        .unwrap()
+        .get("help_text")
+        .cloned();
+
+    // Switch to Tab 2 (TextEditor -> BashEdit)
+    state.preview_mode = PreviewMode::TextEditor;
+    assert_eq!(state.active_activity(), ThemeActivity::BashEdit);
+    assert!(state.is_color_token_inherited("help_text"));
+
+    let help_tok = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Help Text Color")
+        .unwrap()
+        .clone();
+    assert!(
+        state
+            .get_token_value_display(&help_tok)
+            .starts_with("Inherit ("),
+        "Unset activity override must display Inherit (...)"
+    );
+
+    // Setting TrueColor value updates bashedit overrides across 256/16/8 without mutating MainMenu base
+    state.set_color_token_value("help_text", Color::Rgb(0x11, 0xaa, 0xee));
+    assert!(!state.is_color_token_inherited("help_text"));
+    assert!(state
+        .get_token_value_display(&help_tok)
+        .to_ascii_lowercase()
+        .contains("#11aaee"));
+    assert_eq!(
+        state
+            .current_theme
+            .colors_256
+            .as_ref()
+            .unwrap()
+            .get("help_text")
+            .cloned(),
+        base_help_before
+    );
+    for (tier_name, palette_opt) in [
+        ("256", &state.current_theme.colors_256),
+        ("16", &state.current_theme.colors_16),
+        ("8", &state.current_theme.colors_8),
+    ] {
+        let seq = palette_opt
+            .as_ref()
+            .unwrap()
+            .get("bashedit")
+            .unwrap()
+            .as_mapping()
+            .unwrap()
+            .get(serde_yml::Value::String("help_text".to_string()))
+            .unwrap()
+            .as_sequence()
+            .unwrap();
+        assert_ne!(
+            seq[0].as_i64(),
+            Some(-1),
+            "bashedit.help_text fg must be overridden in tier {tier_name}"
+        );
+    }
+
+    // Tab 3 (Modals): shadow override keeps -1 bg across all tiers and persists across save/reload
+    state.preview_mode = PreviewMode::Modals;
+    state.set_color_token_value("shadow", Color::Indexed(240));
+    state.save_to_disk().unwrap();
+
+    let mut reloaded = ThemeEditorState::new(tmp_file.clone(), Some("dracula".to_string()));
+    reloaded.preview_mode = PreviewMode::TextEditor;
+    assert!(!reloaded.is_color_token_inherited("help_text"));
+    assert_eq!(
+        reloaded
+            .current_theme
+            .colors_256
+            .as_ref()
+            .unwrap()
+            .get("modals")
+            .unwrap()
+            .as_mapping()
+            .unwrap()
+            .get(serde_yml::Value::String("shadow".to_string()))
+            .unwrap()
+            .as_sequence()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_i64())
+            .collect::<Vec<_>>(),
+        vec![Some(240), Some(-1)]
+    );
+
+    // Delete/Backspace reset restores -1 / [-1, -1] across 256/16/8 and cannot reset MainMenu
+    assert!(reloaded.reset_color_token_to_inherit("help_text"));
+    assert!(reloaded.is_color_token_inherited("help_text"));
+    for palette_opt in [
+        &reloaded.current_theme.colors_256,
+        &reloaded.current_theme.colors_16,
+        &reloaded.current_theme.colors_8,
+    ] {
+        let seq = palette_opt
+            .as_ref()
+            .unwrap()
+            .get("bashedit")
+            .unwrap()
+            .as_mapping()
+            .unwrap()
+            .get(serde_yml::Value::String("help_text".to_string()))
+            .unwrap()
+            .as_sequence()
+            .unwrap();
+        assert_eq!(seq[0].as_i64(), Some(-1));
+        assert_eq!(seq[1].as_i64(), Some(-1));
+    }
+
+    reloaded.preview_mode = PreviewMode::Menu;
+    assert!(!reloaded.reset_color_token_to_inherit("help_text"));
+
+    let _ = fs::remove_dir_all(&tmp_dir);
+}
+
+fn buffer_row_text(buf: &ratatui::buffer::Buffer, area: ratatui::layout::Rect, y: u16) -> String {
+    (area.x..area.x + area.width)
+        .map(|x| buf[(x, y)].symbol().chars().next().unwrap_or(' '))
+        .collect()
+}
+
+#[test]
+fn test_preview_fixes_shortcuts_panes_footers_themeedit_rows_and_toast_bg_isolation() {
+    use bashmenu_tui::{ResolvedThemeStyles, ThemeActivity};
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::style::Color;
+    use themeedit_cli::{
+        get_token_preview_spans, render_preview_pane, render_preview_pane_with_base, PreviewMode,
+    };
+
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(fixture_path, Some("dracula".to_string()));
+    let area = Rect::new(0, 0, 80, 22);
+    let mut compositor = None;
+
+    // 1. Shortcuts tab renders both [ Keyboard Shortcuts ] and [ Shortcut Inspector ] panes,
+    //    and footer action label "Back" uses help_text color.
+    let sc_styles = ResolvedThemeStyles {
+        help_text: ratatui::style::Style::default().fg(Color::Indexed(120)),
+        footer: ratatui::style::Style::default().fg(Color::Indexed(200)),
+        ..Default::default()
+    };
+    let mut buf = Buffer::empty(area);
+    render_preview_pane(
+        area,
+        &mut buf,
+        PreviewMode::ShortcutEditor,
+        &sc_styles,
+        &mut compositor,
+    );
+    let all_rows: Vec<String> = (area.y..area.y + area.height)
+        .map(|y| buffer_row_text(&buf, area, y))
+        .collect();
+    let full_text = all_rows.join("\n");
+    assert!(
+        full_text.contains("Keyboard Shortcuts"),
+        "Shortcuts preview must contain left pane title"
+    );
+    assert!(
+        full_text.contains("Shortcut Inspector"),
+        "Shortcuts preview must contain right Shortcut Inspector pane title"
+    );
+    assert!(
+        full_text.contains("Shortcut Properties"),
+        "Shortcuts preview must render inspector content"
+    );
+    let footer_y = area.y + area.height - 2;
+    let footer_row = buffer_row_text(&buf, area, footer_y);
+    let back_col = area.x + footer_row.find("Back").expect("Back footer label") as u16;
+    assert_eq!(buf[(back_col, footer_y)].fg, Color::Indexed(120));
+
+    // 2. Editor tab footer "^X Exit" label uses help_text color consistently with Help/Save/Open.
+    buf.reset();
+    render_preview_pane(
+        area,
+        &mut buf,
+        PreviewMode::TextEditor,
+        &sc_styles,
+        &mut compositor,
+    );
+    let ed_footer_row = buffer_row_text(&buf, area, footer_y);
+    for word in ["Help", "Save", "Open", "Exit"] {
+        let col = area.x + ed_footer_row.find(word).expect("Editor footer word") as u16;
+        assert_eq!(
+            buf[(col, footer_y)].fg,
+            Color::Indexed(120),
+            "Editor footer '{word}' must use help_text color"
+        );
+    }
+
+    // 3. ThemeEdit miniature Tokens tree renders unselected rows uniformly in text color,
+    //    and its footer "Save" uses help_text color.
+    let te_styles = ResolvedThemeStyles {
+        text: ratatui::style::Style::default().fg(Color::Indexed(252)),
+        help_text: ratatui::style::Style::default().fg(Color::Indexed(114)),
+        divider: ratatui::style::Style::default().fg(Color::Indexed(81)),
+        footer: ratatui::style::Style::default().fg(Color::Indexed(196)),
+        ..Default::default()
+    };
+    buf.reset();
+    render_preview_pane(
+        area,
+        &mut buf,
+        PreviewMode::ThemeEditor,
+        &te_styles,
+        &mut compositor,
+    );
+    let te_footer_row = buffer_row_text(&buf, area, footer_y);
+    let save_col = area.x + te_footer_row.find("Save").expect("ThemeEdit Save") as u16;
+    assert_eq!(buf[(save_col, footer_y)].fg, Color::Indexed(114));
+
+    for token_txt in ["Background", "Help Text", "Divider"] {
+        let mut checked = false;
+        for y in (area.y + 3)..footer_y {
+            let rtxt = buffer_row_text(&buf, area, y);
+            if let Some(pos) = rtxt.find(token_txt) {
+                assert_eq!(
+                    buf[(area.x + pos as u16, y)].fg,
+                    Color::Indexed(252),
+                    "ThemeEdit tree token '{token_txt}' must use uniform text color"
+                );
+                checked = true;
+                break;
+            }
+        }
+        assert!(
+            checked,
+            "Expected '{token_txt}' row in ThemeEdit tree preview"
+        );
+    }
+
+    // 4. Toast tab isolates toasts.background to toast message boxes only (not outer preview canvas).
+    state.preview_mode = PreviewMode::Menu;
+    state.set_color_token_value("background", Color::Indexed(17));
+    state.preview_mode = PreviewMode::Toast;
+    state.set_color_token_value("background", Color::Indexed(52));
+
+    let base_styles = ResolvedThemeStyles::from_theme_for_activity(
+        &state.current_theme,
+        true,
+        ThemeActivity::MainMenu,
+    );
+    let toast_styles = ResolvedThemeStyles::from_theme_for_activity(
+        &state.current_theme,
+        true,
+        ThemeActivity::Toasts,
+    );
+
+    buf.reset();
+    render_preview_pane_with_base(
+        area,
+        &mut buf,
+        PreviewMode::Toast,
+        &toast_styles,
+        &base_styles,
+        &mut compositor,
+    );
+    // Outer preview canvas remains at MainMenu background (Color 17), NOT Toasts background (Color 52).
+    assert_eq!(buf[(area.x + 2, area.y + 5)].bg, Color::Indexed(17));
+
+    // Selecting "background" token on Toast tab targets the 3 toast boxes, and those cells use Color 52.
+    let bg_tok = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Background Color")
+        .unwrap()
+        .clone();
+    let spans = get_token_preview_spans(&bg_tok, area, PreviewMode::Toast, &toast_styles);
+    assert_eq!(spans.len(), 6);
+    for (sy, sx0, sx1) in spans {
+        assert_eq!(
+            buf[(sx1 - 1, sy)].bg,
+            Color::Indexed(52),
+            "Toast box background cell at ({}, {}) must use toasts.background",
+            sx1 - 1,
+            sy
+        );
+        assert!(sx1 > sx0);
+    }
+}
+
+#[test]
+fn test_f2_theme_picker_modal_switches_edited_theme() {
+    use bashmenu_tui::ThemePickerModal;
+    use crossterm::event::KeyCode;
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(fixture_path, Some("dracula".to_string()));
+    assert_eq!(state.current_name, "dracula");
+
+    // Launch bashmenu's ThemePickerModal seeded with ThemeEditor's loaded themes
+    let names: Vec<String> = state.themes.keys().cloned().collect();
+    let mut modal = ThemePickerModal::new(names, &state.current_name);
+    assert!(
+        modal.themes.len() >= 2,
+        "Expected multiple themes in fixture bashmenu.themes"
+    );
+    assert_eq!(modal.themes[modal.selected_idx], "dracula");
+
+    // Verify rendering works inside modal styles without panicking
+    let area = Rect::new(0, 0, 100, 30);
+    let mut buf = Buffer::empty(area);
+    let styles = bashmenu_tui::ResolvedThemeStyles::default();
+    modal.render(area, &styles, &mut buf);
+
+    // Move selection to a different theme and confirm with Enter
+    if modal.selected_idx + 1 < modal.themes.len() {
+        assert_eq!(modal.handle_key(KeyCode::Down), None);
+    } else {
+        assert_eq!(modal.handle_key(KeyCode::Up), None);
+    }
+    let chosen = modal
+        .handle_key(KeyCode::Enter)
+        .flatten()
+        .expect("Enter in ThemePickerModal must select a theme name");
+    assert_ne!(chosen, "dracula");
+
+    assert!(state.switch_theme(&chosen));
+    assert_eq!(state.current_name, chosen);
+    assert_eq!(state.name_input.as_string(), chosen);
+
+    // Cancel with Esc returns Some(None) and leaves state untouched
+    let mut cancel_modal =
+        ThemePickerModal::new(state.themes.keys().cloned().collect(), &state.current_name);
+    assert_eq!(cancel_modal.handle_key(KeyCode::Esc), Some(None));
+    assert_eq!(state.current_name, chosen);
+}
+
+#[test]
+fn test_themeedit_toast_style_token_and_framed_preview() {
+    use bashmenu_core::ToastStyle;
+    use bashmenu_tui::ResolvedThemeStyles;
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use themeedit_cli::{render_preview_pane_with_base, PreviewMode, TokenCategory, TokenKind};
+
+    let tmp_dir = std::env::temp_dir().join(format!("toast_style_test_{}", std::process::id()));
+    let _ = fs::create_dir_all(&tmp_dir);
+    let tmp_file = tmp_dir.join("bashmenu.themes");
+
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    fs::copy(&fixture_path, &tmp_file).unwrap();
+
+    let mut state = ThemeEditorState::new(tmp_file.clone(), Some("dracula".to_string()));
+
+    // 1. Verify "Toast Style" token lives under Theme: and defaults to Bar
+    let style_tok = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Toast Style")
+        .cloned()
+        .expect("Toast Style token must exist");
+    assert_eq!(style_tok.category(), TokenCategory::Theme);
+    assert_eq!(style_tok.kind, TokenKind::ToastStyle);
+    assert_eq!(state.get_toast_style(), ToastStyle::Bar);
+    assert_eq!(state.get_token_value_display(&style_tok), "Bar");
+    assert!(state.select_token_by_key("toast_style"));
+    assert_eq!(state.tokens[state.selected_idx].kind, TokenKind::ToastStyle);
+
+    // 2. Toggle to Framed, save to disk, and reload
+    assert_eq!(state.toggle_toast_style(), ToastStyle::Framed);
+    assert!(state.is_modified);
+    assert_eq!(state.get_token_value_display(&style_tok), "Framed");
+    state.save_to_disk().unwrap();
+
+    let mut reloaded = ThemeEditorState::new(tmp_file.clone(), Some("dracula".to_string()));
+    assert_eq!(
+        reloaded
+            .current_theme
+            .toast
+            .as_ref()
+            .and_then(|t| t.style.as_deref()),
+        Some("framed")
+    );
+    assert_eq!(reloaded.get_toast_style(), ToastStyle::Framed);
+
+    // 3. Render PreviewMode::Toast and verify framed borders & summary footer
+    let right_area = Rect::new(0, 0, 80, 30);
+    let mut buf = Buffer::empty(right_area);
+    let preview_styles = ResolvedThemeStyles::from_theme_with_tier(
+        &reloaded.current_theme,
+        true,
+        bashmenu_tui::ColorTier::TrueColor,
+    );
+    assert_eq!(preview_styles.toast_style, ToastStyle::Framed);
+
+    render_preview_pane_with_base(
+        right_area,
+        &mut buf,
+        PreviewMode::Toast,
+        &preview_styles,
+        &preview_styles,
+        &mut None,
+    );
+
+    let mut tl_corners = Vec::new();
+    let mut br_corners = Vec::new();
+    for y in 1..right_area.height.saturating_sub(1) {
+        for x in 1..right_area.width.saturating_sub(1) {
+            let sym = buf[(x, y)].symbol();
+            if sym == "╓" {
+                tl_corners.push((x, y, buf[(x, y)].fg));
+            } else if sym == "┘" {
+                br_corners.push((x, y, buf[(x, y)].fg));
+            }
+        }
+    }
+    assert_eq!(tl_corners.len(), 3, "Expected 3 framed sample toasts");
+    assert_eq!(br_corners.len(), 3, "Expected 3 framed sample toasts");
+
+    // Verify top/left/right/bottom border characters and severity accent colors
+    let expected_colors = [
+        preview_styles.toast_info,
+        preview_styles.toast_warning,
+        preview_styles.toast_error,
+    ];
+    for (idx, ((tl_x, tl_y, tl_fg), (br_x, br_y, br_fg))) in
+        tl_corners.iter().zip(br_corners.iter()).enumerate()
+    {
+        assert_eq!(*tl_fg, expected_colors[idx]);
+        assert_eq!(*br_fg, expected_colors[idx]);
+        assert_eq!(buf[(*tl_x + 1, *tl_y)].symbol(), "─");
+        assert_eq!(buf[(*br_x, *tl_y)].symbol(), "┐");
+        assert_eq!(buf[(*tl_x, *tl_y + 1)].symbol(), "║");
+        assert_eq!(buf[(*br_x, *tl_y + 1)].symbol(), "│");
+        assert_eq!(buf[(*tl_x, *br_y)].symbol(), "╙");
+    }
+
+    let mut footer_row = String::new();
+    let summary_y = right_area.y + right_area.height - 2;
+    for x in 0..right_area.width {
+        footer_row.push(buf[(x, summary_y)].symbol().chars().next().unwrap_or(' '));
+    }
+    assert!(footer_row.contains("Style: 'Framed'"));
+
+    // Toggle back to Bar returns to classic mode
+    assert_eq!(reloaded.toggle_toast_style(), ToastStyle::Bar);
+    let _ = fs::remove_dir_all(&tmp_dir);
+}
+
+#[test]
+fn test_menuedit_preview_help_gutter_and_color_reset_inherit() {
+    use bashmenu_tui::ResolvedThemeStyles;
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::style::{Color, Style};
+    use themeedit_cli::{render_preview_pane_with_base, PreviewMode};
+
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(fixture_path, Some("dracula".to_string()));
+
+    state.preview_mode = PreviewMode::MenuEditor;
+    assert_eq!(state.preview_mode, PreviewMode::MenuEditor);
+
+    // 1. In MenuEditor mode, setting Color::Reset writes -1 (inherit)
+    state.set_color_token_value("help_text", Color::Reset);
+    assert!(state.is_color_token_inherited("help_text"));
+
+    // Setting a concrete color overrides
+    state.set_color_token_value("help_text", Color::Indexed(42));
+    assert!(!state.is_color_token_inherited("help_text"));
+
+    // Resetting to inherit restores -1
+    assert!(state.reset_color_token_to_inherit("help_text"));
+    assert!(state.is_color_token_inherited("help_text"));
+
+    // 2. Render MenuEditor preview and verify footer uses help_text
+    let right_area = Rect::new(30, 0, 80, 24);
+    let mut buf = Buffer::empty(right_area);
+    let preview_styles = ResolvedThemeStyles {
+        help_text: Style::default().fg(Color::Indexed(205)),
+        shortcut_key: Style::default().fg(Color::Indexed(226)),
+        ..Default::default()
+    };
+    render_preview_pane_with_base(
+        right_area,
+        &mut buf,
+        PreviewMode::MenuEditor,
+        &preview_styles,
+        &preview_styles,
+        &mut None,
+    );
+
+    let footer_y = right_area.y + right_area.height.saturating_sub(2);
+    // Find "Help" text on footer row and verify it has help_text style
+    let mut found_help = false;
+    for x in right_area.x..right_area.right() {
+        if buf[(x, footer_y)].symbol() == "H" && buf[(x + 1, footer_y)].symbol() == "e" {
+            assert_eq!(buf[(x, footer_y)].fg, Color::Indexed(205));
+            found_help = true;
+            break;
+        }
+    }
+    assert!(
+        found_help,
+        "Footer must render help text with preview_styles.help_text color"
+    );
+}
+
+#[test]
+fn test_derive_colors_confirmation_modal_and_execution() {
+    use bashmenu_tui::ConfirmModal;
+    use crossterm::event::KeyCode;
+
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(fixture_path, Some("alaska-mountain".to_string()));
+    state.is_modified = false;
+
+    let prompt = format!(
+        "Deriving colors from wallpaper '{}' will overwrite current color settings for theme '{}'. Proceed?",
+        "alaska-mountain.jpg", state.current_name
+    );
+    assert!(
+        prompt.contains("overwrite current color settings"),
+        "Prompt must explicitly warn that proceeding will overwrite current color settings"
+    );
+
+    let mut modal = ConfirmModal::new("Derive Theme Colors", &prompt);
+    assert_eq!(modal.title, "Derive Theme Colors");
+
+    // 1. Esc or 'n' cancels without modifying state
+    let cancel_choice = modal.handle_key(KeyCode::Esc);
+    assert!(cancel_choice.is_some() && cancel_choice.unwrap().is_cancel());
+    assert!(!state.is_modified);
+
+    // 2. 'y' confirms and allows executing derivation
+    let yes_choice = modal.handle_key(KeyCode::Char('y'));
+    assert!(yes_choice.is_some() && yes_choice.unwrap().is_yes());
+
+    let res = state.derive_colors_from_wallpaper();
+    assert!(res.is_ok());
+    assert!(state.is_modified);
 }

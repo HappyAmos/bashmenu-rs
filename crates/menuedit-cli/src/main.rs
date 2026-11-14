@@ -6,7 +6,7 @@ use bashmenu_core::{
 };
 use bashmenu_tui::{
     compute_modal_inner, install_panic_hook, AsciiGridModal, ConfirmModal, FilePickerModal,
-    HelpModal, InputModal, ResolvedThemeStyles, TerminalGuard, ToastRack,
+    HelpModal, InputModal, ResolvedThemeStyles, TerminalGuard, ThemeActivity, ToastRack,
 };
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers, MouseButton, MouseEventKind};
@@ -17,7 +17,7 @@ use menuedit_cli::{
     ItemTypePickerModal, ITEM_EDIT_HELP_TEXT, PLACEHOLDER_HELP_TEXT,
 };
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Widget};
 use std::collections::HashSet;
@@ -221,15 +221,16 @@ fn main() -> Result<()> {
         .as_ref()
         .and_then(|c| c.settings.use_nerd_fonts)
         .unwrap_or(true);
-    let styles = if let (Some(c), Some(th)) = (&cfg, &themes) {
-        if let Some(t) = th.get(&c.theme) {
-            ResolvedThemeStyles::from_theme(t, use_nerd)
-        } else {
-            ResolvedThemeStyles::default()
-        }
-    } else {
-        ResolvedThemeStyles::default()
-    };
+    let active_theme = cfg.as_ref().and_then(|c| themes.as_ref()?.get(&c.theme));
+    let styles = active_theme
+        .map(|t| ResolvedThemeStyles::from_theme_for_activity(t, use_nerd, ThemeActivity::MenuEdit))
+        .unwrap_or_default();
+    let modal_styles = active_theme
+        .map(|t| ResolvedThemeStyles::from_theme_for_activity(t, use_nerd, ThemeActivity::Modals))
+        .unwrap_or_default();
+    let toast_styles = active_theme
+        .map(|t| ResolvedThemeStyles::from_theme_for_activity(t, use_nerd, ThemeActivity::Toasts))
+        .unwrap_or_default();
     let mut guard = TerminalGuard::init()?;
 
     let mut toast_rack = ToastRack::new();
@@ -370,20 +371,13 @@ fn main() -> Result<()> {
 
                 let line = Line::from(vec![
                     Span::styled(indent, row_style),
-                    Span::styled(
-                        expand_icon,
-                        if is_sel {
-                            row_style
-                        } else {
-                            Style::default().fg(Color::Cyan)
-                        },
-                    ),
+                    Span::styled(expand_icon, if is_sel { row_style } else { styles.accent }),
                     Span::styled(
                         format!("{:<5} ", badge),
                         if is_sel {
                             row_style
                         } else {
-                            Style::default().fg(Color::Yellow)
+                            styles.shortcut_key
                         },
                     ),
                     Span::styled(label_text, row_style),
@@ -418,28 +412,23 @@ fn main() -> Result<()> {
                 {
                     let y = insp_rect.y + 1 + i as u16;
                     let line_style = if line.starts_with('[') {
-                        Style::default()
-                            .fg(Color::Magenta)
-                            .add_modifier(Modifier::BOLD)
+                        styles.title.add_modifier(Modifier::BOLD)
                     } else if line.starts_with("Title/Label:")
                         || line.starts_with("Expanded Title:")
                     {
-                        Style::default().fg(Color::White)
+                        styles.text
                     } else if line.starts_with("Icon/Glyph:") || line.starts_with("Expanded Icon:")
                     {
-                        Style::default().fg(Color::Cyan)
+                        styles.accent
                     } else if line.starts_with("Action/Target:")
                         || line.starts_with("Expanded Action:")
                     {
-                        Style::default().fg(Color::Yellow)
-                    } else if line.starts_with("Config Key:") {
-                        Style::default().fg(Color::Green)
-                    } else if line.starts_with("Message/Prompt:") {
-                        Style::default().fg(Color::Blue)
+                        styles.shortcut_key
+                    } else if line.starts_with("Config Key:") || line.starts_with("Message/Prompt:")
+                    {
+                        styles.help_text
                     } else if line.starts_with("Preview:") {
-                        Style::default()
-                            .fg(Color::Cyan)
-                            .add_modifier(Modifier::BOLD)
+                        styles.accent.add_modifier(Modifier::BOLD)
                     } else {
                         styles.text
                     };
@@ -494,12 +483,7 @@ fn main() -> Result<()> {
                 } else {
                     line_str
                 };
-                buf.set_string(
-                    inner_x,
-                    row_y,
-                    &clipped_line,
-                    Style::default().fg(Color::DarkGray),
-                );
+                buf.set_string(inner_x, row_y, &clipped_line, styles.footer);
                 for (tok_label, start, end) in ranges {
                     if let Some((_, action)) = items_all.iter().find(|(lbl, _)| *lbl == tok_label) {
                         let screen_start = inner_x + start as u16;
@@ -511,7 +495,7 @@ fn main() -> Result<()> {
                             } else {
                                 tok_label.to_string()
                             };
-                            buf.set_string(screen_start, row_y, &display_tok, styles.accent);
+                            buf.set_string(screen_start, row_y, &display_tok, styles.help_text);
                             footer_hit_regions.push(FooterHitRegion {
                                 row: row_y,
                                 start_x: screen_start,
@@ -527,49 +511,49 @@ fn main() -> Result<()> {
             match &mut active_modal {
                 ActiveModal::None => {}
                 ActiveModal::TypePicker(modal, _) => {
-                    modal.render(area, &styles, buf);
+                    modal.render(area, &modal_styles, buf);
                 }
                 ActiveModal::ItemEdit(modal, _, child_opt) => {
-                    modal.render(area, &styles, buf);
+                    modal.render(area, &modal_styles, buf);
                     if let Some(child) = child_opt {
                         match child.as_mut() {
                             ChildModal::TypePicker(m) => {
-                                m.render(area, &styles, buf);
+                                m.render(area, &modal_styles, buf);
                             }
                             ChildModal::FilePicker(m, _) => {
-                                m.render(area, &styles, buf);
+                                m.render(area, &modal_styles, buf);
                             }
                             ChildModal::Help(m) => {
-                                m.render(area, &styles, buf);
+                                m.render(area, &modal_styles, buf);
                             }
                             ChildModal::AsciiPicker(m) => {
-                                m.render(area, &styles, buf);
+                                m.render(area, &modal_styles, buf);
                             }
                             ChildModal::GlyphSearch(m) => {
-                                m.render(area, &styles, buf);
+                                m.render(area, &modal_styles, buf);
                             }
                         }
                     }
                 }
                 ActiveModal::ConfirmDelete(modal, _) => {
-                    modal.render(area, &styles, buf);
+                    modal.render(area, &modal_styles, buf);
                 }
                 ActiveModal::ConfirmExit(modal) => {
-                    modal.render(area, &styles, buf);
+                    modal.render(area, &modal_styles, buf);
                 }
                 ActiveModal::Help(modal) => {
-                    modal.render(area, &styles, buf);
+                    modal.render(area, &modal_styles, buf);
                 }
                 ActiveModal::AsciiPicker(modal) => {
-                    modal.render(area, &styles, buf);
+                    modal.render(area, &modal_styles, buf);
                 }
                 ActiveModal::GlyphSearch(modal) => {
-                    modal.render(area, &styles, buf);
+                    modal.render(area, &modal_styles, buf);
                 }
             }
 
             // Render floating toast notifications atop everything
-            toast_rack.render(area, &styles, buf);
+            toast_rack.render(area, &toast_styles, buf);
         })?;
 
         toast_rack.tick();

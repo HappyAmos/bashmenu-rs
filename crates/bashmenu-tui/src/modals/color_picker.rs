@@ -84,9 +84,19 @@ pub fn hsv_to_rgb(h: f32, s: f32, v: f32) -> (u8, u8, u8) {
     )
 }
 
-/// Parses a 6-digit hexadecimal color string into RGB.
+/// Parses a 3-digit or 6-digit hexadecimal color string into RGB.
 pub fn parse_hex_rgb(s: &str) -> Option<(u8, u8, u8)> {
     let clean = s.trim().trim_start_matches('#');
+    if clean.len() == 3 {
+        let mut chars = clean.chars();
+        let r_ch = chars.next()?;
+        let g_ch = chars.next()?;
+        let b_ch = chars.next()?;
+        let r = u8::from_str_radix(&format!("{}{}", r_ch, r_ch), 16).ok()?;
+        let g = u8::from_str_radix(&format!("{}{}", g_ch, g_ch), 16).ok()?;
+        let b = u8::from_str_radix(&format!("{}{}", b_ch, b_ch), 16).ok()?;
+        return Some((r, g, b));
+    }
     if clean.len() != 6 {
         return None;
     }
@@ -114,6 +124,10 @@ pub struct ColorPickerModal {
     pub val: f32,
     /// Hex text input buffer
     pub hex_input: String,
+    /// Whether hex input is currently selected/highlighted for replacement
+    pub hex_selected: bool,
+    /// Active cursor position within hex_input (0..=hex_input.len())
+    pub hex_cursor: usize,
     /// Currently resolved color value
     pub current_color: Color,
 }
@@ -131,6 +145,7 @@ impl ColorPickerModal {
             _ => (ColorPickerTab::Palette256, rgb_to_xterm256(r, g, b)),
         };
 
+        let hex_len = hex.len();
         Self {
             title: title.into(),
             tab,
@@ -139,6 +154,8 @@ impl ColorPickerModal {
             sat: s,
             val: v,
             hex_input: hex,
+            hex_selected: false,
+            hex_cursor: hex_len,
             current_color: initial_color,
         }
     }
@@ -149,6 +166,7 @@ impl ColorPickerModal {
         self.current_color = Color::Rgb(r, g, b);
         self.selected_256 = rgb_to_xterm256(r, g, b);
         self.hex_input = format!("#{:02x}{:02x}{:02x}", r, g, b);
+        self.hex_cursor = self.hex_input.len();
     }
 
     /// Synchronizes current color from an ANSI 256 index into RGB and HSV.
@@ -161,6 +179,7 @@ impl ColorPickerModal {
         self.sat = s;
         self.val = v;
         self.hex_input = format!("#{:02x}{:02x}{:02x}", r, g, b);
+        self.hex_cursor = self.hex_input.len();
     }
 
     /// Synchronizes current color from hex input string if valid.
@@ -175,21 +194,69 @@ impl ColorPickerModal {
         }
     }
 
+    /// Pastes hex string from clipboard or explicit string into `hex_input`.
+    pub fn paste_hex(&mut self, s: &str) {
+        let clean: String = s
+            .trim()
+            .trim_start_matches('#')
+            .chars()
+            .filter(|c| c.is_ascii_hexdigit())
+            .take(6)
+            .collect();
+        if clean.len() == 6 || clean.len() == 3 {
+            let full_hex = if clean.len() == 3 {
+                let mut expanded = String::with_capacity(6);
+                for c in clean.chars() {
+                    expanded.push(c);
+                    expanded.push(c);
+                }
+                expanded
+            } else {
+                clean
+            };
+            self.hex_input = format!("#{}", full_hex.to_ascii_uppercase());
+            self.hex_selected = false;
+            self.hex_cursor = self.hex_input.len();
+            self.sync_from_hex();
+        }
+    }
+
     /// Handles keyboard events across all color picker tabs.
     pub fn handle_key(&mut self, code: KeyCode) -> Option<Option<Color>> {
         match code {
             KeyCode::Esc => Some(None),
+            KeyCode::Delete => {
+                if self.tab == ColorPickerTab::HexInput {
+                    if self.hex_input == "#" {
+                        self.current_color = Color::Reset;
+                        Some(Some(Color::Reset))
+                    } else {
+                        self.handle_key_hex(KeyCode::Delete)
+                    }
+                } else {
+                    self.current_color = Color::Reset;
+                    Some(Some(Color::Reset))
+                }
+            }
             KeyCode::Tab => {
                 self.tab = match self.tab {
                     ColorPickerTab::Palette256 => ColorPickerTab::TrueColorHsv,
-                    ColorPickerTab::TrueColorHsv => ColorPickerTab::HexInput,
+                    ColorPickerTab::TrueColorHsv => {
+                        self.hex_selected = true;
+                        self.hex_cursor = self.hex_input.len();
+                        ColorPickerTab::HexInput
+                    }
                     ColorPickerTab::HexInput => ColorPickerTab::Palette256,
                 };
                 None
             }
             KeyCode::BackTab => {
                 self.tab = match self.tab {
-                    ColorPickerTab::Palette256 => ColorPickerTab::HexInput,
+                    ColorPickerTab::Palette256 => {
+                        self.hex_selected = true;
+                        self.hex_cursor = self.hex_input.len();
+                        ColorPickerTab::HexInput
+                    }
                     ColorPickerTab::TrueColorHsv => ColorPickerTab::Palette256,
                     ColorPickerTab::HexInput => ColorPickerTab::TrueColorHsv,
                 };
@@ -254,7 +321,12 @@ impl ColorPickerModal {
             }
             KeyCode::Char('3') => {
                 self.tab = ColorPickerTab::HexInput;
+                self.hex_selected = true;
                 None
+            }
+            KeyCode::Char('0') | KeyCode::Backspace => {
+                self.current_color = Color::Reset;
+                Some(Some(Color::Reset))
             }
             _ => None,
         }
@@ -298,7 +370,12 @@ impl ColorPickerModal {
             }
             KeyCode::Char('3') => {
                 self.tab = ColorPickerTab::HexInput;
+                self.hex_selected = true;
                 None
+            }
+            KeyCode::Char('0') | KeyCode::Backspace => {
+                self.current_color = Color::Reset;
+                Some(Some(Color::Reset))
             }
             _ => None,
         }
@@ -306,21 +383,86 @@ impl ColorPickerModal {
 
     fn handle_key_hex(&mut self, code: KeyCode) -> Option<Option<Color>> {
         match code {
+            KeyCode::Char('#') => {
+                self.hex_input = "#".to_string();
+                self.hex_selected = false;
+                self.hex_cursor = 1;
+                None
+            }
             KeyCode::Char(c) if c.is_ascii_hexdigit() => {
-                let mut current = self.hex_input.trim_start_matches('#').to_string();
-                if current.len() < 6 {
-                    current.push(c.to_ascii_uppercase());
-                    self.hex_input = format!("#{}", current);
+                let digit = c.to_ascii_uppercase();
+                if self.hex_selected {
+                    self.hex_input = format!("#{}", digit);
+                    self.hex_selected = false;
+                    self.hex_cursor = 2;
+                } else if self.hex_cursor < self.hex_input.len() && self.hex_cursor > 0 {
+                    // Replace digit at cursor
+                    let mut chars: Vec<char> = self.hex_input.chars().collect();
+                    chars[self.hex_cursor] = digit;
+                    self.hex_input = chars.into_iter().collect();
+                    self.hex_cursor = (self.hex_cursor + 1).min(7);
+                } else if self.hex_input.len() < 7 {
+                    // Append at cursor
+                    self.hex_input.push(digit);
+                    self.hex_cursor = self.hex_input.len();
+                } else {
+                    // Buffer is full and cursor is at end: start fresh
+                    self.hex_input = format!("#{}", digit);
+                    self.hex_cursor = 2;
+                }
+                self.sync_from_hex();
+                None
+            }
+            KeyCode::Left => {
+                self.hex_selected = false;
+                self.hex_cursor = self.hex_cursor.saturating_sub(1).max(1);
+                None
+            }
+            KeyCode::Right => {
+                self.hex_selected = false;
+                self.hex_cursor = (self.hex_cursor + 1).min(self.hex_input.len());
+                None
+            }
+            KeyCode::Home => {
+                self.hex_selected = false;
+                self.hex_cursor = 1;
+                None
+            }
+            KeyCode::End => {
+                self.hex_selected = false;
+                self.hex_cursor = self.hex_input.len();
+                None
+            }
+            KeyCode::Backspace => {
+                if self.hex_selected {
+                    self.hex_input = "#".to_string();
+                    self.hex_selected = false;
+                    self.hex_cursor = 1;
+                } else if self.hex_cursor > 1 && self.hex_cursor <= self.hex_input.len() {
+                    let mut chars: Vec<char> = self.hex_input.chars().collect();
+                    chars.remove(self.hex_cursor - 1);
+                    self.hex_input = chars.into_iter().collect();
+                    self.hex_cursor = self.hex_cursor.saturating_sub(1).max(1);
                     self.sync_from_hex();
                 }
                 None
             }
-            KeyCode::Backspace => {
-                let mut current = self.hex_input.trim_start_matches('#').to_string();
-                if !current.is_empty() {
-                    current.pop();
-                    self.hex_input = format!("#{}", current);
+            KeyCode::Delete => {
+                if self.hex_selected {
+                    self.hex_input = "#".to_string();
+                    self.hex_selected = false;
+                    self.hex_cursor = 1;
+                } else if self.hex_cursor < self.hex_input.len() && self.hex_cursor > 0 {
+                    let mut chars: Vec<char> = self.hex_input.chars().collect();
+                    chars.remove(self.hex_cursor);
+                    self.hex_input = chars.into_iter().collect();
                     self.sync_from_hex();
+                }
+                None
+            }
+            KeyCode::Insert => {
+                if let Some(txt) = crate::clipboard::get_clipboard_text() {
+                    self.paste_hex(&txt);
                 }
                 None
             }
@@ -334,7 +476,7 @@ impl ColorPickerModal {
             return None;
         }
 
-        let inner_area = super::frame::compute_modal_inner(area, 64, 23);
+        let inner_area = super::frame::compute_modal_inner(area, 72, 23);
         if super::frame::is_close_button_clicked(inner_area, mouse.row, mouse.column) {
             return Some(None);
         }
@@ -349,9 +491,11 @@ impl ColorPickerModal {
             let t1_start = ox + 1;
             let t1_end = t1_start + 18;
             let t2_start = t1_end + 1;
-            let t2_end = t2_start + 21;
+            let t2_end = t2_start + 16;
             let t3_start = t2_end + 1;
-            let t3_end = t3_start + 16;
+            let t3_end = t3_start + 15;
+            let t4_start = t3_end + 1;
+            let t4_end = t4_start + 16;
 
             if col >= t1_start && col < t1_end {
                 self.tab = ColorPickerTab::Palette256;
@@ -363,7 +507,12 @@ impl ColorPickerModal {
             }
             if col >= t3_start && col < t3_end {
                 self.tab = ColorPickerTab::HexInput;
+                self.hex_selected = true;
                 return None;
+            }
+            if col >= t4_start && col < t4_end {
+                self.current_color = Color::Reset;
+                return Some(Some(Color::Reset));
             }
         }
 
@@ -378,6 +527,12 @@ impl ColorPickerModal {
                     let code = cell_y * 16 + cell_x;
                     self.sync_from_256(code);
                     return Some(Some(self.current_color));
+                }
+                let info_x = gx + 50;
+                let info_y = gy + 2;
+                if row == info_y + 8 && col >= info_x && col < info_x + 16 {
+                    self.current_color = Color::Reset;
+                    return Some(Some(Color::Reset));
                 }
             }
             ColorPickerTab::TrueColorHsv => {
@@ -414,9 +569,40 @@ impl ColorPickerModal {
                 }
             }
             ColorPickerTab::HexInput => {
-                // Clicking swatch area commits color
-                let swatch_y = oy + 7;
-                if row >= swatch_y && row <= swatch_y + 3 && col >= ox + 15 && col <= ox + 45 {
+                let start_y = oy + 3;
+                let center_x = ox + (inner_area.width.saturating_sub(44)) / 2;
+
+                // 1. Text input area & action buttons on row start_y + 2
+                if row == start_y + 2 {
+                    if col >= center_x && col < center_x + 13 {
+                        let clicked_idx = (col.saturating_sub(center_x + 2) as usize)
+                            .min(self.hex_input.len())
+                            .max(1);
+                        self.hex_cursor = clicked_idx;
+                        self.hex_selected = false;
+                        return None;
+                    }
+                    if col >= center_x + 14 && col < center_x + 24 {
+                        self.hex_input = "#".to_string();
+                        self.hex_cursor = 1;
+                        self.hex_selected = false;
+                        return None;
+                    }
+                    if col >= center_x + 25 && col < center_x + 35 {
+                        if let Some(txt) = crate::clipboard::get_clipboard_text() {
+                            self.paste_hex(&txt);
+                        }
+                        return None;
+                    }
+                    if col >= center_x + 36 && col < center_x + 47 {
+                        return Some(Some(self.current_color));
+                    }
+                }
+
+                // 2. Clicking swatch area commits color
+                let swatch_y = start_y + 6;
+                if row >= swatch_y && row <= swatch_y + 1 && col >= center_x && col <= center_x + 26
+                {
                     return Some(Some(self.current_color));
                 }
             }
@@ -466,7 +652,7 @@ impl ColorPickerModal {
         styles: &ResolvedThemeStyles,
         buf: &mut Buffer,
     ) -> (Rect, (u16, u16)) {
-        let dialog_w = 64;
+        let dialog_w = 72;
         let dialog_h = 23;
 
         let inner = render_modal_frame(area, dialog_w, dialog_h, &self.title, styles, buf);
@@ -497,14 +683,21 @@ impl ColorPickerModal {
         } else {
             inactive_style
         };
+        let t4_s = if self.current_color == Color::Reset {
+            active_style
+        } else {
+            Style::default().fg(Color::Yellow)
+        };
 
         let t1_text = " [1: 256 Palette] ";
-        let t2_text = " [2: TrueColor (HSV)] ";
+        let t2_text = " [2: TrueColor] ";
         let t3_text = " [3: Hex Code] ";
+        let t4_text = " [Del: Inherit] ";
 
         let t1_x = inner.x + 1;
         let t2_x = t1_x + t1_text.len() as u16;
         let t3_x = t2_x + t2_text.len() as u16;
+        let t4_x = t3_x + t3_text.len() as u16;
 
         let right_bound = inner.x + inner.width;
         if t1_x < right_bound {
@@ -521,6 +714,11 @@ impl ColorPickerModal {
             let max_w = (right_bound - t3_x) as usize;
             let clipped: String = t3_text.chars().take(max_w).collect();
             buf.set_string(t3_x, inner.y, &clipped, t3_s);
+        }
+        if t4_x < right_bound {
+            let max_w = (right_bound - t4_x) as usize;
+            let clipped: String = t4_text.chars().take(max_w).collect();
+            buf.set_string(t4_x, inner.y, &clipped, t4_s);
         }
 
         // Divider under tab bar
@@ -585,52 +783,98 @@ impl ColorPickerModal {
         let (r, g, b) = color_to_rgb(Color::Indexed(self.selected_256));
 
         buf.set_string(info_x, info_y, "Swatch:", styles.gutter);
+        if self.current_color == Color::Reset {
+            buf.set_string(
+                info_x,
+                info_y + 1,
+                "[Inherit]",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            );
+            buf.set_string(
+                info_x,
+                info_y + 3,
+                "Index:  -1",
+                styles.accent.add_modifier(Modifier::BOLD),
+            );
+            buf.set_string(
+                info_x,
+                info_y + 4,
+                "Value: Inherit",
+                Style::default().fg(Color::White),
+            );
+        } else {
+            buf.set_string(
+                info_x,
+                info_y + 1,
+                "████████",
+                Style::default().fg(Color::Indexed(self.selected_256)),
+            );
+            buf.set_string(
+                info_x,
+                info_y + 3,
+                format!("Index: {:3}", self.selected_256),
+                styles.accent.add_modifier(Modifier::BOLD),
+            );
+            buf.set_string(
+                info_x,
+                info_y + 4,
+                format!("Hex: #{r:02x}{g:02x}{b:02x}"),
+                Style::default().fg(Color::White),
+            );
+            buf.set_string(
+                info_x,
+                info_y + 5,
+                format!("R:{:<3} G:{:<3}", r, g),
+                styles.gutter,
+            );
+            buf.set_string(info_x, info_y + 6, format!("B:{:<3}", b), styles.gutter);
+        }
+
+        let btn_inherit = "[ Inherit (-1) ]";
         buf.set_string(
             info_x,
-            info_y + 1,
-            "████████",
-            Style::default().fg(Color::Indexed(self.selected_256)),
+            info_y + 8,
+            btn_inherit,
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
         );
-        buf.set_string(
-            info_x,
-            info_y + 3,
-            format!("Index: {:3}", self.selected_256),
-            styles.accent.add_modifier(Modifier::BOLD),
-        );
-        buf.set_string(
-            info_x,
-            info_y + 4,
-            format!("Hex: #{r:02x}{g:02x}{b:02x}"),
-            Style::default().fg(Color::White),
-        );
-        buf.set_string(
-            info_x,
-            info_y + 5,
-            format!("R:{:<3} G:{:<3}", r, g),
-            styles.gutter,
-        );
-        buf.set_string(info_x, info_y + 6, format!("B:{:<3}", b), styles.gutter);
 
         // Bottom status hint
         let badge_y = inner.y + inner.height.saturating_sub(1);
         let badge_line = Line::from(vec![
             Span::styled(" [", styles.border),
-            Span::styled("██", Style::default().fg(Color::Indexed(self.selected_256))),
+            if self.current_color == Color::Reset {
+                Span::styled(
+                    "-1",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                )
+            } else {
+                Span::styled("██", Style::default().fg(Color::Indexed(self.selected_256)))
+            },
             Span::styled("] ", styles.border),
             Span::styled(
-                format!("Color: {:03}", self.selected_256),
+                if self.current_color == Color::Reset {
+                    "Inherit (-1)".to_string()
+                } else {
+                    format!("Color: {:03}", self.selected_256)
+                },
                 styles.accent.add_modifier(Modifier::BOLD),
             ),
             Span::styled(
-                "  (Enter: Select | Tab: Modes | Esc: Cancel) ",
-                styles.gutter,
+                "  (Enter: Select | Del: Inherit (-1) | Tab: Modes | Esc: Cancel) ",
+                styles.help_text,
             ),
         ]);
         buf.set_line(
             inner.x + 2,
             badge_y,
             &badge_line,
-            inner.width.saturating_sub(4),
+            inner.width.saturating_sub(3),
         );
     }
 
@@ -788,15 +1032,15 @@ impl ColorPickerModal {
                 styles.accent.add_modifier(Modifier::BOLD),
             ),
             Span::styled(
-                "  (Arrows: S/V | [/]: Hue | Enter: Select | Tab: Modes) ",
-                styles.gutter,
+                "  (Arrows: S/V | [/]: Hue | Enter: Select | Del: Inherit | Tab: Modes) ",
+                styles.help_text,
             ),
         ]);
         buf.set_line(
             inner.x + 2,
             badge_y,
             &hint_line,
-            inner.width.saturating_sub(4),
+            inner.width.saturating_sub(3),
         );
     }
 
@@ -811,14 +1055,56 @@ impl ColorPickerModal {
             styles.accent.add_modifier(Modifier::BOLD),
         );
 
-        let input_box = format!("[ {:<8} ]", self.hex_input);
+        buf.set_string(center_x, start_y + 2, "[ ", styles.border);
+
+        let chars: Vec<char> = self.hex_input.chars().collect();
+        for slot in 0..8 {
+            let col = center_x + 2 + slot as u16;
+            let ch = if slot < chars.len() { chars[slot] } else { ' ' };
+
+            let style = if self.hex_selected {
+                if slot < chars.len() {
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default().fg(Color::Yellow)
+                }
+            } else if slot == self.hex_cursor {
+                Style::default()
+                    .fg(Color::Black)
+                    .bg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
+            };
+
+            buf.set_string(col, start_y + 2, ch.to_string(), style);
+        }
+
+        buf.set_string(center_x + 10, start_y + 2, " ]", styles.border);
+
+        // Action buttons
         buf.set_string(
-            center_x,
+            center_x + 14,
             start_y + 2,
-            &input_box,
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
+            "[ Clear ]",
+            styles.text.add_modifier(Modifier::BOLD),
+        );
+        buf.set_string(
+            center_x + 25,
+            start_y + 2,
+            "[ Paste ]",
+            styles.shortcut_key.add_modifier(Modifier::BOLD),
+        );
+        buf.set_string(
+            center_x + 36,
+            start_y + 2,
+            "[ Select ]",
+            styles.accent.add_modifier(Modifier::BOLD),
         );
 
         let (r, g, b) = color_to_rgb(self.current_color);
@@ -865,15 +1151,15 @@ impl ColorPickerModal {
                 styles.accent.add_modifier(Modifier::BOLD),
             ),
             Span::styled(
-                "  (Type 0-9/A-F | Backspace | Enter: Select | Tab: Modes) ",
-                styles.gutter,
+                "  (Type 0-9/A-F | Del: Inherit | Click box to edit | Enter: Select) ",
+                styles.help_text,
             ),
         ]);
         buf.set_line(
             inner.x + 2,
             badge_y,
             &hint_line,
-            inner.width.saturating_sub(4),
+            inner.width.saturating_sub(3),
         );
     }
 }

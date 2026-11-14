@@ -11,12 +11,12 @@ use bashmenu_tui::{
     compute_modal_inner, has_hidden_gutter_text, is_close_button_clicked, key_event_to_token,
     render_modal_frame, visible_text_len, wrap_prompt_text, wrap_spread_help_gutter_layout,
     ConfirmChoice, ConfirmModal, FilePickerModal, HelpGutterHover, HelpModal, ResolvedThemeStyles,
-    TerminalGuard, TextInput, ToastRack,
+    TerminalGuard, TextInput, ThemeActivity, ToastRack,
 };
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -403,7 +403,7 @@ impl KeyCaptureModal {
         let bold_style = styles.shortcut_key.bg(base_bg).add_modifier(Modifier::BOLD);
         let hint_style = styles.help_text.bg(base_bg);
         let err_style = Style::default()
-            .fg(Color::Red)
+            .fg(styles.toast_error)
             .bg(base_bg)
             .add_modifier(Modifier::BOLD);
 
@@ -621,7 +621,7 @@ impl LeaderSettingsModal {
         let active_style = styles.text.bg(base_bg).add_modifier(Modifier::REVERSED);
         let hint_style = styles.help_text.bg(base_bg);
         let err_style = Style::default()
-            .fg(Color::Red)
+            .fg(styles.toast_error)
             .bg(base_bg)
             .add_modifier(Modifier::BOLD);
 
@@ -1169,7 +1169,7 @@ impl ShortcutEditModal {
         let active_style = styles.text.bg(base_bg).add_modifier(Modifier::REVERSED);
         let hint_style = styles.help_text.bg(base_bg);
         let err_style = Style::default()
-            .fg(Color::Red)
+            .fg(styles.toast_error)
             .bg(base_bg)
             .add_modifier(Modifier::BOLD);
 
@@ -1492,9 +1492,17 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
     let app_config = load_config(&config_path).unwrap_or_default();
     let use_nerd = app_config.settings.use_nerd_fonts.unwrap_or(false);
     let themes = load_themes(&themes_path).unwrap_or_default();
-    let styles = themes
-        .get(&app_config.theme)
-        .map(|t| ResolvedThemeStyles::from_theme(t, use_nerd))
+    let active_theme = themes.get(&app_config.theme);
+    let styles = active_theme
+        .map(|t| {
+            ResolvedThemeStyles::from_theme_for_activity(t, use_nerd, ThemeActivity::ShortcutEdit)
+        })
+        .unwrap_or_default();
+    let modal_styles = active_theme
+        .map(|t| ResolvedThemeStyles::from_theme_for_activity(t, use_nerd, ThemeActivity::Modals))
+        .unwrap_or_default();
+    let toast_styles = active_theme
+        .map(|t| ResolvedThemeStyles::from_theme_for_activity(t, use_nerd, ThemeActivity::Toasts))
         .unwrap_or_default();
 
     let shortcuts_cfg = if shortcuts_path.exists() {
@@ -1535,36 +1543,36 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                         child_help,
                         ..
                     } => {
-                        modal.render(f.area(), &styles, f.buffer_mut());
+                        modal.render(f.area(), &modal_styles, f.buffer_mut());
                         if let Some(cap) = child_capture {
-                            cap.render(f.area(), &styles, f.buffer_mut());
+                            cap.render(f.area(), &modal_styles, f.buffer_mut());
                         } else if let Some(picker) = child_picker {
-                            picker.render(f.area(), &styles, f.buffer_mut());
+                            picker.render(f.area(), &modal_styles, f.buffer_mut());
                         } else if let Some(help) = child_help {
-                            help.render(f.area(), &styles, f.buffer_mut());
+                            help.render(f.area(), &modal_styles, f.buffer_mut());
                         }
                     }
                     ActiveShortcutModal::CaptureStandalone(cap) => {
-                        cap.render(f.area(), &styles, f.buffer_mut());
+                        cap.render(f.area(), &modal_styles, f.buffer_mut());
                     }
                     ActiveShortcutModal::LeaderSettings {
                         modal,
                         child_capture,
                     } => {
-                        modal.render(f.area(), &styles, f.buffer_mut());
+                        modal.render(f.area(), &modal_styles, f.buffer_mut());
                         if let Some(cap) = child_capture {
-                            cap.render(f.area(), &styles, f.buffer_mut());
+                            cap.render(f.area(), &modal_styles, f.buffer_mut());
                         }
                     }
                     ActiveShortcutModal::ConfirmDelete(modal)
                     | ActiveShortcutModal::ConfirmExit(modal) => {
-                        modal.render(f.area(), &styles, f.buffer_mut());
+                        modal.render(f.area(), &modal_styles, f.buffer_mut());
                     }
                     ActiveShortcutModal::Help(modal) => {
-                        modal.render(f.area(), &styles, f.buffer_mut());
+                        modal.render(f.area(), &modal_styles, f.buffer_mut());
                     }
                 }
-                toast_rack.render(f.area(), &styles, f.buffer_mut());
+                toast_rack.render(f.area(), &toast_styles, f.buffer_mut());
             })?;
             need_redraw = false;
         }

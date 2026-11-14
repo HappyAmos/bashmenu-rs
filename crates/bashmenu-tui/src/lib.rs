@@ -19,6 +19,7 @@ pub mod transition;
 pub mod wallpaper;
 
 pub use ansi::ansi_to_line;
+pub use bashmenu_core::ToastStyle;
 pub use bbcode::{
     is_bbcode_tag, parse_bbcode_spans, parse_color, split_label_brackets, strip_bbcode,
     truncate_to_width, visible_text_len,
@@ -38,19 +39,21 @@ pub use gutter::{
 pub use marquee::{format_marquee_spacer, get_marquee_slice, MarqueeTracker};
 pub use menu_view::{MenuAction, MenuView};
 pub use modals::{
-    compute_modal_inner, compute_modal_rect, is_close_button_clicked, render_animated_modal_frame,
-    render_modal_frame, wrap_prompt_text, AsciiGridModal, BackgroundConfigAction,
-    BackgroundConfigModal, BackgroundFocus, ColorGridModal, ColorPickerModal, ColorPickerTab,
-    ConfirmChoice, ConfirmModal, FilePickerModal, HelpModal, InputModal, MessageModal,
-    NoteConflictChoice, NoteConflictModal, NoteEditorAction, NoteEditorModal, NoteViewerAction,
-    NoteViewerModal, RadioModal, StreamOutputAction, StreamOutputModal, StreamOutputMsg,
-    ThemePickerModal, ToggleChoice, ToggleModal, MODE_OPTIONS, SCALING_OPTIONS,
+    compute_modal_inner, compute_modal_rect, draw_box_drop_shadow, is_close_button_clicked,
+    render_animated_modal_frame, render_modal_frame, wrap_prompt_text, AsciiGridModal,
+    BackgroundConfigAction, BackgroundConfigModal, BackgroundFocus, ColorGridModal,
+    ColorPickerModal, ColorPickerTab, ConfirmChoice, ConfirmModal, FilePickerModal, HelpModal,
+    InputModal, MessageModal, NoteConflictChoice, NoteConflictModal, NoteEditorAction,
+    NoteEditorModal, NoteViewerAction, NoteViewerModal, RadioModal, StreamOutputAction,
+    StreamOutputModal, StreamOutputMsg, ThemePickerModal, ToggleChoice, ToggleModal, MODE_OPTIONS,
+    SCALING_OPTIONS,
 };
 pub use shortcuts_overlay::{key_event_to_token, ShortcutDispatchResult, ShortcutDispatcher};
 pub use style::{
     ansi_index_to_color, ansi_name_to_color, downsample_color_to_16, downsample_color_to_8,
-    downsample_color_to_tier, parse_color_value, parse_color_value_with_tier, parse_style_pair,
-    parse_style_pair_with_tier, ColorTier, ResolvedThemeStyles,
+    downsample_color_to_tier, is_inherited_color_value, parse_color_value,
+    parse_color_value_with_tier, parse_style_pair, parse_style_pair_with_tier, ColorTier,
+    ResolvedThemeStyles, ThemeActivity,
 };
 pub use terminal::{ensure_terminal_sane, TerminalGuard, TerminalOutput};
 pub use text_input::TextInput;

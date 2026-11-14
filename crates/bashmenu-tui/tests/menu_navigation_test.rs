@@ -1262,9 +1262,15 @@ fn test_help_gutter_expansion_decouples_status_border_and_covers_plugins() {
     }
 
     // C) The help gutter expanded upwards on the left side:
-    // Row 19 is help top border capping at sep_x with corner glyph
-    assert_eq!(buf_expanded[(0, 19)].symbol(), "├");
-    assert_eq!(buf_expanded[(sep_x, 19)].symbol(), "┐");
+    // Find expanded help top border capping at sep_x with corner glyph (<= row 19, below menu items)
+    let help_border_y = (6..20)
+        .find(|&y| buf_expanded[(0, y)].symbol() == "├" && buf_expanded[(sep_x, y)].symbol() == "┐")
+        .expect("Expanded help top border (├ ... ┐) must be rendered above normal gutter");
+    assert!(
+        help_border_y <= 19,
+        "Help top border row {} must expand upward above row 20",
+        help_border_y
+    );
 
     // D) Menu items (rows 2..5) must not be overwritten
     let mut menu_row_found = false;
@@ -1279,4 +1285,160 @@ fn test_help_gutter_expansion_decouples_status_border_and_covers_plugins() {
         }
     }
     assert!(menu_row_found, "Menu items must remain intact and visible");
+}
+
+#[test]
+fn test_ctrl_g_toggles_help_gutter_expansion() {
+    use bashmenu_core::{MenuItemType, ShortcutEntry};
+
+    let schema = create_sample_menu();
+    let styles = ResolvedThemeStyles::default();
+    let mut view = MenuView::new(schema, styles, false, "StatusInfo".to_string());
+
+    // Add extra shortcuts so help gutter has hidden lines at width 80 even with no plugins
+    view.set_shortcuts(vec![
+        ShortcutEntry {
+            key: "F10".to_string(),
+            description: "Backup Files".to_string(),
+            r#type: MenuItemType::Command,
+            action: Some("echo backup".to_string()),
+            ..Default::default()
+        },
+        ShortcutEntry {
+            key: "F11".to_string(),
+            description: "Toggle Dev".to_string(),
+            r#type: MenuItemType::Command,
+            action: Some("echo dev".to_string()),
+            ..Default::default()
+        },
+        ShortcutEntry {
+            key: "F12".to_string(),
+            description: "System Info".to_string(),
+            r#type: MenuItemType::Command,
+            action: Some("echo sys".to_string()),
+            ..Default::default()
+        },
+    ]);
+
+    let area = Rect::new(0, 0, 80, 24);
+    assert!(view.has_hidden_help_text(area));
+    assert!(!view.gutter_hover.is_expanded());
+
+    // Toggle on via toggle_help_gutter (simulating Ctrl+G) without mouse hover or plugins
+    assert!(view.toggle_help_gutter(area));
+    assert!(view.gutter_hover.is_expanded());
+
+    let mut buf_expanded = Buffer::empty(area);
+    view.render(area, &mut buf_expanded);
+    let mut expanded_text = String::new();
+    for y in 0..24 {
+        for x in 0..80 {
+            expanded_text.push(buf_expanded[(x, y)].symbol().chars().next().unwrap_or(' '));
+        }
+    }
+    assert!(
+        expanded_text.contains("[F12]: System Info"),
+        "Expanded help gutter via Ctrl+G must reveal hidden F12 shortcut"
+    );
+
+    // Second toggle collapses immediately
+    assert!(view.toggle_help_gutter(area));
+    assert!(!view.gutter_hover.is_expanded());
+
+    // Expand again, then collapse via any normal key interaction
+    assert!(view.toggle_help_gutter(area));
+    assert!(view.gutter_hover.is_expanded());
+    view.handle_key(KeyCode::Down);
+    assert!(!view.gutter_hover.is_expanded());
+}
+
+#[test]
+fn test_framed_toast_style_rendering() {
+    use bashmenu_core::{ToastNotification, ToastSeverity, ToastStyle};
+    use bashmenu_tui::ToastRack;
+
+    let area = Rect::new(0, 0, 80, 24);
+    let mut styles = ResolvedThemeStyles {
+        toast_info: Color::Rgb(10, 200, 30),
+        toast_warning: Color::Rgb(220, 180, 20),
+        toast_error: Color::Rgb(210, 40, 40),
+        toast_style: ToastStyle::Framed,
+        ..Default::default()
+    };
+
+    let mut rack = ToastRack::new();
+    rack.add(ToastNotification {
+        title: None,
+        message: "Disk space low".to_string(),
+        severity: ToastSeverity::Warning,
+        timeout_secs: 5.0,
+    });
+
+    let mut buf = Buffer::empty(area);
+    rack.render(area, &styles, &mut buf);
+
+    // Locate the framed toast rectangle by finding corners `╓` and `┘` in buffer
+    let mut warn_tl = None;
+    let mut warn_br = None;
+    for y in 0..area.height {
+        for x in 0..area.width {
+            let sym = buf[(x, y)].symbol();
+            if sym == "╓" {
+                warn_tl = Some((x, y));
+            } else if sym == "┘" {
+                warn_br = Some((x, y));
+            }
+        }
+    }
+    let (tl_x, tl_y) = warn_tl.expect("framed warning toast should render top-left '╓'");
+    let (br_x, br_y) = warn_br.expect("framed warning toast should render bottom-right '┘'");
+    let warn_rect = Rect::new(tl_x, tl_y, br_x - tl_x + 1, br_y - tl_y + 1);
+    assert_eq!(
+        warn_rect.height, 4,
+        "framed toast needs 4 rows with title + 1-line body (no extra blank padding rows)"
+    );
+
+    let right_x = warn_rect.x + warn_rect.width - 1;
+    // Top border: ╓───┐
+    assert_eq!(buf[(warn_rect.x, warn_rect.y)].symbol(), "╓");
+    assert_eq!(buf[(warn_rect.x + 1, warn_rect.y)].symbol(), "─");
+    assert_eq!(buf[(right_x, warn_rect.y)].symbol(), "┐");
+    // Title row: ║ Warning ... │ (1-char left margin)
+    assert_eq!(buf[(warn_rect.x, warn_rect.y + 1)].symbol(), "║");
+    assert_eq!(buf[(warn_rect.x + 1, warn_rect.y + 1)].symbol(), " ");
+    assert_eq!(buf[(warn_rect.x + 2, warn_rect.y + 1)].symbol(), "W");
+    assert_eq!(buf[(right_x - 1, warn_rect.y + 1)].symbol(), " ");
+    assert_eq!(buf[(right_x, warn_rect.y + 1)].symbol(), "│");
+    // Body row: ║ Disk space low ... │
+    assert_eq!(buf[(warn_rect.x, warn_rect.y + 2)].symbol(), "║");
+    assert_eq!(buf[(warn_rect.x + 1, warn_rect.y + 2)].symbol(), " ");
+    assert_eq!(buf[(warn_rect.x + 2, warn_rect.y + 2)].symbol(), "D");
+    assert_eq!(buf[(right_x - 1, warn_rect.y + 2)].symbol(), " ");
+    assert_eq!(buf[(right_x, warn_rect.y + 2)].symbol(), "│");
+    // Bottom border: ╙───┘
+    assert_eq!(buf[(warn_rect.x, warn_rect.y + 3)].symbol(), "╙");
+    assert_eq!(buf[(warn_rect.x + 1, warn_rect.y + 3)].symbol(), "─");
+    assert_eq!(buf[(right_x, warn_rect.y + 3)].symbol(), "┘");
+
+    // All borders use severity accent color
+    for &(cx, cy) in &[
+        (warn_rect.x, warn_rect.y),
+        (warn_rect.x + 1, warn_rect.y),
+        (right_x, warn_rect.y),
+        (warn_rect.x, warn_rect.y + 1),
+        (right_x, warn_rect.y + 1),
+        (warn_rect.x, warn_rect.y + 3),
+        (right_x, warn_rect.y + 3),
+    ] {
+        assert_eq!(buf[(cx, cy)].fg, styles.toast_warning);
+    }
+
+    // Verify Bar style retains classic 4-row height
+    styles.toast_style = ToastStyle::Bar;
+    let mut buf_bar = Buffer::empty(area);
+    rack.render(area, &styles, &mut buf_bar);
+    let bar_rows: usize = (0..area.height)
+        .filter(|&y| (0..area.width).any(|x| buf_bar[(x, y)].symbol() == "▌"))
+        .count();
+    assert_eq!(bar_rows, 4);
 }

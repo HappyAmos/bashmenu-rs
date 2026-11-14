@@ -169,6 +169,9 @@ Select menu option directly by shortcut hotkey when shortcut badges are enabled.
 .B Ctrl+Space
 Leader key chord prefix opening the which-key shortcut palette overlay.
 .TP
+.B Ctrl+G
+Expand or collapse the left help gutter to reveal all hidden shortcuts.
+.TP
 .B ENTER
 Execute active selected menu option action.
 .TP
@@ -340,7 +343,7 @@ Paste cutbuffer or system clipboard text at cursor.
 .B Ctrl+Z, Ctrl+Y
 Undo or redo edit operations.
 .SS Visual Theme Editor (themeedit)
-Interactive split-screen theme designer with a collapsible token tree (Theme:, Colors:, Borders:) and multi-view live preview pane. Launch directly with themeedit [-f|--file FILE] [-t|--theme NAME] [--local].
+Interactive split-screen theme designer with a collapsible token tree (Theme:, Colors:, Borders:) and a 7-tab multi-view live preview pane. themeedit's own UI chrome stays styled by the active theme configured in bashmenu.yml while the right-hand preview pane reflects unsaved edits for the active activity tab. Launch directly with themeedit [-f|--file FILE] [-t|--theme NAME] [--local].
 .TP
 .B UP, DOWN, k, j
 Navigate collapsible category nodes and tokens (pressing UP or k at row 0 focuses the theme name for inline renaming).
@@ -352,13 +355,16 @@ Collapse or expand collapsible token tree category nodes (Theme:, Colors:, Borde
 Jump to first/last visible row or scroll by 5 rows.
 .TP
 .B ENTER, SPACE
-Toggle selected category node, or open 256-color, CP437 character, or wallpaper file picker for the focused token.
+Toggle selected category node, or open 256-color/TrueColor, CP437 character, or wallpaper file picker for the focused token (edits base palette on Tab 1 or active activity overrides on Tabs 2-7).
 .TP
 .B [, ]
 Cycle to previous or next theme (alphabetically sorted).
 .TP
-.B TAB, p, 1-5
-Cycle or jump between live preview views (Main Menu, Text Editor, Popup Modals, Menu Editor, Toast Notifications).
+.B F2
+Open interactive Theme Selector modal to choose a theme to edit.
+.TP
+.B TAB, Shift+TAB, p, 1-7
+Cycle or jump between live activity preview tabs (1 Menu, 2 Text Editor, 3 Popup Modals, 4 Menu Editor, 5 Toast Notifications, 6 Theme Editor, 7 Shortcuts Editor), switching which activity receives color edits.
 .TP
 .B F4, b
 Open Background Wallpaper Configuration modal (Image, Opacity, Scaling, Mode, Clustering, Quantization).
@@ -369,11 +375,11 @@ Auto-derive harmonious 256-color palette (including plugin text color) from the 
 .B F6, Ctrl+N
 Create a new theme using the monochrome base palette.
 .TP
-.B F7, F2, Ctrl+R
+.B F7, Ctrl+R
 Rename current theme inline.
 .TP
 .B F8, Delete
-Delete current theme from bashmenu.themes (prompts confirmation); when a Wallpaper token is focused, Delete or Backspace removes the wallpaper; when the Indicator token is focused, Delete resets the indicator to '> '.
+Delete current theme from bashmenu.themes (prompts confirmation); on activity tabs 2-7, pressing Delete or Backspace on a color token resets it to -1 (Inherit from main menu); when a Wallpaper token is focused, Delete or Backspace removes the wallpaper; when the Indicator token is focused, Delete resets the indicator to '> '.
 .TP
 .B Ctrl+S
 Save theme directly to bashmenu.themes (prompts Save As only if untitled).
@@ -529,7 +535,7 @@ Direct Linux framebuffer hardware graphics on /dev/fb0 are configured via
 (auto, image, true, false) or at launch via the
 .B \-i, \-\-image
 flag for full-resolution pixel wallpapers.
-Stationary mouse hover expansion delay for the help gutter is configured via
+Pressing Ctrl+G toggles expansion of the help gutter immediately via keyboard; stationary mouse hover expansion delay for the help gutter is configured via
 .I settings.help_gutter_delay
 in seconds (default: 4.0; setting to 0 disables delay for instant expansion). When expanded, the help gutter dynamically increases row count to display all hidden shortcuts without affecting the fixed status gutter top border or visible menu items.
 .SS Menu Structure (bashmenu.mnu)
@@ -852,17 +858,26 @@ Preceding a bracket with a backslash (e.g. \[rs][b] or \[rs][red]) escapes the p
 .B no_formatting Directive:
 Menu items and dialogs accept an optional no_formatting boolean parameter to disable BBCode tag processing when displaying literal bracketed text. (Note: pipe-delimited Markdown tables and ## headings are rendered natively by MessageModal rather than BBCode tags.)
 .SS Color Themes Specification (bashmenu.themes)
-Color themes configure the visual color scheme for the main menu, visual menu editor, text editor, and modal screens. Themes are defined under top-level theme names (dracula, nord, cyberpunk, gruvbox, qbasic, pacman, industry, matrix, monochrome, synthwave, amber_crt, hotdog_stand) for 256, 16, and 8 color modes using single-line compact lists [fg, bg].
+Color themes configure the visual color scheme for the main menu, text editor (bashedit), modal popups, visual menu editor (menuedit), toast notifications, visual theme editor (themeedit), and shortcuts editor (shortcutedit). Themes are defined under top-level theme names (dracula, nord, cyberpunk, gruvbox, qbasic, pacman, industry, matrix, monochrome, synthwave, amber_crt, hotdog_stand, etc.) for 256, 16, and 8 color modes.
 .PP
-Supported Theme Elements: background, title, border, text, highlight, accent,
+Supported Theme Elements: background, title, border, text, highlight, highlight_text, accent,
 footer, help_text (configures help text in bottom gutter and modal footers),
 plugin (configures text color of background plugin feeds), gutter, selection,
-shortcut_key, divider, button_primary, button_error,
-button_cancel, button_success, window_close_button, scrollbar, shadow, and whitespace (configures
-non-visible whitespace character color in the text editor).
+shortcut_key, divider, toast_info, toast_warning, toast_error, window_close_button,
+scrollbar, shadow (rendered with [fg, -1] syncing drop-shadow bg to fg), and whitespace
+(configures non-visible whitespace character color in the text editor).
+.PP
+.B Per-Activity Color Overrides & -1 Inheritance:
+Each color tier (256, 16, 8) contains optional nested override maps for
+\fBbashedit\fR, \fBmodals\fR, \fBmenuedit\fR, \fBtoasts\fR, \fBthemeedit\fR, and
+\fBshortcutedit\fR. Within any activity override section, -1 (for scalars such as
+background and highlight_text) or [-1, -1] (for [fg, bg] pairs) inherits directly from
+the top-level main menu palette. TrueColor values (#rrggbb) selected via the Color Dropper
+or HSV/Hex picker are stored in the 256 tier (including activity override maps) and
+automatically downsampled into the 16 and 8 tiers.
 .PP
 .B Formatting Rule for Editor Compatibility:
-Theme definitions maintain compact single-line flow-style bracket lists (e.g. title: [201, -1]). This enables bashedit's color preview features and themeedit's parser to accurately parse inline bracketed color values and render live color swatch previews.
+Theme definitions maintain clean YAML token lists and scalars compatible with bashmenu, themeedit, and ymlcheck validation.
 .PP
 .B Color Fallback Resolution Tiers:
 The engine automatically queries terminal capabilities and gracefully degrades through four color tiers: TrueColor (24-bit / 16.7M colors, active under COLORTERM=truecolor or 24bit), 256-color palette (xterm 0-255 indices), 16-color ANSI palette (standard virtual terminals TERM=linux), and 8-color basic ANSI palette. Themes define explicit 256, 16, and 8 color blocks to guarantee high contrast across all environments.
@@ -889,6 +904,9 @@ borders never override dividers. Dividers only appear in a menu if declared as
 an option in bashmenu.mnu. Dividers of length \fB{window_width}\fR render
 within standard margins with vertical borders and no tees; dividers of length
 \fB{screen_width}\fR run border to border using left and right tees without margins.
+.PP
+.B Toast Notification Style (toast:):
+Themes can configure persistent toast layout via a top-level \fBtoast:\fR section (editable in \fBthemeedit\fR under \fITheme: -> Toast Style\fR): \fBstyle\fR accepts \fBbar\fR (default left accent glyph via \fBtoast.char\fR) or \fBframed\fR (severity-colored \fI╓─┐ / ║...│ / ╙─┘\fR borders with 1-character horizontal margins).
 .SS Wallpaper Backgrounds & TrueColor Compositing (settings.background)
 HA Bash Menu features a TrueColor half-block (\(bu) wallpaper compositing engine that renders graphical background images directly behind menus, options, and status lines using universal ANSI text capabilities.
 Wallpapers can be specified in user settings (\fIsettings.background\fR in bashmenu.yml) or bundled with themes (\fItheme_background\fR in bashmenu.themes).

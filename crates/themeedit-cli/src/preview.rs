@@ -2,14 +2,84 @@
 
 use crate::PreviewMode;
 use bashmenu_tui::{
-    composite_buffer, format_spread_gutter_line, parse_bbcode_spans, rgb_to_xterm256,
-    visible_text_len, ResolvedThemeStyles, WallpaperCompositor,
+    composite_buffer, draw_box_drop_shadow, format_spread_gutter_line, parse_bbcode_spans,
+    rgb_to_xterm256, visible_text_len, ResolvedThemeStyles, WallpaperCompositor,
 };
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Widget};
+use unicode_width::UnicodeWidthStr;
+
+/// Computes `(toast_x, toast_w, [(y, h); 3])` for the 3 stacked sample toasts.
+pub fn toast_preview_boxes(
+    right_area: Rect,
+    style: bashmenu_core::ToastStyle,
+) -> (u16, u16, [(u16, u16); 3]) {
+    let p_avail_w = right_area.width.saturating_sub(4);
+    let toast_w = (p_avail_w.saturating_sub(6)).clamp(28, 48);
+    let toast_x = right_area.x + right_area.width.saturating_sub(toast_w + 3);
+    let bot_y = right_area.y + right_area.height.saturating_sub(3);
+
+    match style {
+        bashmenu_core::ToastStyle::Bar => {
+            let t3_y = bot_y.saturating_sub(3);
+            let t2_y = t3_y.saturating_sub(3);
+            let t1_y = t2_y.saturating_sub(3);
+            (toast_x, toast_w, [(t1_y, 2), (t2_y, 2), (t3_y, 2)])
+        }
+        bashmenu_core::ToastStyle::Framed => {
+            let th = 4_u16;
+            let step = 5_u16;
+            let t3_y = bot_y.saturating_sub(th);
+            let t2_y = t3_y.saturating_sub(step);
+            let t1_y = t2_y.saturating_sub(step);
+            (toast_x, toast_w, [(t1_y, th), (t2_y, th), (t3_y, th)])
+        }
+    }
+}
+
+/// Screen coordinates `(x_start, x_end)` of a rendered tab in the preview header.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PreviewTabSpan {
+    /// Preview tab variant represented by this header segment.
+    pub mode: PreviewMode,
+    /// Inclusive starting terminal column (`x`).
+    pub x_start: u16,
+    /// Exclusive ending terminal column (`x`).
+    pub x_end: u16,
+    /// Formatted label rendered for this tab.
+    pub label: String,
+}
+
+/// Computes all seven preview tab labels and their clickable header X ranges.
+pub fn preview_tab_bar_layout(right_area: Rect, active: PreviewMode) -> Vec<PreviewTabSpan> {
+    let use_short = right_area.width < 88;
+    let mut cur_x = right_area.x.saturating_add(4); // After "┌─[ "
+    let mut tabs = Vec::with_capacity(PreviewMode::ALL.len());
+    for mode in PreviewMode::ALL {
+        let base = if use_short {
+            mode.short_label()
+        } else {
+            mode.tab_label()
+        };
+        let label = if mode == active {
+            format!("▶ {} ◀", base)
+        } else {
+            base.to_string()
+        };
+        let width = label.width() as u16;
+        tabs.push(PreviewTabSpan {
+            mode,
+            x_start: cur_x,
+            x_end: cur_x.saturating_add(width),
+            label,
+        });
+        cur_x = cur_x.saturating_add(width + 3); // " | " separator
+    }
+    tabs
+}
 
 /// Renders the preview pane for ThemeEdit across `right_area` into `buf`.
 pub fn render_preview_pane(
@@ -19,46 +89,44 @@ pub fn render_preview_pane(
     preview_styles: &ResolvedThemeStyles,
     wp_compositor: &mut Option<WallpaperCompositor>,
 ) {
+    render_preview_pane_with_base(
+        right_area,
+        buf,
+        mode,
+        preview_styles,
+        preview_styles,
+        wp_compositor,
+    );
+}
+
+/// Renders the preview pane using `base_styles` as the outer canvas backdrop.
+pub fn render_preview_pane_with_base(
+    right_area: Rect,
+    buf: &mut Buffer,
+    mode: PreviewMode,
+    preview_styles: &ResolvedThemeStyles,
+    base_styles: &ResolvedThemeStyles,
+    wp_compositor: &mut Option<WallpaperCompositor>,
+) {
     if right_area.width < 10 || right_area.height < 6 {
         return;
     }
 
-    let tab_menu = if mode == PreviewMode::Menu {
-        "▶ 1: Menu ◀"
+    let tabs = preview_tab_bar_layout(right_area, mode);
+    let tab_labels: Vec<&str> = tabs.iter().map(|t| t.label.as_str()).collect();
+    let preview_title = format!("─[ {} ]", tab_labels.join(" | "));
+    let canvas_styles = if mode == PreviewMode::Toast {
+        base_styles
     } else {
-        "1: Menu"
+        preview_styles
     };
-    let tab_ed = if mode == PreviewMode::TextEditor {
-        "▶ 2: Editor ◀"
-    } else {
-        "2: Editor"
-    };
-    let tab_mod = if mode == PreviewMode::Modals {
-        "▶ 3: Modals ◀"
-    } else {
-        "3: Modals"
-    };
-    let tab_me = if mode == PreviewMode::MenuEditor {
-        "▶ 4: MenuEdit ◀"
-    } else {
-        "4: MenuEdit"
-    };
-    let tab_toast = if mode == PreviewMode::Toast {
-        "▶ 5: Toasts ◀"
-    } else {
-        "5: Toasts"
-    };
-
-    let preview_title = format!(
-        "─[ Preview: {} | {} | {} | {} | {} ]",
-        tab_menu, tab_ed, tab_mod, tab_me, tab_toast
-    );
 
     let preview_block = Block::default()
         .borders(Borders::ALL)
         .title(preview_title)
-        .border_style(Style::default().fg(preview_styles.border))
-        .style(Style::default().bg(preview_styles.background));
+        .title_style(canvas_styles.title)
+        .border_style(Style::default().fg(canvas_styles.border))
+        .style(Style::default().bg(canvas_styles.background));
     preview_block.render(right_area, buf);
 
     let p_inner_x = right_area.x + 2;
@@ -66,7 +134,7 @@ pub fn render_preview_pane(
     let p_avail_w = right_area.width.saturating_sub(4);
     let p_avail_h = right_area.height.saturating_sub(4);
     let b = &preview_styles.borders;
-    let border_style = Style::default().fg(preview_styles.border);
+    let border_style = Style::default().fg(canvas_styles.border);
 
     match mode {
         PreviewMode::Menu => {
@@ -323,42 +391,60 @@ pub fn render_preview_pane(
         PreviewMode::TextEditor => {
             // 1. Tab Bar
             let tab_line = Line::from(vec![
-                Span::styled(" [bashmenu.yml*] ", preview_styles.highlight),
+                Span::styled(
+                    " [bashmenu.yml*] ",
+                    preview_styles.selection.add_modifier(Modifier::BOLD),
+                ),
                 Span::styled(" [notes.yml] ", preview_styles.text),
                 Span::styled(" [+] ", preview_styles.accent),
             ]);
             buf.set_line(p_inner_x, p_inner_y, &tab_line, p_avail_w);
 
             let sep_str = "─".repeat(p_avail_w as usize);
-            buf.set_string(p_inner_x, p_inner_y + 1, &sep_str, preview_styles.border);
+            buf.set_string(p_inner_x, p_inner_y + 1, &sep_str, preview_styles.divider);
 
-            // 2. Editor Text Content with Line Numbers
-            let code_lines = [
-                (" 1 │ ", "theme: \"dracula\""),
-                (" 2 │ ", "terminal:"),
-                (" 3 │ ", "  alt_buffer: true"),
-                (" 4 │ ", "  show_whitespace: false"),
-                (" 5 │ ", "menu:"),
-                (" 6 │ ", "  preferred_width_pct: 90"),
-                (" ~ │ ", ""),
+            // 2. Editor Text Content with Line Numbers, Whitespace, and Selection
+            let rows_area_end = right_area.y + right_area.height.saturating_sub(3);
+            let lines: Vec<Line> = vec![
+                Line::from(vec![
+                    Span::styled(" 1 │ ", preview_styles.gutter),
+                    Span::styled("theme: \"dracula\"", preview_styles.text),
+                ]),
+                Line::from(vec![
+                    Span::styled(" 2 │ ", preview_styles.gutter),
+                    Span::styled("terminal:", preview_styles.text),
+                ]),
+                Line::from(vec![
+                    Span::styled(" 3 │ ", preview_styles.gutter),
+                    Span::styled("··", preview_styles.whitespace),
+                    Span::styled("alt_buffer: true", preview_styles.highlight),
+                ]),
+                Line::from(vec![
+                    Span::styled(" 4 │ ", preview_styles.gutter),
+                    Span::styled("··", preview_styles.whitespace),
+                    Span::styled("show_whitespace: ", preview_styles.text),
+                    Span::styled("true", preview_styles.selection),
+                ]),
+                Line::from(vec![
+                    Span::styled(" 5 │ ", preview_styles.gutter),
+                    Span::styled("menu:", preview_styles.text),
+                ]),
+                Line::from(vec![
+                    Span::styled(" 6 │ ", preview_styles.gutter),
+                    Span::styled("··", preview_styles.whitespace),
+                    Span::styled("preferred_width_pct: 90", preview_styles.text),
+                ]),
+                Line::from(vec![
+                    Span::styled(" ~ │ ", preview_styles.gutter),
+                    Span::styled("", preview_styles.text),
+                ]),
             ];
 
-            for (row, (lineno, text)) in code_lines.iter().enumerate() {
+            for (row, full_line) in lines.into_iter().enumerate() {
                 let y = p_inner_y + 2 + row as u16;
-                if y >= right_area.y + right_area.height.saturating_sub(3) {
+                if y >= rows_area_end {
                     break;
                 }
-                let is_cursor_line = row == 2;
-                let line_style = if is_cursor_line {
-                    preview_styles.highlight
-                } else {
-                    preview_styles.text
-                };
-
-                let full_line = Line::from(vec![
-                    Span::styled(*lineno, preview_styles.gutter),
-                    Span::styled(*text, line_style),
-                ]);
                 buf.set_line(p_inner_x, y, &full_line, p_avail_w);
             }
 
@@ -399,12 +485,17 @@ pub fn render_preview_pane(
                 &b.border_vertical_right,
                 border_style,
             );
-            buf.set_string(
-                p_inner_x,
-                footer_y,
-                "^G Help  ^O WriteOut  ^R ReadFile  ^X Exit",
-                preview_styles.gutter,
-            );
+            let footer_line = Line::from(vec![
+                Span::styled("^G ", preview_styles.shortcut_key),
+                Span::styled("Help  ", preview_styles.help_text),
+                Span::styled("^O ", preview_styles.shortcut_key),
+                Span::styled("Save  ", preview_styles.help_text),
+                Span::styled("^R ", preview_styles.shortcut_key),
+                Span::styled("Open  ", preview_styles.help_text),
+                Span::styled("^X ", preview_styles.shortcut_key),
+                Span::styled("Exit", preview_styles.help_text),
+            ]);
+            buf.set_line(p_inner_x, footer_y, &footer_line, p_avail_w);
         }
         PreviewMode::Modals => {
             // Wallpaper background overlay
@@ -424,29 +515,19 @@ pub fn render_preview_pane(
             let mod_x = p_inner_x + (p_avail_w.saturating_sub(mod_w)) / 2;
             let mod_y = p_inner_y + (p_avail_h.saturating_sub(mod_h)) / 2;
 
-            // Modal Drop Shadow over wallpaper
-            let shadow_char = '░';
-            let shadow_style = preview_styles.shadow;
-            let max_bound_x = right_area.x + right_area.width.saturating_sub(1);
-            let max_bound_y = right_area.y + right_area.height.saturating_sub(1);
-            // Right shadow (2 columns wide)
-            for y in (mod_y + 1)..(mod_y + mod_h + 1) {
-                for dx in 0..2 {
-                    let px = mod_x + mod_w + dx;
-                    if px < max_bound_x && y < max_bound_y {
-                        buf[(px, y)].set_char(shadow_char).set_style(shadow_style);
-                    }
-                }
-            }
-            // Bottom shadow (1 row high)
-            let bottom_shadow_y = mod_y + mod_h;
-            for px in (mod_x + 2)..(mod_x + mod_w + 2) {
-                if px < max_bound_x && bottom_shadow_y < max_bound_y {
-                    buf[(px, bottom_shadow_y)]
-                        .set_char(shadow_char)
-                        .set_style(shadow_style);
-                }
-            }
+            // Modal Drop Shadow clipped to inner preview area
+            let inner_bounds = Rect::new(
+                right_area.x + 1,
+                right_area.y + 1,
+                right_area.width.saturating_sub(2),
+                right_area.height.saturating_sub(2),
+            );
+            draw_box_drop_shadow(
+                inner_bounds,
+                Rect::new(mod_x, mod_y, mod_w, mod_h),
+                preview_styles,
+                buf,
+            );
 
             // Clear modal dialog area so wallpaper doesn't bleed through dialog interior
             for cy in mod_y..(mod_y + mod_h) {
@@ -657,9 +738,15 @@ pub fn render_preview_pane(
                 &b.border_vertical_right,
                 border_style,
             );
-            let p_footer_items = ["[F1] Help", "[s] Save", "[ESC] Exit"];
-            let p_spread = format_spread_gutter_line(&p_footer_items, p_avail_w as usize);
-            buf.set_string(p_inner_x, footer_y, &p_spread, preview_styles.gutter);
+            let footer_line = Line::from(vec![
+                Span::styled("[F1] ", preview_styles.shortcut_key),
+                Span::styled("Help  ", preview_styles.help_text),
+                Span::styled("[s] ", preview_styles.shortcut_key),
+                Span::styled("Save  ", preview_styles.help_text),
+                Span::styled("[ESC] ", preview_styles.shortcut_key),
+                Span::styled("Exit", preview_styles.help_text),
+            ]);
+            buf.set_line(p_inner_x, footer_y, &footer_line, p_avail_w);
         }
         PreviewMode::Toast => {
             // Wallpaper background overlay
@@ -667,9 +754,9 @@ pub fn render_preview_pane(
                 if let Some(grid) = comp.get_grid(
                     right_area.width as usize,
                     right_area.height as usize,
-                    preview_styles.background,
+                    canvas_styles.background,
                 ) {
-                    composite_buffer(right_area, buf, grid, preview_styles.background);
+                    composite_buffer(right_area, buf, grid, canvas_styles.background);
                 }
             }
 
@@ -679,11 +766,7 @@ pub fn render_preview_pane(
             };
 
             // Title banner
-            let title_bg = if preview_styles.background == Color::Reset {
-                bg_color
-            } else {
-                preview_styles.background
-            };
+            let title_bg = canvas_styles.background;
             buf.set_string(
                 p_inner_x,
                 p_inner_y,
@@ -698,112 +781,355 @@ pub fn render_preview_pane(
             );
 
             let bar_glyph = &preview_styles.toast_bar_char;
-
-            // 3 Stacked Sample Toasts docked bottom-right
-            let toast_w = (p_avail_w.saturating_sub(6)).clamp(28, 48);
-            let toast_x = right_area.x + right_area.width.saturating_sub(toast_w + 3);
-
-            let bot_y = right_area.y + right_area.height.saturating_sub(3);
-
-            // Toast 3 (Error) at bottom
-            let t3_y = bot_y.saturating_sub(3);
-            let t3_style = Style::default().fg(preview_styles.toast_error).bg(bg_color);
-            let t3_text_style = Style::default()
+            let (toast_x, toast_w, boxes) =
+                toast_preview_boxes(right_area, preview_styles.toast_style);
+            let text_style = Style::default()
                 .fg(preview_styles.text.fg.unwrap_or(Color::White))
                 .bg(bg_color);
-            for dx in 0..toast_w {
-                buf[(toast_x + dx, t3_y)]
-                    .set_char(' ')
-                    .set_style(Style::default().bg(bg_color));
-                buf[(toast_x + dx, t3_y + 1)]
-                    .set_char(' ')
-                    .set_style(Style::default().bg(bg_color));
-            }
-            buf.set_string(toast_x, t3_y, bar_glyph, t3_style);
-            buf.set_string(
-                toast_x + 2,
-                t3_y,
-                "Error",
-                t3_style.add_modifier(Modifier::BOLD),
-            );
-            buf.set_string(toast_x, t3_y + 1, bar_glyph, t3_style);
-            buf.set_string(
-                toast_x + 2,
-                t3_y + 1,
-                "Connection failed on port 8080",
-                t3_text_style,
-            );
+            let bg_only = Style::default().bg(bg_color);
 
-            // Toast 2 (Warning) above Toast 3
-            let t2_y = t3_y.saturating_sub(3);
-            let t2_style = Style::default()
-                .fg(preview_styles.toast_warning)
-                .bg(bg_color);
-            let t2_text_style = Style::default()
-                .fg(preview_styles.text.fg.unwrap_or(Color::White))
-                .bg(bg_color);
-            for dx in 0..toast_w {
-                buf[(toast_x + dx, t2_y)]
-                    .set_char(' ')
-                    .set_style(Style::default().bg(bg_color));
-                buf[(toast_x + dx, t2_y + 1)]
-                    .set_char(' ')
-                    .set_style(Style::default().bg(bg_color));
-            }
-            buf.set_string(toast_x, t2_y, bar_glyph, t2_style);
-            buf.set_string(
-                toast_x + 2,
-                t2_y,
-                "Warning",
-                t2_style.add_modifier(Modifier::BOLD),
-            );
-            buf.set_string(toast_x, t2_y + 1, bar_glyph, t2_style);
-            buf.set_string(
-                toast_x + 2,
-                t2_y + 1,
-                "High memory consumption (88%)",
-                t2_text_style,
-            );
+            let samples = [
+                (
+                    boxes[0],
+                    preview_styles.toast_info,
+                    "Information",
+                    "Saved configuration to disk",
+                ),
+                (
+                    boxes[1],
+                    preview_styles.toast_warning,
+                    "Warning",
+                    "High memory consumption (88%)",
+                ),
+                (
+                    boxes[2],
+                    preview_styles.toast_error,
+                    "Error",
+                    "Connection failed on port 8080",
+                ),
+            ];
 
-            // Toast 1 (Information) above Toast 2
-            let t1_y = t2_y.saturating_sub(3);
-            let t1_style = Style::default().fg(preview_styles.toast_info).bg(bg_color);
-            let t1_text_style = Style::default()
-                .fg(preview_styles.text.fg.unwrap_or(Color::White))
-                .bg(bg_color);
-            for dx in 0..toast_w {
-                buf[(toast_x + dx, t1_y)]
-                    .set_char(' ')
-                    .set_style(Style::default().bg(bg_color));
-                buf[(toast_x + dx, t1_y + 1)]
-                    .set_char(' ')
-                    .set_style(Style::default().bg(bg_color));
+            if preview_styles.toast_style == bashmenu_core::ToastStyle::Framed {
+                let horiz = "─".repeat(toast_w.saturating_sub(2) as usize);
+                let inner_blank = " ".repeat(toast_w.saturating_sub(2) as usize);
+                let content_max = toast_w.saturating_sub(4) as usize;
+
+                for ((ty, th), sev_color, title, msg) in samples {
+                    let b_style = Style::default().fg(sev_color).bg(bg_color);
+                    let t_style = b_style.add_modifier(Modifier::BOLD);
+                    let right_x = toast_x + toast_w.saturating_sub(1);
+
+                    // Top border
+                    buf.set_string(toast_x, ty, format!("╓{}┐", horiz), b_style);
+                    // Interior rows (blank padding + borders)
+                    for row_y in (ty + 1)..(ty + th.saturating_sub(1)) {
+                        buf.set_string(toast_x, row_y, "║", b_style);
+                        buf.set_string(toast_x + 1, row_y, &inner_blank, bg_only);
+                        buf.set_string(right_x, row_y, "│", b_style);
+                    }
+                    // Title & message rows directly inside top/bottom borders
+                    let title_y = ty + 1;
+                    let msg_y = ty + 2;
+                    let clip_title: String = title.chars().take(content_max).collect();
+                    let clip_msg: String = msg.chars().take(content_max).collect();
+                    buf.set_string(toast_x + 2, title_y, clip_title, t_style);
+                    buf.set_string(toast_x + 2, msg_y, clip_msg, text_style);
+                    // Bottom border
+                    buf.set_string(
+                        toast_x,
+                        ty + th.saturating_sub(1),
+                        format!("╙{}┘", horiz),
+                        b_style,
+                    );
+                }
+            } else {
+                for ((ty, _th), sev_color, title, msg) in samples {
+                    let t_style = Style::default().fg(sev_color).bg(bg_color);
+                    for dx in 0..toast_w {
+                        buf[(toast_x + dx, ty)].set_char(' ').set_style(bg_only);
+                        buf[(toast_x + dx, ty + 1)].set_char(' ').set_style(bg_only);
+                    }
+                    buf.set_string(toast_x, ty, bar_glyph, t_style);
+                    buf.set_string(toast_x + 2, ty, title, t_style.add_modifier(Modifier::BOLD));
+                    buf.set_string(toast_x, ty + 1, bar_glyph, t_style);
+                    buf.set_string(toast_x + 2, ty + 1, msg, text_style);
+                }
             }
-            buf.set_string(toast_x, t1_y, bar_glyph, t1_style);
-            buf.set_string(
-                toast_x + 2,
-                t1_y,
-                "Information",
-                t1_style.add_modifier(Modifier::BOLD),
-            );
-            buf.set_string(toast_x, t1_y + 1, bar_glyph, t1_style);
-            buf.set_string(
-                toast_x + 2,
-                t1_y + 1,
-                "Saved configuration to disk",
-                t1_text_style,
-            );
 
             // Bottom configuration summary footer
             let summary_y = right_area.y + right_area.height - 2;
             let summary_txt = format!(
-                "Bar: '{}'  Accent Bar  [Enter: Pick Glyph]",
+                "Style: '{}'  Bar: '{}'  [Enter: Toggle / Pick]",
+                preview_styles.toast_style.display_label(),
                 preview_styles.toast_bar_char
             );
             let summary_style = preview_styles.gutter.bg(title_bg);
             buf.set_string(p_inner_x, summary_y, summary_txt, summary_style);
         }
+        PreviewMode::ThemeEditor => {
+            render_theme_editor_preview(right_area, buf, preview_styles);
+        }
+        PreviewMode::ShortcutEditor => {
+            render_shortcut_editor_preview(right_area, buf, preview_styles);
+        }
     }
+}
+
+/// Renders a miniature Theme Editor split-pane mockup showcasing ThemeEdit tokens.
+fn render_theme_editor_preview(
+    right_area: Rect,
+    buf: &mut Buffer,
+    preview_styles: &ResolvedThemeStyles,
+) {
+    let p_inner_x = right_area.x + 2;
+    let p_inner_y = right_area.y + 2;
+    let p_avail_w = right_area.width.saturating_sub(4);
+    let b = &preview_styles.borders;
+    let border_style = Style::default().fg(preview_styles.border);
+
+    let bot_y = right_area.y + right_area.height.saturating_sub(1);
+    let footer_y = bot_y.saturating_sub(1);
+    let div_y = footer_y.saturating_sub(1);
+
+    let body_h = div_y.saturating_sub(p_inner_y);
+    let left_w = ((p_avail_w as usize * 48) / 100).max(16) as u16;
+    let right_w = p_avail_w.saturating_sub(left_w + 1);
+
+    // Top miniature close button
+    let close_x = right_area.x + right_area.width.saturating_sub(4);
+    let mut close_st = preview_styles.window_close_button;
+    if close_st.bg.is_none() || close_st.bg == Some(Color::Reset) {
+        close_st = close_st.bg(preview_styles.background);
+    }
+    buf.set_string(close_x, right_area.y, "[X]", close_st);
+
+    if body_h >= 4 && right_w >= 10 {
+        let tree_rect = Rect::new(p_inner_x, p_inner_y, left_w, body_h);
+        let sample_rect = Rect::new(p_inner_x + left_w + 1, p_inner_y, right_w, body_h);
+
+        Block::default()
+            .borders(Borders::ALL)
+            .title("─[ Tokens ]")
+            .title_style(preview_styles.title)
+            .border_style(border_style)
+            .style(Style::default().bg(preview_styles.background))
+            .render(tree_rect, buf);
+
+        Block::default()
+            .borders(Borders::ALL)
+            .title("─[ Preview Pane ]")
+            .title_style(preview_styles.title)
+            .border_style(
+                Style::default().fg(preview_styles.accent.fg.unwrap_or(preview_styles.border)),
+            )
+            .style(Style::default().bg(preview_styles.background))
+            .render(sample_rect, buf);
+
+        // Tree rows
+        let rows: [(&str, Style); 5] = [
+            (
+                "▾ Colors",
+                preview_styles.accent.add_modifier(Modifier::BOLD),
+            ),
+            ("  Background    Color 234", preview_styles.text),
+            ("▶ Text Color    Color 255", preview_styles.highlight),
+            ("  Help Text     Inherit", preview_styles.text),
+            ("  Divider       Color 81", preview_styles.text),
+        ];
+        for (idx, (txt, st)) in rows.iter().enumerate() {
+            let y = tree_rect.y + 1 + idx as u16;
+            if y >= tree_rect.bottom().saturating_sub(1) {
+                break;
+            }
+            let inner_w = tree_rect.width.saturating_sub(2) as usize;
+            let clipped = format!(
+                "{:<w$}",
+                txt.chars().take(inner_w).collect::<String>(),
+                w = inner_w
+            );
+            buf.set_string(tree_rect.x + 1, y, &clipped, *st);
+        }
+
+        // Scrollbar thumb inside tree right border
+        if tree_rect.height > 4 {
+            buf[(tree_rect.right() - 1, tree_rect.y + 2)]
+                .set_char('█')
+                .set_style(preview_styles.scrollbar);
+        }
+
+        // Right sample preview content
+        let sx = sample_rect.x + 2;
+        let sy = sample_rect.y + 1;
+        let smax = sample_rect.bottom().saturating_sub(1);
+        if sy < smax {
+            buf.set_string(sx, sy, "Sample Header", preview_styles.title);
+        }
+        if sy + 1 < smax {
+            buf.set_string(sx, sy + 1, "Active Highlight", preview_styles.highlight);
+        }
+        if sy + 2 < smax {
+            buf.set_string(sx, sy + 2, "────────", preview_styles.divider);
+        }
+        if sy + 3 < smax {
+            buf.set_string(sx, sy + 3, "Hint / Inherit -1", preview_styles.help_text);
+        }
+    }
+
+    // Divider & Footer bar
+    buf.set_string(right_area.x, div_y, &b.border_vertical_left, border_style);
+    buf.set_string(
+        right_area.x + right_area.width - 1,
+        div_y,
+        &b.border_vertical_right,
+        border_style,
+    );
+    buf.set_string(
+        p_inner_x,
+        div_y,
+        "─".repeat(p_avail_w as usize),
+        preview_styles.divider,
+    );
+
+    let footer_line = Line::from(vec![
+        Span::styled("[1-7] ", preview_styles.shortcut_key),
+        Span::styled("View  ", preview_styles.help_text),
+        Span::styled("[Del] ", preview_styles.shortcut_key),
+        Span::styled("Reset -1  ", preview_styles.help_text),
+        Span::styled("[Ctrl+S] ", preview_styles.shortcut_key),
+        Span::styled("Save", preview_styles.help_text),
+    ]);
+    buf.set_line(p_inner_x, footer_y, &footer_line, p_avail_w);
+}
+
+/// Renders a miniature Shortcuts Editor mockup showcasing `shortcutedit` tokens.
+fn render_shortcut_editor_preview(
+    right_area: Rect,
+    buf: &mut Buffer,
+    preview_styles: &ResolvedThemeStyles,
+) {
+    let p_inner_x = right_area.x + 2;
+    let p_inner_y = right_area.y + 2;
+    let p_avail_w = right_area.width.saturating_sub(4);
+    let b = &preview_styles.borders;
+    let border_style = Style::default().fg(preview_styles.border);
+
+    let bot_y = right_area.y + right_area.height.saturating_sub(1);
+    let footer_y = bot_y.saturating_sub(1);
+    let div_y = footer_y.saturating_sub(1);
+
+    let list_h = div_y.saturating_sub(p_inner_y).max(3);
+    let left_w = p_avail_w / 2;
+    let right_w = p_avail_w.saturating_sub(left_w);
+    let list_rect = Rect::new(p_inner_x, p_inner_y, left_w, list_h);
+    let insp_rect = Rect::new(p_inner_x + left_w, p_inner_y, right_w, list_h);
+
+    Block::default()
+        .borders(Borders::ALL)
+        .title("─[ Keyboard Shortcuts ]")
+        .title_style(preview_styles.title)
+        .border_style(border_style)
+        .style(Style::default().bg(preview_styles.background))
+        .render(list_rect, buf);
+
+    let items: [(&str, &str, bool); 4] = [
+        ("[1]     ", "Launch Terminal (alacritty)", true),
+        ("[2]     ", "Open File Manager (yazi)", false),
+        ("[Ctrl+E]", "Edit Configuration File", false),
+        ("[F2]    ", "Quick System Diagnostics", false),
+    ];
+
+    for (idx, (key, desc, is_sel)) in items.iter().enumerate() {
+        let y = list_rect.y + 1 + idx as u16;
+        if y >= list_rect.bottom().saturating_sub(1) {
+            break;
+        }
+        let inner_w = list_rect.width.saturating_sub(2) as usize;
+        if *is_sel {
+            let text = format!(
+                "{:<w$}",
+                format!("{} {}", key, desc)
+                    .chars()
+                    .take(inner_w)
+                    .collect::<String>(),
+                w = inner_w
+            );
+            buf.set_string(list_rect.x + 1, y, &text, preview_styles.highlight);
+        } else {
+            let line = Line::from(vec![
+                Span::styled(*key, preview_styles.shortcut_key),
+                Span::styled(" ", preview_styles.text),
+                Span::styled(*desc, preview_styles.text),
+            ]);
+            buf.set_line(list_rect.x + 1, y, &line, inner_w as u16);
+        }
+    }
+
+    if list_rect.height > 4 {
+        buf[(list_rect.right() - 1, list_rect.y + 1)]
+            .set_char('█')
+            .set_style(preview_styles.scrollbar);
+    }
+
+    // Right Pane: Shortcut Inspector matching real `shortcutedit` two-pane layout
+    if insp_rect.width >= 6 {
+        Block::default()
+            .borders(Borders::ALL)
+            .title("─[ Shortcut Inspector ]")
+            .title_style(preview_styles.title)
+            .border_style(border_style)
+            .style(Style::default().bg(preview_styles.background))
+            .render(insp_rect, buf);
+
+        if insp_rect.width > 4 && insp_rect.height > 2 {
+            let r_x = insp_rect.x + 2;
+            let r_w = insp_rect.width.saturating_sub(4);
+            let max_y = insp_rect.bottom().saturating_sub(1);
+            let insp_rows: [(&str, Style); 5] = [
+                (
+                    "Shortcut Properties",
+                    preview_styles.accent.add_modifier(Modifier::BOLD),
+                ),
+                ("Description: Launch Terminal", preview_styles.text),
+                ("Key Chord:   [1]", preview_styles.shortcut_key),
+                ("Action:      alacritty", preview_styles.text),
+                ("Mode:        Console", preview_styles.help_text),
+            ];
+            for (idx, (txt, st)) in insp_rows.iter().enumerate() {
+                let r_y = insp_rect.y + 1 + idx as u16;
+                if r_y >= max_y {
+                    break;
+                }
+                buf.set_line(r_x, r_y, &Line::from(Span::styled(*txt, *st)), r_w);
+            }
+        }
+    }
+
+    // Divider & Footer
+    buf.set_string(right_area.x, div_y, &b.border_vertical_left, border_style);
+    buf.set_string(
+        right_area.x + right_area.width - 1,
+        div_y,
+        &b.border_vertical_right,
+        border_style,
+    );
+    buf.set_string(
+        p_inner_x,
+        div_y,
+        "─".repeat(p_avail_w as usize),
+        preview_styles.divider,
+    );
+
+    let footer_line = Line::from(vec![
+        Span::styled("[Ins] ", preview_styles.shortcut_key),
+        Span::styled("Add  ", preview_styles.help_text),
+        Span::styled("[Enter] ", preview_styles.shortcut_key),
+        Span::styled("Edit  ", preview_styles.help_text),
+        Span::styled("[Del] ", preview_styles.shortcut_key),
+        Span::styled("Remove  ", preview_styles.help_text),
+        Span::styled("[ESC] ", preview_styles.shortcut_key),
+        Span::styled("Back", preview_styles.help_text),
+    ]);
+    buf.set_line(p_inner_x, footer_y, &footer_line, p_avail_w);
 }
 
 /// Formats a Ratatui Color into a string color code (hex, index, or name) with 256 decimal code.

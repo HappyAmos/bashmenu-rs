@@ -490,6 +490,14 @@ impl HelpGutterHover {
         self.is_expanded
     }
 
+    /// Toggles the expanded state of the help gutter directly via keyboard.
+    pub fn toggle_expanded(&mut self) -> bool {
+        self.hover_pos = None;
+        self.hover_start = None;
+        self.is_expanded = !self.is_expanded;
+        true
+    }
+
     /// Resets hover coordinates, timer, and expansion state.
     pub fn reset(&mut self) {
         self.hover_pos = None;

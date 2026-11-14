@@ -106,16 +106,20 @@ pub fn resolve_glyph(glyph_def: &str, use_nerd_fonts: bool) -> String {
         if !emoji_part.is_empty() {
             return emoji_part.to_string();
         }
-        if !hex_part.is_empty() && is_hex_token(hex_part) {
-            let clean = hex_part
-                .trim()
-                .trim_start_matches('#')
-                .trim_start_matches('$')
-                .trim_start_matches("0x");
-            if let Ok(val) = u32::from_str_radix(clean, 16) {
-                if let Some(ch) = char::from_u32(val) {
-                    return ch.to_string();
+        if !hex_part.is_empty() {
+            if is_hex_token(hex_part) {
+                let clean = hex_part
+                    .trim()
+                    .trim_start_matches('#')
+                    .trim_start_matches('$')
+                    .trim_start_matches("0x");
+                if let Ok(val) = u32::from_str_radix(clean, 16) {
+                    if let Some(ch) = char::from_u32(val) {
+                        return ch.to_string();
+                    }
                 }
+            } else {
+                return hex_part.to_string();
             }
         }
     }
@@ -172,6 +176,11 @@ mod tests {
         // When nerd fonts disabled, falls back to character tier
         let fallback = resolve_glyph("{nf:@:#ee90:🚀}", false);
         assert_eq!(fallback, "@");
+
+        // Literal Nerd Font glyph in the 2nd slot resolves when enabled
+        assert_eq!(resolve_glyph("{nf:@::}", true), "");
+        // Empty char tier returns empty string when nerd fonts disabled
+        assert_eq!(resolve_glyph("{nf::#f1a7c}", false), "");
     }
 
     #[test]

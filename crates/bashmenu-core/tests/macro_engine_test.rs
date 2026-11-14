@@ -258,6 +258,28 @@ fn test_utc_seconds_and_command_placeholders() {
 }
 
 #[test]
+fn test_cmd_alias_matches_command_placeholder() {
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../bashmenu.yml");
+    let mut config = load_config(fixture).expect("load config");
+    config.user.insert(
+        "name".to_string(),
+        serde_yml::Value::String("bashmenu_tester".to_string()),
+    );
+    let mut ctx = MacroContext::new(&config);
+    ctx.home_dir = std::path::PathBuf::from("/home/testuser");
+
+    let cmd_out = interpolate_placeholders("Out: {command:printf 'alias_ok'}", &ctx);
+    let alias_out = interpolate_placeholders("Out: {cmd:printf 'alias_ok'}", &ctx);
+    assert_eq!(cmd_out, "Out: alias_ok");
+    assert_eq!(alias_out, cmd_out);
+
+    let nested_cmd = interpolate_placeholders("{command:echo {user.name} {home}}", &ctx);
+    let nested_alias = interpolate_placeholders("{cmd:echo {user.name} {home}}", &ctx);
+    assert_eq!(nested_cmd, "bashmenu_tester /home/testuser");
+    assert_eq!(nested_alias, nested_cmd);
+}
+
+#[test]
 fn test_file_and_dir_picker_macros_and_modifiers() {
     use bashmenu_core::{
         apply_dir_picker_macros, apply_file_picker_macros, extract_picker_spec, MenuItem,

@@ -6,6 +6,116 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
+/// Canonical activity override section keys stored inside a theme palette.
+pub const ACTIVITY_OVERRIDE_KEYS: [&str; 6] = [
+    "bashedit",
+    "modals",
+    "menuedit",
+    "toasts",
+    "themeedit",
+    "shortcutedit",
+];
+
+/// Returns `true` if `token` stores a single scalar color rather than a `[fg, bg]` pair.
+pub fn is_scalar_color_token(token: &str) -> bool {
+    matches!(token, "background" | "highlight_text")
+}
+
+/// Returns the supported color override token keys for a given activity section name.
+pub fn activity_override_tokens(activity_key: &str) -> &'static [&'static str] {
+    match activity_key {
+        "bashedit" => &[
+            "background",
+            "title",
+            "text",
+            "border",
+            "divider",
+            "accent",
+            "selection",
+            "whitespace",
+            "gutter",
+            "help_text",
+            "footer",
+            "shortcut_key",
+            "scrollbar",
+            "window_close_button",
+        ],
+        "modals" => &[
+            "background",
+            "title",
+            "text",
+            "highlight",
+            "highlight_text",
+            "border",
+            "divider",
+            "accent",
+            "selection",
+            "shortcut_key",
+            "help_text",
+            "gutter",
+            "footer",
+            "scrollbar",
+            "shadow",
+            "window_close_button",
+        ],
+        "menuedit" | "themeedit" | "shortcutedit" => &[
+            "background",
+            "title",
+            "text",
+            "highlight",
+            "highlight_text",
+            "border",
+            "divider",
+            "accent",
+            "selection",
+            "shortcut_key",
+            "help_text",
+            "gutter",
+            "footer",
+            "scrollbar",
+            "window_close_button",
+        ],
+        "toasts" => &[
+            "background",
+            "title",
+            "text",
+            "gutter",
+            "help_text",
+            "toast_info",
+            "toast_warning",
+            "toast_error",
+        ],
+        _ => &[],
+    }
+}
+
+/// Builds default `-1` (inherit from base theme) activity override sub-maps for
+/// `bashedit`, `modals`, `menuedit`, `toasts`, `themeedit`, and `shortcutedit`.
+pub fn default_activity_overrides_map() -> HashMap<String, serde_yml::Value> {
+    let inherit_val = || serde_yml::Value::Number((-1).into());
+    let inherit_pair = || {
+        serde_yml::Value::Sequence(vec![
+            serde_yml::Value::Number((-1).into()),
+            serde_yml::Value::Number((-1).into()),
+        ])
+    };
+
+    let mut overrides = HashMap::new();
+    for &activity in &ACTIVITY_OVERRIDE_KEYS {
+        let mut sub_map = serde_yml::Mapping::new();
+        for &tok in activity_override_tokens(activity) {
+            let val = if is_scalar_color_token(tok) {
+                inherit_val()
+            } else {
+                inherit_pair()
+            };
+            sub_map.insert(serde_yml::Value::String(tok.to_string()), val);
+        }
+        overrides.insert(activity.to_string(), serde_yml::Value::Mapping(sub_map));
+    }
+    overrides
+}
+
 /// Theme marquee scroll configuration
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MarqueeConfig {
@@ -125,9 +235,57 @@ pub struct DividerConfig {
     pub length: Option<String>,
 }
 
+/// Visual layout style for toast notification popups.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ToastStyle {
+    /// Classic toast with solid or glyph vertical left accent bar.
+    #[default]
+    Bar,
+    /// Framed toast with double left border and single top/right/bottom frame.
+    Framed,
+}
+
+impl ToastStyle {
+    /// Parses a toast style name (defaults to `ToastStyle::Bar`).
+    pub fn from_str_name(s: &str) -> Self {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "framed" | "box" | "border" => Self::Framed,
+            _ => Self::Bar,
+        }
+    }
+
+    /// Returns canonical lowercase YAML string representation.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Bar => "bar",
+            Self::Framed => "framed",
+        }
+    }
+
+    /// Returns user-facing display label for theme editor UI.
+    pub fn display_label(&self) -> &'static str {
+        match self {
+            Self::Bar => "Bar",
+            Self::Framed => "Framed",
+        }
+    }
+
+    /// Toggles between `Bar` and `Framed` toast styles.
+    pub fn toggle(self) -> Self {
+        match self {
+            Self::Bar => Self::Framed,
+            Self::Framed => Self::Bar,
+        }
+    }
+}
+
 /// Theme toast notification configuration.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct ToastConfig {
+    /// Visual layout style (`"bar"` or `"framed"`, defaults to `"bar"`)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub style: Option<String>,
     /// Left accent indicator glyph (defaults to left half block `▌`)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub char: Option<String>,
@@ -317,6 +475,7 @@ impl Theme {
             gap: 4,
         });
         t.toast = Some(ToastConfig {
+            style: None,
             char: Some("▌".to_string()),
             timeout: Some(2.0),
         });
@@ -329,20 +488,30 @@ impl Theme {
             ])
         };
         colors.insert("background".to_string(), serde_yml::Value::Number(0.into()));
+        colors.insert("title".to_string(), make_pair(255, -1));
         colors.insert("text".to_string(), make_pair(255, -1));
         colors.insert("highlight".to_string(), make_pair(0, 255));
+        colors.insert(
+            "highlight_text".to_string(),
+            serde_yml::Value::Number(0.into()),
+        );
         colors.insert("border".to_string(), make_pair(250, -1));
         colors.insert("divider".to_string(), make_pair(245, -1));
         colors.insert("accent".to_string(), make_pair(255, -1));
         colors.insert("shortcut_key".to_string(), make_pair(255, -1));
+        colors.insert("selection".to_string(), make_pair(0, 255));
+        colors.insert("whitespace".to_string(), make_pair(242, -1));
         colors.insert("gutter".to_string(), make_pair(242, -1));
+        colors.insert("footer".to_string(), make_pair(245, -1));
         colors.insert("help_text".to_string(), make_pair(250, -1));
         colors.insert("plugin".to_string(), make_pair(250, -1));
+        colors.insert("window_close_button".to_string(), make_pair(255, -1));
         colors.insert("scrollbar".to_string(), make_pair(245, -1));
-        colors.insert("shadow".to_string(), make_pair(236, 0));
+        colors.insert("shadow".to_string(), make_pair(236, -1));
         colors.insert("toast_info".to_string(), make_pair(255, -1));
         colors.insert("toast_warning".to_string(), make_pair(250, -1));
         colors.insert("toast_error".to_string(), make_pair(245, -1));
+        colors.extend(default_activity_overrides_map());
         t.colors_256 = Some(colors);
         t
     }

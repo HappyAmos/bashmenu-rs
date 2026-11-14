@@ -12,8 +12,9 @@ use bashmenu_core::{
     MARKDOWN_REFERENCE_TEXT, PLACEHOLDER_HELP_TEXT,
 };
 use bashmenu_tui::{
-    install_panic_hook, AsciiGridModal, ColorGridModal, ConfirmModal, FilePickerModal, HelpModal,
-    InputModal, ResolvedThemeStyles, TerminalGuard, ToastRack,
+    color_to_rgb, install_panic_hook, AsciiGridModal, ColorGridModal, ConfirmModal,
+    FilePickerModal, HelpModal, InputModal, ResolvedThemeStyles, TerminalGuard, ThemeActivity,
+    ToastRack,
 };
 use clap::Parser;
 use crossterm::event::{
@@ -267,12 +268,17 @@ fn main() -> Result<()> {
     let use_nerd = config.settings.use_nerd_fonts.unwrap_or(false);
 
     let active_theme_name = cli.theme.as_deref().unwrap_or(&config.theme);
+    let active_theme = themes.get(active_theme_name);
 
-    let styles = if let Some(t) = themes.get(active_theme_name) {
-        ResolvedThemeStyles::from_theme(t, use_nerd)
-    } else {
-        ResolvedThemeStyles::default()
-    };
+    let styles = active_theme
+        .map(|t| ResolvedThemeStyles::from_theme_for_activity(t, use_nerd, ThemeActivity::BashEdit))
+        .unwrap_or_default();
+    let modal_styles = active_theme
+        .map(|t| ResolvedThemeStyles::from_theme_for_activity(t, use_nerd, ThemeActivity::Modals))
+        .unwrap_or_default();
+    let toast_styles = active_theme
+        .map(|t| ResolvedThemeStyles::from_theme_for_activity(t, use_nerd, ThemeActivity::Toasts))
+        .unwrap_or_default();
 
     // Initialize document tabs
     let mut tabs: Vec<EditorBuffer> = Vec::new();
@@ -416,9 +422,16 @@ fn main() -> Result<()> {
             let header_title = format!("  BashEdit - {}  ", active_name);
 
             // Fill header bar background
+            let (br, bg_g, bb) = color_to_rgb(styles.border);
+            let border_lum = (br as u32 * 299 + bg_g as u32 * 587 + bb as u32 * 114) / 1000;
+            let header_fg = if border_lum > 128 {
+                Color::Black
+            } else {
+                Color::White
+            };
             let header_bg_style = Style::default()
                 .bg(styles.border)
-                .fg(Color::Black)
+                .fg(header_fg)
                 .add_modifier(Modifier::BOLD);
 
             for x in area.x..area.x + area.width {
@@ -430,15 +443,25 @@ fn main() -> Result<()> {
 
             let close_btn_label = " [X] ";
             let close_btn_x = area.x + area.width.saturating_sub(close_btn_label.len() as u16);
+            let close_fg = styles
+                .window_close_button
+                .fg
+                .filter(|&c| c != styles.border)
+                .unwrap_or(header_fg);
             buf.set_string(
                 close_btn_x,
                 header_y,
                 close_btn_label,
-                header_bg_style.add_modifier(Modifier::BOLD),
+                Style::default()
+                    .bg(styles.border)
+                    .fg(close_fg)
+                    .add_modifier(Modifier::BOLD),
             );
 
             // 2. Tab Bar (Row 1): Multiple document tabs with active highlight, [x] close, and [+]
-            let tab_bar_style = Style::default().bg(styles.background).fg(Color::DarkGray);
+            let tab_bar_style = Style::default()
+                .bg(styles.background)
+                .fg(styles.footer.fg.unwrap_or(Color::DarkGray));
 
             for x in area.x..area.x + area.width {
                 buf[(x, tab_bar_y)].set_style(tab_bar_style);
@@ -470,7 +493,7 @@ fn main() -> Result<()> {
 
                 if tabs.len() > 1 {
                     let close_x = tab_x;
-                    buf.set_string(close_x, tab_bar_y, " ✕ ", Style::default().fg(Color::Red));
+                    buf.set_string(close_x, tab_bar_y, " ✕ ", styles.window_close_button);
                     tab_x += 3;
                     tab_close_regions.push((idx, close_x, tab_x));
                 }
@@ -494,12 +517,7 @@ fn main() -> Result<()> {
                     let v_idx = active_tab.scroll_row + view_row;
 
                     if v_idx >= v_lines.len() {
-                        buf.set_string(
-                            inner_x,
-                            screen_y,
-                            "~",
-                            Style::default().fg(Color::DarkGray),
-                        );
+                        buf.set_string(inner_x, screen_y, "~", styles.gutter);
                         continue;
                     }
 
@@ -509,20 +527,10 @@ fn main() -> Result<()> {
                     if show_line_numbers {
                         if vl.is_first_chunk {
                             let l_num_str = format!("{:>4} │ ", doc_row + 1);
-                            buf.set_string(
-                                inner_x,
-                                screen_y,
-                                &l_num_str,
-                                Style::default().fg(Color::DarkGray),
-                            );
+                            buf.set_string(inner_x, screen_y, &l_num_str, styles.gutter);
                         } else {
                             let blank_gutter = "     │ ";
-                            buf.set_string(
-                                inner_x,
-                                screen_y,
-                                blank_gutter,
-                                Style::default().fg(Color::DarkGray),
-                            );
+                            buf.set_string(inner_x, screen_y, blank_gutter, styles.gutter);
                         }
                     }
 
@@ -539,47 +547,16 @@ fn main() -> Result<()> {
                             let raw_ch = chars.get(doc_col).copied().unwrap_or(' ');
                             let is_cursor = doc_row == active_tab.cursor_row
                                 && doc_col == active_tab.cursor_col;
-
-                            let is_selected = if let Some(((sy, sx), (ey, ex))) = selection_range {
-                                if sy == ey {
-                                    doc_row == sy && doc_col >= sx && doc_col < ex
-                                } else if doc_row == sy {
-                                    doc_col >= sx
-                                } else if doc_row == ey {
-                                    doc_col < ex
-                                } else {
-                                    doc_row > sy && doc_row < ey
-                                }
-                            } else {
-                                false
-                            };
-
-                            let display_ch = if show_whitespace {
-                                if raw_ch == ' ' {
-                                    '·'
-                                } else if raw_ch == '\t' {
-                                    '→'
-                                } else {
-                                    raw_ch
-                                }
-                            } else {
-                                raw_ch
-                            };
-
-                            let text_fg = styles.text.fg.unwrap_or(Color::White);
-                            let text_bg = styles.text.bg.unwrap_or(styles.background);
-                            let cursor_style = Style::default()
-                                .fg(text_bg)
-                                .bg(text_fg)
-                                .add_modifier(Modifier::BOLD);
-
-                            let style = if is_cursor {
-                                cursor_style
-                            } else if is_selected {
-                                styles.highlight.add_modifier(Modifier::REVERSED)
-                            } else {
-                                styles.text
-                            };
+                            let is_selected = is_cell_selected(selection_range, doc_row, doc_col);
+                            let (display_ch, style) = editor_cell_appearance(
+                                raw_ch,
+                                doc_col,
+                                chars.len(),
+                                is_cursor,
+                                is_selected,
+                                show_whitespace,
+                                &styles,
+                            );
 
                             buf.set_string(screen_x, screen_y, display_ch.to_string(), style);
                         }
@@ -603,23 +580,13 @@ fn main() -> Result<()> {
                     let doc_row = active_tab.scroll_row + view_row;
 
                     if doc_row >= active_tab.lines.len() {
-                        buf.set_string(
-                            inner_x,
-                            screen_y,
-                            "~",
-                            Style::default().fg(Color::DarkGray),
-                        );
+                        buf.set_string(inner_x, screen_y, "~", styles.gutter);
                         continue;
                     }
 
                     if show_line_numbers {
                         let l_num_str = format!("{:>4} │ ", doc_row + 1);
-                        buf.set_string(
-                            inner_x,
-                            screen_y,
-                            &l_num_str,
-                            Style::default().fg(Color::DarkGray),
-                        );
+                        buf.set_string(inner_x, screen_y, &l_num_str, styles.gutter);
                     }
 
                     let line_str = &active_tab.lines[doc_row];
@@ -633,47 +600,16 @@ fn main() -> Result<()> {
                         let raw_ch = chars.get(doc_col).copied().unwrap_or(' ');
                         let is_cursor =
                             doc_row == active_tab.cursor_row && doc_col == active_tab.cursor_col;
-
-                        let is_selected = if let Some(((sy, sx), (ey, ex))) = selection_range {
-                            if sy == ey {
-                                doc_row == sy && doc_col >= sx && doc_col < ex
-                            } else if doc_row == sy {
-                                doc_col >= sx
-                            } else if doc_row == ey {
-                                doc_col < ex
-                            } else {
-                                doc_row > sy && doc_row < ey
-                            }
-                        } else {
-                            false
-                        };
-
-                        let display_ch = if show_whitespace {
-                            if raw_ch == ' ' && doc_col < chars.len() {
-                                '·'
-                            } else if raw_ch == '\t' {
-                                '→'
-                            } else {
-                                raw_ch
-                            }
-                        } else {
-                            raw_ch
-                        };
-
-                        let text_fg = styles.text.fg.unwrap_or(Color::White);
-                        let text_bg = styles.text.bg.unwrap_or(styles.background);
-                        let cursor_style = Style::default()
-                            .fg(text_bg)
-                            .bg(text_fg)
-                            .add_modifier(Modifier::BOLD);
-
-                        let style = if is_cursor {
-                            cursor_style
-                        } else if is_selected {
-                            styles.highlight.add_modifier(Modifier::REVERSED)
-                        } else {
-                            styles.text
-                        };
+                        let is_selected = is_cell_selected(selection_range, doc_row, doc_col);
+                        let (display_ch, style) = editor_cell_appearance(
+                            raw_ch,
+                            doc_col,
+                            chars.len(),
+                            is_cursor,
+                            is_selected,
+                            show_whitespace,
+                            &styles,
+                        );
 
                         buf.set_string(screen_x, screen_y, display_ch.to_string(), style);
                     }
@@ -719,19 +655,14 @@ fn main() -> Result<()> {
             let (line_r1, ranges_r1) =
                 bashmenu_tui::spread_gutter_line_layout(&labels_r1, legend_avail_w);
 
-            buf.set_string(
-                inner_x,
-                legend_row1_y,
-                &line_r1,
-                Style::default().fg(Color::DarkGray),
-            );
+            buf.set_string(inner_x, legend_row1_y, &line_r1, styles.footer);
 
             for (idx, (start, end)) in ranges_r1.into_iter().enumerate() {
                 if idx < items_r1.len() {
                     let (label, action) = items_r1[idx];
                     let screen_start = inner_x + start as u16;
                     let screen_end = inner_x + end as u16;
-                    buf.set_string(screen_start, legend_row1_y, label, styles.accent);
+                    buf.set_string(screen_start, legend_row1_y, label, styles.help_text);
                     footer_hit_regions.push(FooterHitRegion {
                         row: legend_row1_y,
                         start_x: screen_start,
@@ -756,19 +687,14 @@ fn main() -> Result<()> {
             let (line_r2, ranges_r2) =
                 bashmenu_tui::spread_gutter_line_layout(&labels_r2, legend_avail_w);
 
-            buf.set_string(
-                inner_x,
-                legend_row2_y,
-                &line_r2,
-                Style::default().fg(Color::DarkGray),
-            );
+            buf.set_string(inner_x, legend_row2_y, &line_r2, styles.footer);
 
             for (idx, (start, end)) in ranges_r2.into_iter().enumerate() {
                 if idx < items_r2.len() {
                     let (label, action) = items_r2[idx];
                     let screen_start = inner_x + start as u16;
                     let screen_end = inner_x + end as u16;
-                    buf.set_string(screen_start, legend_row2_y, label, styles.accent);
+                    buf.set_string(screen_start, legend_row2_y, label, styles.help_text);
                     footer_hit_regions.push(FooterHitRegion {
                         row: legend_row2_y,
                         start_x: screen_start,
@@ -793,12 +719,7 @@ fn main() -> Result<()> {
                 active_tab.lines.len(),
                 active_tab.cursor_col + 1
             );
-            buf.set_string(
-                inner_x,
-                status_y,
-                &pos_str,
-                Style::default().fg(Color::White),
-            );
+            buf.set_string(inner_x, status_y, &pos_str, styles.text);
 
             let status_info = if !active_tab.status_message.is_empty() {
                 format!("{}  {}", active_tab.status_message, status_flags)
@@ -807,22 +728,23 @@ fn main() -> Result<()> {
             };
 
             let status_info_x = (area.x + area.width).saturating_sub(status_info.len() as u16 + 2);
+            let status_color = if active_tab.is_modified {
+                styles.toast_warning
+            } else {
+                styles.toast_info
+            };
             buf.set_string(
                 status_info_x,
                 status_y,
                 &status_info,
-                Style::default().fg(if active_tab.is_modified {
-                    Color::Yellow
-                } else {
-                    Color::Green
-                }),
+                Style::default().fg(status_color),
             );
 
             // 7. Active Toasts
-            toast_rack.render(area, &styles, buf);
+            toast_rack.render(area, &toast_styles, buf);
 
             // 8. Modals
-            if let Some(orig) = render_modal(&mut active_modal, area, &styles, &tabs, buf) {
+            if let Some(orig) = render_modal(&mut active_modal, area, &modal_styles, &tabs, buf) {
                 last_grid_origin = orig;
             }
         })?;
@@ -1588,6 +1510,63 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+/// Returns `true` if `(doc_row, doc_col)` lies within `selection_range`.
+fn is_cell_selected(
+    selection_range: Option<((usize, usize), (usize, usize))>,
+    doc_row: usize,
+    doc_col: usize,
+) -> bool {
+    let Some(((sy, sx), (ey, ex))) = selection_range else {
+        return false;
+    };
+    if sy == ey {
+        doc_row == sy && doc_col >= sx && doc_col < ex
+    } else if doc_row == sy {
+        doc_col >= sx
+    } else if doc_row == ey {
+        doc_col < ex
+    } else {
+        doc_row > sy && doc_row < ey
+    }
+}
+
+/// Resolves display character and style for one canvas cell in `bashedit`.
+fn editor_cell_appearance(
+    raw_ch: char,
+    doc_col: usize,
+    line_len: usize,
+    is_cursor: bool,
+    is_selected: bool,
+    show_whitespace: bool,
+    styles: &ResolvedThemeStyles,
+) -> (char, Style) {
+    let is_ws = show_whitespace && doc_col < line_len && (raw_ch == ' ' || raw_ch == '\t');
+    let display_ch = if is_ws {
+        if raw_ch == ' ' {
+            '·'
+        } else {
+            '→'
+        }
+    } else {
+        raw_ch
+    };
+    let text_fg = styles.text.fg.unwrap_or(Color::White);
+    let text_bg = styles.text.bg.unwrap_or(styles.background);
+    let style = if is_cursor {
+        Style::default()
+            .fg(text_bg)
+            .bg(text_fg)
+            .add_modifier(Modifier::BOLD)
+    } else if is_selected {
+        styles.selection
+    } else if is_ws {
+        styles.whitespace
+    } else {
+        styles.text
+    };
+    (display_ch, style)
+}
+
 /// Renders the currently active modal overlay dialog.
 fn render_modal(
     active_modal: &mut ActiveModal,
@@ -1642,11 +1621,11 @@ fn render_modal(
                 inner.x + 2,
                 inner.y + 2,
                 &clipped2,
-                if is_running {
-                    Style::default().fg(Color::Red)
+                Style::default().fg(if is_running {
+                    styles.toast_error
                 } else {
-                    Style::default().fg(Color::Yellow)
-                },
+                    styles.toast_warning
+                }),
             );
             buf.set_string(
                 inner.x + 2,

@@ -2,8 +2,108 @@
 
 use crate::borders::ResolvedWindowBorders;
 use crate::wallpaper::{color_to_rgb, rgb_to_ansi16_name, rgb_to_ansi8_name, rgb_to_xterm256};
-use bashmenu_core::Theme;
+use bashmenu_core::{activity_override_tokens, Theme};
 use ratatui::style::{Color, Modifier, Style};
+use std::collections::HashMap;
+
+/// Logical UI activity or program context for per-activity theme overrides.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum ThemeActivity {
+    /// Primary `bashmenu` interactive menu screen (base theme palette).
+    #[default]
+    MainMenu,
+    /// Built-in `bashedit` text editor.
+    BashEdit,
+    /// Modal dialog overlays across all BashMenu apps.
+    Modals,
+    /// Visual `menuedit` menu tree editor.
+    MenuEdit,
+    /// Popup toast notification banners.
+    Toasts,
+    /// Visual `themeedit` theme and palette editor.
+    ThemeEdit,
+    /// Custom keybinding and `shortcutedit` shortcuts screen.
+    ShortcutEdit,
+}
+
+impl ThemeActivity {
+    /// Canonical YAML sub-map key for this activity inside a tier palette.
+    pub fn yaml_key(self) -> &'static str {
+        match self {
+            Self::MainMenu => "bashmenu",
+            Self::BashEdit => "bashedit",
+            Self::Modals => "modals",
+            Self::MenuEdit => "menuedit",
+            Self::Toasts => "toasts",
+            Self::ThemeEdit => "themeedit",
+            Self::ShortcutEdit => "shortcutedit",
+        }
+    }
+
+    /// Legacy YAML sub-map aliases checked as read fallbacks when migrating themes.
+    pub fn legacy_yaml_keys(self) -> &'static [&'static str] {
+        match self {
+            Self::BashEdit => &["editor"],
+            Self::MenuEdit => &["menu_editor"],
+            _ => &[],
+        }
+    }
+
+    /// Returns all six override activity variants excluding `MainMenu`.
+    pub fn all_override_activities() -> &'static [ThemeActivity] {
+        &[
+            Self::BashEdit,
+            Self::Modals,
+            Self::MenuEdit,
+            Self::Toasts,
+            Self::ThemeEdit,
+            Self::ShortcutEdit,
+        ]
+    }
+
+    /// Returns the supported color token names for this activity.
+    pub fn supported_tokens(self) -> &'static [&'static str] {
+        match self {
+            Self::MainMenu => &[
+                "background",
+                "title",
+                "text",
+                "highlight",
+                "highlight_text",
+                "border",
+                "divider",
+                "accent",
+                "selection",
+                "whitespace",
+                "shortcut_key",
+                "help_text",
+                "plugin",
+                "gutter",
+                "footer",
+                "window_close_button",
+                "scrollbar",
+                "shadow",
+                "toast_info",
+                "toast_warning",
+                "toast_error",
+            ],
+            _ => activity_override_tokens(self.yaml_key()),
+        }
+    }
+}
+
+/// Returns `true` if a YAML color token or `[fg, bg]` pair represents `-1` inheritance.
+pub fn is_inherited_color_value(val: &serde_yml::Value) -> bool {
+    match val {
+        serde_yml::Value::Null => true,
+        serde_yml::Value::Number(n) => n.as_i64().is_some_and(|i| i < 0),
+        serde_yml::Value::String(s) => s.trim().parse::<i64>().is_ok_and(|i| i < 0),
+        serde_yml::Value::Sequence(seq) => {
+            !seq.is_empty() && seq.iter().all(is_inherited_color_value)
+        }
+        _ => false,
+    }
+}
 
 /// Terminal color depth capability tier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
@@ -250,6 +350,8 @@ pub struct ResolvedThemeStyles {
     pub indicator_symbol: String,
     /// Resolved box-drawing glyphs for window borders
     pub borders: ResolvedWindowBorders,
+    /// Visual layout style for toast notification popups
+    pub toast_style: bashmenu_core::ToastStyle,
     /// Toast notification vertical accent indicator bar glyph
     pub toast_bar_char: String,
     /// Default display duration in seconds for toast popups
@@ -264,6 +366,8 @@ pub struct ResolvedThemeStyles {
     pub scrollbar: Style,
     /// Modal dialog drop-shadow style
     pub shadow: Style,
+    /// Visible whitespace glyph style in text editors
+    pub whitespace: Style,
     /// Active terminal color capability tier
     pub tier: ColorTier,
 }
@@ -299,6 +403,7 @@ impl Default for ResolvedThemeStyles {
             window_close_button: Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
             indicator_symbol: "► ".to_string(),
             borders: ResolvedWindowBorders::default(),
+            toast_style: bashmenu_core::ToastStyle::default(),
             toast_bar_char: "▌".to_string(),
             toast_timeout: 2.0,
             toast_info: Color::Rgb(78, 191, 113),
@@ -306,6 +411,7 @@ impl Default for ResolvedThemeStyles {
             toast_error: Color::Rgb(255, 85, 85),
             scrollbar: Style::default().fg(Color::Cyan),
             shadow: Style::default().fg(Color::DarkGray).bg(Color::Black),
+            whitespace: Style::default().fg(Color::DarkGray),
             tier: ColorTier::TrueColor,
         }
     }
@@ -343,50 +449,42 @@ pub fn parse_color_value_with_tier(val: &serde_yml::Value, tier: ColorTier) -> O
                     return Some(Color::Indexed(i as u8));
                 }
             }
-            if s_trim.starts_with('#') {
-                let hex = s_trim.trim_start_matches('#');
-                if hex.len() == 6 {
-                    if let Ok(rgb) = u32::from_str_radix(hex, 16) {
-                        let r = ((rgb >> 16) & 0xFF) as u8;
-                        let g = ((rgb >> 8) & 0xFF) as u8;
-                        let b = (rgb & 0xFF) as u8;
-                        return Some(match tier {
-                            ColorTier::Color8 => downsample_color_to_8(Color::Rgb(r, g, b)),
-                            ColorTier::Color16 => downsample_color_to_16(Color::Rgb(r, g, b)),
-                            ColorTier::Color256 | ColorTier::TrueColor => Color::Rgb(r, g, b),
-                        });
-                    }
+            if let Some(hex_rgb) = s_trim
+                .strip_prefix('#')
+                .filter(|h| h.len() == 6)
+                .and_then(|h| u32::from_str_radix(h, 16).ok())
+            {
+                let r = ((hex_rgb >> 16) & 0xFF) as u8;
+                let g = ((hex_rgb >> 8) & 0xFF) as u8;
+                let b = (hex_rgb & 0xFF) as u8;
+                Some(Color::Rgb(r, g, b))
+            } else {
+                match s_trim.to_uppercase().as_str() {
+                    "COLOR_BLACK" | "BLACK" => Some(Color::Black),
+                    "COLOR_RED" | "RED" => Some(Color::Red),
+                    "COLOR_GREEN" | "GREEN" => Some(Color::Green),
+                    "COLOR_YELLOW" | "YELLOW" => Some(Color::Yellow),
+                    "COLOR_BLUE" | "BLUE" => Some(Color::Blue),
+                    "COLOR_MAGENTA" | "MAGENTA" => Some(Color::Magenta),
+                    "COLOR_CYAN" | "CYAN" => Some(Color::Cyan),
+                    "COLOR_WHITE" | "WHITE" => Some(Color::White),
+                    "COLOR_GREY" | "COLOR_GRAY" | "GRAY" | "GREY" => Some(Color::DarkGray),
+                    "COLOR_BRIGHT_BLACK" => Some(Color::DarkGray),
+                    "COLOR_BRIGHT_RED" => Some(Color::LightRed),
+                    "COLOR_BRIGHT_GREEN" => Some(Color::LightGreen),
+                    "COLOR_BRIGHT_YELLOW" => Some(Color::LightYellow),
+                    "COLOR_BRIGHT_BLUE" => Some(Color::LightBlue),
+                    "COLOR_BRIGHT_MAGENTA" => Some(Color::LightMagenta),
+                    "COLOR_BRIGHT_CYAN" => Some(Color::LightCyan),
+                    "COLOR_BRIGHT_WHITE" => Some(Color::White),
+                    _ => None,
                 }
-            }
-            match s_trim.to_uppercase().as_str() {
-                "COLOR_BLACK" | "BLACK" => Some(Color::Black),
-                "COLOR_RED" | "RED" => Some(Color::Red),
-                "COLOR_GREEN" | "GREEN" => Some(Color::Green),
-                "COLOR_YELLOW" | "YELLOW" => Some(Color::Yellow),
-                "COLOR_BLUE" | "BLUE" => Some(Color::Blue),
-                "COLOR_MAGENTA" | "MAGENTA" => Some(Color::Magenta),
-                "COLOR_CYAN" | "CYAN" => Some(Color::Cyan),
-                "COLOR_WHITE" | "WHITE" => Some(Color::White),
-                "COLOR_GREY" | "COLOR_GRAY" | "GRAY" | "GREY" => Some(Color::DarkGray),
-                "COLOR_BRIGHT_BLACK" => Some(Color::DarkGray),
-                "COLOR_BRIGHT_RED" => Some(Color::LightRed),
-                "COLOR_BRIGHT_GREEN" => Some(Color::LightGreen),
-                "COLOR_BRIGHT_YELLOW" => Some(Color::LightYellow),
-                "COLOR_BRIGHT_BLUE" => Some(Color::LightBlue),
-                "COLOR_BRIGHT_MAGENTA" => Some(Color::LightMagenta),
-                "COLOR_BRIGHT_CYAN" => Some(Color::LightCyan),
-                "COLOR_BRIGHT_WHITE" => Some(Color::White),
-                _ => None,
             }
         }
         _ => None,
     }?;
 
-    Some(match tier {
-        ColorTier::Color8 => downsample_color_to_8(raw_color),
-        ColorTier::Color16 => downsample_color_to_16(raw_color),
-        ColorTier::Color256 | ColorTier::TrueColor => raw_color,
-    })
+    Some(downsample_color_to_tier(raw_color, tier))
 }
 
 /// Parses a color identifier (number, hex string, or named constant) into a
@@ -436,7 +534,223 @@ pub fn parse_style_pair(val: Option<&serde_yml::Value>) -> Option<Style> {
     parse_style_pair_with_tier(val, ColorTier::detect())
 }
 
+/// Finds the override sub-map matching `activity`'s canonical key or legacy alias.
+fn find_activity_map(
+    p: &HashMap<String, serde_yml::Value>,
+    activity: ThemeActivity,
+) -> Option<&serde_yml::Mapping> {
+    p.get(activity.yaml_key())
+        .and_then(|v| v.as_mapping())
+        .or_else(|| {
+            activity
+                .legacy_yaml_keys()
+                .iter()
+                .find_map(|k| p.get(*k).and_then(|v| v.as_mapping()))
+        })
+}
+
+/// Merges a resolved style pair onto `base`, keeping `base.fg` when `st.fg` is `-1`.
+fn merge_style_pair(base: Style, st: Style, extra_mod: Option<Modifier>) -> Style {
+    let fg = st.fg.or(base.fg);
+    let mut out = Style::default();
+    if let Some(c) = fg {
+        out = out.fg(c);
+    }
+    if let Some(c) = st.bg {
+        out = out.bg(c);
+    }
+    if let Some(m) = extra_mod {
+        out = out.add_modifier(m);
+    }
+    out
+}
+
 impl ResolvedThemeStyles {
+    /// Applies palette token entries from `p` onto `self`.
+    ///
+    /// When `is_override` is `true`, `-1` / `[-1, -1]` values leave the inherited base
+    /// styles unchanged and automatic fallback propagation (`text` -> `plugin`,
+    /// `gutter` -> `whitespace`) is skipped.
+    fn apply_palette_map(
+        &mut self,
+        p: &HashMap<String, serde_yml::Value>,
+        tier: ColorTier,
+        is_override: bool,
+    ) {
+        if let Some(bg) = p
+            .get("background")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_color_value_with_tier(v, tier))
+        {
+            if bg != Color::Reset {
+                self.background = bg;
+            }
+        }
+        if let Some(st) = p
+            .get("border")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
+        {
+            if let Some(fg) = st.fg {
+                self.border = fg;
+            }
+        }
+        if let Some(st) = p
+            .get("title")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
+        {
+            self.title = merge_style_pair(self.title, st, Some(Modifier::BOLD));
+        }
+        if let Some(st) = p
+            .get("text")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
+        {
+            let merged = merge_style_pair(self.text, st, None);
+            self.text = merged;
+            if !is_override && !p.contains_key("plugin") {
+                self.plugin = merged;
+            }
+        }
+        if let Some(st) = p
+            .get("highlight")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
+        {
+            self.highlight = merge_style_pair(self.highlight, st, Some(Modifier::BOLD));
+        }
+        if let Some(st) = p
+            .get("highlight_text")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
+        {
+            if let Some(fg) = st.fg {
+                self.highlight = self.highlight.fg(fg);
+            }
+        }
+        if let Some(st) = p
+            .get("accent")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
+        {
+            self.accent = merge_style_pair(self.accent, st, None);
+        }
+        if let Some(st) = p
+            .get("footer")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
+        {
+            self.footer = merge_style_pair(self.footer, st, None);
+        }
+        if let Some(st) = p
+            .get("gutter")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
+        {
+            let merged = merge_style_pair(self.gutter, st, None);
+            self.gutter = merged;
+            if !is_override && !p.contains_key("whitespace") {
+                self.whitespace = merged;
+            }
+        }
+        if let Some(st) = p
+            .get("whitespace")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
+        {
+            self.whitespace = merge_style_pair(self.whitespace, st, None);
+        }
+        if let Some(st) = p
+            .get("help_text")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
+        {
+            self.help_text = merge_style_pair(self.help_text, st, None);
+        }
+        if let Some(st) = p
+            .get("plugin")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
+        {
+            self.plugin = merge_style_pair(self.plugin, st, None);
+        }
+        if let Some(st) = p
+            .get("selection")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
+        {
+            self.selection = merge_style_pair(self.selection, st, None);
+        }
+        if let Some(st) = p
+            .get("shortcut_key")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
+        {
+            self.shortcut_key = merge_style_pair(self.shortcut_key, st, Some(Modifier::BOLD));
+        }
+        if let Some(st) = p
+            .get("divider")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
+        {
+            self.divider = merge_style_pair(self.divider, st, None);
+        }
+        if let Some(st) = p
+            .get("window_close_button")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
+        {
+            self.window_close_button =
+                merge_style_pair(self.window_close_button, st, Some(Modifier::BOLD));
+        }
+        if let Some(st) = p
+            .get("scrollbar")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
+        {
+            self.scrollbar = merge_style_pair(self.scrollbar, st, None);
+        }
+        if let Some(st) = p
+            .get("shadow")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
+        {
+            let fg_color = st
+                .fg
+                .unwrap_or_else(|| self.shadow.fg.unwrap_or(Color::DarkGray));
+            let bg_color = st.bg.unwrap_or(fg_color);
+            self.shadow = Style::default().fg(fg_color).bg(bg_color);
+        }
+        if let Some(c) = p
+            .get("toast_info")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_color_value_with_tier(v, tier))
+        {
+            if c != Color::Reset {
+                self.toast_info = c;
+            }
+        }
+        if let Some(c) = p
+            .get("toast_warning")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_color_value_with_tier(v, tier))
+        {
+            if c != Color::Reset {
+                self.toast_warning = c;
+            }
+        }
+        if let Some(c) = p
+            .get("toast_error")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_color_value_with_tier(v, tier))
+        {
+            if c != Color::Reset {
+                self.toast_error = c;
+            }
+        }
+    }
+
     /// Resolves theme palette from Theme struct using a specific color tier.
     pub fn from_theme_with_tier(theme: &Theme, use_nerd_fonts: bool, tier: ColorTier) -> Self {
         let mut resolved = Self {
@@ -509,93 +823,14 @@ impl ResolvedThemeStyles {
         };
 
         if let Some(p) = palette {
-            if let Some(bg) = p
-                .get("background")
-                .and_then(|v| parse_color_value_with_tier(v, tier))
-            {
-                resolved.background = bg;
-            }
-            if let Some(st) = parse_style_pair_with_tier(p.get("border"), tier) {
-                resolved.border = st.fg.unwrap_or(Color::Cyan);
-            }
-            if let Some(st) = parse_style_pair_with_tier(p.get("title"), tier) {
-                resolved.title = st.add_modifier(Modifier::BOLD);
-            }
-            if let Some(st) = parse_style_pair_with_tier(p.get("text"), tier) {
-                resolved.text = st;
-                resolved.plugin = st;
-            }
-            if let Some(st) = parse_style_pair_with_tier(p.get("highlight"), tier) {
-                resolved.highlight = st.add_modifier(Modifier::BOLD);
-            }
-            if let Some(st) = parse_style_pair_with_tier(p.get("highlight_text"), tier) {
-                if let Some(fg) = st.fg {
-                    resolved.highlight = resolved.highlight.fg(fg);
-                }
-            }
-            if let Some(st) = parse_style_pair_with_tier(p.get("accent"), tier) {
-                resolved.accent = st;
-            }
-            if let Some(st) = parse_style_pair_with_tier(p.get("footer"), tier) {
-                resolved.footer = st;
-            }
-            if let Some(st) = parse_style_pair_with_tier(p.get("gutter"), tier) {
-                resolved.gutter = st;
-            }
-            if let Some(st) = parse_style_pair_with_tier(p.get("help_text"), tier) {
-                resolved.help_text = st;
-            }
-            if let Some(st) = parse_style_pair_with_tier(p.get("plugin"), tier) {
-                resolved.plugin = st;
-            }
-            if let Some(st) = parse_style_pair_with_tier(p.get("selection"), tier) {
-                resolved.selection = st;
-            }
-            if let Some(st) = parse_style_pair_with_tier(p.get("shortcut_key"), tier) {
-                resolved.shortcut_key = st.add_modifier(Modifier::BOLD);
-            }
-            if let Some(st) = parse_style_pair_with_tier(p.get("divider"), tier) {
-                resolved.divider = st;
-            }
-            if let Some(st) = parse_style_pair_with_tier(p.get("window_close_button"), tier) {
-                resolved.window_close_button = st.add_modifier(Modifier::BOLD);
-            }
-            if let Some(st) = parse_style_pair_with_tier(p.get("scrollbar"), tier) {
-                resolved.scrollbar = st;
-            }
-            if let Some(st) = parse_style_pair_with_tier(p.get("shadow"), tier) {
-                resolved.shadow = Style::default()
-                    .fg(st.fg.unwrap_or(Color::DarkGray))
-                    .bg(st.bg.unwrap_or(Color::Black));
-            }
-            if let Some(c) = p
-                .get("toast_info")
-                .and_then(|v| parse_color_value_with_tier(v, tier))
-            {
-                if c != Color::Reset {
-                    resolved.toast_info = c;
-                }
-            }
-            if let Some(c) = p
-                .get("toast_warning")
-                .and_then(|v| parse_color_value_with_tier(v, tier))
-            {
-                if c != Color::Reset {
-                    resolved.toast_warning = c;
-                }
-            }
-            if let Some(c) = p
-                .get("toast_error")
-                .and_then(|v| parse_color_value_with_tier(v, tier))
-            {
-                if c != Color::Reset {
-                    resolved.toast_error = c;
-                }
-            }
+            resolved.apply_palette_map(p, tier, false);
         }
 
         // Toast configuration
         if let Some(t_cfg) = &theme.toast {
+            if let Some(style_str) = &t_cfg.style {
+                resolved.toast_style = bashmenu_core::ToastStyle::from_str_name(style_str);
+            }
             if let Some(ch) = &t_cfg.char {
                 let parsed = bashmenu_core::parse_ascii_val(ch);
                 if !parsed.is_empty() {
@@ -614,10 +849,71 @@ impl ResolvedThemeStyles {
         resolved
     }
 
+    /// Resolves theme palette for a specific UI activity using a explicit color tier.
+    pub fn from_theme_with_tier_for_activity(
+        theme: &Theme,
+        use_nerd_fonts: bool,
+        tier: ColorTier,
+        activity: ThemeActivity,
+    ) -> Self {
+        let mut resolved = Self::from_theme_with_tier(theme, use_nerd_fonts, tier);
+        if activity == ThemeActivity::MainMenu {
+            return resolved;
+        }
+
+        let palette_candidates: [Option<&HashMap<String, serde_yml::Value>>; 3] = match tier {
+            ColorTier::Color8 => [
+                theme.colors_8.as_ref(),
+                theme.colors_16.as_ref(),
+                theme.colors_256.as_ref(),
+            ],
+            ColorTier::Color16 => [
+                theme.colors_16.as_ref(),
+                theme.colors_256.as_ref(),
+                theme.colors_8.as_ref(),
+            ],
+            ColorTier::Color256 | ColorTier::TrueColor => [
+                theme.colors_256.as_ref(),
+                theme.colors_16.as_ref(),
+                theme.colors_8.as_ref(),
+            ],
+        };
+
+        if let Some(sub_mapping) = palette_candidates
+            .into_iter()
+            .flatten()
+            .find_map(|p| find_activity_map(p, activity))
+        {
+            let mut override_map = HashMap::new();
+            for (k, v) in sub_mapping {
+                if let Some(ks) = k.as_str() {
+                    override_map.insert(ks.to_string(), v.clone());
+                }
+            }
+            resolved.apply_palette_map(&override_map, tier, true);
+        }
+
+        resolved
+    }
+
     /// Resolves theme palette from Theme struct using detected environment
     /// color tier.
     pub fn from_theme(theme: &Theme, use_nerd_fonts: bool) -> Self {
         Self::from_theme_with_tier(theme, use_nerd_fonts, ColorTier::detect())
+    }
+
+    /// Resolves theme palette for a specific UI activity using the detected color tier.
+    pub fn from_theme_for_activity(
+        theme: &Theme,
+        use_nerd_fonts: bool,
+        activity: ThemeActivity,
+    ) -> Self {
+        Self::from_theme_with_tier_for_activity(
+            theme,
+            use_nerd_fonts,
+            ColorTier::detect(),
+            activity,
+        )
     }
 
     /// Sets the runtime toast notification timeout (from global settings).

@@ -205,6 +205,7 @@ impl MenuView {
         self.gutter_hover
             .set_duration(std::time::Duration::from_secs_f64(delay.max(0.0)));
         self.config = config;
+        self.config.settings.use_nerd_fonts = Some(self.use_nerd_fonts);
     }
 
     /// Update theme styles
@@ -215,6 +216,7 @@ impl MenuView {
     /// Update nerd fonts rendering mode
     pub fn set_use_nerd_fonts(&mut self, use_nerd: bool) {
         self.use_nerd_fonts = use_nerd;
+        self.config.settings.use_nerd_fonts = Some(use_nerd);
     }
 
     /// Update status gutter template or value
@@ -406,14 +408,7 @@ impl MenuView {
             .len()
             .saturating_sub(offset)
             .min(content_avail_h);
-        let remaining_h = content_avail_h.saturating_sub(menu_needed_h);
-        let active_plugin_rows = if remaining_h > 0 && !self.plugin_rows.is_empty() {
-            remaining_h.min(self.plugin_rows.len())
-        } else {
-            0
-        };
-        let menu_display_h = content_avail_h.saturating_sub(active_plugin_rows);
-        let menu_bottom_y = content_start_y + menu_display_h as u16;
+        let menu_bottom_y = content_start_y + menu_needed_h as u16;
 
         let bot_y = area.y + area.height.saturating_sub(1);
         let max_allowed = if bot_y > menu_bottom_y + 1 {
@@ -1758,6 +1753,19 @@ impl MenuView {
     /// Resets gutter hover tooltip expansion on user interaction (key press, click, scroll).
     pub fn handle_interaction(&mut self) -> bool {
         self.gutter_hover.handle_interaction()
+    }
+
+    /// Toggles the expanded help gutter overlay if hidden help items exist.
+    pub fn toggle_help_gutter(&mut self, area: Rect) -> bool {
+        let has_hidden = self.has_hidden_help_text(area) && area.height >= 7;
+        if has_hidden {
+            self.gutter_hover.toggle_expanded()
+        } else if self.gutter_hover.is_expanded() {
+            self.gutter_hover.reset();
+            true
+        } else {
+            false
+        }
     }
 }
 

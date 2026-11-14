@@ -1057,9 +1057,11 @@ static ENV_RE: std::sync::LazyLock<Regex> =
 static DOT_RE: std::sync::LazyLock<Regex> =
     std::sync::LazyLock::new(|| Regex::new(r"\{([a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)+)\}").unwrap());
 
-/// Regular expression matching embedded bash command substitution `{command:...}`.
-static COMMAND_RE: std::sync::LazyLock<Regex> =
-    std::sync::LazyLock::new(|| Regex::new(r"\{command:((?:[^{}]|\{[^{}]*\})+)\}").unwrap());
+/// Regular expression matching embedded bash command substitution
+/// `{command:...}` and its `{cmd:...}` alias.
+static COMMAND_RE: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
+    Regex::new(r"\{(?:command|cmd):((?:[^{}]|\{[^{}]*\})+)\}").unwrap()
+});
 
 /// Regular expression matching file picker macro directives `{file_picker:...}`.
 static FILE_PICKER_MACRO_RE: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
@@ -1523,7 +1525,7 @@ pub fn extract_toasts(text: &str, ctx: &MacroContext) -> (String, Vec<ToastNotif
 /// - Builtin system paths: `{home}`, `{bashmenu_dir}`, `{dev_dir}`, `{scripts_dir}`, `{notebooks_dir}`, `{shortcuts_file}`, etc.
 /// - System stats & badges: `{time_24}`, `{date}`, `{user}`, `{host}`, `{localip}`, `{battery}`
 /// - Dot-notation config paths: `{user.<key>}`, `{settings.<key>}`, `{app.theme}`
-/// - Command substitutions: `{command:<cmd>}` (cached for 30 seconds)
+/// - Command substitutions: `{command:<cmd>}` / `{cmd:<cmd>}` (30s cache)
 ///
 /// # Recursion & Depth
 /// Supports nested placeholders (e.g. `{command:echo {user.name}}`) up to a maximum
@@ -1551,7 +1553,7 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
 
     // Step 2. Adaptive glyph: {nf:...} (prefers Nerd Font glyph if use_nerd_fonts is enabled)
     if res.contains("{nf:") {
-        let use_nerd = ctx.config.settings.use_nerd_fonts.unwrap_or(false);
+        let use_nerd = ctx.config.settings.use_nerd_fonts.unwrap_or(true);
         res = NF_RE
             .replace_all(&res, |caps: &Captures| resolve_glyph(&caps[0], use_nerd))
             .to_string();
@@ -1881,8 +1883,8 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
         }
     }
 
-    // 7. Command substitution: {command:<cmd>} with 30s TTL caching
-    if res.contains("{command:") {
+    // 7. Command substitution: {command:<cmd>} / {cmd:<cmd>} with 30s TTL caching
+    if res.contains("{command:") || res.contains("{cmd:") {
         res = COMMAND_RE
             .replace_all(&res, |caps: &Captures| {
                 let raw_cmd = &caps[1];

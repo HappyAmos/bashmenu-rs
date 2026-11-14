@@ -2,7 +2,10 @@
 //!
 //! Validates YAML files for syntax or specific schema rules (themes, config, menu).
 
-use bashmenu_core::{load_config, load_menu, load_shortcuts, load_themes, validate_key_spec};
+use bashmenu_core::{
+    activity_override_tokens, load_config, load_menu, load_shortcuts, load_themes,
+    validate_key_spec, ACTIVITY_OVERRIDE_KEYS,
+};
 use clap::{ArgGroup, Parser};
 use std::collections::HashSet;
 use std::fs;
@@ -33,6 +36,43 @@ const VALID_16_COLORS: &[&str] = &[
     "COLOR_PURPLE",
     "COLOR_PINK",
     "COLOR_BROWN",
+];
+
+/// Canonical names for 8-color ANSI terminal palette colors.
+const VALID_8_COLORS: &[&str] = &[
+    "COLOR_BLACK",
+    "COLOR_RED",
+    "COLOR_GREEN",
+    "COLOR_YELLOW",
+    "COLOR_BLUE",
+    "COLOR_MAGENTA",
+    "COLOR_CYAN",
+    "COLOR_WHITE",
+];
+
+/// Canonical top-level color tokens supported inside each palette tier.
+const VALID_BASE_COLOR_TOKENS: &[&str] = &[
+    "background",
+    "title",
+    "text",
+    "highlight",
+    "highlight_text",
+    "border",
+    "divider",
+    "accent",
+    "selection",
+    "whitespace",
+    "shortcut_key",
+    "help_text",
+    "plugin",
+    "gutter",
+    "footer",
+    "window_close_button",
+    "scrollbar",
+    "shadow",
+    "toast_info",
+    "toast_warning",
+    "toast_error",
 ];
 
 /// Valid field keys permitted in a theme's `window:` border configuration map.
@@ -149,6 +189,179 @@ fn validate_yaml_syntax(path: &Path) -> bool {
     }
 }
 
+/// Validates a single palette color element (number, `-1` inherit, hex, or ANSI constant).
+fn validate_palette_scalar(
+    elem: &serde_yml::Value,
+    tier_name: &str,
+    valid_constants: Option<&HashSet<&str>>,
+    ctx: &str,
+    errors: &mut Vec<String>,
+) {
+    match elem {
+        serde_yml::Value::Number(n) => {
+            let Some(i) = n.as_i64() else {
+                errors.push(format!("{}: Color value must be an integer", ctx));
+                return;
+            };
+            if i == -1 {
+                return;
+            }
+            let max_idx = match tier_name {
+                "8" => 7,
+                "16" => 15,
+                _ => 255,
+            };
+            if !(0..=max_idx).contains(&i) {
+                errors.push(format!(
+                    "{}: Color index {} out of range (expected -1 or 0..={})",
+                    ctx, i, max_idx
+                ));
+            }
+        }
+        serde_yml::Value::String(s) => {
+            let s_trim = s.trim();
+            if s_trim == "-1" {
+                return;
+            }
+            if tier_name == "256" {
+                let is_hex = s_trim
+                    .strip_prefix('#')
+                    .is_some_and(|h| h.len() == 6 && h.chars().all(|c| c.is_ascii_hexdigit()));
+                let is_idx = s_trim
+                    .parse::<i64>()
+                    .is_ok_and(|i| i == -1 || (0..=255).contains(&i));
+                if !is_hex && !is_idx {
+                    if let Some(valid16) = valid_constants {
+                        if !valid16.contains(s_trim) {
+                            errors.push(format!("{}: Invalid 256/TrueColor token '{}'", ctx, s));
+                        }
+                    } else {
+                        errors.push(format!("{}: Invalid 256/TrueColor token '{}'", ctx, s));
+                    }
+                }
+            } else if let Some(allowed) = valid_constants {
+                if !allowed.contains(s_trim) {
+                    errors.push(format!("{}: Invalid color constant '{}'", ctx, s));
+                }
+            }
+        }
+        _ => {
+            errors.push(format!(
+                "{}: Expected color integer or string constant",
+                ctx
+            ));
+        }
+    }
+}
+
+/// Validates a palette entry inside a tier (`256`, `16`, or `8`), including nested
+/// activity override sub-maps.
+#[allow(clippy::too_many_arguments)]
+fn validate_palette_entry(
+    key: &str,
+    val: &serde_yml::Value,
+    theme_name: &str,
+    tier_name: &str,
+    activity_scope: Option<&str>,
+    valid_base: &HashSet<&str>,
+    valid_activities: &HashSet<&str>,
+    valid_16: &HashSet<&str>,
+    valid_8: &HashSet<&str>,
+    errors: &mut Vec<String>,
+) {
+    let tier_constants = match tier_name {
+        "8" => Some(valid_8),
+        "16" => Some(valid_16),
+        _ => Some(valid_16),
+    };
+    let path_ctx = match activity_scope {
+        Some(act) => format!("'{}.{}.{}.{}'", theme_name, tier_name, act, key),
+        None => format!("'{}.{}.{}'", theme_name, tier_name, key),
+    };
+
+    if let Some(act) = activity_scope {
+        let allowed_sub = activity_override_tokens(act);
+        if !allowed_sub.contains(&key) {
+            errors.push(format!(
+                "{}: Unknown or unsupported token '{}' in activity '{}'",
+                path_ctx, key, act
+            ));
+            return;
+        }
+        if matches!(val, serde_yml::Value::Mapping(_)) {
+            errors.push(format!(
+                "{}: Nested mappings are not allowed inside activity overrides",
+                path_ctx
+            ));
+            return;
+        }
+    } else if valid_activities.contains(key) {
+        let Some(sub_map) = val.as_mapping() else {
+            errors.push(format!(
+                "{}: Activity override section must be a YAML map",
+                path_ctx
+            ));
+            return;
+        };
+        for (sk, sv) in sub_map {
+            let Some(sk_str) = sk.as_str() else {
+                errors.push(format!(
+                    "{}: Activity override keys must be strings",
+                    path_ctx
+                ));
+                continue;
+            };
+            validate_palette_entry(
+                sk_str,
+                sv,
+                theme_name,
+                tier_name,
+                Some(key),
+                valid_base,
+                valid_activities,
+                valid_16,
+                valid_8,
+                errors,
+            );
+        }
+        return;
+    } else if !valid_base.contains(key) {
+        errors.push(format!(
+            "{}: Unknown or legacy palette key '{}'",
+            path_ctx, key
+        ));
+        return;
+    }
+
+    match val {
+        serde_yml::Value::Sequence(seq) => {
+            if seq.len() != 2 {
+                errors.push(format!("{}: Must be a 2-element list [fg, bg]", path_ctx));
+                return;
+            }
+            for (i, elem) in seq.iter().enumerate() {
+                let layer = if i == 0 { "fg" } else { "bg" };
+                let elem_ctx = format!(
+                    "'{}.{}.{}.{}.{}'",
+                    theme_name,
+                    tier_name,
+                    activity_scope.unwrap_or_default(),
+                    key,
+                    layer
+                )
+                .replace("..", ".");
+                validate_palette_scalar(elem, tier_name, tier_constants, &elem_ctx, errors);
+            }
+        }
+        serde_yml::Value::Number(_) | serde_yml::Value::String(_) => {
+            validate_palette_scalar(val, tier_name, tier_constants, &path_ctx, errors);
+        }
+        _ => {
+            errors.push(format!("{}: Invalid color value type", path_ctx));
+        }
+    }
+}
+
 /// Validates a `bashmenu.themes` theme file against schema rules, palette color ranges, and border keys.
 fn validate_theme_file(path: &Path) -> bool {
     println!("Validating theme file {}...", path.display());
@@ -162,38 +375,31 @@ fn validate_theme_file(path: &Path) -> bool {
 
     let mut errors = Vec::new();
     let valid_16: HashSet<&str> = VALID_16_COLORS.iter().copied().collect();
+    let valid_8: HashSet<&str> = VALID_8_COLORS.iter().copied().collect();
+    let valid_base: HashSet<&str> = VALID_BASE_COLOR_TOKENS.iter().copied().collect();
+    let valid_activities: HashSet<&str> = ACTIVITY_OVERRIDE_KEYS.iter().copied().collect();
     let valid_borders: HashSet<&str> = VALID_WINDOW_BORDER_KEYS.iter().copied().collect();
 
     for (name, theme) in &themes {
-        // Validate 256 colors
-        if let Some(c256) = &theme.colors_256 {
-            for (key, val) in c256 {
-                if let serde_yml::Value::Sequence(seq) = val {
-                    if seq.len() != 2 {
-                        errors.push(format!(
-                            "'{}.256.{}': Must be a 2-element list [fg, bg]",
-                            name, key
-                        ));
-                    }
-                }
-            }
-        }
-
-        // Validate 16 colors
-        if let Some(c16) = &theme.colors_16 {
-            for (key, val) in c16 {
-                if let serde_yml::Value::Sequence(seq) = val {
-                    for (i, elem) in seq.iter().enumerate() {
-                        let layer = if i == 0 { "fg" } else { "bg" };
-                        if let serde_yml::Value::String(s) = elem {
-                            if s != "-1" && !valid_16.contains(s.as_str()) {
-                                errors.push(format!(
-                                    "'{}.16.{}.{}': Invalid color constant '{}'",
-                                    name, key, layer, s
-                                ));
-                            }
-                        }
-                    }
+        for (tier_name, palette_opt) in [
+            ("256", &theme.colors_256),
+            ("16", &theme.colors_16),
+            ("8", &theme.colors_8),
+        ] {
+            if let Some(pal) = palette_opt {
+                for (key, val) in pal {
+                    validate_palette_entry(
+                        key,
+                        val,
+                        name,
+                        tier_name,
+                        None,
+                        &valid_base,
+                        &valid_activities,
+                        &valid_16,
+                        &valid_8,
+                        &mut errors,
+                    );
                 }
             }
         }
@@ -217,6 +423,22 @@ fn validate_theme_file(path: &Path) -> bool {
                     "'{}.window': Unknown border property '{}'",
                     name, key
                 ));
+            }
+        }
+
+        // Validate toast style if configured
+        if let Some(toast) = &theme.toast {
+            if let Some(style) = &toast.style {
+                let norm = style.trim().to_ascii_lowercase();
+                if !matches!(
+                    norm.as_str(),
+                    "bar" | "classic" | "default" | "framed" | "box" | "border"
+                ) {
+                    errors.push(format!(
+                        "'{}.toast.style': Unknown toast style '{}' (expected 'bar' or 'framed')",
+                        name, style
+                    ));
+                }
             }
         }
     }

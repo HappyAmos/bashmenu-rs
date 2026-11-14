@@ -1,3 +1,47 @@
+## Theme Editor `<F5>` Derive Colors Confirmation Dialog
+- [x] Added `ActiveModal::ConfirmDerive` confirmation dialog in `crates/themeedit-cli/src/main.rs` when triggering `<F5>` or clicking `[F5] Derive` on the footer bar.
+- [x] Warns user explicitly: `"Deriving colors from wallpaper '<file>' will overwrite current color settings for theme '<theme>'. Proceed?"`.
+- [x] Only prompts when a valid background wallpaper image is configured; if missing or unresolvable, surfaces diagnostic toast without altering theme state.
+- [x] Validated via integration test `test_derive_colors_confirmation_modal_and_execution` in `crates/themeedit-cli/tests/themeedit_test.rs`.
+
+## Color Picker Hex Input Cursor Navigation & Editing
+- [x] Added visible high-contrast cursor to `ColorPickerModal` Hex Code tab (`crates/bashmenu-tui/src/modals/color_picker.rs`), rendering active cursor cell with black text on cyan background (`Modifier::BOLD`).
+- [x] Implemented cursor-aware navigation (`Left`, `Right`, `Home`, `End`), deletion (`Backspace`, `Delete`), and in-place character replacement across character slots 1..6.
+- [x] Added mouse click positioning inside `[ #RRGGBB ]` text area to move cursor directly to clicked character cell, while preserving action buttons for `[ Clear ]`, `[ Paste ]`, and `[ Select ]`.
+- [x] Added unit tests in `crates/bashmenu-tui/tests/modals_test.rs` covering cursor positioning via mouse clicks, keyboard navigation, in-place character replacement, backspace/delete behavior, clear button reset, and inherit selection on empty buffer.
+
+## Color Picker Hex Code Input, Click-to-Edit, Clear & Clipboard Paste
+- [x] Overhauled Hex Code input in `bashmenu-tui/src/modals/color_picker.rs`: added `hex_selected` auto-selection and replacement so typing hex digits directly replaces prefilled hex codes, supported typing `#` to reset, supported 3-digit and 6-digit hex parsing in `parse_hex_rgb`, and added `paste_hex` for clipboard strings.
+- [x] Added mouse click support on the hex text box `[ #RRGGBB ]` to clear/select for instant typing, plus interactive buttons for `[ Clear ]`, `[ Paste ]` (reads system clipboard), and `[ Select ]` (commits color).
+- [x] Added tests in `bashmenu-tui/tests/modals_test.rs` covering keyboard typing replacement, mouse clicking input box to clear, clicking `[ Clear ]`, clicking `[ Paste ]`, and clicking `[ Select ]`.
+
+## MenuEdit Preview Help Gutter Color & ColorPicker Inherit (-1)
+- [x] Fixed MenuEdit preview footer help gutter in `themeedit-cli/src/preview.rs` to render with `preview_styles.help_text` and `preview_styles.shortcut_key` rather than `preview_styles.gutter`, and updated `themeedit-cli/src/main.rs` hit-testing for `PreviewMode::MenuEditor` row == footer_y from `"footer"` to `"help_text"`.
+- [x] Added Inherit / `-1` (`Color::Reset`) selection in `bashmenu-tui/src/modals/color_picker.rs`: added `[Del: Inherit]` tab header button, `[ Inherit (-1) ]` palette action button, `Delete` / `Char('0')` / `Backspace` shortcuts across picker tabs, and swatch rendering for inherited colors.
+- [x] Connected Inherit selection in `themeedit-cli` (`lib.rs`, `main.rs`) so selecting inherit / `-1` in the color picker automatically calls `reset_color_token_to_inherit` on activity override tabs (or assigns `-1` on `MainMenu`), with tests in `modals_test.rs` and `themeedit_test.rs`.
+
+## Config Parse-Error Safeguard (`bashmenu.yml`)
+- [x] Guarded `save_config` in `bashmenu-core/src/config.rs` against overwriting existing non-empty unparseable YAML files, automatically writing a `.yml.bak` backup copy and returning an explanatory `BashMenuError::Schema` error (with unit test `test_save_config_preserves_unparseable_file_and_writes_backup`).
+- [x] Updated `bashmenu-cli/src/main.rs` to surface `bashmenu.yml` YAML parse errors on startup and `Reload` via `ToastSeverity::Error` toasts while falling back read-only in memory without overwriting the user's file, and routed all interactive config saves through `save_config_or_toast` to alert the user when saves are blocked.
+
+## Compact Framed Toast Borders & Nerd Font Indicator Fix
+- [x] Removed empty top and bottom padding rows inside `ToastStyle::Framed` toasts (`toast.rs`, `themeedit-cli/src/preview.rs`, `themeedit-cli/src/main.rs`) and updated framed toast tests (`menu_navigation_test.rs`) and docs (`bashmenu.md`, `bashmenu.1`).
+- [x] Fixed errant `/` next to main menu selection indicator and missing Nerd Fonts (`bashmenu.mnu`, `~/.config/bashmenu/bashmenu.mnu`, literal Nerd Font resolution in `bashmenu-core/src/glyph.rs`, `MenuView::set_config`/`set_use_nerd_fonts` sync in `menu_view.rs`, and `use_nerd_fonts.unwrap_or(true)` default in `bashmenu-cli` and `macro_engine.rs`).
+
+## Macro Alias, Help Gutter Shortcut, Themeedit Switcher & Framed Toast Style
+- [x] Fixed `{cmd: <command>}` placeholder regex and fast-path guard in `bashmenu-core/src/macro_engine.rs` so `{cmd: ...}` executes identically to `{command: ...}`, with regression test in `macro_engine_test.rs`.
+- [x] Added `<Ctrl+G>` keyboard shortcut in `bashmenu` (`menu_view.rs`, `gutter.rs`, `bashmenu-cli/src/main.rs`) to toggle/expand the help gutter without mouse hover, decoupling help-gutter expansion from menu item height so status/plugin gutters stay intact.
+- [x] Added `<F2>` keyboard shortcut in `themeedit` opening `ThemePickerModal` (reused from `bashmenu-tui`) to switch the edited theme (`switch_theme`), moved inline rename exclusively to `F7` / `Ctrl+R`, and updated the footer bar with `[F2] Themes`.
+- [x] Added persistent per-theme `ToastStyle` (`Bar` | `Framed`) in `bashmenu-core`, `bashmenu-tui` (`style.rs`, `toast.rs`), `themeedit-cli` (`Theme:` -> `Toast Style` token, live preview in `PreviewMode::Toast`, and hit-testing), and `ymlcheck-cli`, drawing `╓─┐ / ║...│ / ╙─┘` severity-colored borders with 1-char margins and top/bottom blank padding rows; updated `bashmenu.md` and `bashmenu.1`.
+
+## Per-Activity Theme Overrides, Drop-Shadow Fix & `.themes` Schema Overhaul
+- [x] Added per-activity theme color resolution (`ThemeActivity::{MainMenu, BashEdit, Modals, MenuEdit, Toasts, ThemeEdit, ShortcutEdit}`) in `bashmenu-core` and `bashmenu-tui`, supporting `-1` / `[-1, -1]` inheritance from the main menu palette and `#rrggbb` TrueColor storage in `'256'` with automatic downsampling into `'16'` and `'8'`.
+- [x] Fixed modal drop-shadow rendering by extracting `draw_box_drop_shadow`, synchronizing `shadow: [fg, -1]` cell background to foreground across `render_modal_frame` / `render_animated_modal_frame`, and mapping neutral mid/dark gray shadows accurately to `COLOR_GREY` in 16-color downsampling.
+- [x] Overhauled both `/home/andrew/github/bashmenu-rs/bashmenu.themes` and `~/.config/bashmenu/bashmenu.themes` (preserving custom user edits) to strip legacy keys (`button_*`, `editor`, `menu_editor`, old `modals`), add missing base tokens (`highlight_text`, `toast_*`), normalize `shadow` to `[fg, -1]`, and populate all 6 activity override sections with `-1` inheritance defaults; updated `ymlcheck --themes` to enforce the new schema.
+- [x] Upgraded `themeedit` to a 7-tab activity workflow (`1:Menu`..`7:Shortcuts`, `Tab`/`BackTab`, clickable header tabs), added `Selection Color`/`Whitespace Color` tokens and `Delete`/`Backspace` reset to `-1`, and isolated `themeedit`'s own chrome, modals, and toasts to the active theme assigned in `bashmenu.yml`.
+- [x] Wired `MainMenu`, `BashEdit`, `Modals`, `MenuEdit`, `Toasts`, and `ShortcutEdit` resolved styles cleanly through `bashmenu`, `bashedit`, `menuedit`, and `shortcutedit` and removed hardcoded UI colors in `bashedit`, `menuedit`, `item_edit`, and `shortcut_editor`.
+- [x] Added unit and integration coverage in `crates/bashmenu-tui/tests/style_test.rs` and `crates/themeedit-cli/tests/themeedit_test.rs`, and updated `bashmenu.md` and `bashmenu.1`.
+
 ## Documentation Modernization & Legacy Python Cleanup
 - [x] Audited and synchronized `bashmenu.md` and `bashmenu.1` against the Rust codebase (v0.1.2), replacing all legacy Textual, Rich, and Python runtime references with Ratatui architecture, double-buffered cell rendering, and native ANSI escape sequences.
 - [x] Replaced Section 7.2 in `bashmenu.md` and `.SS In-Process Python Plugins` in `bashmenu.1` with comprehensive documentation of subprocess execution modes (`execution_mode`, `stream`, `interactive`, `window_percent`, `alt_buffer`, `quiet`).

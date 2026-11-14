@@ -2506,7 +2506,7 @@ impl ItemEditModal {
         let cancel_style = if is_cancel_active {
             styles.highlight.add_modifier(Modifier::BOLD)
         } else {
-            Style::default().fg(Color::DarkGray)
+            styles.footer
         };
 
         buf.set_string(start_btn_x, btn_y, save_text, save_style);
@@ -2537,18 +2537,8 @@ impl ItemEditModal {
         let spread_r1 = bashmenu_tui::format_spread_gutter_line(&items_r1, footer_w);
         let spread_r2 = bashmenu_tui::format_spread_gutter_line(&items_r2, footer_w);
 
-        buf.set_string(
-            inner.x + 1,
-            footer_y1,
-            spread_r1,
-            Style::default().fg(Color::DarkGray),
-        );
-        buf.set_string(
-            inner.x + 1,
-            footer_y2,
-            spread_r2,
-            Style::default().fg(Color::DarkGray),
-        );
+        buf.set_string(inner.x + 1, footer_y1, spread_r1, styles.help_text);
+        buf.set_string(inner.x + 1, footer_y2, spread_r2, styles.help_text);
 
         inner
     }

@@ -4,7 +4,7 @@ items:
 - '{divider}': null
 - Notes [{notebooks_dir}/notes.yml]:
     type: notebook
-    icon: '{nf:/:#f1a7c}'
+    icon: '{nf::#f1a7c}'
     action: '{notebooks_dir}/notes.yml'
     file: '{notebooks_dir}/notes.yml'
     interactive: true

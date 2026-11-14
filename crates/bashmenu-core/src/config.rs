@@ -668,8 +668,29 @@ pub fn load_config<P: AsRef<Path>>(path: P) -> Result<BashMenuConfig> {
 }
 
 /// Persists configuration to `bashmenu.yml` preserving comment header.
+///
+/// Refuses to overwrite an existing non-empty file that fails YAML parsing,
+/// writing a `.yml.bak` backup copy first so user edits are not lost.
 pub fn save_config<P: AsRef<Path>>(path: P, config: &BashMenuConfig) -> Result<()> {
     let p = path.as_ref();
+    if p.exists() {
+        let existing = fs::read_to_string(p).map_err(|e| BashMenuError::Io {
+            path: p.to_path_buf(),
+            source: e,
+        })?;
+        if !existing.trim().is_empty() {
+            if let Err(parse_err) = serde_yml::from_str::<BashMenuConfig>(&existing) {
+                let backup_path = p.with_extension("yml.bak");
+                let _ = fs::write(&backup_path, &existing);
+                return Err(BashMenuError::Schema(format!(
+                    "Refusing to overwrite unparseable {} (backup saved to {}): {}",
+                    p.display(),
+                    backup_path.display(),
+                    parse_err
+                )));
+            }
+        }
+    }
     let yaml_body = serde_yml::to_string(config)?;
     let output = format!("{}\n{}", CONFIG_HEADER.trim(), yaml_body);
     fs::write(p, output).map_err(|e| BashMenuError::Io {
@@ -886,5 +907,37 @@ mod tests {
         assert!(!saved_str.contains("flags.speed:"));
         assert!(saved_str.contains("email: user@example.com"));
         let _ = fs::remove_file(test_out);
+    }
+
+    #[test]
+    fn test_save_config_preserves_unparseable_file_and_writes_backup() {
+        let temp_dir = std::env::temp_dir();
+        let tmp = temp_dir.join("test_preserve_unparseable_bashmenu.yml");
+        let bak = tmp.with_extension("yml.bak");
+        let _ = fs::remove_file(&tmp);
+        let _ = fs::remove_file(&bak);
+
+        let broken_yaml = concat!(
+            "theme: default\n",
+            "user:\n",
+            "  localip:{cmd: \"ip -4 route get 1.1.1.1 | awk '{print $7; exit}'\"}\n",
+            "settings:\n",
+            "  show_menu_shortcuts: true\n",
+        );
+        fs::write(&tmp, broken_yaml).expect("Write broken YAML");
+
+        assert!(load_config(&tmp).is_err());
+
+        let save_res = save_config(&tmp, &BashMenuConfig::default());
+        assert!(save_res.is_err());
+
+        let intact = fs::read_to_string(&tmp).expect("Read original YAML");
+        assert_eq!(intact, broken_yaml);
+
+        let backup = fs::read_to_string(&bak).expect("Read backup YAML");
+        assert_eq!(backup, broken_yaml);
+
+        let _ = fs::remove_file(&tmp);
+        let _ = fs::remove_file(&bak);
     }
 }

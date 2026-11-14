@@ -164,7 +164,7 @@ impl ColorGridModal {
         let badge_y = inner.y + inner.height.saturating_sub(1);
         let swatch_style = Style::default().fg(Color::Indexed(self.selected_code));
         let num_style = styles.accent.add_modifier(Modifier::BOLD);
-        let hint_style = styles.gutter;
+        let hint_style = styles.help_text;
 
         let badge_line = Line::from(vec![
             Span::styled(" [", styles.border),
@@ -325,7 +325,7 @@ impl AsciiGridModal {
         let badge_y = inner.y + inner.height.saturating_sub(1);
         let char_style = styles.highlight.add_modifier(Modifier::BOLD);
         let num_style = styles.accent.add_modifier(Modifier::BOLD);
-        let hint_style = styles.gutter;
+        let hint_style = styles.help_text;
 
         let badge_line = Line::from(vec![
             Span::styled(" [ ", styles.border),

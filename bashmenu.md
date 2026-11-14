@@ -134,6 +134,7 @@ Used as dynamic templates for code generation, settings, or block injections:
 | `PageUp` / `PageDown` | Scroll selection up / down by a page increment (10 items). |
 | `1` - `9`, `a` - `z`, `A` - `Z` | Direct option shortcut hotkey jump (when shortcut badges are enabled). |
 | `Ctrl+Space` | Leader key chord prefix (opens which-key shortcut palette overlay). |
+| `Ctrl+G` | Expand or collapse the left help gutter to reveal all hidden shortcuts. |
 | `ENTER` | Execute selected item action. |
 | `F1` | View Markdown user manual (`bashmenu.md`) via `bmpager --markdown`. |
 | `F2` | Open Theme selector dialog. |
@@ -229,21 +230,22 @@ Used as dynamic templates for code generation, settings, or block injections:
 
 ### 3.4 Visual Theme Editor (`themeedit`)
 
-The visual theme editor provides a split-screen interface featuring a collapsible token tree (`Theme:`, `Colors:`, `Borders:`) on the left and a live multi-view preview pane on the right (`Main Menu`, `Text Editor`, `Popup Windows / Modals`, `Visual Menu Editor`, and `Toast Notifications`). All category nodes start collapsed by default and open via `Left`/`Right` arrow keys, `Enter`/`Space`, mouse clicks on the category header, or clicking directly on an element in the preview pane (which auto-expands the category and focuses the matching token in the tree). Launch directly with `themeedit [-f|--file <FILE>] [-t|--theme <NAME>] [--local]`.
+The visual theme editor provides a split-screen interface featuring a collapsible token tree (`Theme:`, `Colors:`, `Borders:`) on the left and a 7-tab live multi-view preview pane on the right (`Main Menu`, `Text Editor`, `Popup Windows / Modals`, `Visual Menu Editor`, `Toast Notifications`, `Visual Theme Editor`, and `Shortcuts Editor`). `themeedit`'s own UI chrome stays styled by the active theme assigned in `bashmenu.yml`, while the preview pane displays live unsaved edits for whichever activity tab is active. All category nodes start collapsed by default and open via `Left`/`Right` arrow keys, `Enter`/`Space`, mouse clicks on the category header, or clicking directly on an element in the preview pane (which auto-expands the category and focuses the matching token in the tree). Launch directly with `themeedit [-f|--file <FILE>] [-t|--theme <NAME>] [--local]`.
 
 | Keybinding | Action |
 | :--- | :--- |
 | `UP` / `DOWN`, `k` / `j` | Navigate collapsible category nodes and tokens (pressing `UP` / `k` at the top row focuses the Theme Name input for inline renaming). |
 | `LEFT` / `RIGHT`, `h` / `l` | Collapse or expand category nodes (`Theme:`, `Colors:`, `Borders:`). |
 | `Home` / `End`, `PgUp` / `PgDn` | Jump to first/last visible row or scroll by 5 rows. |
-| `ENTER` / `SPACE` | Toggle selected category node, or open color/character/file picker for the selected token. |
+| `ENTER` / `SPACE` | Toggle selected category node, or open color/character/file picker for the selected token (edits the base palette on Tab `1` or the active activity's override on Tabs `2`-`7`). |
 | `[` / `]` | Cycle to previous / next theme (alphabetically sorted). |
-| `TAB` / `p` / `1`-`5` | Cycle or jump between live preview views (`1` Menu, `2` Text Editor, `3` Modals, `4` Menu Editor, `5` Toasts). |
+| `F2` | Open interactive Theme Selector modal (`ThemePickerModal`) to choose a theme to edit. |
+| `TAB` / `Shift+TAB` / `p` / `1`-`7` | Cycle or jump between live activity preview tabs (`1` Menu, `2` Text Editor, `3` Modals, `4` Menu Editor, `5` Toasts, `6` Theme Editor, `7` Shortcuts Editor), switching which activity receives color edits. |
 | `F4` / `b` | Open Background Wallpaper Configuration modal (Image, Opacity, Scaling, Mode, Clustering, Quantization). |
 | `F5` | Auto-derive harmonious 256-color palette (including `plugin` text color) from the configured wallpaper image. |
 | `F6` / `Ctrl+N` | Create a new theme using the monochrome base palette. |
-| `F7` / `F2` / `Ctrl+R` | Rename current theme inline. |
-| `F8` / `Delete` | Delete current theme from `bashmenu.themes` (with confirmation modal); when a Wallpaper token is focused, `Delete` or `Backspace` removes the wallpaper; when the `Indicator` token is focused, `Delete` resets the indicator to `> `. |
+| `F7` / `Ctrl+R` | Rename current theme inline. |
+| `F8` / `Delete` | Delete current theme from `bashmenu.themes` (with confirmation modal); on activity tabs `2`-`7`, `Delete` or `Backspace` on a color token resets it to `-1` (`Inherit` from the main menu palette); when a Wallpaper token is focused, `Delete` or `Backspace` removes the wallpaper; when the `Indicator` token is focused, `Delete` resets the indicator to `> `. |
 | `Ctrl+S` | Save theme directly to `bashmenu.themes` (prompts Save As only if `untitled`). |
 | `Ctrl+A` | Save As under a new theme name. |
 | `Left Click` (Preview) | Focuses the clicked UI element's corresponding Theme Token in the tree and flashes its preview spans. |
@@ -450,8 +452,8 @@ Dividers can be defined under `user.divider` (or `settings.divider`) with full s
 
 The `settings.status_gutter` setting allows customization of the system badges displayed in the bottom right corner (the status gutter). This setting is a string containing text and placeholders separated by pipe symbols (`|`). Neither the status gutter nor the left-aligned help gutter ever exceeds 50% of the screen width. Badges and help action items are delimited by pipe symbols (`|`) and treated as atomic units. When text exceeds 50% of the screen width, overlapping items drop to the next line. Neither gutter ever exceeds two lines in normal mode.
 
-#### Help Gutter Hover Expansion & Delay (`settings.help_gutter_delay`):
-The bottom left help gutter displays contextual key navigation bindings and configured custom shortcuts. In normal display mode, the gutter uses at most two lines. If there are more shortcuts than fit in the default two lines, stationary mouse hover over the help gutter expands the gutter upward to display all remaining shortcuts without truncation:
+#### Help Gutter Expansion (`Ctrl+G` & Hover Delay `settings.help_gutter_delay`):
+The bottom left help gutter displays contextual key navigation bindings and configured custom shortcuts. In normal display mode, the gutter uses at most two lines. If there are more shortcuts than fit in the default two lines, pressing `Ctrl+G` toggles full help gutter expansion immediately, or stationary mouse hover over the help gutter expands the gutter upward to display all remaining shortcuts without truncation:
 - **Customizable Delay (`settings.help_gutter_delay` / `settings.help_gutter_hover_delay`)**: Configures the duration in seconds of stationary mouse hover required before the help gutter expands. Setting `help_gutter_delay: 0` causes the help gutter to expand immediately whenever hovered. Configurable directly in `bashmenu.yml` or through `Options & Settings -> Bashmenu Settings -> Help Gutter Hover Delay`. Defaults to `4.0` seconds.
 - **Fixed Status Gutter Border Decoupling**: When the help gutter expands upward, it operates as an independent left-side panel overlay. The status gutter top border and status badges on the right side remain strictly anchored in place and are completely unaffected by the help expansion.
 - **Dynamic Unbounded Height**: The expansion routine adds as many rows as needed to display all available help tokens and shortcuts. It dynamically expands upward, covering background plugins or empty space if necessary, while stopping cleanly below the active menu items without interfering with menu item navigation or click targets.
@@ -597,33 +599,36 @@ The menu structure is defined as a hierarchical list of entries under a root `it
 | `transition` | `true`\|`false` (enables or disables visual transition when executing item; defaults to `true`). |
 
 ### 4.3 Color Themes Specification (`bashmenu.themes`)
-Color themes configure the visual palette for the main menu, visual menu editor, text editor, and modal screens. Themes are defined under top-level theme names (`dracula`, `nord`, `cyberpunk`, `gruvbox`, `qbasic`, `pacman`, `industry`, `matrix`, `monochrome`, `synthwave`, `amber_crt`, `hotdog_stand`) for `256`, `16`, and `8` color modes using single-line compact lists `[fg, bg]`.
+Color themes configure the visual palette for the main menu, text editor (`bashedit`), modals/popups, visual menu editor (`menuedit`), toast notifications, visual theme editor (`themeedit`), and shortcuts editor (`shortcutedit`). Themes are defined under top-level theme names (`dracula`, `nord`, `cyberpunk`, `gruvbox`, `qbasic`, `pacman`, `industry`, `matrix`, `monochrome`, `synthwave`, `amber_crt`, `hotdog_stand`, etc.) for `256`, `16`, and `8` color modes.
 
 | Supported Theme Element | Description |
 | :--- | :--- |
-| `background` | Window background color (`COLOR_BLACK`, int index `0-255`, or `-1`). |
+| `background` | Window background color (`COLOR_BLACK`, int index `0-255`, `#rrggbb`, or `-1`). |
 | `title` | Top window title header text color. |
 | `border` | Outer frame and panel border line color. |
 | `text` | Regular menu item text color. |
 | `highlight` | Active selection bar text and background colors. |
+| `highlight_text` | Active selection bar foreground text color. |
 | `accent` | Accent highlights, path labels, and prompt titles. |
 | `footer` | Help footer line color. |
 | `help_text` | Dedicated help text color in the bottom gutter and modal footers. |
 | `plugin` | Dedicated text color for background plugin output feeds. |
-| `gutter` | Status gutter text color. |
+| `gutter` | Status gutter and line-number gutter text color. |
 | `selection` | Text selection highlight color. |
 | `shortcut_key` | Direct selection shortcut hotkey character badge color. |
 | `divider` | Horizontal divider line color. |
-| `button_primary` | Modal dialog primary action button color. |
-| `button_error` | Modal dialog error/destructive action button color. |
-| `button_cancel` | Modal dialog cancel action button color. |
-| `button_success` | Modal dialog success action button color. |
+| `toast_info` | Informational toast accent indicator color. |
+| `toast_warning` | Warning toast accent indicator color. |
+| `toast_error` | Error toast accent indicator color. |
 | `scrollbar` | Scroll bar thumb (foreground) and track (background) colors. |
-| `shadow` | Modal dialog and popup window drop-shadow color. |
+| `shadow` | Modal dialog and popup window drop-shadow color (`[fg, -1]` syncs cell background to foreground). |
 | `whitespace` | Non-visible whitespace characters (spaces, tabs, newlines) display color in the text editor. |
 | `window_close_button` | Close 'x' button in window title bars and modal dialogs. |
 
-*Formatting Rule for Editor Compatibility:* Theme definitions maintain compact single-line flow-style bracket lists (e.g., `title: [201, -1]`). This enables `bashedit`'s color preview features and `themeedit`'s parser to accurately parse inline bracketed color values and render live color swatch previews.
+#### Per-Activity Color Overrides & `-1` Inheritance
+Each color tier (`256`, `16`, `8`) may include optional nested override sections for `bashedit`, `modals`, `menuedit`, `toasts`, `themeedit`, and `shortcutedit`. Within any activity override section, setting a scalar color (`background`, `highlight_text`) to `-1` or a `[fg, bg]` pair element to `-1` (`[-1, -1]` when fully inherited) inherits that color directly from the top-level main menu palette. TrueColor values (`#rrggbb`, such as colors sampled with the Color Dropper or HSV/Hex picker) are stored inside the `256` tier (including nested activity override maps) and automatically downsampled into the `16` and `8` tiers; at runtime, `#rrggbb` renders verbatim on TrueColor terminals and quantizes to xterm-256 on `256`-color terminals.
+
+*Formatting Rule for Editor Compatibility:* Theme definitions maintain compact color lists and scalar entries readable by both `bashedit` color previews and `themeedit`.
 
 #### Color Mode Hierarchy & Adaptive Fallback:
 HA Bash Menu automatically detects terminal color capabilities and gracefully
@@ -712,6 +717,11 @@ Divider styling (`char` glyph, `length`, and color) is defined **strictly in the
 ###### Divider Widths: `{window_width}` vs `{screen_width}`
 - `{window_width}`: Standard shorter divider bounded within window borders and 2-character margins (`avail_w = max(20, w - 6)`). Framed by standard vertical borders (`border_vertical_left`/`border_vertical_right`) with 2-character padding on each side, and **without** border tees.
 - `{screen_width}`: Full-width divider running from left border to right border (`w - 2`), overriding all margins. Connects directly to `left_tee` (`border_tee_left`) on the left and `right_tee` (`border_tee_right`) on the right without margin spaces.
+
+##### Toast Notification Style (`toast:`)
+Themes can configure toast notification layout under a top-level `toast:` block (or under `Theme:` -> `Toast Style` in `themeedit`):
+- `style`: `"bar"` (default classic left accent bar using `toast.char`, e.g., `▌`) or `"framed"` (box-drawn frame using severity-colored `╓` / `─` / `┐` top, `║` / `│` sides, and `╙` / `─` / `┘` bottom borders with 1-character horizontal margins).
+- `char`: Left accent indicator glyph used in `"bar"` mode (default `▌`).
 
 ### 4.4 Wallpaper Backgrounds & Image Preparation
 

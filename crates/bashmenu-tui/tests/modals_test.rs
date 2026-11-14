@@ -1595,7 +1595,7 @@ fn test_color_picker_modal_truecolor_and_tabs() {
 
     // 5. Mouse tab switching and close button [X]
     let area = Rect::new(0, 0, 80, 30);
-    let inner_area = bashmenu_tui::compute_modal_inner(area, 64, 23);
+    let inner_area = bashmenu_tui::compute_modal_inner(area, 72, 23);
 
     let mouse_down = MouseEvent {
         kind: MouseEventKind::Down(MouseButton::Left),
@@ -1615,18 +1615,179 @@ fn test_color_picker_modal_truecolor_and_tabs() {
     };
     assert_eq!(modal_rgb.handle_mouse(mouse_close, area), Some(None));
 
-    // 6. Buffer rendering without panic across all tabs
-    let styles = ResolvedThemeStyles::default();
+    // 6. Buffer rendering without overflow and using configured help_text color
+    let styles = ResolvedThemeStyles {
+        help_text: ratatui::style::Style::default().fg(Color::Indexed(120)),
+        gutter: ratatui::style::Style::default().fg(Color::Indexed(244)),
+        ..Default::default()
+    };
     let mut buf = Buffer::empty(area);
 
-    modal_rgb.tab = ColorPickerTab::Palette256;
-    modal_rgb.render(area, &styles, &mut buf);
+    let right_border_x = inner_area.x + inner_area.width;
+    let badge_y = inner_area.y + inner_area.height.saturating_sub(1);
 
-    modal_rgb.tab = ColorPickerTab::TrueColorHsv;
-    modal_rgb.render(area, &styles, &mut buf);
+    for tab in [
+        ColorPickerTab::Palette256,
+        ColorPickerTab::TrueColorHsv,
+        ColorPickerTab::HexInput,
+    ] {
+        buf.reset();
+        modal_rgb.tab = tab;
+        modal_rgb.render(area, &styles, &mut buf);
 
-    modal_rgb.tab = ColorPickerTab::HexInput;
-    modal_rgb.render(area, &styles, &mut buf);
+        for y in inner_area.y..(inner_area.y + inner_area.height) {
+            assert_eq!(
+                buf[(right_border_x, y)].symbol(),
+                styles.borders.border_vertical_right,
+                "Tab {:?} overflowed right border at row {}",
+                tab,
+                y
+            );
+        }
+
+        let help_fg_found = (inner_area.x + 2..right_border_x).any(|x| {
+            buf[(x, badge_y)].fg == Color::Indexed(120) && buf[(x, badge_y)].symbol() == "("
+        });
+        assert!(
+            help_fg_found,
+            "Tab {:?} bottom help hint must use styles.help_text color",
+            tab
+        );
+    }
+
+    // 7. Inherit / -1 selection via Delete key, Char('0'), and mouse click
+    let mut modal_inherit = ColorPickerModal::new("Inherit Test", Color::Indexed(42));
+    assert_eq!(
+        modal_inherit.handle_key(KeyCode::Delete),
+        Some(Some(Color::Reset))
+    );
+    assert_eq!(modal_inherit.current_color, Color::Reset);
+
+    let mut modal_inherit2 = ColorPickerModal::new("Inherit Test 2", Color::Indexed(42));
+    assert_eq!(
+        modal_inherit2.handle_key(KeyCode::Char('0')),
+        Some(Some(Color::Reset))
+    );
+
+    // Mouse click on [Del: Inherit] header tab (col: inner_area.x + 55, row: inner_area.y)
+    let mouse_inherit_tab = MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: inner_area.x + 55,
+        row: inner_area.y,
+        modifiers: crossterm::event::KeyModifiers::empty(),
+    };
+    let mut modal_inherit3 = ColorPickerModal::new("Inherit Test 3", Color::Indexed(42));
+    assert_eq!(
+        modal_inherit3.handle_mouse(mouse_inherit_tab, area),
+        Some(Some(Color::Reset))
+    );
+
+    // Mouse click on [ Inherit (-1) ] palette button (col: inner_area.x + 54, row: inner_area.y + 12)
+    let mouse_inherit_btn = MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: inner_area.x + 54,
+        row: inner_area.y + 12,
+        modifiers: crossterm::event::KeyModifiers::empty(),
+    };
+    let mut modal_inherit4 = ColorPickerModal::new("Inherit Test 4", Color::Indexed(42));
+    assert_eq!(
+        modal_inherit4.handle_mouse(mouse_inherit_btn, area),
+        Some(Some(Color::Reset))
+    );
+
+    // 8. Hex tab interactive input, clear, paste, and select
+    let mut modal_hex = ColorPickerModal::new("Hex Test", Color::Rgb(10, 20, 30));
+    modal_hex.tab = ColorPickerTab::HexInput;
+    modal_hex.hex_selected = true;
+
+    // Typing a hex digit when selected starts fresh with that digit
+    modal_hex.handle_key(KeyCode::Char('f'));
+    assert_eq!(modal_hex.hex_input, "#F");
+    for c in "F5500".chars() {
+        modal_hex.handle_key(KeyCode::Char(c));
+    }
+    assert_eq!(modal_hex.hex_input, "#FF5500");
+    assert_eq!(modal_hex.current_color, Color::Rgb(255, 85, 0));
+
+    // Mouse click on the input box area (start_y + 2 = inner_area.y + 5, col = center_x + 3)
+    let center_x = inner_area.x + (inner_area.width.saturating_sub(44)) / 2;
+    let click_input_box = MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: center_x + 3,
+        row: inner_area.y + 5,
+        modifiers: crossterm::event::KeyModifiers::empty(),
+    };
+    modal_hex.handle_mouse(click_input_box, area);
+    assert_eq!(modal_hex.hex_cursor, 1);
+    assert!(!modal_hex.hex_selected);
+    assert_eq!(modal_hex.hex_input, "#FF5500");
+
+    // Replace character at cursor 1
+    modal_hex.handle_key(KeyCode::Char('0'));
+    assert_eq!(modal_hex.hex_input, "#0F5500");
+    assert_eq!(modal_hex.hex_cursor, 2);
+
+    // Left and Right cursor navigation
+    modal_hex.handle_key(KeyCode::Left);
+    assert_eq!(modal_hex.hex_cursor, 1);
+    modal_hex.handle_key(KeyCode::Right);
+    assert_eq!(modal_hex.hex_cursor, 2);
+    modal_hex.handle_key(KeyCode::End);
+    assert_eq!(modal_hex.hex_cursor, 7);
+    modal_hex.handle_key(KeyCode::Home);
+    assert_eq!(modal_hex.hex_cursor, 1);
+
+    // Backspace & Delete behavior
+    modal_hex.handle_key(KeyCode::Right); // cursor at 2
+    modal_hex.handle_key(KeyCode::Backspace); // deletes char at 1 ('0')
+    assert_eq!(modal_hex.hex_input, "#F5500");
+    assert_eq!(modal_hex.hex_cursor, 1);
+    modal_hex.handle_key(KeyCode::Delete); // deletes char at 1 ('F')
+    assert_eq!(modal_hex.hex_input, "#5500");
+    assert_eq!(modal_hex.hex_cursor, 1);
+
+    // Click [ Clear ] button (col: center_x + 16, row: inner_area.y + 5)
+    modal_hex.hex_input = "#AABBCC".to_string();
+    modal_hex.hex_cursor = 7;
+    let click_clear = MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: center_x + 16,
+        row: inner_area.y + 5,
+        modifiers: crossterm::event::KeyModifiers::empty(),
+    };
+    modal_hex.handle_mouse(click_clear, area);
+    assert_eq!(modal_hex.hex_input, "#");
+    assert_eq!(modal_hex.hex_cursor, 1);
+
+    // When buffer is "#", pressing Delete inherits Color::Reset
+    assert_eq!(
+        modal_hex.handle_key(KeyCode::Delete),
+        Some(Some(Color::Reset))
+    );
+
+    // Click [ Paste ] button (col: center_x + 28, row: inner_area.y + 5)
+    bashmenu_tui::clipboard::set_clipboard_text("336699");
+    let click_paste = MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: center_x + 28,
+        row: inner_area.y + 5,
+        modifiers: crossterm::event::KeyModifiers::empty(),
+    };
+    modal_hex.handle_mouse(click_paste, area);
+    assert_eq!(modal_hex.hex_input, "#336699");
+    assert_eq!(modal_hex.current_color, Color::Rgb(51, 102, 153));
+
+    // Click [ Select ] button (col: center_x + 38, row: inner_area.y + 5) commits color
+    let click_select = MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: center_x + 38,
+        row: inner_area.y + 5,
+        modifiers: crossterm::event::KeyModifiers::empty(),
+    };
+    assert_eq!(
+        modal_hex.handle_mouse(click_select, area),
+        Some(Some(Color::Rgb(51, 102, 153)))
+    );
 }
 
 #[test]

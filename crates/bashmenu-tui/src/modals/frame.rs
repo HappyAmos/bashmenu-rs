@@ -28,23 +28,19 @@ pub fn compute_modal_inner(area: Rect, dialog_w: u16, dialog_h: u16) -> Rect {
     )
 }
 
-/// Renders an intermediate animated modal frame with drop shadow into `buf`.
-pub fn render_animated_modal_frame(
+/// Renders classic 2-column right and 1-row bottom drop shadow around `box_rect`.
+pub fn draw_box_drop_shadow(
     area: Rect,
     box_rect: Rect,
     styles: &ResolvedThemeStyles,
     buf: &mut Buffer,
 ) {
-    if box_rect.width < 3 || box_rect.height < 2 {
-        return;
-    }
+    let shadow_char = styles.borders.shadow_char.chars().next().unwrap_or('░');
+    let shadow_style = styles.shadow;
     let start_x = box_rect.x;
     let start_y = box_rect.y;
     let w = box_rect.width;
     let h = box_rect.height;
-
-    let shadow_char = '░';
-    let shadow_style = styles.shadow;
 
     // 1. Right Shadow (2 columns wide, starts at start_y + 1)
     let right_shadow_x = start_x + w;
@@ -66,6 +62,20 @@ pub fn render_animated_modal_frame(
                 .set_style(shadow_style);
         }
     }
+}
+
+/// Renders an intermediate animated modal frame with drop shadow into `buf`.
+pub fn render_animated_modal_frame(
+    area: Rect,
+    box_rect: Rect,
+    styles: &ResolvedThemeStyles,
+    buf: &mut Buffer,
+) {
+    if box_rect.width < 3 || box_rect.height < 2 {
+        return;
+    }
+
+    draw_box_drop_shadow(area, box_rect, styles, buf);
 
     // 3. Clear Dialog Region & Render Border Block
     Clear.render(box_rect, buf);
@@ -99,33 +109,11 @@ pub fn render_modal_frame(
 
     let start_x = area.x + (area.width.saturating_sub(w + 2)) / 2;
     let start_y = area.y + (area.height.saturating_sub(h + 1)) / 2;
+    let dialog_rect = Rect::new(start_x, start_y, w, h);
 
-    let shadow_char = '░';
-    let shadow_style = styles.shadow;
-
-    // 1. Right Shadow (2 columns wide, starts at start_y + 1)
-    let right_shadow_x = start_x + w;
-    for y in (start_y + 1)..(start_y + h + 1) {
-        for dx in 0..2 {
-            let px = right_shadow_x + dx;
-            if px < area.x + area.width && y < area.y + area.height {
-                buf[(px, y)].set_char(shadow_char).set_style(shadow_style);
-            }
-        }
-    }
-
-    // 2. Bottom Shadow (1 row high, starts at start_x + 2)
-    let bottom_shadow_y = start_y + h;
-    for px in (start_x + 2)..(start_x + w + 2) {
-        if px < area.x + area.width && bottom_shadow_y < area.y + area.height {
-            buf[(px, bottom_shadow_y)]
-                .set_char(shadow_char)
-                .set_style(shadow_style);
-        }
-    }
+    draw_box_drop_shadow(area, dialog_rect, styles, buf);
 
     // 3. Clear Dialog Region & Render Border Block
-    let dialog_rect = Rect::new(start_x, start_y, w, h);
     Clear.render(dialog_rect, buf);
 
     let clean_title = title.trim();

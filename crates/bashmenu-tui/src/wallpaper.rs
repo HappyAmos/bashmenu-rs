@@ -939,8 +939,8 @@ pub fn derive_palette_from_image(
     let selection_fg: u8 = if primary.lum > 135.0 { 16 } else { 255 };
     let text_fg: u8 = 255;
 
-    // 6. Semantic alert/button accents from image if available
-    let button_error = ranked
+    // 6. Semantic alert accents from image if available
+    let toast_err = ranked
         .iter()
         .find(|c| (c.h >= 0.94 || c.h <= 0.06) && c.s >= 0.35)
         .map(|c| c.idx)
@@ -950,11 +950,6 @@ pub fn derive_palette_from_image(
         .find(|c| (0.06..=0.20).contains(&c.h) && c.s >= 0.30)
         .map(|c| c.idx)
         .unwrap_or(214);
-    let button_success = ranked
-        .iter()
-        .find(|c| (0.22..=0.44).contains(&c.h) && c.s >= 0.30)
-        .map(|c| c.idx)
-        .unwrap_or(40);
 
     let make_pair = |fg: i64, bg: i64| -> serde_yml::Value {
         serde_yml::Value::Sequence(vec![
@@ -975,6 +970,10 @@ pub fn derive_palette_from_image(
         "highlight".to_string(),
         make_pair(selection_fg as i64, primary_accent as i64),
     );
+    colors.insert(
+        "highlight_text".to_string(),
+        serde_yml::Value::Number((selection_fg as i64).into()),
+    );
     colors.insert("accent".to_string(), make_pair(secondary_accent as i64, -1));
     colors.insert("footer".to_string(), make_pair(border_color as i64, -1));
     colors.insert("gutter".to_string(), make_pair(gutter_color as i64, -1));
@@ -988,22 +987,6 @@ pub fn derive_palette_from_image(
     );
     colors.insert("divider".to_string(), make_pair(border_color as i64, -1));
     colors.insert(
-        "button_primary".to_string(),
-        make_pair(selection_fg as i64, primary_accent as i64),
-    );
-    colors.insert(
-        "button_error".to_string(),
-        make_pair(255, button_error as i64),
-    );
-    colors.insert(
-        "button_cancel".to_string(),
-        make_pair(text_fg as i64, gutter_color as i64),
-    );
-    colors.insert(
-        "button_success".to_string(),
-        make_pair(255, button_success as i64),
-    );
-    colors.insert(
         "help_text".to_string(),
         make_pair(secondary_accent as i64, -1),
     );
@@ -1013,7 +996,7 @@ pub fn derive_palette_from_image(
         "scrollbar".to_string(),
         make_pair(primary_accent as i64, 236),
     );
-    colors.insert("shadow".to_string(), make_pair(236, bg_color as i64));
+    colors.insert("shadow".to_string(), make_pair(236, -1));
     colors.insert("whitespace".to_string(), make_pair(gutter_color as i64, -1));
     colors.insert(
         "toast_info".to_string(),
@@ -1023,10 +1006,8 @@ pub fn derive_palette_from_image(
         "toast_warning".to_string(),
         make_pair(toast_warn as i64, -1),
     );
-    colors.insert(
-        "toast_error".to_string(),
-        make_pair(button_error as i64, -1),
-    );
+    colors.insert("toast_error".to_string(), make_pair(toast_err as i64, -1));
+    colors.extend(bashmenu_core::default_activity_overrides_map());
 
     Ok(colors)
 }
@@ -1068,13 +1049,11 @@ pub fn rgb_to_ansi16_name(r: u8, g: u8, b: u8) -> &'static str {
     let (h, s, v) = rgb_to_hsv(r, g, b);
     let lum = color_luminance(r, g, b);
 
-    if lum < 28.0 {
+    if lum < 18.0 {
         return "COLOR_BLACK";
     }
     if s < 0.18 {
-        if lum < 70.0 {
-            "COLOR_BLACK"
-        } else if lum < 150.0 {
+        if lum < 150.0 {
             "COLOR_GREY"
         } else if lum < 225.0 {
             "COLOR_WHITE"

@@ -26,15 +26,15 @@ use bashmenu_core::{
     load_shortcuts, load_themes, merge_note_content, rename_note, resolve_notebook_path,
     resolve_shortcuts_path, save_config, save_notebook, BashMenuConfig, ConfirmAction,
     ExecutionMode, MacroContext, MenuItem, MenuItemType, MenuSchema, NoteItem, NoteSwapFile,
-    PluginEngine, ShortcutsConfig, ToastNotification,
+    PluginEngine, ShortcutsConfig, ToastNotification, ToastSeverity,
 };
 use bashmenu_tui::{
     install_panic_hook, is_framebuffer_available, ColorTier, ConfirmChoice, ConfirmModal,
     FilePickerModal, FramebufferDevice, HelpModal, InputModal, MenuAction, MenuView, MessageModal,
     ModalAnimation, NoteConflictChoice, NoteConflictModal, NoteEditorAction, NoteEditorModal,
     NoteViewerAction, NoteViewerModal, RadioModal, ResolvedThemeStyles, ShortcutDispatchResult,
-    ShortcutDispatcher, StreamOutputAction, StreamOutputModal, TerminalGuard, ThemePickerModal,
-    ToastRack, ToggleChoice, ToggleModal, TransitionEffect, TransitionSpeed,
+    ShortcutDispatcher, StreamOutputAction, StreamOutputModal, TerminalGuard, ThemeActivity,
+    ThemePickerModal, ToastRack, ToggleChoice, ToggleModal, TransitionEffect, TransitionSpeed,
 };
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode};
@@ -44,6 +44,52 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
+
+/// Adds a red error toast notification to `toast_rack`.
+fn push_error_toast(toast_rack: &mut ToastRack, title: &str, message: String, timeout_secs: f64) {
+    toast_rack.add(ToastNotification {
+        message,
+        title: Some(title.to_string()),
+        severity: ToastSeverity::Error,
+        timeout_secs,
+    });
+}
+
+/// Persists `config` to `path`, surfacing any save block or I/O failure as an
+/// error toast.
+fn save_config_or_toast(path: &Path, config: &BashMenuConfig, toast_rack: &mut ToastRack) {
+    if let Err(e) = save_config(path, config) {
+        push_error_toast(toast_rack, "Config Save Blocked", e.to_string(), 6.0);
+    }
+}
+
+/// Resolves `MainMenu`, `Modals`, and `Toasts` styles from an optional theme.
+fn resolve_bashmenu_styles(
+    theme: Option<&bashmenu_core::Theme>,
+    use_nerd: bool,
+    toast_timeout: Option<f64>,
+) -> (
+    ResolvedThemeStyles,
+    ResolvedThemeStyles,
+    ResolvedThemeStyles,
+) {
+    if let Some(t) = theme {
+        (
+            ResolvedThemeStyles::from_theme_for_activity(t, use_nerd, ThemeActivity::MainMenu)
+                .with_toast_timeout(toast_timeout),
+            ResolvedThemeStyles::from_theme_for_activity(t, use_nerd, ThemeActivity::Modals)
+                .with_toast_timeout(toast_timeout),
+            ResolvedThemeStyles::from_theme_for_activity(t, use_nerd, ThemeActivity::Toasts)
+                .with_toast_timeout(toast_timeout),
+        )
+    } else {
+        (
+            ResolvedThemeStyles::default().with_toast_timeout(toast_timeout),
+            ResolvedThemeStyles::default().with_toast_timeout(toast_timeout),
+            ResolvedThemeStyles::default().with_toast_timeout(toast_timeout),
+        )
+    }
+}
 
 /// Command-line argument schema for the main `bashmenu` executable.
 #[derive(Parser, Debug)]
@@ -242,8 +288,27 @@ fn main() -> Result<()> {
     } else {
         bashmenu_core::get_user_config_dir().join("bashmenu.yml")
     };
+    let mut startup_config_err: Option<String> = None;
     let mut config = if config_path.exists() {
-        load_config(&config_path).unwrap_or_default()
+        match load_config(&config_path) {
+            Ok(c) => c,
+            Err(e) => {
+                startup_config_err =
+                    Some(format!("Failed to parse {}: {}", config_path.display(), e));
+                let home = PathBuf::from(std::env::var("HOME").unwrap_or_default());
+                let dev_cfg = repo_dir
+                    .clone()
+                    .unwrap_or_else(|| {
+                        bashmenu_core::resolve_dev_dir(&home, &bashmenu_core::get_user_config_dir())
+                    })
+                    .join("bashmenu.yml");
+                if dev_cfg.exists() && dev_cfg != config_path {
+                    load_config(&dev_cfg).unwrap_or_default()
+                } else {
+                    BashMenuConfig::default()
+                }
+            }
+        }
     } else {
         let vanilla_cfg = bashmenu_core::resolve_app_path("bashmenu.yml");
         if vanilla_cfg.exists() && vanilla_cfg != config_path {
@@ -366,14 +431,10 @@ fn main() -> Result<()> {
     }
 
     let mut use_nerd =
-        config.settings.use_nerd_fonts.unwrap_or(false) && !on_linux_console && fb_device.is_none();
+        config.settings.use_nerd_fonts.unwrap_or(true) && !on_linux_console && fb_device.is_none();
     let active_theme = themes.get(&config.theme);
-    let mut styles = if let Some(t) = active_theme {
-        ResolvedThemeStyles::from_theme(t, use_nerd)
-            .with_toast_timeout(config.settings.toast_timeout)
-    } else {
-        ResolvedThemeStyles::default().with_toast_timeout(config.settings.toast_timeout)
-    };
+    let (mut styles, mut modal_styles, mut toast_styles) =
+        resolve_bashmenu_styles(active_theme, use_nerd, config.settings.toast_timeout);
 
     let active_color_mode = match styles.tier {
         ColorTier::Color8 => "3-bit (8 color)",
@@ -436,6 +497,17 @@ fn main() -> Result<()> {
     let mut last_marquee_tick = Instant::now();
     let mut last_interaction = Instant::now();
     let mut toast_rack = ToastRack::new();
+    if let Some(err_msg) = startup_config_err {
+        push_error_toast(
+            &mut toast_rack,
+            "Config Syntax Error (bashmenu.yml)",
+            format!(
+                "{}\nFile preserved on disk; fix YAML syntax before saving settings.",
+                err_msg
+            ),
+            8.0,
+        );
+    }
 
     if let Some(fb) = guard.framebuffer_mut() {
         fb.set_image_mode(use_fb_image_mode);
@@ -593,65 +665,69 @@ fn main() -> Result<()> {
                 menu_view.render(f.area(), f.buffer_mut());
                 match &mut active_modal {
                     ActiveModal::None => {
-                        shortcut_dispatcher.render_leader_popup(f.area(), &styles, f.buffer_mut());
+                        shortcut_dispatcher.render_leader_popup(
+                            f.area(),
+                            &modal_styles,
+                            f.buffer_mut(),
+                        );
                     }
                     ActiveModal::Help(modal) => {
-                        modal.render(f.area(), &styles, f.buffer_mut());
+                        modal.render(f.area(), &modal_styles, f.buffer_mut());
                     }
                     ActiveModal::ThemePicker(modal) => {
-                        modal.render(f.area(), &styles, f.buffer_mut());
+                        modal.render(f.area(), &modal_styles, f.buffer_mut());
                     }
                     ActiveModal::Input(modal) => {
-                        modal.render(f.area(), &styles, f.buffer_mut());
+                        modal.render(f.area(), &modal_styles, f.buffer_mut());
                     }
                     ActiveModal::NoteViewer(modal) => {
-                        modal.render(f.area(), &styles, f.buffer_mut());
+                        modal.render(f.area(), &modal_styles, f.buffer_mut());
                     }
                     ActiveModal::NoteEditor(modal) => {
-                        modal.render(f.area(), &styles, f.buffer_mut());
+                        modal.render(f.area(), &modal_styles, f.buffer_mut());
                     }
                     ActiveModal::NewNoteTitle(_, modal) => {
-                        modal.render(f.area(), &styles, f.buffer_mut());
+                        modal.render(f.area(), &modal_styles, f.buffer_mut());
                     }
                     ActiveModal::RenameNoteTitle(_, _, modal) => {
-                        modal.render(f.area(), &styles, f.buffer_mut());
+                        modal.render(f.area(), &modal_styles, f.buffer_mut());
                     }
                     ActiveModal::ConfirmDeleteNote(_, _, modal) => {
-                        modal.render(f.area(), &styles, f.buffer_mut());
+                        modal.render(f.area(), &modal_styles, f.buffer_mut());
                     }
                     ActiveModal::ConfirmItem(_, modal) => {
-                        modal.render(f.area(), &styles, f.buffer_mut());
+                        modal.render(f.area(), &modal_styles, f.buffer_mut());
                     }
                     ActiveModal::ConfirmInjectBlock { modal, .. } => {
-                        modal.render(f.area(), &styles, f.buffer_mut());
+                        modal.render(f.area(), &modal_styles, f.buffer_mut());
                     }
                     ActiveModal::Message(modal) => {
-                        modal.render(f.area(), &styles, f.buffer_mut());
+                        modal.render(f.area(), &modal_styles, f.buffer_mut());
                     }
                     ActiveModal::Toggle(_, modal) => {
-                        modal.render(f.area(), &styles, f.buffer_mut());
+                        modal.render(f.area(), &modal_styles, f.buffer_mut());
                     }
                     ActiveModal::ConfigInput(_, modal) => {
-                        modal.render(f.area(), &styles, f.buffer_mut());
+                        modal.render(f.area(), &modal_styles, f.buffer_mut());
                     }
                     ActiveModal::ParamInput(_, modal) => {
-                        modal.render(f.area(), &styles, f.buffer_mut());
+                        modal.render(f.area(), &modal_styles, f.buffer_mut());
                     }
                     ActiveModal::Radio(_, modal) => {
-                        modal.render(f.area(), &styles, f.buffer_mut());
+                        modal.render(f.area(), &modal_styles, f.buffer_mut());
                     }
                     ActiveModal::ItemFilePicker(_, _, modal) => {
-                        modal.render(f.area(), &styles, f.buffer_mut());
+                        modal.render(f.area(), &modal_styles, f.buffer_mut());
                     }
                     ActiveModal::StreamOutput(modal) => {
-                        modal.render(f.area(), &styles, f.buffer_mut());
+                        modal.render(f.area(), &modal_styles, f.buffer_mut());
                     }
                     ActiveModal::NoteConflict(modal) => {
-                        modal.render(f.area(), &styles, f.buffer_mut());
+                        modal.render(f.area(), &modal_styles, f.buffer_mut());
                     }
                 }
                 // Render non-blocking toast notifications on top
-                toast_rack.render(f.area(), &styles, f.buffer_mut());
+                toast_rack.render(f.area(), &toast_styles, f.buffer_mut());
             };
 
             if transition_effect != TransitionEffect::None {
@@ -722,7 +798,14 @@ fn main() -> Result<()> {
                 if k.kind == crossterm::event::KeyEventKind::Release {
                     continue;
                 }
-                menu_view.handle_interaction();
+                let is_ctrl_g = matches!(active_modal, ActiveModal::None)
+                    && !shortcut_dispatcher.is_leader_pending()
+                    && matches!(k.code, KeyCode::Char('g') | KeyCode::Char('G'))
+                    && k.modifiers
+                        .contains(crossterm::event::KeyModifiers::CONTROL);
+                if !is_ctrl_g {
+                    menu_view.handle_interaction();
+                }
             }
             need_redraw = true;
             let prev_levels = menu_view.menu_level_titles();
@@ -771,11 +854,14 @@ fn main() -> Result<()> {
                     if let Some(opt_theme) = chosen {
                         if let Some(new_theme) = opt_theme {
                             config.theme = new_theme;
-                            let _ = save_config(&config_path, &config);
+                            save_config_or_toast(&config_path, &config, &mut toast_rack);
                             menu_view.set_config(config.clone());
                             if let Some(t) = themes.get(&config.theme) {
-                                styles = ResolvedThemeStyles::from_theme(t, use_nerd)
-                                    .with_toast_timeout(config.settings.toast_timeout);
+                                (styles, modal_styles, toast_styles) = resolve_bashmenu_styles(
+                                    Some(t),
+                                    use_nerd,
+                                    config.settings.toast_timeout,
+                                );
                                 menu_view.set_styles(styles.clone());
                                 guard.set_default_bg(styles.background);
                                 let wp_config = config.resolve_wallpaper(Some(t));
@@ -797,7 +883,7 @@ fn main() -> Result<()> {
                     if let Some(opt_val) = submitted {
                         if let Some(new_gutter) = opt_val {
                             config.settings.status_gutter = Some(new_gutter.clone());
-                            let _ = save_config(&config_path, &config);
+                            save_config_or_toast(&config_path, &config, &mut toast_rack);
                             menu_view.set_config(config.clone());
                             let mut ctx = make_macro_ctx!(&config);
                             ctx.window_width = size.width as usize;
@@ -1361,17 +1447,20 @@ fn main() -> Result<()> {
                         if c == ToggleChoice::True || c == ToggleChoice::False {
                             let val = c == ToggleChoice::True;
                             config.set_value(key_path.as_str(), serde_yml::Value::Bool(val));
-                            let _ = save_config(&config_path, &config);
+                            save_config_or_toast(&config_path, &config, &mut toast_rack);
                             menu_view.set_config(config.clone());
                             if key_path == "settings.use_nerd_fonts" {
-                                let unf = config.settings.use_nerd_fonts.unwrap_or(false)
+                                let unf = config.settings.use_nerd_fonts.unwrap_or(true)
                                     && !on_linux_console
                                     && !guard.has_framebuffer();
                                 use_nerd = unf;
                                 menu_view.set_use_nerd_fonts(unf);
                                 if let Some(t) = themes.get(&config.theme) {
-                                    styles = ResolvedThemeStyles::from_theme(t, use_nerd)
-                                        .with_toast_timeout(config.settings.toast_timeout);
+                                    (styles, modal_styles, toast_styles) = resolve_bashmenu_styles(
+                                        Some(t),
+                                        use_nerd,
+                                        config.settings.toast_timeout,
+                                    );
                                     menu_view.set_styles(styles.clone());
                                 }
                             }
@@ -1411,7 +1500,7 @@ fn main() -> Result<()> {
                                 serde_yml::Value::String(trimmed.to_string())
                             };
                             config.set_value(key_path.as_str(), parsed);
-                            let _ = save_config(&config_path, &config);
+                            save_config_or_toast(&config_path, &config, &mut toast_rack);
                             menu_view.set_config(config.clone());
                             if key_path == "settings.toast_timeout"
                                 || key_path == "settings.toast.timeout"
@@ -1419,8 +1508,11 @@ fn main() -> Result<()> {
                                 || key_path == "app.settings.toast.timeout"
                             {
                                 if let Some(t) = themes.get(&config.theme) {
-                                    styles = ResolvedThemeStyles::from_theme(t, use_nerd)
-                                        .with_toast_timeout(config.settings.toast_timeout);
+                                    (styles, modal_styles, toast_styles) = resolve_bashmenu_styles(
+                                        Some(t),
+                                        use_nerd,
+                                        config.settings.toast_timeout,
+                                    );
                                     menu_view.set_styles(styles.clone());
                                 }
                             }
@@ -1463,7 +1555,7 @@ fn main() -> Result<()> {
                     if let Some(opt_val) = submitted {
                         if let Some(selected) = opt_val {
                             config.set_value(key_path.as_str(), serde_yml::Value::String(selected));
-                            let _ = save_config(&config_path, &config);
+                            save_config_or_toast(&config_path, &config, &mut toast_rack);
                             menu_view.set_config(config.clone());
                             if key_path == "settings.framebuffer"
                                 || key_path == "app.settings.framebuffer"
@@ -1722,6 +1814,15 @@ fn main() -> Result<()> {
                                             .contains(crossterm::event::KeyModifiers::CONTROL)
                                     {
                                         MenuAction::Exit
+                                    } else if matches!(
+                                        key.code,
+                                        KeyCode::Char('g') | KeyCode::Char('G')
+                                    ) && key
+                                        .modifiers
+                                        .contains(crossterm::event::KeyModifiers::CONTROL)
+                                    {
+                                        menu_view.toggle_help_gutter(area);
+                                        MenuAction::None
                                     } else {
                                         menu_view.handle_key(key.code)
                                     }
@@ -1891,10 +1992,20 @@ fn main() -> Result<()> {
                             last_interaction = Instant::now();
                             clear_command_cache();
 
-                            if let Ok(new_config) = load_config(&config_path) {
-                                config = new_config;
+                            match load_config(&config_path) {
+                                Ok(new_config) => {
+                                    config = new_config;
+                                }
+                                Err(e) => {
+                                    push_error_toast(
+                                        &mut toast_rack,
+                                        "Config Reload Failed (bashmenu.yml)",
+                                        format!("YAML syntax error: {}", e),
+                                        8.0,
+                                    );
+                                }
                             }
-                            use_nerd = config.settings.use_nerd_fonts.unwrap_or(false)
+                            use_nerd = config.settings.use_nerd_fonts.unwrap_or(true)
                                 && !on_linux_console
                                 && !guard.has_framebuffer();
                             menu_view.set_use_nerd_fonts(use_nerd);
@@ -1918,13 +2029,11 @@ fn main() -> Result<()> {
                                 themes = new_themes;
                             }
                             let active_theme = themes.get(&config.theme);
-                            styles = if let Some(t) = active_theme {
-                                ResolvedThemeStyles::from_theme(t, use_nerd)
-                                    .with_toast_timeout(config.settings.toast_timeout)
-                            } else {
-                                ResolvedThemeStyles::default()
-                                    .with_toast_timeout(config.settings.toast_timeout)
-                            };
+                            (styles, modal_styles, toast_styles) = resolve_bashmenu_styles(
+                                active_theme,
+                                use_nerd,
+                                config.settings.toast_timeout,
+                            );
                             menu_view.set_styles(styles.clone());
                             guard.set_default_bg(styles.background);
 
@@ -1960,7 +2069,7 @@ fn main() -> Result<()> {
                         MenuAction::ToggleShortcuts => {
                             let show = menu_view.toggle_shortcuts();
                             config.settings.show_menu_shortcuts = Some(show);
-                            let _ = save_config(&config_path, &config);
+                            save_config_or_toast(&config_path, &config, &mut toast_rack);
                             menu_view.set_config(config.clone());
                         }
                         MenuAction::ConfigureGutter => {

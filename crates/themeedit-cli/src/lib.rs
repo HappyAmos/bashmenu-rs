@@ -2,15 +2,17 @@
 
 pub mod preview;
 pub use preview::{
-    extract_preview_cell_color, extract_preview_color_at, format_color_code, render_preview_pane,
+    extract_preview_cell_color, extract_preview_color_at, format_color_code,
+    preview_tab_bar_layout, render_preview_pane, render_preview_pane_with_base,
+    toast_preview_boxes, PreviewTabSpan,
 };
 
 use anyhow::Result;
 use bashmenu_core::{
-    load_themes, save_themes, DividerConfig, MarqueeConfig, Theme, ThemeCollection,
-    WallpaperSetting, WindowBorders,
+    default_activity_overrides_map, is_scalar_color_token, load_themes, save_themes, DividerConfig,
+    MarqueeConfig, Theme, ThemeCollection, ToastStyle, WallpaperSetting, WindowBorders,
 };
-use bashmenu_tui::{ResolvedThemeStyles, TextInput};
+use bashmenu_tui::{is_inherited_color_value, ResolvedThemeStyles, TextInput, ThemeActivity};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
@@ -74,6 +76,8 @@ pub enum TokenKind {
     MarqueeChar,
     /// Marquee scroll repeat gap in spaces
     MarqueeGap,
+    /// Visual layout style for toast notifications ("Bar" or "Framed")
+    ToastStyle,
     /// Toast notification vertical indicator glyph
     ToastChar,
     /// Background wallpaper image path
@@ -116,6 +120,7 @@ impl TokenItem {
             | TokenKind::DividerLength
             | TokenKind::MarqueeChar
             | TokenKind::MarqueeGap
+            | TokenKind::ToastStyle
             | TokenKind::ToastChar => TokenCategory::Theme,
         }
     }
@@ -124,7 +129,7 @@ impl TokenItem {
 /// Active preview mode displaying different BashMenu screens.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PreviewMode {
-    /// Main menu interactive preview
+    /// Main menu interactive preview (edits base theme palette)
     #[default]
     Menu,
     /// Text editor (`bashedit`) preview
@@ -135,9 +140,24 @@ pub enum PreviewMode {
     MenuEditor,
     /// Toast notification popups preview
     Toast,
+    /// Visual theme editor (`themeedit`) preview
+    ThemeEditor,
+    /// Shortcuts editor (`shortcutedit`) preview
+    ShortcutEditor,
 }
 
 impl PreviewMode {
+    /// Ordered list of all seven preview tabs (`1` through `7`).
+    pub const ALL: [PreviewMode; 7] = [
+        PreviewMode::Menu,
+        PreviewMode::TextEditor,
+        PreviewMode::Modals,
+        PreviewMode::MenuEditor,
+        PreviewMode::Toast,
+        PreviewMode::ThemeEditor,
+        PreviewMode::ShortcutEditor,
+    ];
+
     /// Cycles to the next preview mode screen.
     pub fn next(self) -> Self {
         match self {
@@ -145,7 +165,35 @@ impl PreviewMode {
             PreviewMode::TextEditor => PreviewMode::Modals,
             PreviewMode::Modals => PreviewMode::MenuEditor,
             PreviewMode::MenuEditor => PreviewMode::Toast,
-            PreviewMode::Toast => PreviewMode::Menu,
+            PreviewMode::Toast => PreviewMode::ThemeEditor,
+            PreviewMode::ThemeEditor => PreviewMode::ShortcutEditor,
+            PreviewMode::ShortcutEditor => PreviewMode::Menu,
+        }
+    }
+
+    /// Cycles to the previous preview mode screen (`Shift+Tab`).
+    pub fn prev(self) -> Self {
+        match self {
+            PreviewMode::Menu => PreviewMode::ShortcutEditor,
+            PreviewMode::TextEditor => PreviewMode::Menu,
+            PreviewMode::Modals => PreviewMode::TextEditor,
+            PreviewMode::MenuEditor => PreviewMode::Modals,
+            PreviewMode::Toast => PreviewMode::MenuEditor,
+            PreviewMode::ThemeEditor => PreviewMode::Toast,
+            PreviewMode::ShortcutEditor => PreviewMode::ThemeEditor,
+        }
+    }
+
+    /// Returns the `ThemeActivity` associated with this preview tab.
+    pub fn activity(self) -> ThemeActivity {
+        match self {
+            PreviewMode::Menu => ThemeActivity::MainMenu,
+            PreviewMode::TextEditor => ThemeActivity::BashEdit,
+            PreviewMode::Modals => ThemeActivity::Modals,
+            PreviewMode::MenuEditor => ThemeActivity::MenuEdit,
+            PreviewMode::Toast => ThemeActivity::Toasts,
+            PreviewMode::ThemeEditor => ThemeActivity::ThemeEdit,
+            PreviewMode::ShortcutEditor => ThemeActivity::ShortcutEdit,
         }
     }
 
@@ -157,6 +205,34 @@ impl PreviewMode {
             PreviewMode::Modals => "Popup Windows / Modals",
             PreviewMode::MenuEditor => "Visual Menu Editor",
             PreviewMode::Toast => "Toast Notifications",
+            PreviewMode::ThemeEditor => "Theme Editor",
+            PreviewMode::ShortcutEditor => "Shortcuts Editor",
+        }
+    }
+
+    /// Compact numbered tab label for the preview pane header bar.
+    pub fn tab_label(self) -> &'static str {
+        match self {
+            PreviewMode::Menu => "1:Menu",
+            PreviewMode::TextEditor => "2:Editor",
+            PreviewMode::Modals => "3:Modals",
+            PreviewMode::MenuEditor => "4:MenuEdit",
+            PreviewMode::Toast => "5:Toasts",
+            PreviewMode::ThemeEditor => "6:ThemeEdit",
+            PreviewMode::ShortcutEditor => "7:Shortcuts",
+        }
+    }
+
+    /// Ultra-compact numbered label used on narrow split panes.
+    pub fn short_label(self) -> &'static str {
+        match self {
+            PreviewMode::Menu => "1:Menu",
+            PreviewMode::TextEditor => "2:Edit",
+            PreviewMode::Modals => "3:Mod",
+            PreviewMode::MenuEditor => "4:MEd",
+            PreviewMode::Toast => "5:Tst",
+            PreviewMode::ThemeEditor => "6:Thm",
+            PreviewMode::ShortcutEditor => "7:Keys",
         }
     }
 }
@@ -353,6 +429,10 @@ impl ThemeEditorState {
                 kind: TokenKind::Color("highlight_text".to_string()),
             },
             TokenItem {
+                label: "Selection Color".to_string(),
+                kind: TokenKind::Color("selection".to_string()),
+            },
+            TokenItem {
                 label: "Border Color".to_string(),
                 kind: TokenKind::Color("border".to_string()),
             },
@@ -395,6 +475,10 @@ impl ThemeEditorState {
             TokenItem {
                 label: "Shadow Color".to_string(),
                 kind: TokenKind::Color("shadow".to_string()),
+            },
+            TokenItem {
+                label: "Whitespace Color".to_string(),
+                kind: TokenKind::Color("whitespace".to_string()),
             },
             // Borders
             TokenItem {
@@ -462,6 +546,10 @@ impl ThemeEditorState {
                 kind: TokenKind::Border("gutter_bottom_tee".to_string()),
             },
             // Toast Notifications
+            TokenItem {
+                label: "Toast Style".to_string(),
+                kind: TokenKind::ToastStyle,
+            },
             TokenItem {
                 label: "Toast Left Bar".to_string(),
                 kind: TokenKind::ToastChar,
@@ -603,6 +691,42 @@ impl ThemeEditorState {
                 serde_yml::Value::Number((-1).into()),
             ]),
         );
+        colors.insert(
+            "selection".to_string(),
+            serde_yml::Value::Sequence(vec![
+                serde_yml::Value::Number(255.into()),
+                serde_yml::Value::Number(201.into()),
+            ]),
+        );
+        colors.insert(
+            "whitespace".to_string(),
+            serde_yml::Value::Sequence(vec![
+                serde_yml::Value::Number(239.into()),
+                serde_yml::Value::Number((-1).into()),
+            ]),
+        );
+        colors.insert(
+            "toast_info".to_string(),
+            serde_yml::Value::Sequence(vec![
+                serde_yml::Value::Number(117.into()),
+                serde_yml::Value::Number((-1).into()),
+            ]),
+        );
+        colors.insert(
+            "toast_warning".to_string(),
+            serde_yml::Value::Sequence(vec![
+                serde_yml::Value::Number(214.into()),
+                serde_yml::Value::Number((-1).into()),
+            ]),
+        );
+        colors.insert(
+            "toast_error".to_string(),
+            serde_yml::Value::Sequence(vec![
+                serde_yml::Value::Number(196.into()),
+                serde_yml::Value::Number((-1).into()),
+            ]),
+        );
+        colors.extend(default_activity_overrides_map());
         t.colors_16 = Some(bashmenu_tui::downsample_palette_to_16(&colors));
         t.colors_8 = Some(bashmenu_tui::downsample_palette_to_8(&colors));
         t.colors_256 = Some(colors);
@@ -613,59 +737,12 @@ impl ThemeEditorState {
     pub fn get_token_value_display(&self, token: &TokenItem) -> String {
         match &token.kind {
             TokenKind::Color(key) => {
-                if let Some(c_map) = &self.current_theme.colors_256 {
-                    if let Some(val) = c_map.get(key) {
-                        if let Some(seq) = val.as_sequence() {
-                            if key == "highlight" {
-                                if let Some(bg_val) = seq.get(1) {
-                                    if let Some(bg) = bg_val.as_i64() {
-                                        if bg >= 0 {
-                                            return format!("Color {}", bg);
-                                        }
-                                    } else if let Some(s) = bg_val.as_str() {
-                                        if s != "-1" {
-                                            return s.to_string();
-                                        }
-                                    }
-                                }
-                            }
-                            if let Some(fg) = seq.first().and_then(|v| v.as_i64()) {
-                                return format!("Color {}", fg);
-                            } else if let Some(s) = seq.first().and_then(|v| v.as_str()) {
-                                return s.to_string();
-                            }
-                        } else if let Some(n) = val.as_i64() {
-                            return format!("Color {}", n);
-                        } else if let Some(s) = val.as_str() {
-                            return s.to_string();
-                        }
-                    } else if key == "highlight_text" {
-                        if let Some(val) = c_map.get("highlight") {
-                            if let Some(seq) = val.as_sequence() {
-                                if let Some(fg) = seq.first().and_then(|v| v.as_i64()) {
-                                    if fg >= 0 {
-                                        return format!("Color {}", fg);
-                                    }
-                                } else if let Some(s) = seq.first().and_then(|v| v.as_str()) {
-                                    if s != "-1" {
-                                        return s.to_string();
-                                    }
-                                }
-                            }
-                        }
-                    }
+                if self.is_color_token_inherited(key) {
+                    let base =
+                        resolve_activity_display(&self.current_theme, ThemeActivity::MainMenu, key);
+                    return format!("Inherit ({})", base);
                 }
-                if key == "highlight_text" {
-                    let styles = ResolvedThemeStyles::from_theme(&self.current_theme, true);
-                    if let Some(fg) = styles.highlight.fg {
-                        return format!("Color {}", color_to_u8(fg));
-                    }
-                }
-                let col = self.get_color_token_color(key);
-                if col != Color::Reset {
-                    return format!("Color {}", color_to_u8(col));
-                }
-                "Default".to_string()
+                resolve_activity_display(&self.current_theme, self.active_activity(), key)
             }
             TokenKind::Border(key) => {
                 if let Some(win) = &self.current_theme.window {
@@ -739,6 +816,7 @@ impl ThemeEditorState {
                     .unwrap_or(4);
                 format!("{}", gap)
             }
+            TokenKind::ToastStyle => self.get_toast_style().display_label().to_string(),
             TokenKind::ToastChar => {
                 let c = self
                     .current_theme
@@ -807,270 +885,135 @@ impl ThemeEditorState {
         self.set_color_token_value(key, Color::Indexed(color_idx));
     }
 
+    /// Returns the `ThemeActivity` edited on the current preview tab.
+    pub fn active_activity(&self) -> ThemeActivity {
+        self.preview_mode.activity()
+    }
+
+    /// Returns `true` if `key` currently inherits from `MainMenu` (`-1`).
+    ///
+    /// Always returns `false` on `PreviewMode::Menu` because tab 1 edits the
+    /// base `bashmenu` palette itself.
+    pub fn is_color_token_inherited(&self, key: &str) -> bool {
+        let activity = self.active_activity();
+        if activity == ThemeActivity::MainMenu {
+            return false;
+        }
+        let Some(c_map) = &self.current_theme.colors_256 else {
+            return true;
+        };
+        match find_tier_token_value(c_map, activity, key) {
+            None => true,
+            Some(val) => is_token_value_inherited_for_key(key, val),
+        }
+    }
+
+    /// Resets an activity override token to `-1` (or `[-1, -1]`) across tiers.
+    ///
+    /// Returns `true` when an override was cleared; returns `false` on Tab 1
+    /// (`MainMenu`) or if the token already inherits from the base palette.
+    pub fn reset_color_token_to_inherit(&mut self, key: &str) -> bool {
+        let activity = self.active_activity();
+        if activity == ThemeActivity::MainMenu || self.is_color_token_inherited(key) {
+            return false;
+        }
+        let inherit_val = if is_scalar_color_token(key) {
+            serde_yml::Value::Number((-1).into())
+        } else {
+            serde_yml::Value::Sequence(vec![
+                serde_yml::Value::Number((-1).into()),
+                serde_yml::Value::Number((-1).into()),
+            ])
+        };
+
+        if let Some(c_map) = &mut self.current_theme.colors_256 {
+            reset_tier_token_entry(c_map, activity, key, &inherit_val);
+        }
+        if let Some(c16) = &mut self.current_theme.colors_16 {
+            reset_tier_token_entry(c16, activity, key, &inherit_val);
+        }
+        if let Some(c8) = &mut self.current_theme.colors_8 {
+            reset_tier_token_entry(c8, activity, key, &inherit_val);
+        }
+
+        self.is_modified = true;
+        self.status_message = format!(
+            "Reset {} ({}) to inherit (-1)",
+            key,
+            self.preview_mode.title()
+        );
+        true
+    }
+
     /// Updates a color token entry with a specified Ratatui Color (Indexed, RGB, or named).
     pub fn set_color_token_value(&mut self, key: &str, color: Color) {
+        let activity = self.active_activity();
         if self.current_theme.colors_256.is_none() {
             self.current_theme.colors_256 = Some(HashMap::new());
         }
-        if let Some(c_map) = &mut self.current_theme.colors_256 {
-            let val = match color {
-                Color::Indexed(code) => serde_yml::Value::Number((code as i64).into()),
-                Color::Rgb(r, g, b) => serde_yml::Value::String(format!("#{r:02x}{g:02x}{b:02x}")),
-                _ => {
-                    let (r, g, b) = bashmenu_tui::color_to_rgb(color);
-                    serde_yml::Value::String(format!("#{r:02x}{g:02x}{b:02x}"))
-                }
-            };
-            if key == "background" {
-                c_map.insert(key.to_string(), val.clone());
-            } else if key == "highlight" {
+        let raw_val = match color {
+            Color::Reset => serde_yml::Value::Number((-1).into()),
+            Color::Indexed(code) => serde_yml::Value::Number((code as i64).into()),
+            Color::Rgb(r, g, b) => serde_yml::Value::String(format!("#{r:02x}{g:02x}{b:02x}")),
+            _ => {
                 let (r, g, b) = bashmenu_tui::color_to_rgb(color);
-                let lum = (r as u32 * 299 + g as u32 * 587 + b as u32 * 114) / 1000;
-                let existing_fg = c_map.get("highlight_text").cloned().or_else(|| {
-                    c_map
-                        .get("highlight")
-                        .and_then(|v| v.as_sequence())
-                        .and_then(|seq| seq.first())
-                        .cloned()
-                });
-                let fg_val = if let Some(efg) = existing_fg {
-                    if let Some(efg_color) = bashmenu_tui::parse_color_value(&efg) {
-                        if efg_color != Color::Reset {
-                            efg
-                        } else if lum > 128 {
-                            serde_yml::Value::Number(16.into())
-                        } else {
-                            serde_yml::Value::Number(255.into())
-                        }
-                    } else if lum > 128 {
-                        serde_yml::Value::Number(16.into())
-                    } else {
-                        serde_yml::Value::Number(255.into())
-                    }
-                } else if lum > 128 {
-                    serde_yml::Value::Number(16.into())
-                } else {
-                    serde_yml::Value::Number(255.into())
-                };
-
-                let pair = serde_yml::Value::Sequence(vec![fg_val, val.clone()]);
-                c_map.insert(key.to_string(), pair.clone());
-                if c_map.contains_key("selection") {
-                    c_map.insert("selection".to_string(), pair);
-                }
-            } else if key == "highlight_text" {
-                let existing_bg = c_map
-                    .get("highlight")
-                    .and_then(|v| v.as_sequence())
-                    .and_then(|seq| seq.get(1))
-                    .cloned()
-                    .unwrap_or_else(|| serde_yml::Value::Number(201.into()));
-
-                let pair = serde_yml::Value::Sequence(vec![val.clone(), existing_bg]);
-                c_map.insert("highlight".to_string(), pair.clone());
-                c_map.insert(key.to_string(), val.clone());
-                if c_map.contains_key("selection") {
-                    c_map.insert("selection".to_string(), pair);
-                }
-            } else {
-                c_map.insert(
-                    key.to_string(),
-                    serde_yml::Value::Sequence(vec![
-                        val.clone(),
-                        serde_yml::Value::Number((-1).into()),
-                    ]),
-                );
+                serde_yml::Value::String(format!("#{r:02x}{g:02x}{b:02x}"))
             }
+        };
 
-            // Keep 16-color fallback palette tier in sync if present
-            if let Some(c16) = &mut self.current_theme.colors_16 {
-                let val_16 = bashmenu_tui::downsample_color_value_to_16(&val);
-                if key == "background" {
-                    c16.insert(key.to_string(), val_16);
-                } else if key == "highlight" {
-                    let (r, g, b) = bashmenu_tui::color_to_rgb(color);
-                    let lum = (r as u32 * 299 + g as u32 * 587 + b as u32 * 114) / 1000;
-                    let existing_fg_16 = c16
-                        .get("highlight_text")
-                        .cloned()
-                        .or_else(|| {
-                            c16.get("highlight")
-                                .and_then(|v| v.as_sequence())
-                                .and_then(|seq| seq.first())
-                                .cloned()
-                        })
-                        .unwrap_or_else(|| {
-                            if lum > 128 {
-                                serde_yml::Value::String("COLOR_BLACK".to_string())
-                            } else {
-                                serde_yml::Value::String("COLOR_WHITE".to_string())
-                            }
-                        });
-                    let pair_16 = serde_yml::Value::Sequence(vec![existing_fg_16, val_16]);
-                    c16.insert(key.to_string(), pair_16.clone());
-                    if c16.contains_key("selection") {
-                        c16.insert("selection".to_string(), pair_16);
-                    }
-                } else if key == "highlight_text" {
-                    let existing_bg_16 = c16
-                        .get("highlight")
-                        .and_then(|v| v.as_sequence())
-                        .and_then(|seq| seq.get(1))
-                        .cloned()
-                        .unwrap_or_else(|| serde_yml::Value::String("COLOR_BLUE".to_string()));
-                    let pair_16 = serde_yml::Value::Sequence(vec![val_16.clone(), existing_bg_16]);
-                    c16.insert("highlight".to_string(), pair_16.clone());
-                    c16.insert(key.to_string(), val_16);
-                    if c16.contains_key("selection") {
-                        c16.insert("selection".to_string(), pair_16);
-                    }
-                } else {
-                    c16.insert(
-                        key.to_string(),
-                        serde_yml::Value::Sequence(vec![
-                            val_16,
-                            serde_yml::Value::Number((-1).into()),
-                        ]),
-                    );
-                }
-            }
+        if let Some(c_map) = &mut self.current_theme.colors_256 {
+            write_color_token_to_tier(
+                c_map,
+                activity,
+                key,
+                color,
+                &raw_val,
+                PaletteTierTarget::Color256,
+            );
+        }
+        if let Some(c16) = &mut self.current_theme.colors_16 {
+            write_color_token_to_tier(
+                c16,
+                activity,
+                key,
+                color,
+                &raw_val,
+                PaletteTierTarget::Color16,
+            );
+        }
+        if let Some(c8) = &mut self.current_theme.colors_8 {
+            write_color_token_to_tier(
+                c8,
+                activity,
+                key,
+                color,
+                &raw_val,
+                PaletteTierTarget::Color8,
+            );
+        }
 
-            // Keep 8-color fallback palette tier in sync if present
-            if let Some(c8) = &mut self.current_theme.colors_8 {
-                let val_8 = bashmenu_tui::downsample_color_value_to_8(&val);
-                if key == "background" {
-                    c8.insert(key.to_string(), val_8);
-                } else if key == "highlight" {
-                    let (r, g, b) = bashmenu_tui::color_to_rgb(color);
-                    let lum = (r as u32 * 299 + g as u32 * 587 + b as u32 * 114) / 1000;
-                    let existing_fg_8 = c8
-                        .get("highlight_text")
-                        .cloned()
-                        .or_else(|| {
-                            c8.get("highlight")
-                                .and_then(|v| v.as_sequence())
-                                .and_then(|seq| seq.first())
-                                .cloned()
-                        })
-                        .unwrap_or_else(|| {
-                            if lum > 128 {
-                                serde_yml::Value::String("COLOR_BLACK".to_string())
-                            } else {
-                                serde_yml::Value::String("COLOR_WHITE".to_string())
-                            }
-                        });
-                    let pair_8 = serde_yml::Value::Sequence(vec![existing_fg_8, val_8]);
-                    c8.insert(key.to_string(), pair_8.clone());
-                    if c8.contains_key("selection") {
-                        c8.insert("selection".to_string(), pair_8);
-                    }
-                } else if key == "highlight_text" {
-                    let existing_bg_8 = c8
-                        .get("highlight")
-                        .and_then(|v| v.as_sequence())
-                        .and_then(|seq| seq.get(1))
-                        .cloned()
-                        .unwrap_or_else(|| serde_yml::Value::String("COLOR_BLUE".to_string()));
-                    let pair_8 = serde_yml::Value::Sequence(vec![val_8.clone(), existing_bg_8]);
-                    c8.insert("highlight".to_string(), pair_8.clone());
-                    c8.insert(key.to_string(), val_8);
-                    if c8.contains_key("selection") {
-                        c8.insert("selection".to_string(), pair_8);
-                    }
-                } else {
-                    c8.insert(
-                        key.to_string(),
-                        serde_yml::Value::Sequence(vec![
-                            val_8,
-                            serde_yml::Value::Number((-1).into()),
-                        ]),
-                    );
-                }
-            }
-            self.is_modified = true;
-            let display_str = match color {
-                Color::Indexed(code) => format!("color {}", code),
-                Color::Rgb(r, g, b) => format!("#{r:02x}{g:02x}{b:02x}"),
-                _ => format_color_code(color),
-            };
+        self.is_modified = true;
+        let display_str = match color {
+            Color::Reset => "inherit (-1)".to_string(),
+            Color::Indexed(code) => format!("color {}", code),
+            Color::Rgb(r, g, b) => format!("#{r:02x}{g:02x}{b:02x}"),
+            _ => format_color_code(color),
+        };
+        if activity == ThemeActivity::MainMenu {
             self.status_message = format!("Updated {} to {}", key, display_str);
+        } else {
+            self.status_message = format!(
+                "Updated {} ({}) to {}",
+                key,
+                self.preview_mode.title(),
+                display_str
+            );
         }
     }
 
     /// Retrieves the current Ratatui Color for a palette token key.
     pub fn get_color_token_color(&self, key: &str) -> Color {
-        if key == "highlight_text" {
-            if let Some(c_map) = &self.current_theme.colors_256 {
-                if let Some(val) = c_map.get(key) {
-                    if let Some(c) = bashmenu_tui::parse_color_value(val) {
-                        if c != Color::Reset {
-                            return c;
-                        }
-                    }
-                }
-                if let Some(val) = c_map.get("highlight") {
-                    if let Some(seq) = val.as_sequence() {
-                        if let Some(fg_val) = seq.first() {
-                            if let Some(c) = bashmenu_tui::parse_color_value(fg_val) {
-                                if c != Color::Reset {
-                                    return c;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            let styles = ResolvedThemeStyles::from_theme(&self.current_theme, true);
-            return styles.highlight.fg.unwrap_or(Color::Black);
-        }
-
-        if key == "highlight" {
-            if let Some(c_map) = &self.current_theme.colors_256 {
-                if let Some(val) = c_map.get(key) {
-                    if let Some(seq) = val.as_sequence() {
-                        if let Some(bg_val) = seq.get(1) {
-                            if let Some(c) = bashmenu_tui::parse_color_value(bg_val) {
-                                if c != Color::Reset {
-                                    return c;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            let styles = ResolvedThemeStyles::from_theme(&self.current_theme, true);
-            return styles.highlight.bg.unwrap_or(Color::Cyan);
-        }
-
-        if let Some(c_map) = &self.current_theme.colors_256 {
-            if let Some(val) = c_map.get(key) {
-                if let Some(c) = bashmenu_tui::parse_color_value(val) {
-                    return c;
-                }
-            }
-        }
-        let styles = ResolvedThemeStyles::from_theme(&self.current_theme, true);
-        match key {
-            "background" => styles.background,
-            "title" => styles.title.fg.unwrap_or(Color::White),
-            "text" => styles.text.fg.unwrap_or(Color::White),
-            "highlight" => styles.highlight.bg.unwrap_or(Color::Cyan),
-            "border" => styles.border,
-            "divider" => styles.divider.fg.unwrap_or(Color::Cyan),
-            "accent" => styles.accent.fg.unwrap_or(Color::LightCyan),
-            "shortcut_key" => styles.shortcut_key.fg.unwrap_or(Color::Yellow),
-            "help_text" => styles.help_text.fg.unwrap_or(Color::Cyan),
-            "plugin" => styles.plugin.fg.unwrap_or(Color::Cyan),
-            "gutter" => styles.gutter.fg.unwrap_or(Color::DarkGray),
-            "footer" => styles.footer.fg.unwrap_or(Color::DarkGray),
-            "window_close_button" => styles.window_close_button.fg.unwrap_or(Color::Red),
-            "scrollbar" => styles.scrollbar.fg.unwrap_or(Color::Cyan),
-            "shadow" => styles.shadow.fg.unwrap_or(Color::DarkGray),
-            "toast_info" => styles.toast_info,
-            "toast_warning" => styles.toast_warning,
-            "toast_error" => styles.toast_error,
-            _ => Color::White,
-        }
+        resolve_activity_color(&self.current_theme, self.active_activity(), key)
     }
 
     /// Applies or clears full background wallpaper configuration.
@@ -1148,10 +1091,21 @@ impl ThemeEditorState {
         for (k, v) in derived {
             c_map.insert(k, v);
         }
-        // Clear view-specific sub-table overrides so derived colors apply uniformly
-        c_map.remove("menu_editor");
-        c_map.remove("editor");
-        c_map.remove("modals");
+        // Clear legacy sub-table keys and reset all 6 activity override maps to -1
+        for legacy_key in [
+            "menu_editor",
+            "editor",
+            "modals",
+            "button_primary",
+            "button_error",
+            "button_cancel",
+            "button_success",
+        ] {
+            c_map.remove(legacy_key);
+        }
+        for (act_key, act_map) in default_activity_overrides_map() {
+            c_map.insert(act_key, act_map);
+        }
 
         // Also derive harmonious 16-color and 8-color fallback palette tiers
         let c_map_16 = bashmenu_tui::downsample_palette_to_16(c_map);
@@ -1171,55 +1125,7 @@ impl ThemeEditorState {
 
     /// Retrieves the current 8-bit color index for a palette token key.
     pub fn get_color_token_u8(&self, key: &str) -> u8 {
-        if key == "highlight" || key == "highlight_text" {
-            let c = self.get_color_token_color(key);
-            return color_to_u8(c);
-        }
-        if let Some(c_map) = &self.current_theme.colors_256 {
-            if let Some(val) = c_map.get(key) {
-                if let Some(seq) = val.as_sequence() {
-                    if let Some(fg) = seq.first().and_then(|v| v.as_i64()) {
-                        if (0..=255).contains(&fg) {
-                            return fg as u8;
-                        }
-                    }
-                } else if let Some(n) = val.as_i64() {
-                    if (0..=255).contains(&n) {
-                        return n as u8;
-                    }
-                }
-                if let Some(c) = bashmenu_tui::parse_color_value(val) {
-                    return color_to_u8(c);
-                }
-            }
-        }
-        // Fallback to resolved styles from active theme
-        let styles = ResolvedThemeStyles::from_theme(&self.current_theme, true);
-        match key {
-            "background" => color_to_u8(styles.background),
-            "title" => styles.title.fg.map(color_to_u8).unwrap_or(255),
-            "text" => styles.text.fg.map(color_to_u8).unwrap_or(255),
-            "highlight" => styles.highlight.bg.map(color_to_u8).unwrap_or(255),
-            "border" => color_to_u8(styles.border),
-            "divider" => styles.divider.fg.map(color_to_u8).unwrap_or(255),
-            "accent" => styles.accent.fg.map(color_to_u8).unwrap_or(255),
-            "shortcut_key" => styles.shortcut_key.fg.map(color_to_u8).unwrap_or(255),
-            "help_text" => styles.help_text.fg.map(color_to_u8).unwrap_or(255),
-            "plugin" => styles.plugin.fg.map(color_to_u8).unwrap_or(255),
-            "gutter" => styles.gutter.fg.map(color_to_u8).unwrap_or(255),
-            "footer" => styles.footer.fg.map(color_to_u8).unwrap_or(255),
-            "window_close_button" => styles
-                .window_close_button
-                .fg
-                .map(color_to_u8)
-                .unwrap_or(255),
-            "scrollbar" => styles.scrollbar.fg.map(color_to_u8).unwrap_or(255),
-            "shadow" => styles.shadow.fg.map(color_to_u8).unwrap_or(236),
-            "toast_info" => color_to_u8(styles.toast_info),
-            "toast_warning" => color_to_u8(styles.toast_warning),
-            "toast_error" => color_to_u8(styles.toast_error),
-            _ => 255,
-        }
+        color_to_u8(self.get_color_token_color(key))
     }
 
     /// Sets the border glyph character for a specific window frame element.
@@ -1322,6 +1228,35 @@ impl ThemeEditorState {
             self.is_modified = true;
             self.status_message = format!("Updated marquee gap to {}", next_gap);
         }
+    }
+
+    /// Returns the configured toast layout style for the current theme.
+    pub fn get_toast_style(&self) -> ToastStyle {
+        self.current_theme
+            .toast
+            .as_ref()
+            .and_then(|t| t.style.as_deref())
+            .map(ToastStyle::from_str_name)
+            .unwrap_or_default()
+    }
+
+    /// Sets the toast layout style for the current theme.
+    pub fn set_toast_style(&mut self, style: ToastStyle) {
+        if self.current_theme.toast.is_none() {
+            self.current_theme.toast = Some(bashmenu_core::ToastConfig::default());
+        }
+        if let Some(t) = &mut self.current_theme.toast {
+            t.style = Some(style.as_str().to_string());
+            self.is_modified = true;
+            self.status_message = format!("Updated toast style to '{}'", style.display_label());
+        }
+    }
+
+    /// Toggles the toast layout style between Bar and Framed.
+    pub fn toggle_toast_style(&mut self) -> ToastStyle {
+        let next = self.get_toast_style().toggle();
+        self.set_toast_style(next);
+        next
     }
 
     /// Updates left vertical accent bar character for toast popups.
@@ -1645,6 +1580,7 @@ impl ThemeEditorState {
                 TokenKind::DividerLength => key == "divider_length",
                 TokenKind::MarqueeChar => key == "marquee_char",
                 TokenKind::MarqueeGap => key == "marquee_gap",
+                TokenKind::ToastStyle => key == "toast_style",
                 TokenKind::ToastChar => key == "toast_char",
                 TokenKind::WallpaperImage => key == "wallpaper" || key == "wallpaper_image",
                 TokenKind::WallpaperOpacity => key == "wallpaper_opacity" || key == "opacity",
@@ -1672,6 +1608,12 @@ impl ThemeEditorState {
                                 && (key == "close_button" || key == "close_btn" || key == "close"))
                             || (k == "title" && key == "header")
                             || (k == "footer" && key == "bottom_bar")
+                            || (k == "selection"
+                                && (key == "sel" || key == "selection_color" || key == "select"))
+                            || (k == "whitespace"
+                                && (key == "ws"
+                                    || key == "whitespace_color"
+                                    || key == "indent_guide"))
                             || (k == "shadow" && (key == "shadow_color" || key == "drop_shadow"))
                     }
                     TokenKind::Border(k) => {
@@ -1688,6 +1630,7 @@ impl ThemeEditorState {
                     }
                     TokenKind::DividerChar => key == "divider",
                     TokenKind::MarqueeChar => key == "marquee",
+                    TokenKind::ToastStyle => key == "toast_style" || key == "toast_mode",
                     TokenKind::ToastChar => {
                         key == "toast_char" || key == "toast_bar" || key == "toast"
                     }
@@ -1713,12 +1656,436 @@ impl ThemeEditorState {
     }
 }
 
+/// Internal tier target used when writing palette overrides uniformly.
+#[derive(Clone, Copy)]
+enum PaletteTierTarget {
+    Color256,
+    Color16,
+    Color8,
+}
+
+/// Mutable view into either a top-level palette map or an activity sub-map.
+enum TierMapMut<'a> {
+    Top(&'a mut HashMap<String, serde_yml::Value>),
+    Sub(&'a mut serde_yml::Mapping),
+}
+
+impl<'a> TierMapMut<'a> {
+    fn get(&self, key: &str) -> Option<&serde_yml::Value> {
+        match self {
+            Self::Top(m) => m.get(key),
+            Self::Sub(m) => m.get(serde_yml::Value::String(key.to_string())),
+        }
+    }
+
+    fn insert(&mut self, key: &str, val: serde_yml::Value) {
+        match self {
+            Self::Top(m) => {
+                m.insert(key.to_string(), val);
+            }
+            Self::Sub(m) => {
+                m.insert(serde_yml::Value::String(key.to_string()), val);
+            }
+        }
+    }
+}
+
+/// Looks up a token's raw YAML value for `activity` inside a tier map.
+fn find_tier_token_value<'a>(
+    c_map: &'a HashMap<String, serde_yml::Value>,
+    activity: ThemeActivity,
+    key: &str,
+) -> Option<&'a serde_yml::Value> {
+    if activity == ThemeActivity::MainMenu {
+        return c_map.get(key);
+    }
+    let yaml_key = serde_yml::Value::String(key.to_string());
+    if let Some(val) = c_map
+        .get(activity.yaml_key())
+        .and_then(|v| v.as_mapping())
+        .and_then(|m| m.get(&yaml_key))
+    {
+        return Some(val);
+    }
+    for leg in activity.legacy_yaml_keys() {
+        if let Some(val) = c_map
+            .get(*leg)
+            .and_then(|v| v.as_mapping())
+            .and_then(|m| m.get(&yaml_key))
+        {
+            return Some(val);
+        }
+    }
+    None
+}
+
+/// Returns `true` when `val` represents `-1` inheritance for `key`.
+fn is_token_value_inherited_for_key(key: &str, val: &serde_yml::Value) -> bool {
+    if is_inherited_color_value(val) {
+        return true;
+    }
+    if key == "highlight" || key == "selection" {
+        if let Some(seq) = val.as_sequence() {
+            return seq.get(1).is_none_or(is_inherited_color_value);
+        }
+    }
+    false
+}
+
+/// Formats a scalar YAML color value (`i64` or string) for display.
+fn format_yaml_scalar_value(val: &serde_yml::Value) -> Option<String> {
+    if is_inherited_color_value(val) {
+        return None;
+    }
+    if let Some(n) = val.as_i64() {
+        return Some(format!("Color {}", n));
+    }
+    if let Some(s) = val.as_str() {
+        return Some(s.to_string());
+    }
+    None
+}
+
+/// Extracts the display string for `key` within `activity` in `c_map`.
+fn format_yaml_token_display(
+    c_map: &HashMap<String, serde_yml::Value>,
+    activity: ThemeActivity,
+    key: &str,
+) -> Option<String> {
+    if let Some(val) = find_tier_token_value(c_map, activity, key) {
+        if let Some(seq) = val.as_sequence() {
+            if key == "highlight" || key == "selection" {
+                if let Some(bg_val) = seq.get(1) {
+                    if let Some(s) = format_yaml_scalar_value(bg_val) {
+                        return Some(s);
+                    }
+                }
+                if key == "highlight" {
+                    return None;
+                }
+            }
+            if let Some(fg_val) = seq.first() {
+                if let Some(s) = format_yaml_scalar_value(fg_val) {
+                    return Some(s);
+                }
+            }
+        } else if let Some(s) = format_yaml_scalar_value(val) {
+            return Some(s);
+        }
+    }
+    if key == "highlight_text" {
+        if let Some(hl_val) = find_tier_token_value(c_map, activity, "highlight") {
+            if let Some(fg_val) = hl_val.as_sequence().and_then(|s| s.first()) {
+                if let Some(s) = format_yaml_scalar_value(fg_val) {
+                    return Some(s);
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Resolves the display string for `key` under `activity`.
+fn resolve_activity_display(theme: &Theme, activity: ThemeActivity, key: &str) -> String {
+    if let Some(c_map) = &theme.colors_256 {
+        if let Some(disp) = format_yaml_token_display(c_map, activity, key) {
+            return disp;
+        }
+        if activity != ThemeActivity::MainMenu {
+            if let Some(disp) = format_yaml_token_display(c_map, ThemeActivity::MainMenu, key) {
+                return disp;
+            }
+        }
+    }
+    let col = resolve_activity_color(theme, activity, key);
+    if col != Color::Reset {
+        format!("Color {}", color_to_u8(col))
+    } else {
+        "Default".to_string()
+    }
+}
+
+/// Resolves the Ratatui `Color` for `key` under `activity`.
+fn resolve_activity_color(theme: &Theme, activity: ThemeActivity, key: &str) -> Color {
+    let styles = ResolvedThemeStyles::from_theme_for_activity(theme, true, activity);
+    if let Some(c_map) = &theme.colors_256 {
+        let check_act = |act: ThemeActivity| -> Option<Color> {
+            if key == "highlight_text" {
+                if let Some(val) = find_tier_token_value(c_map, act, key) {
+                    if !is_inherited_color_value(val) {
+                        if let Some(c) = bashmenu_tui::parse_color_value(val) {
+                            if c != Color::Reset {
+                                return Some(c);
+                            }
+                        }
+                    }
+                }
+                if let Some(val) = find_tier_token_value(c_map, act, "highlight") {
+                    if let Some(fg) = val.as_sequence().and_then(|s| s.first()) {
+                        if !is_inherited_color_value(fg) {
+                            if let Some(c) = bashmenu_tui::parse_color_value(fg) {
+                                if c != Color::Reset {
+                                    return Some(c);
+                                }
+                            }
+                        }
+                    }
+                }
+                return None;
+            }
+            if key == "highlight" || key == "selection" {
+                if let Some(val) = find_tier_token_value(c_map, act, key) {
+                    if let Some(seq) = val.as_sequence() {
+                        if let Some(bg) = seq.get(1) {
+                            if !is_inherited_color_value(bg) {
+                                if let Some(c) = bashmenu_tui::parse_color_value(bg) {
+                                    if c != Color::Reset {
+                                        return Some(c);
+                                    }
+                                }
+                            }
+                        }
+                        if key == "selection" {
+                            if let Some(fg) = seq.first() {
+                                if !is_inherited_color_value(fg) {
+                                    if let Some(c) = bashmenu_tui::parse_color_value(fg) {
+                                        if c != Color::Reset {
+                                            return Some(c);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                return None;
+            }
+            if let Some(val) = find_tier_token_value(c_map, act, key) {
+                if !is_inherited_color_value(val) {
+                    if let Some(c) = bashmenu_tui::parse_color_value(val) {
+                        if c != Color::Reset {
+                            return Some(c);
+                        }
+                    }
+                }
+            }
+            None
+        };
+
+        if let Some(c) = check_act(activity) {
+            return c;
+        }
+        if activity != ThemeActivity::MainMenu {
+            if let Some(c) = check_act(ThemeActivity::MainMenu) {
+                return c;
+            }
+        }
+    }
+
+    match key {
+        "background" => styles.background,
+        "title" => styles.title.fg.unwrap_or(Color::White),
+        "text" => styles.text.fg.unwrap_or(Color::White),
+        "highlight" => styles.highlight.bg.unwrap_or(Color::Cyan),
+        "highlight_text" => styles.highlight.fg.unwrap_or(Color::Black),
+        "selection" => styles
+            .selection
+            .bg
+            .or(styles.selection.fg)
+            .unwrap_or(Color::Cyan),
+        "whitespace" => styles.whitespace.fg.unwrap_or(Color::DarkGray),
+        "border" => styles.border,
+        "divider" => styles.divider.fg.unwrap_or(Color::Cyan),
+        "accent" => styles.accent.fg.unwrap_or(Color::LightCyan),
+        "shortcut_key" => styles.shortcut_key.fg.unwrap_or(Color::Yellow),
+        "help_text" => styles.help_text.fg.unwrap_or(Color::Cyan),
+        "plugin" => styles.plugin.fg.unwrap_or(Color::Cyan),
+        "gutter" => styles.gutter.fg.unwrap_or(Color::DarkGray),
+        "footer" => styles.footer.fg.unwrap_or(Color::DarkGray),
+        "window_close_button" => styles.window_close_button.fg.unwrap_or(Color::Red),
+        "scrollbar" => styles.scrollbar.fg.unwrap_or(Color::Cyan),
+        "shadow" => styles.shadow.fg.unwrap_or(Color::DarkGray),
+        "toast_info" => styles.toast_info,
+        "toast_warning" => styles.toast_warning,
+        "toast_error" => styles.toast_error,
+        _ => Color::White,
+    }
+}
+
+/// Computes a high-contrast foreground color YAML value for a background color.
+fn contrast_fg_value(color: Color, tier: PaletteTierTarget) -> serde_yml::Value {
+    let (r, g, b) = bashmenu_tui::color_to_rgb(color);
+    let lum = (r as u32 * 299 + g as u32 * 587 + b as u32 * 114) / 1000;
+    match tier {
+        PaletteTierTarget::Color256 => {
+            serde_yml::Value::Number(if lum > 128 { 16 } else { 255 }.into())
+        }
+        PaletteTierTarget::Color16 | PaletteTierTarget::Color8 => serde_yml::Value::String(
+            if lum > 128 {
+                "COLOR_BLACK"
+            } else {
+                "COLOR_WHITE"
+            }
+            .to_string(),
+        ),
+    }
+}
+
+/// Gets or initializes the activity override YAML mapping inside `tier_map`.
+fn get_or_init_activity_mapping(
+    tier_map: &mut HashMap<String, serde_yml::Value>,
+    activity: ThemeActivity,
+) -> Option<&mut serde_yml::Mapping> {
+    let key = activity.yaml_key();
+    let needs_seed = !matches!(tier_map.get(key), Some(serde_yml::Value::Mapping(_)));
+    if needs_seed {
+        let mut migrated = None;
+        for leg in activity.legacy_yaml_keys() {
+            if let Some(val) = tier_map.remove(*leg) {
+                if val.is_mapping() {
+                    migrated = Some(val);
+                    break;
+                }
+            }
+        }
+        let val = migrated.unwrap_or_else(|| {
+            let mut m = serde_yml::Mapping::new();
+            for tok in bashmenu_core::activity_override_tokens(key) {
+                let default_v = if is_scalar_color_token(tok) {
+                    serde_yml::Value::Number((-1).into())
+                } else {
+                    serde_yml::Value::Sequence(vec![
+                        serde_yml::Value::Number((-1).into()),
+                        serde_yml::Value::Number((-1).into()),
+                    ])
+                };
+                m.insert(serde_yml::Value::String((*tok).to_string()), default_v);
+            }
+            serde_yml::Value::Mapping(m)
+        });
+        tier_map.insert(key.to_string(), val);
+    }
+    match tier_map.get_mut(key) {
+        Some(serde_yml::Value::Mapping(m)) => Some(m),
+        _ => None,
+    }
+}
+
+/// Writes `key` with `raw_val` (downsampled for `tier`) into top-level or activity map.
+fn write_color_token_to_tier(
+    tier_map: &mut HashMap<String, serde_yml::Value>,
+    activity: ThemeActivity,
+    key: &str,
+    color: Color,
+    raw_val: &serde_yml::Value,
+    tier: PaletteTierTarget,
+) {
+    let val = match tier {
+        PaletteTierTarget::Color256 => raw_val.clone(),
+        PaletteTierTarget::Color16 => bashmenu_tui::downsample_color_value_to_16(raw_val),
+        PaletteTierTarget::Color8 => bashmenu_tui::downsample_color_value_to_8(raw_val),
+    };
+    let is_override = activity != ThemeActivity::MainMenu;
+    let mut target = if is_override {
+        match get_or_init_activity_mapping(tier_map, activity) {
+            Some(m) => TierMapMut::Sub(m),
+            None => return,
+        }
+    } else {
+        TierMapMut::Top(tier_map)
+    };
+
+    if key == "background" {
+        target.insert(key, val);
+    } else if key == "highlight" {
+        let existing_fg = target
+            .get("highlight_text")
+            .filter(|v| !is_inherited_color_value(v))
+            .cloned()
+            .or_else(|| {
+                target
+                    .get("highlight")
+                    .and_then(|v| v.as_sequence())
+                    .and_then(|seq| seq.first())
+                    .filter(|v| !is_inherited_color_value(v))
+                    .cloned()
+            });
+        let fg_val = if let Some(efg) = existing_fg {
+            if bashmenu_tui::parse_color_value(&efg).is_some_and(|c| c != Color::Reset) {
+                efg
+            } else if is_override {
+                serde_yml::Value::Number((-1).into())
+            } else {
+                contrast_fg_value(color, tier)
+            }
+        } else if is_override {
+            serde_yml::Value::Number((-1).into())
+        } else {
+            contrast_fg_value(color, tier)
+        };
+        target.insert(key, serde_yml::Value::Sequence(vec![fg_val, val]));
+    } else if key == "selection" {
+        let fg_val = contrast_fg_value(color, tier);
+        target.insert(key, serde_yml::Value::Sequence(vec![fg_val, val]));
+    } else if key == "highlight_text" {
+        if is_override {
+            target.insert(key, val);
+        } else {
+            let existing_bg = target
+                .get("highlight")
+                .and_then(|v| v.as_sequence())
+                .and_then(|seq| seq.get(1))
+                .cloned()
+                .unwrap_or_else(|| match tier {
+                    PaletteTierTarget::Color256 => serde_yml::Value::Number(201.into()),
+                    PaletteTierTarget::Color16 | PaletteTierTarget::Color8 => {
+                        serde_yml::Value::String("COLOR_BLUE".to_string())
+                    }
+                });
+            target.insert(
+                "highlight",
+                serde_yml::Value::Sequence(vec![val.clone(), existing_bg]),
+            );
+            target.insert(key, val);
+        }
+    } else {
+        target.insert(
+            key,
+            serde_yml::Value::Sequence(vec![val, serde_yml::Value::Number((-1).into())]),
+        );
+    }
+}
+
+/// Resets an override token inside `tier_map` to `-1` / `[-1, -1]`.
+fn reset_tier_token_entry(
+    tier_map: &mut HashMap<String, serde_yml::Value>,
+    activity: ThemeActivity,
+    key: &str,
+    inherit_val: &serde_yml::Value,
+) {
+    let Some(sub) = get_or_init_activity_mapping(tier_map, activity) else {
+        return;
+    };
+    sub.insert(
+        serde_yml::Value::String(key.to_string()),
+        inherit_val.clone(),
+    );
+    if key == "highlight_text" {
+        let hl_key = serde_yml::Value::String("highlight".to_string());
+        if let Some(serde_yml::Value::Sequence(seq)) = sub.get_mut(&hl_key) {
+            if !seq.is_empty() {
+                seq[0] = serde_yml::Value::Number((-1).into());
+            }
+        }
+    }
+}
+
 /// Calculates visual rectangular spans `(y, x_start, x_end)` in the preview pane corresponding
 /// to a theme token so the UI can flash them when selected or clicked.
 pub fn get_token_preview_spans(
     token: &TokenItem,
     right_area: Rect,
-    _mode: PreviewMode,
+    mode: PreviewMode,
     preview_styles: &ResolvedThemeStyles,
 ) -> Vec<(u16, u16, u16)> {
     let mut spans = Vec::new();
@@ -1740,12 +2107,33 @@ pub fn get_token_preview_spans(
 
     match &token.kind {
         TokenKind::Color(key) if key == "background" => {
-            for y in (right_area.y + 1)..bot_y {
-                spans.push((
-                    y,
-                    right_area.x + 1,
-                    right_area.x + right_area.width.saturating_sub(1),
-                ));
+            if mode == PreviewMode::Toast {
+                let (toast_x, toast_w, boxes) =
+                    preview::toast_preview_boxes(right_area, preview_styles.toast_style);
+                let is_framed = preview_styles.toast_style == ToastStyle::Framed;
+                let end_x = if is_framed {
+                    toast_x + toast_w.saturating_sub(1)
+                } else {
+                    toast_x + toast_w
+                };
+                for (ty, th) in boxes {
+                    let (y_start, y_end) = if is_framed {
+                        (ty + 1, ty + th.saturating_sub(1))
+                    } else {
+                        (ty, ty + th)
+                    };
+                    for y in y_start..y_end {
+                        spans.push((y, toast_x + 1, end_x));
+                    }
+                }
+            } else {
+                for y in (right_area.y + 1)..bot_y {
+                    spans.push((
+                        y,
+                        right_area.x + 1,
+                        right_area.x + right_area.width.saturating_sub(1),
+                    ));
+                }
             }
         }
         TokenKind::WallpaperImage
@@ -1855,6 +2243,26 @@ pub fn get_token_preview_spans(
         TokenKind::Color(key) if key == "highlight_text" => {
             spans.push((content_start_y, p_inner_x + 2, p_inner_x + 24));
         }
+        TokenKind::Color(key) if key == "selection" => {
+            if mode == PreviewMode::TextEditor {
+                spans.push((content_start_y, p_inner_x, p_inner_x + 17));
+                spans.push((content_start_y + 5, p_inner_x + 7, p_inner_x + 25));
+            } else {
+                spans.push((content_start_y, p_inner_x, p_inner_x + p_avail_w));
+            }
+        }
+        TokenKind::Color(key) if key == "whitespace" => {
+            if mode == PreviewMode::TextEditor {
+                spans.push((content_start_y + 4, p_inner_x + 5, p_inner_x + 9));
+                spans.push((content_start_y + 5, p_inner_x + 5, p_inner_x + 9));
+            } else {
+                spans.push((
+                    gt_y + 1,
+                    sep_x + 1,
+                    right_area.x + right_area.width.saturating_sub(2),
+                ));
+            }
+        }
         TokenKind::Color(key) if key == "text" => {
             spans.push((content_start_y + 1, p_inner_x + 2, p_inner_x + 22));
             spans.push((content_start_y + 2, p_inner_x + 2, p_inner_x + 28));
@@ -1949,22 +2357,31 @@ pub fn get_token_preview_spans(
                 spans.push((bottom_y, mod_x + 2, (mod_x + mod_w + 2).min(max_x)));
             }
         }
+        TokenKind::ToastStyle => {
+            let (toast_x, toast_w, boxes) =
+                preview::toast_preview_boxes(right_area, preview_styles.toast_style);
+            for (ty, th) in boxes {
+                for y in ty..(ty + th) {
+                    spans.push((y, toast_x, toast_x + toast_w));
+                }
+            }
+        }
         TokenKind::ToastChar => {
-            let toast_w = 40_u16.min(right_area.width.saturating_sub(4));
-            let toast_h = 4_u16.min(right_area.height.saturating_sub(2));
-            let toast_x = right_area.x + right_area.width.saturating_sub(toast_w + 2);
-            let toast_y = bot_y.saturating_sub(toast_h + 1);
-            for y in toast_y..toast_y + toast_h {
-                spans.push((y, toast_x, toast_x + 2));
+            let (toast_x, _toast_w, boxes) =
+                preview::toast_preview_boxes(right_area, preview_styles.toast_style);
+            for (ty, th) in boxes {
+                for y in ty..(ty + th) {
+                    spans.push((y, toast_x, toast_x + 2));
+                }
             }
         }
         TokenKind::Color(key) if key.starts_with("toast_") => {
-            let toast_w = 40_u16.min(right_area.width.saturating_sub(4));
-            let toast_h = 4_u16.min(right_area.height.saturating_sub(2));
-            let toast_x = right_area.x + right_area.width.saturating_sub(toast_w + 2);
-            let toast_y = bot_y.saturating_sub(toast_h + 1);
-            for y in toast_y..toast_y + toast_h {
-                spans.push((y, toast_x, toast_x + toast_w));
+            let (toast_x, toast_w, boxes) =
+                preview::toast_preview_boxes(right_area, preview_styles.toast_style);
+            for (ty, th) in boxes {
+                for y in ty..(ty + th) {
+                    spans.push((y, toast_x, toast_x + toast_w));
+                }
             }
         }
         _ => {
@@ -2104,7 +2521,8 @@ pub fn render_root_frame(
             theme_name,
             if is_modified { " (Modified)" } else { "" }
         ))
-        .border_style(Style::default().fg(Color::Cyan))
+        .border_style(Style::default().fg(styles.border))
+        .title_style(styles.title)
         .style(Style::default().bg(styles.background));
     root_block.render(area, buf);
 }

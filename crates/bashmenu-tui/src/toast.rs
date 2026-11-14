@@ -155,6 +155,7 @@ impl ToastRack {
             let message_lines = wrap_text_to_width(&toast.message, content_avail_w);
 
             let has_title = !title_text.is_empty();
+            let is_framed = styles.toast_style == crate::ToastStyle::Framed;
             let total_h = 2 + (if has_title { 1 } else { 0 }) + message_lines.len().max(1);
 
             let longest_line_w = message_lines
@@ -189,64 +190,118 @@ impl ToastRack {
                 .fg(styles.text.fg.unwrap_or(Color::White))
                 .bg(bg_color);
 
-            let inner_w = toast_w.saturating_sub(1);
+            if is_framed {
+                let horiz_w = toast_w.saturating_sub(2);
+                let top_border = format!("╓{}┐", "─".repeat(horiz_w));
+                let bot_border = format!("╙{}┘", "─".repeat(horiz_w));
+                let area_bottom = area.y + area.height;
+                let right_x = toast_x + toast_w.saturating_sub(1) as u16;
 
-            // Row 0: Top padding row
-            let r0_y = toast_y;
-            if r0_y < area.y + area.height {
-                buf.set_string(toast_x, r0_y, left_bar, bar_style);
-                buf.set_string(toast_x + 1, r0_y, " ".repeat(inner_w), content_bg_style);
-            }
-
-            let mut row_offset = 1;
-
-            // Row 1: Title (if present)
-            if has_title {
-                let r_y = toast_y + row_offset;
-                if r_y < area.y + area.height {
-                    buf.set_string(toast_x, r_y, left_bar, bar_style);
-                    buf.set_string(toast_x + 1, r_y, " ", content_bg_style);
-                    buf.set_string(toast_x + 2, r_y, title_text, title_style);
-                    let used = 1 + UnicodeWidthStr::width(title_text);
-                    let pad = inner_w.saturating_sub(used);
-                    if pad > 0 {
-                        buf.set_string(
-                            toast_x + 1 + used as u16,
-                            r_y,
-                            " ".repeat(pad),
-                            content_bg_style,
-                        );
-                    }
+                let mut row_offset = 0u16;
+                // Row 0: Top border
+                let r_top = toast_y + row_offset;
+                if r_top >= area.y && r_top < area_bottom {
+                    buf.set_string(toast_x, r_top, &top_border, bar_style);
                 }
                 row_offset += 1;
-            }
 
-            // Message rows
-            for line in &message_lines {
-                let r_y = toast_y + row_offset;
-                if r_y < area.y + area.height {
-                    buf.set_string(toast_x, r_y, left_bar, bar_style);
-                    buf.set_string(toast_x + 1, r_y, " ", content_bg_style);
-                    buf.set_string(toast_x + 2, r_y, line, text_style);
-                    let used = 1 + UnicodeWidthStr::width(line.as_str());
-                    let pad = inner_w.saturating_sub(used);
-                    if pad > 0 {
-                        buf.set_string(
-                            toast_x + 1 + used as u16,
-                            r_y,
-                            " ".repeat(pad),
-                            content_bg_style,
-                        );
-                    }
+                // Helper closure for content rows inside the frame
+                let draw_framed_text_row =
+                    |buf: &mut Buffer, y: u16, txt: &str, txt_style: Style| {
+                        if y < area.y || y >= area_bottom {
+                            return;
+                        }
+                        buf.set_string(toast_x, y, "║", bar_style);
+                        buf.set_string(toast_x + 1, y, " ", content_bg_style);
+                        buf.set_string(toast_x + 2, y, txt, txt_style);
+                        let used = 1 + UnicodeWidthStr::width(txt);
+                        let pad = horiz_w.saturating_sub(used);
+                        if pad > 0 {
+                            buf.set_string(
+                                toast_x + 1 + used as u16,
+                                y,
+                                " ".repeat(pad),
+                                content_bg_style,
+                            );
+                        }
+                        buf.set_string(right_x, y, "│", bar_style);
+                    };
+
+                if has_title {
+                    draw_framed_text_row(buf, toast_y + row_offset, title_text, title_style);
+                    row_offset += 1;
                 }
-                row_offset += 1;
-            }
 
-            // Bottom padding row
-            let r_bot = toast_y + row_offset;
-            if r_bot < area.y + area.height {
-                buf.set_string(toast_x, r_bot, left_bar, bar_style);
-                buf.set_string(toast_x + 1, r_bot, " ".repeat(inner_w), content_bg_style);
+                for line in &message_lines {
+                    draw_framed_text_row(buf, toast_y + row_offset, line, text_style);
+                    row_offset += 1;
+                }
+
+                // Bottom border row
+                let r_bot = toast_y + row_offset;
+                if r_bot >= area.y && r_bot < area_bottom {
+                    buf.set_string(toast_x, r_bot, &bot_border, bar_style);
+                }
+            } else {
+                let inner_w = toast_w.saturating_sub(1);
+
+                // Row 0: Top padding row
+                let r0_y = toast_y;
+                if r0_y < area.y + area.height {
+                    buf.set_string(toast_x, r0_y, left_bar, bar_style);
+                    buf.set_string(toast_x + 1, r0_y, " ".repeat(inner_w), content_bg_style);
+                }
+
+                let mut row_offset = 1;
+
+                // Row 1: Title (if present)
+                if has_title {
+                    let r_y = toast_y + row_offset;
+                    if r_y < area.y + area.height {
+                        buf.set_string(toast_x, r_y, left_bar, bar_style);
+                        buf.set_string(toast_x + 1, r_y, " ", content_bg_style);
+                        buf.set_string(toast_x + 2, r_y, title_text, title_style);
+                        let used = 1 + UnicodeWidthStr::width(title_text);
+                        let pad = inner_w.saturating_sub(used);
+                        if pad > 0 {
+                            buf.set_string(
+                                toast_x + 1 + used as u16,
+                                r_y,
+                                " ".repeat(pad),
+                                content_bg_style,
+                            );
+                        }
+                    }
+                    row_offset += 1;
+                }
+
+                // Message rows
+                for line in &message_lines {
+                    let r_y = toast_y + row_offset;
+                    if r_y < area.y + area.height {
+                        buf.set_string(toast_x, r_y, left_bar, bar_style);
+                        buf.set_string(toast_x + 1, r_y, " ", content_bg_style);
+                        buf.set_string(toast_x + 2, r_y, line, text_style);
+                        let used = 1 + UnicodeWidthStr::width(line.as_str());
+                        let pad = inner_w.saturating_sub(used);
+                        if pad > 0 {
+                            buf.set_string(
+                                toast_x + 1 + used as u16,
+                                r_y,
+                                " ".repeat(pad),
+                                content_bg_style,
+                            );
+                        }
+                    }
+                    row_offset += 1;
+                }
+
+                // Bottom padding row
+                let r_bot = toast_y + row_offset;
+                if r_bot < area.y + area.height {
+                    buf.set_string(toast_x, r_bot, left_bar, bar_style);
+                    buf.set_string(toast_x + 1, r_bot, " ".repeat(inner_w), content_bg_style);
+                }
             }
 
             if toast_y < 2 {
