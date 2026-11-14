@@ -4,7 +4,7 @@ A lightweight CLI tool to search, list, and render Markdown cheatsheets.
 
 ## Features
 
-- **Markdown Rendering**: Uses `rich.sh` (Python Rich) for terminal rendering with standard output fallback.
+- **Markdown Rendering**: Uses `rich.sh` (Python Rich) for terminal rendering, falling back to `bmpager --markdown` and then raw standard output.
 - **Tag Support**: Parses YAML frontmatter tags in cheatsheets.
 - **Priority Search**: Matches filenames/paths first, then tags, then content.
 - **Flexible Listing**: List all cheatsheets with tags or filter matches.

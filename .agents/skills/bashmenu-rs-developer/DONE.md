@@ -1044,3 +1044,11 @@
 - [x] Documented scrollbar and scrolling controls for `{info:<path>}` / `MessageModal` in `bashmenu.md`, `bashmenu.1`, and `.agents/rules/invariants.md`.
 - [x] Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, and `shellcheck *.sh scripts/*.sh` all pass with zero warnings.
 
+
+## Documentation 1:1 Codebase Parity Audit & Sync
+- [x] Audited source code across all suite crates (`bashmenu-core`, `bashmenu-tui`, `bashmenu-cli`, `menuedit-cli`, `themeedit-cli`, `bashedit-cli`, `bmpager-cli`, `cheat-cli`, `ymlcheck-cli`) against all documentation and built-in help constants.
+- [x] Updated `crates/bashmenu-core/src/constants.rs` (`PLACEHOLDER_HELP_TEXT` with `{env:<var_name>}` and `{cmd:<cmd>}` 30s cache note; `BASHEDIT_HELP_TEXT` removing non-existent `^Shift+S` and adding `Ctrl+Shift+Tab`).
+- [x] Fixed `README.md` companion CLI examples (`ymlcheck` mutually exclusive mode invocations; `menuedit -f`, `shortcutedit -f`, `themeedit -t` flags), `assets/cheat.md` renderer fallback chain (`rich.sh` -> `bmpager --markdown` -> stdout), and `docs/ARCHITECTURE.md` (`Vec<String>` line buffers, all 11 transitions + `ModalAnimation`, `framebuffer: "image"`, `{dev}`, `{cmd:...}`, `{env}`, `{info:<path>}`).
+- [x] Synchronized `.agents/skills/bashmenu-rs-developer/SKILL.md` (`EditorBuffer`, actual `scripts/` and `templates/`, accurate `themeedit` bindings, BBCode tags, and `ymlcheck --shortcuts` / `--yaml`).
+- [x] Updated `bashmenu.md` and `bashmenu.1` for 1:1 parity across `bashmenu`, `menuedit`, `bashedit`, `themeedit`, `bmpager`, `cheat`, `shortcutedit`, `ymlcheck`, `bashmenu.yml` (plugin `sleep` in seconds), `bashmenu.mnu` (`items:` schema), Notebook/NoteViewer/NoteEditor actions, placeholders, and BBCode tags (removing unimplemented `[table]`/`[list]`/theme-token colors/backtick suppression and misplaced theme notes in Section 3.7).
+- [x] Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, and `shellcheck *.sh scripts/*.sh` all pass with exit code 0.

@@ -20,6 +20,7 @@ editor for Linux systems.
   - [3.5 Interactive Terminal Pager (`bmpager`)](#35-interactive-terminal-pager-bmpager)
   - [3.6 Cheatsheet Manager (`cheat`)](#36-cheatsheet-manager-cheat)
   - [3.7 Custom Keyboard Shortcuts Editor (`shortcutedit`)](#37-custom-keyboard-shortcuts-editor-shortcutedit--menuedit---shortcuts)
+  - [3.8 YAML Schema & Syntax Validator (`ymlcheck`)](#38-yaml-schema--syntax-validator-ymlcheck)
 - [4. Configuration & Schema Specifications](#4-configuration--schema-specifications)
   - [4.1 Settings Store (`bashmenu.yml`)](#41-settings-store-bashmenuyml)
   - [4.2 Menu Structure (`bashmenu.mnu`)](#42-menu-structure-bashmenumnu)
@@ -129,8 +130,9 @@ Used as dynamic templates for code generation, settings, or block injections:
 | Keybinding | Action |
 | :--- | :--- |
 | `UP` / `DOWN`, `k` / `j` | Navigate highlighted selection row. |
+| `Home` / `End` | Jump to first / last item in the current menu. |
 | `PageUp` / `PageDown` | Scroll selection up / down by a page increment (10 items). |
-| `0` - `9`, `a` - `z` | Direct option shortcut hotkey jump. |
+| `1` - `9`, `a` - `z`, `A` - `Z` | Direct option shortcut hotkey jump (when shortcut badges are enabled). |
 | `Ctrl+Space` | Leader key chord prefix (opens which-key shortcut palette overlay). |
 | `ENTER` | Execute selected item action. |
 | `F1` | View Markdown user manual (`bashmenu.md`) via `bmpager --markdown`. |
@@ -142,7 +144,8 @@ Used as dynamic templates for code generation, settings, or block injections:
 | `F7` | Configure status gutter format modal. |
 | `F8` | Launch interactive Visual Theme Editor (`themeedit`). |
 | `F9` | Launch interactive Visual Keyboard Shortcuts Editor (`shortcutedit`). |
-| `ESC` / `q` | Return to parent submenu or exit application. |
+| `ESC` / `BACKSPACE` / `q` | Return to parent submenu or exit application. |
+| `Ctrl+C` | Immediate exit from application. |
 
 *Note on Intelligent State Retention:* When returning from editors, or scripts with `refresh: true`, the engine traces and preserves your submenu coordinate depth to return you to your exact location, skipping the root menu.
 
@@ -150,16 +153,16 @@ Used as dynamic templates for code generation, settings, or block injections:
 
 | Keybinding | Action |
 | :--- | :--- |
-| `a` / `Insert` | Add new menu option node. |
+| `a` / `A` / `Insert` | Add new menu option node. |
 | `e` / `ENTER` | Edit selected node properties (opens `ItemEditModal`). |
-| `t` | Change selected item type. |
+| `t` / `CTRL+T` | Change selected item type. |
 | `SPACE` / `LEFT` / `RIGHT` | Expand or collapse submenu tree node. |
-| `d` / `Delete` | Delete selected option node (with confirm box). |
+| `d` / `D` / `Delete` | Delete selected node (prompts confirmation). |
 | `m` | Move selected node down. |
 | `M` | Move selected node up. |
 | `>` | Indent item into preceding Submenu folder. |
 | `<` | Outdent item out to Parent menu list. |
-| `F1` / `?` | Display HA Bash Menu manual (`bashmenu.md`). |
+| `F1` | Display Menu Editor & Inspector Help Guide modal. |
 | `F2` | Toggle (collapse/expand) all children of top root menu. |
 | `F3` / `CTRL+A` | View ASCII character table. |
 | `F4` / `CTRL+N` | Search Nerd Font & Emoji glyphs. |
@@ -170,17 +173,30 @@ Used as dynamic templates for code generation, settings, or block injections:
 *ItemEditModal Dialog Keybindings:*
 | Keybinding | Action |
 | :--- | :--- |
-| `CTRL+S` / `F2` / `s` | Save changes to item. |
-| `CTRL+T` / `t` | Change item type. |
+| `CTRL+S` / `F2` | Save changes to item. |
+| `CTRL+T` | Change item type. |
 | `CTRL+A` / `F3` | View ASCII character table. |
 | `CTRL+N` / `F4` | Search Nerd Font & Emoji glyphs. |
 | `CTRL+P` / `F5` | View available placeholders and macros modal. |
-| `F1` / `?` | Display item property editor help modal. |
-| `ESC` / `c` | Cancel changes and close dialog. |
+| `LEFT` / `RIGHT` / `h` / `l` / `SPACE` / `1`-`3` | Select execution mode (`1` Console, `2` Streaming, `3` Interactive) when Execution Mode is focused. |
+| `F1` | Display item property editor help modal. |
+| `ESC` | Cancel changes and close dialog. |
 
 *Note on Menu Focus Synchronization & Property Inspector Previews:* When launching `menuedit` from `bashmenu` (via `F4` or menu item action), the editor tree automatically synchronizes active keyboard focus and selection directly on the item that was selected in `bashmenu`, so pressing `e` or `ENTER` immediately opens the `ItemEditModal` dialog for that exact item. The Property Inspector side panel features a real-time visual `Preview:` section for all item types (commands, submenus, scripts, dividers, etc.) showing exactly how the item will appear in the main menu (including resolved Nerd Font/emoji icons, placeholders, and right-aligned shortcut brackets). Additionally, the `ItemEditModal` dialog dynamically updates its preview box in real-time as title or icon fields are edited.
 
 ### 3.3 Built-in Text Editor (`bashedit`)
+
+| Option | Description |
+| :--- | :--- |
+| `[FILE]` | File path to open (opens empty buffer if omitted). |
+| `-r`, `--read-only` | Open file in read-only mode. |
+| `--tabstop <N>` | Set tab width in spaces (default: `4`). |
+| `--show-whitespace` | Render spaces and tabs with visible markers. |
+| `--wrap` | Enable soft word-wrapping at startup. |
+| `--tab-to-spaces <BOOL>` | Convert Tab key presses into spaces (`true` or `false`). |
+| `-l`, `--line <N>` | Jump to 1-based line number `<N>` on open. |
+| `-t`, `--theme <NAME>` | Override active color theme. |
+| `--local` | Load configuration and theme files from current working directory. |
 
 | Keybinding | Action |
 | :--- | :--- |
@@ -190,21 +206,22 @@ Used as dynamic templates for code generation, settings, or block injections:
 | `F4` | Open 256-color palette viewer modal. |
 | `F5` | View available placeholders & macros modal. |
 | `F6` | View Markdown preview via `bmpager --markdown --no-file`. |
-| `F7` | Toggle line numbers gutter display. |
+| `F7` / `Alt+N` | Toggle line numbers gutter display. |
 | `F8` | View Markdown syntax quick reference modal. |
 | `F9` / `Alt+W` | Toggle soft-wrap text display. |
 | `Ctrl+Q` / `ESC` | Exit editor (prompts save if modified). |
 | `Ctrl+O` / `Ctrl+R` | Open file via file picker modal. |
 | `Ctrl+S` | Save active file. |
-| `Ctrl+A` / `Ctrl+Shift+S` | Save As (prompt destination path). |
-| `Ctrl+N` / `[ + ]` | Create new empty tab document. |
+| `Ctrl+A` | Save As (prompt destination path). |
+| `Ctrl+N` / `Ctrl+E` / `[ + ]` | Create new empty tab document. |
 | `Alt+Left` / `Alt+Right` | Switch to previous / next tab. |
 | `Alt+]` / `Ctrl+Tab` | Switch to next tab. |
-| `Alt+[` / `Shift+Tab` | Switch to previous tab. |
+| `Alt+[` / `Ctrl+Shift+Tab` | Switch to previous tab. |
 | `Ctrl+W` | Where Is (search document text). |
 | `Shift+Arrows` / `Shift+Home/End` | Select text range (desktop selection). |
 | `Ctrl+Left` / `Ctrl+Right` | Move word left / right. |
 | `Ctrl+Up` / `Ctrl+Down` | Move paragraph up / down. |
+| `Ctrl+Home` / `Ctrl+End` | Jump to start / end of document. |
 | `Ctrl+X` | Cut line or active selection block. |
 | `Ctrl+C` | Copy line or active selection block. |
 | `Ctrl+V` | Paste cutbuffer / clipboard text. |
@@ -212,22 +229,24 @@ Used as dynamic templates for code generation, settings, or block injections:
 
 ### 3.4 Visual Theme Editor (`themeedit`)
 
-The visual theme editor provides a split-screen interface featuring a collapsible token tree (`Theme:`, `Colors:`, `Borders:`) on the left and a live multi-view preview pane on the right (`Main Menu`, `Text Editor`, `Popup Windows / Modals`, `Visual Menu Editor`, and `Toast Notifications`). All category nodes start collapsed by default and open via `Left`/`Right` arrow keys, `Enter`/`Space`, mouse clicks on the category header, or clicking directly on an element in the preview pane (which auto-expands the category and focuses the matching token in the tree).
+The visual theme editor provides a split-screen interface featuring a collapsible token tree (`Theme:`, `Colors:`, `Borders:`) on the left and a live multi-view preview pane on the right (`Main Menu`, `Text Editor`, `Popup Windows / Modals`, `Visual Menu Editor`, and `Toast Notifications`). All category nodes start collapsed by default and open via `Left`/`Right` arrow keys, `Enter`/`Space`, mouse clicks on the category header, or clicking directly on an element in the preview pane (which auto-expands the category and focuses the matching token in the tree). Launch directly with `themeedit [-f|--file <FILE>] [-t|--theme <NAME>] [--local]`.
 
 | Keybinding | Action |
 | :--- | :--- |
-| `UP` / `DOWN`, `k` / `j` | Navigate collapsible category nodes and tokens. |
+| `UP` / `DOWN`, `k` / `j` | Navigate collapsible category nodes and tokens (pressing `UP` / `k` at the top row focuses the Theme Name input for inline renaming). |
 | `LEFT` / `RIGHT`, `h` / `l` | Collapse or expand category nodes (`Theme:`, `Colors:`, `Borders:`). |
+| `Home` / `End`, `PgUp` / `PgDn` | Jump to first/last visible row or scroll by 5 rows. |
 | `ENTER` / `SPACE` | Toggle selected category node, or open color/character/file picker for the selected token. |
 | `[` / `]` | Cycle to previous / next theme (alphabetically sorted). |
 | `TAB` / `p` / `1`-`5` | Cycle or jump between live preview views (`1` Menu, `2` Text Editor, `3` Modals, `4` Menu Editor, `5` Toasts). |
-| `F4` / `b` | Choose background wallpaper image via file picker modal. |
+| `F4` / `b` | Open Background Wallpaper Configuration modal (Image, Opacity, Scaling, Mode, Clustering, Quantization). |
 | `F5` | Auto-derive harmonious 256-color palette (including `plugin` text color) from the configured wallpaper image. |
 | `F6` / `Ctrl+N` | Create a new theme using the monochrome base palette. |
 | `F7` / `F2` / `Ctrl+R` | Rename current theme inline. |
-| `F8` / `Delete` | Delete current theme from `bashmenu.themes` (with confirmation modal), or clear wallpaper image when `Wallpaper Image` token is focused. |
+| `F8` / `Delete` | Delete current theme from `bashmenu.themes` (with confirmation modal); when a Wallpaper token is focused, `Delete` or `Backspace` removes the wallpaper; when the `Indicator` token is focused, `Delete` resets the indicator to `> `. |
 | `Ctrl+S` | Save theme directly to `bashmenu.themes` (prompts Save As only if `untitled`). |
 | `Ctrl+A` | Save As under a new theme name. |
+| `Left Click` (Preview) | Focuses the clicked UI element's corresponding Theme Token in the tree and flashes its preview spans. |
 | `Right Click` (Preview) | **Color Dropper**: Samples the visible pixel color from the clicked location in the preview pane, copies the color code to the system clipboard, and assigns it directly to the currently selected Theme Token (if it is a color setting). |
 | `ESC` / `q` | Exit theme editor (prompts if unsaved changes exist). |
 
@@ -240,8 +259,14 @@ The `bmpager` standalone pager provides full-screen interactive viewing of files
 | `-m`, `--markdown` | Render input formatted as CommonMark Markdown (wrapped to window width). |
 | `-w`, `--wrap`, `--wrap-text` | Soft-wrap non-markdown plain and ANSI text lines to terminal width. |
 | `-c`, `--no-color` | Discard ANSI escape sequences instead of rendering colors. |
-| `--no-file` | Omit filename badge and disable external/built-in editor launcher. |
-| `--editor=MODE` | Configure editor mode (`default` or `builtin`). |
+| `--no-help` | Hide the bottom help bar for maximum content lines. |
+| `--no-file`, `--no-edit`, `--view-only` | Omit filename badge and disable editor launching. |
+| `--editor=MODE` | Configure editor mode (`default` / `system` or `builtin` / `bm`). |
+| `--builtin-editor`, `--bm-editor` | Shorthand for `--editor=builtin` (launches `bashedit`). |
+| `--system-editor`, `--default-editor` | Shorthand for `--editor=default` (uses `$VISUAL` / `$EDITOR`). |
+| `--max-lines=N` | Cap in-memory line buffer to `N` lines (ring buffer). |
+| `--file=PATH`, `--edit-target=PATH` | Associate an explicit file path for editing when paging a stream. |
+| `--reload-cmd=CMD` | Re-run `CMD` to refresh buffer contents after editing. |
 | `+N` | Start viewing with line `N` at the top of the window. |
 | `+/PATTERN` | Jump to the first line matching search pattern. |
 
@@ -258,7 +283,7 @@ The `bmpager` standalone pager provides full-screen interactive viewing of files
 | `l` / `o` | Open interactive hyperlink and section anchor selector. |
 | `e` / `E` | Open active file in configured editor (`bashedit` or `$EDITOR`). |
 | `h` / `?` / `F1` | Display scrollable pager help modal. |
-| `q` / `Q` / `ESC` | Exit pager. |
+| `q` / `Q` / `ESC` / `Ctrl+C` | Exit pager (or close active modal). |
 
 ### 3.6 Cheatsheet Manager (`cheat`)
 
@@ -272,10 +297,10 @@ The `cheat` standalone CLI tool searches, lists, and displays Markdown cheatshee
 | `-d`, `--directory` | Print the configured cheatsheets directory path. |
 | `-h`, `--help` | Print help information. |
 
-Configuration is stored in `~/.config/bashmenu/cheat.yml` (pointing to `dir: ~/cheat`). Cheatsheets are rendered via `bmpager --markdown` with raw text terminal fallback.
+Configuration is stored in `~/.config/bashmenu/cheat.yml` (pointing to `dir: ~/cheat`, overridable via `CHEAT_CONFIG`). Cheatsheets are rendered via `rich.sh` when available, falling back to `bmpager --markdown` and then raw standard output.
 
 ### 3.7 Custom Keyboard Shortcuts Editor (`shortcutedit` / `menuedit --shortcuts`)
-`shortcutedit` (also accessible via `menuedit --shortcuts` or `F9` / `<leader> s` from the main menu) is a split-screen visual editor for `shortcuts.yml` (`{bashmenu_dir}/shortcuts.yml`).
+`shortcutedit` (also accessible via `menuedit --shortcuts`, `shortcutedit [-f|--file <FILE>] [--local]`, or `F9` / `<leader> s` from the main menu) is a split-screen visual editor for `shortcuts.yml` (`{bashmenu_dir}/shortcuts.yml`).
 
 - **Leader Key Chords (`<Ctrl+Space>`):** Pressing the configured `leader_key` (default `ctrl+space`) in the main menu opens a compact *which-key* popup overlay showing all active `<leader> <key>` shortcuts and waits up to `leader_timeout_ms` (`1500` ms default) for the follow-up key.
 - **Direct Shortcuts:** Function keys (`F10`, `F12`) and modified combos (`ctrl+<key>`, `alt+<key>`) execute immediately with a single keystroke.
@@ -283,27 +308,40 @@ Configuration is stored in `~/.config/bashmenu/cheat.yml` (pointing to `dir: ~/c
 
 | Keybinding | Action |
 | :--- | :--- |
-| `a` | Add a new keyboard shortcut. |
-| `e` / `ENTER` | Edit the selected shortcut's properties. |
-| `c` / `F2` | Interactively capture a direct key combo or `<leader> <key>` chord. |
-| `l` | Configure global `leader_key`, `leader_timeout_ms`, and popup hint. |
+| `UP` / `DOWN`, `k` / `j`, `Home` / `End` | Navigate configured shortcuts list. |
+| `a` / `A` / `Insert` | Add a new keyboard shortcut. |
+| `e` / `E` / `ENTER` | Edit the selected shortcut's properties. |
+| `c` / `C` / `F2` | Interactively capture a direct key combo or `<leader> <key>` chord. |
+| `l` / `L` | Configure global `leader_key`, `leader_timeout_ms`, and popup hint. |
 | `SPACE` | Toggle the selected shortcut enabled/disabled. |
-| `d` / `Delete` | Delete the selected shortcut. |
+| `d` / `D` / `Delete` | Delete the selected shortcut. |
 | `m` / `M` | Move the selected shortcut down / up. |
+| `F1` / `?` / `CTRL+P` | View Placeholders & Macros reference modal. |
+| `s` / `S` / `CTRL+S` | Save `shortcuts.yml` (preserving `SHORTCUTS_HEADER`). |
+| `ESC` / `q` / `Q` | Exit editor (prompts if unsaved changes exist). |
+
+*Edit Shortcut Modal Keybindings:*
+| Keybinding | Action |
+| :--- | :--- |
+| `TAB` / `DOWN` | Advance focus to next field. |
+| `SHIFT+TAB` / `UP` | Move focus to previous field. |
+| `F2` / `CTRL+K` | Capture a key combo or `<leader> <key>` chord interactively. |
 | `CTRL+P` | View Placeholders & Macros reference modal. |
-| `s` / `CTRL+S` | Save `shortcuts.yml` (preserving `SHORTCUTS_HEADER`). |
-| `ESC` / `q` | Exit editor. |
+| `CTRL+S` | Save changes to shortcut. |
+| `ESC` | Cancel changes and close dialog. |
 
-*Theme Renaming & Deletion:*
-- **Renaming:** Themes can be renamed directly by editing the **Theme Name:** text input field in the inspector panel under **General & Identity**, or by clicking the adjacent **[Rename]** button (or pressing `Ctrl+R`), which opens the interactive `RenameThemeModal` with automatic slug sanitization.
-- **Deleting:** Themes can be deleted from `bashmenu.themes` either by clicking the **[Delete]** button in the inspector panel under **General & Identity** (or pressing `Ctrl+D`), or directly from the Theme Picker modal (`F2`) using `[d]` / `Delete`. Both options present a confirmation dialog. If the theme is currently active in `bashmenu.yml`, the user is notified and the active theme is automatically switched to a fallback theme (e.g. `dracula`).
+### 3.8 YAML Schema & Syntax Validator (`ymlcheck`)
 
-*Launching Theme Editor:*
-- Directly via command line: `themeedit [theme_name]` (or `themeedit -f <themes_file> -t <theme_name>`).
-- Directly inside HA Bash Menu via `F8` shortcut.
-- Inside HA Bash Menu via `F2` (Theme Picker) by pressing `e` on any highlighted theme.
-- Via the main menu under `Bashmenu Settings -> Theme Editor`.
-- Auto-derive theme colors from wallpaper: press `<F5>` inside `themeedit` to automatically derive a harmonious 256-color palette (with 16/8-color perceptual downsampling) from the configured background wallpaper.
+The `ymlcheck` CLI utility validates YAML syntax and enforces schema constraints for configuration, menu, theme, and shortcut files. Validation mode flags are mutually exclusive per invocation (`ymlcheck [MODE] <FILES>...`):
+
+| Option | Description |
+| :--- | :--- |
+| `<FILES>...` | One or more YAML file paths to validate (validates general YAML syntax if no mode flag is given). |
+| `-c`, `--config` | Validate `bashmenu.yml` configuration schema (`theme` non-empty, `settings.tabstop` in `1..=16`). |
+| `-t`, `--themes`, `--theme` | Validate `bashmenu.themes` palette definitions (256-color `[fg, bg]` pairs, 16-color `COLOR_*` constants, window border keys). |
+| `-m`, `--menu` | Recursively validate `bashmenu.mnu` menu schema (`items` non-empty, valid option `type` values, `radio` `key` presence). |
+| `-s`, `--shortcuts`, `--shortcut` | Validate `shortcuts.yml` schema (`leader_key` spec, non-empty descriptions, duplicate active key detection, `window_percent` in `20..=100`). |
+| `-y`, `--yaml` | Explicitly validate general YAML syntax only. |
 
 ---
 
@@ -414,7 +452,7 @@ The `settings.status_gutter` setting allows customization of the system badges d
 
 #### Help Gutter Hover Expansion & Delay (`settings.help_gutter_delay`):
 The bottom left help gutter displays contextual key navigation bindings and configured custom shortcuts. In normal display mode, the gutter uses at most two lines. If there are more shortcuts than fit in the default two lines, stationary mouse hover over the help gutter expands the gutter upward to display all remaining shortcuts without truncation:
-- **Customizable Delay (`settings.help_gutter_delay`)**: Configures the duration in seconds of stationary mouse hover required before the help gutter expands. Setting `help_gutter_delay: 0` causes the help gutter to expand immediately whenever hovered. Configurable directly in `bashmenu.yml` or through `Options & Settings -> Bashmenu Settings -> Help Gutter Hover Delay`. Defaults to `4.0` seconds.
+- **Customizable Delay (`settings.help_gutter_delay` / `settings.help_gutter_hover_delay`)**: Configures the duration in seconds of stationary mouse hover required before the help gutter expands. Setting `help_gutter_delay: 0` causes the help gutter to expand immediately whenever hovered. Configurable directly in `bashmenu.yml` or through `Options & Settings -> Bashmenu Settings -> Help Gutter Hover Delay`. Defaults to `4.0` seconds.
 - **Fixed Status Gutter Border Decoupling**: When the help gutter expands upward, it operates as an independent left-side panel overlay. The status gutter top border and status badges on the right side remain strictly anchored in place and are completely unaffected by the help expansion.
 - **Dynamic Unbounded Height**: The expansion routine adds as many rows as needed to display all available help tokens and shortcuts. It dynamically expands upward, covering background plugins or empty space if necessary, while stopping cleanly below the active menu items without interfering with menu item navigation or click targets.
 - **Immediate Collapse on Interaction**: Any key press, mouse click, scroll, or cursor departure outside the help gutter instantly collapses the expanded gutter back to its normal height.
@@ -442,7 +480,7 @@ The main menu dynamically calculates its status refresh interval to balance real
   settings:
     refresh_interval: 1.0   # Explicitly refresh status line every 1 second
   ```
-  *(Note: Background plugins configured under `settings.plugins.<name>` control their own individual polling frequencies via their `sleep:` setting in milliseconds, e.g. `sleep: 10000`.)*
+  *(Note: Background plugins configured under `settings.plugins.<name>` control their own individual polling frequencies via their `sleep:` setting in seconds, e.g. `sleep: 300`.)*
 
 #### Visual Screen Transitions & Speed (`settings.transition` & `settings.transition_speed`):
 HA Bash Menu features hardware-synchronized visual transitions rendered
@@ -529,8 +567,7 @@ settings:
 | `false` | Disables framebuffer rendering and uses standard terminal character cells only. |
 
 ### 4.2 Menu Structure (`bashmenu.mnu`)
-The menu structure is defined as a hierarchical list of dictionaries under
-a main `options` list. Each option dictionary supports several attributes:
+The menu structure is defined as a hierarchical list of entries under a root `items:` list using concise label-as-key mappings (e.g., `- Item Label: { ... }`, with backward-compatible support for explicit `label:` keys). Each item supports the following attributes:
 
 | Attribute | Description |
 | :--- | :--- |
@@ -798,7 +835,7 @@ pngquant --nofs 24 --speed 1 --ext -clean.png input.png
 
 | Type | Description & Behavior | Primary Attributes |
 | :--- | :--------------------- | :----------------- |
-| `submenu` | Opens nested list of menu choices | `submenu: {options: []}` |
+| `submenu` | Opens nested list of menu choices | `submenu: {title: "...", items: []}` |
 | `command` | Runs a standard shell command string | `action`, `interactive` |
 | `script` | Launches an external executable script | `action`, `external` |
 | `config` | Prompts user to edit setting value | `key`, `picker`, `start_dir` |
@@ -854,21 +891,23 @@ notebook:
 
 #### Interactive Markdown Preview & Task Lists
 Notes formatted in Markdown support interactive GFM task-list checkboxes (`- [ ]` and `- [x]`):
-* **Keyboard Navigation:** Navigate between checkboxes using the arrow keys or `Tab`.
+* **Keyboard Navigation:** Navigate lines and checkboxes using the `Up` / `Down` arrow keys (or `k` / `j`).
 * **Instant Toggle:** Press `Space` or click directly on any checkbox to toggle its checked state.
 * **Automatic Persistence:** Checked states are updated in the YAML file on disk immediately.
 
 #### Help Gutter & Note Actions
 * **Create Note (`[N]`):** When entering a notebook submenu, the bottom help gutter displays `[N]: New Note`. Pressing `n` or `N` prompts for a note title and opens the note editor.
-* **View Note (`ENTER`):** Opens `NoteViewerModal` with wrapped, formatted Markdown or BBCode text and interactive widgets.
-* **Copy Note (`[C]` / `Ctrl+C`):** Copies the raw note markdown text to the system clipboard and shared cutbuffer, enabling instant cross-interface pasting into the built-in text editor (`bashedit`), terminal prompts, or external applications.
-* **Edit Note (`[E]`):** Accessible directly from the note viewer to modify raw note text using the full-screen `NoteEditorModal` editor modal.
-* **Delete Note (`[D]`):** In a notebook submenu, the help gutter displays `[D]: Delete`. Pressing `d` or `D` on a selected note prompts confirmation before removing it. Outside of a notebook, `[D]` is inactive and omitted from the gutter.
+* **View Note (`ENTER`):** Opens `NoteViewerModal` with wrapped, formatted Markdown or BBCode text and interactive task checkboxes.
+* **Edit Note (`[E]`):** Inside `NoteViewerModal`, press `e` or `E` to edit the note inside the in-modal `NoteEditorModal` (`Ctrl+S` Save, `ESC` Cancel, `Ctrl+A` Select All, `Ctrl+C` Copy, `Ctrl+X` Cut, `Ctrl+V` Paste, `Shift+Arrows/Home/End/PgUp/PgDn` selection, `Ctrl+Left/Right` word jump, `Ctrl+Home/End` document start/end).
+* **Full-Screen Edit (`[F]` / `F3`):** Inside `NoteViewerModal`, press `f`, `F`, or `F3` to open the note inside the full-screen `bashedit` text editor.
+* **Rename Note (`[M]`):** Press `m` or `M` in either the notebook submenu or `NoteViewerModal` to rename the selected note.
+* **Show / Hide Completed Tasks (`[H]`):** Inside `NoteViewerModal`, press `h` or `H` to toggle visibility of completed (`- [x]`) checklist items.
+* **Copy Note (`[C]`):** Inside `NoteViewerModal`, press `c` or `C` to copy the raw note markdown to the terminal clipboard via OSC 52.
+* **Delete Note (`[D]`):** Press `d` or `D` in either the notebook submenu or `NoteViewerModal` to delete the note (prompts confirmation).
 
-#### Smart Auto-Formatting, Ghost Text & Clipboard Interoperability
-* **Auto-Formatting on Enter:** When editing notes in `NoteEditorModal`, pressing `Enter` automatically continues checkboxes (`- [ ]`), unordered bullets (`- `, `* `, `+ `), numbered lists (`1. ` -> `2. `), and blockquotes (`> `). Pressing `Enter` on an empty marker clears the marker (smart de-escalation).
-* **Faint Ghost Text & Tab Completion:** When starting a checkbox marker (e.g., typing `- [ `), faint ghost text appears suggesting `] ` which can be completed by pressing `Tab`.
-* **Unified Cutbuffer & Clipboard:** Notes and the built-in text editor (`bashedit`) share a unified clipboard subsystem utilizing platform tools (`wl-copy`/`wl-paste`, `xclip`, `xsel`, `pbcopy`/`pbpaste`, `termux`) with seamless fallback to `~/.cache/bashmenu/cutbuffer.txt` on headless systems.
+#### Smart Auto-Formatting & Clipboard Interoperability
+* **Auto-Formatting on Enter:** When editing notes in `NoteEditorModal`, pressing `Enter` automatically continues checkboxes (`- [ ]`), unordered bullets (`- `, `* `, `+ `), numbered lists (`1. ` -> `2. `), and blockquotes (`> `). Pressing `Enter` on an empty marker clears the marker (smart de-escalation). Pressing `Tab` inserts 4 spaces.
+* **Unified Cutbuffer & Clipboard:** Notes and the built-in text editor (`bashedit`) share a unified clipboard subsystem utilizing platform tools (`wl-copy`/`wl-paste`, `xclip`, `xsel`, `pbcopy`/`pbpaste`, `termux`) and OSC 52, with fallback to `~/.cache/bashmenu/cutbuffer.txt` on headless systems.
 
 #### Swap File Recovery & 3-Way Merge Conflict Resolution
 To prevent data loss from terminal crashes, system reboots, or concurrent edits, the notebook editor maintains per-note swap files stored in the same directory as the notebook:
@@ -963,14 +1002,15 @@ These variables are dynamically resolved using active configuration and environm
 | `{user}` / `{username}` | Current system username. |
 | `{host}` / `{hostname}` | System host name. |
 | `{user-mode}` | Current privilege mode (`"root"` if running with root/sudo privileges, otherwise `"user"`). |
-| `{version}` | Script version (e.g., `0.0.1`). |
+| `{env:VAR_NAME}` | Environment variable lookup (e.g., `{env:USER}`, `{env:HOME}`). |
 | `{home}` | User's absolute home directory path. |
 | `{bashmenu_dir}` | User configuration root directory path (`~/.config/bashmenu`). |
-| `{dev_dir}` / `{repo_dir}` | Local git repository / development workspace root directory path. |
+| `{dev_dir}` / `{dev}` | Local git repository / development workspace root directory path. |
 | `{templates_dir}` / `{templates}` | Templates folder path (`settings.templates_dir`). |
 | `{scripts_dir}` / `{scripts}` | Scripts folder path (`settings.scripts_dir`). |
 | `{cache_dir}` / `{cache}` | Cache folder path (`settings.cache_dir`, default `~/.cache/bashmenu`). Sets `$CACHE_DIR`. |
 | `{notebooks_dir}` / `{notebooks}` | Custom notes and notebook collection directory path (`{bashmenu_dir}/notebooks`). |
+| `{shortcuts_file}` / `{shortcuts}` | Path to active `shortcuts.yml` keyboard shortcuts configuration file. |
 | `{bash_aliases}` | Path to `~/.bash_aliases`. |
 | `{bashrc}` | Path to `~/.bashrc`. |
 | `{zshrc}` | Path to `~/.zshrc`. |
@@ -1006,7 +1046,7 @@ These variables are dynamically resolved using active configuration and environm
 | `{window_height}` | Current active window height in character lines. |
 | `{ascii:decimal}` | Prints characters by their decimal code (using CP437 for extended ASCII, e.g. `{ascii:168}` resolves to `¿`). |
 | `{app.<key.path>}` / `{<key.path>}` | Resolves any configuration path from `bashmenu.yml` using the explicit `{app.<key>}` namespace (e.g., `{app.theme}`, `{app.settings.tabstop}`, `{app.user.postal_code}`) or shorthand format (e.g., `{settings.cache_dir}`, `{user.editor}`). |
-| `{command:shell_cmd}` | Dynamic shell command execution placeholder. Runs `shell_cmd` via system shell, sanitizes and strips trailing whitespace/newlines, and replaces the tag with the command output (supports nested braces, 30.0s cache, and 3.0s execution timeout). |
+| `{command:shell_cmd}` / `{cmd:shell_cmd}` | Dynamic shell command execution placeholder. Runs `shell_cmd` via system shell, sanitizes and strips trailing whitespace/newlines, and replaces the tag with the command output (supports nested braces and a 30.0s TTL cache, cleared on `<F5>`). |
 | `{toast:SECONDS:"Message"}` / `{toast:"Message"}` | Configurable non-blocking toast notification directive. Displays a brief floating toast notification on the bottom-right corner for specified seconds (defaults to 1-2 seconds if omitted) and resolves to an empty string. Supports double quotes, single quotes, or unquoted strings (e.g. `{toast: 2: "Saved"}` or `{toast: "Done"}`). |
 | `{env}` / `{environment}` | Displays an environment overview table modal showing active file locations for `bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `cheat.yml`, and application version. Can also be interpolated inline as a Markdown table. |
 | `{info:<path>}` | Loads a user-defined Markdown file (supporting nested placeholders such as `{info:{bashmenu_dir}/info.md}` or tilde paths `{info:~/.config/bashmenu/info.md}`), parses optional YAML frontmatter (`title`, `width` %, `height` %), expands all placeholders in the body, and displays it in a popup modal. Automatically renders a vertical scrollbar when content exceeds the modal height, supporting keyboard (`Up`/`Down`/`PgUp`/`PgDn`/`Home`/`End`) and mouse (scroll wheel and scrollbar clicks/drags) scrolling. |
@@ -1062,64 +1102,31 @@ The application includes a rich formatting parser allowing developers to use inl
 
 | Tag | Description |
 | :--- | :--- |
-| `[b]text[/b]` | Renders text in **bold**. |
-| `[u]text[/u]` | Renders text with an **underline**. |
+| `[b]text[/b]` / `[bold]text[/bold]` | Renders text in **bold**. |
+| `[i]text[/i]` / `[italic]text[/italic]` | Renders text in *italics*. |
+| `[u]text[/u]` / `[underline]text[/underline]` | Renders text with an **underline**. |
 | `[dim]text[/dim]` | Renders text with **dimmed** contrast. |
-| `[reverse]text[/reverse]` | Renders text in **reversed** foreground/background contrast. |
-| `[color=color_name]text[/color]` | Renders text in a custom theme color. |
-| `[table width=100%][tr][th]Col[/th][/tr][tr][td]Val[/td][/tr][/table]` | Renders an aligned Unicode box-drawing table (`┌─┬─┐`, `│ │ │`, `├─┼─┤`, `└─┴─┘`) with auto-sized or percentage column widths (e.g. 50/50, 33/33/33), bold headers, and in-cell text wrapping. |
-| `[list][*]Item 1[*]Item 2[/list]` | Renders an unordered bulleted list (`• Item 1`). Closing `[/*]` tags are optional. |
-| `[list=1][*]Item 1[*]Item 2[/list]` | Renders an ordered numbered list (`1. Item 1`, `2. Item 2`). |
+| `[s]text[/s]` / `[strike]text[/strike]` | Renders text with a **strikethrough**. |
+| `[reverse]text[/reverse]` / `[reversed]` / `[invert]` | Renders text in **reversed** foreground/background contrast. |
+| `[color=<c>]text[/color]` / `[fg=<c>]text[/fg]` / `[<c>]text[/<c>]` | Applies foreground color `<c>` to the wrapped text. |
+| `[bg=<c>]text[/bg]` / `[on <c>]text[/on]` | Applies background color `<c>` to the wrapped text. |
+| `[/]` | Universal closing tag that resets all active style and color attributes. |
 
-#### Theme Colors Available:
+#### Supported Color Specifications (`<c>`):
 
-The `[color=...]` tag accepts active theme semantic tokens, standard/bright ANSI constants, 256-color palette indices, and 24-bit TrueColor hex codes:
-
-##### 1. Active Theme Semantic Tokens:
-| Color Identifier | Target Element / Description |
-| :--- | :--- |
-| `color=text` | Standard text color of the active theme. |
-| `color=border` | Border frame color. |
-| `color=title` | Main title header color. |
-| `color=highlight` | Selected/highlighted bar colors. |
-| `color=footer` | Help footer line color. |
-| `color=help_text` | Dedicated help text color in bottom gutter and modal footers. |
-| `color=plugin` | Background plugin feed output text color. |
-| `color=shortcut_key` | Direct action shortcut character badge color. |
-| `color=accent` | Accent indicator/status badge color. |
-| `color=divider` | Horizontal line divider color. |
-| `color=background` | Window and dialog background color. |
-| `color=selection` | Active item selection highlight color. |
-| `color=gutter` | Status and help gutter text color. |
-| `color=button_primary` | Primary action button color. |
-| `color=button_error` | Error / danger button color. |
-| `color=button_cancel` | Cancel / secondary button color. |
-| `color=button_success` | Success / confirmation button color. |
-| `color=window_close_button` | Window title bar close button ('x') color. |
-| `color=scrollbar` | Scrollbar thumb and track styling. |
-| `color=whitespace` | Non-visible editor whitespace display color. |
-
-##### 2. Named ANSI & Bright Color Constants:
-| Constant | Target ANSI Color |
-| :--- | :--- |
-| `COLOR_BLACK`, `COLOR_RED`, `COLOR_GREEN`, `COLOR_YELLOW` | Standard 16-color ANSI primary palette (0–3). |
-| `COLOR_BLUE`, `COLOR_MAGENTA`, `COLOR_CYAN`, `COLOR_WHITE` | Standard 16-color ANSI primary palette (4–7). |
-| `COLOR_GREY`, `COLOR_GRAY`, `COLOR_BRIGHT_BLACK` | Bright Black / Neutral Gray (ANSI 8). |
-| `COLOR_BRIGHT_RED`, `COLOR_BRIGHT_GREEN`, `COLOR_BRIGHT_YELLOW` | High-intensity bright ANSI colors (9–11). |
-| `COLOR_BRIGHT_BLUE`, `COLOR_BRIGHT_MAGENTA`, `COLOR_BRIGHT_CYAN` | High-intensity bright ANSI colors (12–14). |
-| `COLOR_BRIGHT_WHITE` | High-intensity bright white (ANSI 15). |
-| `COLOR_ORANGE`, `COLOR_PURPLE`, `COLOR_PINK`, `COLOR_BROWN` | Extended named color definitions. |
-
-##### 3. 256-Color Palette Indices & TrueColor Hex Values:
-* **256-Color Palette:** Integer index `0` to `255` (e.g. `[color=196]bright red[/color]`, `[color=214]orange[/color]`, `[color=61]slate blue[/color]`).
-* **24-Bit TrueColor Hex:** Standard HTML/CSS hex format (e.g. `[color=#ff5555]soft red[/color]`, `[color=#bd93f9]purple[/color]`).
+1. **Named ANSI Colors (case-insensitive):**
+   - **Standard:** `black`, `red`, `green`, `yellow`, `blue`, `magenta`, `purple`, `cyan`, `white`, `reset`, `default`
+   - **Gray & Bright Variants:** `gray`, `grey`, `darkgray`, `darkgrey`, `bright_black`, `light_black`, `lightred`, `bright_red`, `lightgreen`, `bright_green`, `lightyellow`, `bright_yellow`, `lightblue`, `bright_blue`, `lightmagenta`, `bright_magenta`, `lightcyan`, `bright_cyan`, `bright_white`, `light_white`
+2. **24-Bit TrueColor Hex Values:**
+   - Standard 6-digit `#RRGGBB` (e.g. `[color=#ff5555]soft red[/color]`, `[bg=#282a36]dark panel[/bg]`)
+   - Compact 3-digit `#RGB` (e.g. `[color=#f55]red[/color]`, `[#bd9]mint[/]`)
 
 #### Key Features:
-* **Nesting Support**: Tags can be nested seamlessly (e.g. `[b]bold text [color=accent]with accented[/color] highlight[/b]`).
-* **Visible Width Safety**: Centering, padding, and layout checks automatically ignore tags, ensuring pixel-perfect alignments for any styled text.
-* **Code Block & Backtick Tag Suppression**: Formatting tags inside inline code backticks `` `[b]code[/b]` `` and fenced code blocks ```` ```[color=red]code[/color]``` ```` are automatically suppressed and displayed literally as plain text.
-* **Backslash Tag Escaping**: Preceding a tag bracket with a backslash `\[tag]` (e.g., `\[b]` or `\[/b]`) escapes the formatting parser, rendering the literal bracketed tag text.
-* **`no_formatting` Directive / Flag**: Dialog screens and formatting conversion utilities accept an optional `no_formatting: bool = False` parameter to disable tag processing entirely when displaying raw unformatted text.
+* **Nesting Support:** Style and color tags can be nested seamlessly (e.g., `[b]bold text [color=cyan]with cyan[/color] highlight[/b]`).
+* **Visible Width Safety:** Centering, padding, and alignment routines strip BBCode tags via `strip_bbcode()` before measuring terminal column widths.
+* **Backslash Tag Escaping:** Preceding a tag bracket with a backslash (`\[b]`, `\[red]`) escapes the formatting parser, rendering the literal bracketed text.
+* **`no_formatting` Directive / Flag:** Menu items and dialog displays accept an optional `no_formatting: true` attribute to disable tag processing entirely when displaying literal bracketed text.
+* **Native Markdown Tables & Headings:** Pipe-delimited Markdown tables (`| Col1 | Col2 |`) and headings (`## Heading`) are parsed and rendered natively by `MessageModal` (such as `{info:<path>}` and `{env}`) rather than BBCode tags.
 
 ---
 
@@ -1182,9 +1189,9 @@ HA Bash Menu features an asynchronous, background-cached plugin architecture for
    #!/usr/bin/env bash
    # Example: scripts/my_plugin.sh
    UPTIME=$(uptime -p | sed 's/up //')
-   echo -e "[b]System Uptime:[/b] [color=accent]${UPTIME}[/color]"
+   echo -e "[b]System Uptime:[/b] [color=cyan]${UPTIME}[/color]"
    ```
-   *Note:* The script can output one or multiple lines, and may include rich BBCode formatting tags (e.g. `[b]`, `[color=accent]`) and placeholders.
+   *Note:* The script can output one or multiple lines, and may include rich BBCode formatting tags (e.g. `[b]`, `[color=cyan]`) and placeholders.
 
 2. **Register in `bashmenu.yml`**:
    Add the plugin definition under `settings.plugins` in `bashmenu.yml`:

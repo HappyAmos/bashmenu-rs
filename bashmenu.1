@@ -157,8 +157,17 @@ Dynamic aliases shell template sourced inside user profiles.
 .B UP, DOWN, k, j
 Navigate highlighted selection row.
 .TP
-.B 0-9, a-z
-Select menu option directly by shortcut hotkey.
+.B HOME, END
+Jump to first or last item in the current menu.
+.TP
+.B PageUp, PageDown
+Scroll selection up or down by 10 items.
+.TP
+.B 1-9, a-z, A-Z
+Select menu option directly by shortcut hotkey when shortcut badges are enabled.
+.TP
+.B Ctrl+Space
+Leader key chord prefix opening the which-key shortcut palette overlay.
 .TP
 .B ENTER
 Execute active selected menu option action.
@@ -190,27 +199,30 @@ Launch interactive Visual Theme Editor (themeedit).
 .B F9
 Launch interactive Visual Keyboard Shortcuts Editor (shortcutedit).
 .TP
-.B ESC, q
+.B ESC, BACKSPACE, q
 Return to parent menu, or quit if at the root menu level.
+.TP
+.B Ctrl+C
+Immediate exit from application.
 
 .PP
 .B Intelligent State Retention:
 When returning from editors, or scripts with refresh: true, the engine traces and preserves your submenu coordinate depth to return you to your exact location, skipping the root menu.
 .SS Visual Menu Editor (menuedit)
 .TP
-.B a, Insert
+.B a, A, Insert
 Add new menu option node.
 .TP
 .B e, ENTER
 Edit node properties or submenu header title (opens ItemEditModal).
 .TP
-.B t
+.B t, CTRL+T
 Change selected item type.
 .TP
 .B SPACE, LEFT, RIGHT
 Expand or collapse submenu tree node.
 .TP
-.B d, Delete
+.B d, D, Delete
 Delete selected menu option node (with confirm box).
 .TP
 .B m
@@ -225,8 +237,8 @@ Indent (>) item into preceding Submenu folder.
 .B <
 Outdent (<) item to parent menu.
 .TP
-.B F1, ?
-Display HA Bash Menu manual (bashmenu.md) modal.
+.B F1
+Display Menu Editor & Inspector Help Guide modal.
 .TP
 .B F2
 Toggle (collapse/expand) all children of top root menu.
@@ -248,13 +260,13 @@ Exit editor (prompts to save if modifications exist).
 
 .PP
 .B ItemEditModal Dialog Keybindings:
-CTRL+S / F2 / s (Save changes), CTRL+T / t (Change item type), CTRL+A / F3 (ASCII table), CTRL+N / F4 (Glyphs), CTRL+P / F5 (Placeholders), F1 / ? (Item property help), ESC / c (Cancel).
+CTRL+S / F2 (Save changes), CTRL+T (Change item type), CTRL+A / F3 (ASCII table), CTRL+N / F4 (Glyphs), CTRL+P / F5 (Placeholders), LEFT / RIGHT / h / l / SPACE / 1-3 (Select execution mode), F1 (Item property help), ESC (Cancel).
 
 .PP
 .B Menu Focus Synchronization & Property Inspector Previews:
 When launching menuedit from bashmenu (via F4 or menu item action), the editor tree automatically synchronizes active keyboard focus and selection directly on the item that was selected in bashmenu, so pressing e or ENTER immediately opens the ItemEditModal dialog for that exact item. The Property Inspector side panel features a real-time visual Preview section for all item types (commands, submenus, scripts, dividers, etc.) showing exactly how the item will appear in the main menu (including resolved Nerd Font/emoji icons, placeholders, and right-aligned shortcut brackets). Additionally, the ItemEditModal dialog dynamically updates its preview box in real-time as title or icon fields are edited.
 .SS Built-in Text Editor (bashedit)
-The application features a built-in text editor supporting tabs, colocated swap files, and desktop shortcuts.
+The application features a built-in text editor supporting tabs, colocated swap files, and desktop shortcuts. Command-line options: bashedit [-r|--read-only] [--tabstop N] [--show-whitespace] [--wrap] [--tab-to-spaces BOOL] [-l|--line N] [-t|--theme NAME] [--local] [FILE].
 .TP
 .B F1
 View BashEdit keybindings manual modal dialog.
@@ -274,11 +286,14 @@ Show modal with available placeholders and macros.
 .B F6
 View Markdown preview via bmpager --markdown --no-file.
 .TP
-.B F7
+.B F7, Alt+N
 Toggle line numbers gutter display.
 .TP
 .B F8
 View Markdown syntax quick reference modal.
+.TP
+.B F9, Alt+W
+Toggle soft-wrap text display.
 .TP
 .B Ctrl+Q, ESC
 Exit editor (prompts to save if modifications exist).
@@ -289,13 +304,13 @@ Open file via file picker modal into current or new tab.
 .B Ctrl+S
 Save active file buffer.
 .TP
-.B Ctrl+A, Ctrl+Shift+S
+.B Ctrl+A
 Save As (prompts for destination file path).
 .TP
-.B Ctrl+N, [ + ]
+.B Ctrl+N, Ctrl+E, [ + ]
 Create a new empty document tab.
 .TP
-.B Alt+Left, Alt+Right / Alt+], Alt+[
+.B Alt+Left, Alt+Right / Alt+], Alt+[ / Ctrl+Tab, Ctrl+Shift+Tab
 Switch to next or previous document tab.
 .TP
 .B Ctrl+W
@@ -310,6 +325,9 @@ Skip cursor by word left or right.
 .B Ctrl+Up, Ctrl+Down
 Skip cursor by paragraph up or down.
 .TP
+.B Ctrl+Home, Ctrl+End
+Jump to start or end of document.
+.TP
 .B Ctrl+X
 Cut line or active selection block to clipboard.
 .TP
@@ -322,10 +340,16 @@ Paste cutbuffer or system clipboard text at cursor.
 .B Ctrl+Z, Ctrl+Y
 Undo or redo edit operations.
 .SS Visual Theme Editor (themeedit)
-Interactive split-screen theme designer with a collapsible token tree (Theme:, Colors:, Borders:) and multi-view live preview pane.
+Interactive split-screen theme designer with a collapsible token tree (Theme:, Colors:, Borders:) and multi-view live preview pane. Launch directly with themeedit [-f|--file FILE] [-t|--theme NAME] [--local].
+.TP
+.B UP, DOWN, k, j
+Navigate collapsible category nodes and tokens (pressing UP or k at row 0 focuses the theme name for inline renaming).
 .TP
 .B LEFT, RIGHT, h, l
 Collapse or expand collapsible token tree category nodes (Theme:, Colors:, Borders:).
+.TP
+.B HOME, END, PGUP, PGDN
+Jump to first/last visible row or scroll by 5 rows.
 .TP
 .B ENTER, SPACE
 Toggle selected category node, or open 256-color, CP437 character, or wallpaper file picker for the focused token.
@@ -337,7 +361,7 @@ Cycle to previous or next theme (alphabetically sorted).
 Cycle or jump between live preview views (Main Menu, Text Editor, Popup Modals, Menu Editor, Toast Notifications).
 .TP
 .B F4, b
-Choose background wallpaper image via file picker modal.
+Open Background Wallpaper Configuration modal (Image, Opacity, Scaling, Mode, Clustering, Quantization).
 .TP
 .B F5
 Auto-derive harmonious 256-color palette (including plugin text color) from the configured wallpaper image.
@@ -349,13 +373,16 @@ Create a new theme using the monochrome base palette.
 Rename current theme inline.
 .TP
 .B F8, Delete
-Delete current theme from bashmenu.themes (prompts confirmation), or clear wallpaper image when Wallpaper Image token is focused.
+Delete current theme from bashmenu.themes (prompts confirmation); when a Wallpaper token is focused, Delete or Backspace removes the wallpaper; when the Indicator token is focused, Delete resets the indicator to '> '.
 .TP
 .B Ctrl+S
 Save theme directly to bashmenu.themes (prompts Save As only if untitled).
 .TP
 .B Ctrl+A
 Save As under a new theme name.
+.TP
+.B Left Click (Preview Pane)
+Focuses the clicked UI element's matching Theme Token in the tree and flashes its preview spans.
 .TP
 .B Right Click (Preview Pane)
 Color Dropper tool: samples the visible pixel color from the clicked location in the live preview pane, copies the color code to the system clipboard, and assigns it directly to whichever Theme Token is currently selected (if it is a color setting).
@@ -369,6 +396,36 @@ Render input formatted as Markdown (wrapped to terminal window width).
 .TP
 .B -w, --wrap, --wrap-text
 Soft-wrap non-markdown text lines to window width.
+.TP
+.B -c, --no-color
+Discard ANSI escape sequences instead of rendering colors.
+.TP
+.B --no-file, --no-edit, --view-only
+Omit filename badge and disable editor launching.
+.TP
+.B --no-help
+Hide the bottom help bar for maximum content lines.
+.TP
+.B --editor=MODE
+Configure editor mode (default / system or builtin / bm).
+.TP
+.B --builtin-editor, --bm-editor
+Shorthand for --editor=builtin (launches bashedit).
+.TP
+.B --system-editor, --default-editor
+Shorthand for --editor=default (uses $VISUAL / $EDITOR).
+.TP
+.B --max-lines=N
+Cap in-memory line buffer to N lines (ring buffer).
+.TP
+.B --file=PATH, --edit-target=PATH
+Associate an explicit file path for editing when paging a stream.
+.TP
+.B --reload-cmd=CMD
+Re-run CMD to refresh buffer contents after editing.
+.TP
+.B +N, +/PATTERN
+Start viewing at line N or jump to the first line matching PATTERN.
 .TP
 .B j, DOWN, ENTER / k, UP
 Scroll down or up one line.
@@ -394,8 +451,32 @@ Open active file in configured editor (bashedit or $EDITOR).
 .B h, ?, F1
 Open scrollable pager help modal.
 .TP
-.B q, Q, ESC
+.B q, Q, ESC, Ctrl+C
 Close modal or exit pager.
+.SS Cheatsheet Manager (cheat)
+Searches, lists, and displays Markdown cheatsheets from ~/.config/bashmenu/cheat.yml (dir: ~/cheat, overridable via CHEAT_CONFIG). Renders via rich.sh when available, falling back to bmpager --markdown and then raw standard output.
+.TP
+.B cheat [query], -l/--list [query], -s/--search [query], -d/--directory
+View matching cheatsheet, list or search cheatsheets with frontmatter tags, or print configured directory path.
+.SS Custom Keyboard Shortcuts Editor (shortcutedit)
+Split-screen visual editor for shortcuts.yml. Launch via shortcutedit [-f|--file FILE] [--local], menuedit --shortcuts, or F9 from the main menu.
+.TP
+.B UP, DOWN, k, j, HOME, END
+Navigate configured shortcuts list.
+.TP
+.B a, A, Insert / e, E, ENTER / c, C, F2
+Add shortcut, edit selected shortcut properties, or interactively capture a key combo / <leader> chord.
+.TP
+.B l, L / SPACE / d, D, Delete / m, M
+Configure leader key settings, toggle enabled state, delete shortcut, or move entry down/up.
+.TP
+.B F1, ?, CTRL+P / s, S, CTRL+S / ESC, q, Q
+Open placeholders reference, save shortcuts.yml, or exit editor.
+.TP
+.B Edit Shortcut Modal:
+TAB/DOWN (next field), SHIFT+TAB/UP (prev field), F2/Ctrl+K (capture key), Ctrl+P (placeholders), Ctrl+S (save), ESC (cancel).
+.SS YAML Schema & Syntax Validator (ymlcheck)
+Validates YAML syntax and schemas using mutually exclusive modes (ymlcheck [MODE] <FILES>...): \fB\-c, \-\-config\fR (bashmenu.yml), \fB\-t, \-\-themes, \-\-theme\fR (bashmenu.themes), \fB\-m, \-\-menu\fR (bashmenu.mnu), \fB\-s, \-\-shortcuts, \-\-shortcut\fR (shortcuts.yml), and \fB\-y, \-\-yaml\fR (general YAML syntax; also default when omitted).
 .SH CONFIGURATION & SCHEMA SPECIFICATIONS
 .SS Settings Store (bashmenu.yml)
 Stores nested, dot-notation accessible key-value settings. Any nested path (e.g.
@@ -452,14 +533,13 @@ Stationary mouse hover expansion delay for the help gutter is configured via
 .I settings.help_gutter_delay
 in seconds (default: 4.0; setting to 0 disables delay for instant expansion). When expanded, the help gutter dynamically increases row count to display all hidden shortcuts without affecting the fixed status gutter top border or visible menu items.
 .SS Menu Structure (bashmenu.mnu)
-The menu is defined as a hierarchical YAML options list. Options can utilize the
-following configuration keys:
+The menu is defined as a hierarchical YAML items list using label-as-key mappings (with backward-compatible support for explicit \fBlabel\fR keys). Items can utilize the following configuration keys:
 .TP
 .B type
 Option action type (see SECTION TYPES).
 .TP
 .B label
-Row label. Can use dynamic placeholders.
+Row label (when not using the label-as-key mapping syntax). Can use dynamic placeholders.
 .TP
 .B icon
 Icon tags utilizing brackets: {nf:[char]:[nerd-font hex]:[emoji]}.
@@ -484,7 +564,7 @@ Confirmation options and alert prompts.
 .SH SECTION TYPES
 .TP
 .B submenu
-Opens a nested submenu options list.
+Opens a nested submenu items list (submenu: {title: "...", items: []}).
 .TP
 .B command
 Executes a standard shell command.
@@ -506,7 +586,7 @@ Opens file in built-in text editor (bashedit).
 .TP
 .B notebook
 Opens dynamic notes collection menu from YAML file ({notebooks_dir}/notes.yml).
-Supports interactive task-list checkboxes, Markdown/BBCode modal viewers, full NoteEditorModal editor modals with smart list auto-formatting, ghost text, shared cross-interface clipboard ([C]/Ctrl+C/Ctrl+V), help gutter note creation ([N]), atomic swap file crash recovery (.<stem>.note.<slug>.swp), and interactive 3-way merge conflict resolution ([Merge], [Overwrite], [Reload], [Save As]).
+Supports interactive task-list checkboxes (navigate lines with UP/DOWN/k/j, toggle checkboxes with SPACE or click), show/hide completed tasks ([H]), Markdown/BBCode modal viewers, in-modal NoteEditorModal ([E]: Ctrl+S save, ESC cancel, Ctrl+A/C/X/V, Shift+Arrows selection, Ctrl+Left/Right word jump, Ctrl+Home/End) with smart list auto-formatting, full-screen bashedit ([F]/F3), OSC 52 copy ([C]), help gutter note creation ([N]), renaming ([M]), deletion ([D]), atomic swap file crash recovery (.<stem>.note.<slug>.swp), and interactive 3-way merge conflict resolution ([Merge], [Overwrite], [Reload], [Save As]).
 .TP
 .B confirm
 Launches Yes/No confirmation dialog box.
@@ -602,8 +682,8 @@ System host name.
 .B {user-mode}
 Current privilege mode ("root" if running with root/sudo privileges, otherwise "user").
 .TP
-.B {version}
-Script version (e.g., 0.0.1).
+.B {env:VAR_NAME}
+Environment variable lookup (e.g., {env:USER}, {env:HOME}).
 .TP
 .B {home}
 User's absolute home directory path.
@@ -611,7 +691,7 @@ User's absolute home directory path.
 .B {bashmenu_dir}
 User configuration root directory (~/.config/bashmenu).
 .TP
-.B {dev_dir}, {repo_dir}
+.B {dev_dir}, {dev}
 Local git repository and development workspace root directory.
 .TP
 .B {templates_dir}, {templates}, {scripts_dir}, {scripts}
@@ -622,6 +702,9 @@ Cache folder paths (defaults to ~/.cache/bashmenu). Sets $CACHE_DIR.
 .TP
 .B {notebooks_dir}, {notebooks}
 Custom notes and notebooks directory path ({bashmenu_dir}/notebooks).
+.TP
+.B {shortcuts_file}, {shortcuts}
+Full path to the active shortcuts.yml keyboard shortcuts file.
 .TP
 .B {bashrc}, {zshrc}, {profile}, {bash_profile}, {zprofile}, {shell_profile}
 User shell profile configuration paths with intelligent existence fallback.
@@ -685,8 +768,8 @@ Configuration key lookup from bashmenu.yml using explicit app namespace (e.g.,
 {app.theme}, {app.settings.tabstop}, {app.user.postal_code}) or shorthand format
 ({settings.cache_dir}, {user.editor}, {user.divider}).
 .TP
-.B {command:shell_cmd}
-Dynamic shell command execution placeholder. Runs shell_cmd via the system shell, trims trailing whitespace/newlines, and replaces the tag with the command output. Fully supports nested curly braces (e.g., {command:hostname -I | awk '{print $1}'}). Features a 30.0-second performance cache TTL and a 3.0-second safety execution timeout.
+.B {command:shell_cmd}, {cmd:shell_cmd}
+Dynamic shell command execution placeholder. Runs shell_cmd via the system shell, trims trailing whitespace/newlines, and replaces the tag with the command output. Fully supports nested curly braces (e.g., {command:hostname -I | awk '{print $1}'}). Features a 30.0-second performance cache TTL (cleared on F5).
 .TP
 .B {toast:SECONDS:"Message"}, {toast:"Message"}
 Configurable non-blocking toast notification directive. Displays a floating toast notification on the bottom-right corner for the specified duration in seconds (default 2.0s) and resolves to an empty string.
@@ -731,40 +814,43 @@ Every menu option icon slot occupies a standardized 4-column display width (vis_
 The application incorporates a rich inline formatting parser allowing developers to
 use nested bracketed formatting tags inside labels, headers, status gutters, and dialogues.
 .TP
-.B [b]text[/b]
+.B [b]text[/b], [bold]text[/bold]
 Renders bold text.
 .TP
-.B [u]text[/u]
+.B [i]text[/i], [italic]text[/italic]
+Renders italic text.
+.TP
+.B [u]text[/u], [underline]text[/underline]
 Renders underlined text.
 .TP
 .B [dim]text[/dim]
 Renders dimmed contrast text.
 .TP
-.B [reverse]text[/reverse]
-Renders reversed contrast text.
+.B [s]text[/s], [strike]text[/strike]
+Renders strikethrough text.
 .TP
-.B [color=color_name]text[/color]
-Renders custom theme-colored text. Supports active theme semantic tokens (text, border, title, highlight, footer, help_text, plugin, shortcut_key, accent, divider, background, selection, gutter, button_primary, button_error, button_cancel, button_success, window_close_button, scrollbar, whitespace), named ANSI/bright constants (COLOR_BLACK, COLOR_RED, COLOR_GREEN, COLOR_YELLOW, COLOR_BLUE, COLOR_MAGENTA, COLOR_CYAN, COLOR_WHITE, COLOR_GREY, COLOR_GRAY, COLOR_BRIGHT_BLACK, COLOR_BRIGHT_RED, COLOR_BRIGHT_GREEN, COLOR_BRIGHT_YELLOW, COLOR_BRIGHT_BLUE, COLOR_BRIGHT_MAGENTA, COLOR_BRIGHT_CYAN, COLOR_BRIGHT_WHITE, COLOR_ORANGE, COLOR_PURPLE, COLOR_PINK, COLOR_BROWN), 256-color palette numbers (0 to 255), and 24-bit TrueColor hex values (#rrggbb).
+.B [reverse]text[/reverse], [reversed]text[/reversed], [invert]text[/invert]
+Renders reversed foreground/background contrast text.
 .TP
-.B [table width=100%][tr][th]Col[/th][/tr][tr][td]Val[/td][/tr][/table]
-Renders an aligned box-drawing Unicode table with dynamically fitted or percentage-based column widths (e.g. 50/50, 33/33/33), bold headers, in-cell word wrapping, and optional row separators.
+.B [color=<c>]text[/color], [fg=<c>]text[/fg], [<c>]text[/<c>]
+Applies foreground color <c>. Supported values (case-insensitive): named ANSI colors (black, red, green, yellow, blue, magenta, purple, cyan, white, gray, grey, darkgray, darkgrey, bright_black, light_black, lightred, bright_red, lightgreen, bright_green, lightyellow, bright_yellow, lightblue, bright_blue, lightmagenta, bright_magenta, lightcyan, bright_cyan, bright_white, light_white, reset, default) and TrueColor hex codes (#RRGGBB and 3-digit #RGB).
 .TP
-.B [list][*]Item 1[*]Item 2[/list]
-Renders an unordered bulleted list (using bullet glyphs). Closing [/*] tags are optional.
+.B [bg=<c>]text[/bg], [on <c>]text[/on]
+Applies background color <c> using any named ANSI color or TrueColor hex code (#RRGGBB or #RGB).
 .TP
-.B [list=1][*]Item 1[*]Item 2[/list]
-Renders an ordered numbered list (1., 2., etc.). Also supports alphabetical lists ([list=a]).
+.B [/]
+Universal closing tag that resets all active style and color attributes.
 .PP
 .B Formatting Rules & Feature Flags:
 .IP \(bu 2
-.B Code Block & Backtick Suppression:
-Formatting tags within code backticks (`[b]code[/b]`) or fenced code blocks are automatically suppressed and rendered literally.
+.B Nesting & Visible Width Safety:
+Tags can be nested and stacked arbitrarily. Centering, padding, and alignment routines strip BBCode tags via strip_bbcode() before measuring terminal column widths.
 .IP \(bu 2
 .B Backslash Tag Escaping:
-Preceding a tag bracket with a backslash (e.g. \[rs][b] or \[rs][/b]) escapes the parser, outputting literal bracketed tag text.
+Preceding a bracket with a backslash (e.g. \[rs][b] or \[rs][red]) escapes the parser, outputting literal bracketed text.
 .IP \(bu 2
 .B no_formatting Directive:
-Modals and text formatting conversion utilities accept an optional no_formatting parameter to disable tag processing entirely.
+Menu items and dialogs accept an optional no_formatting boolean parameter to disable BBCode tag processing when displaying literal bracketed text. (Note: pipe-delimited Markdown tables and ## headings are rendered natively by MessageModal rather than BBCode tags.)
 .SS Color Themes Specification (bashmenu.themes)
 Color themes configure the visual color scheme for the main menu, visual menu editor, text editor, and modal screens. Themes are defined under top-level theme names (dracula, nord, cyberpunk, gruvbox, qbasic, pacman, industry, matrix, monochrome, synthwave, amber_crt, hotdog_stand) for 256, 16, and 8 color modes using single-line compact lists [fg, bg].
 .PP
@@ -890,7 +976,7 @@ rendering cleanly above or below multi-column tables.
 .B Creating & Registering a Custom Plugin:
 To create a custom plugin, write an executable script in
 .I scripts_dir
-(e.g., scripts/my_status.sh) that outputs text to standard stdout (supporting BBCode styling tags like [b] or [color=accent]). Then register it under
+(e.g., scripts/my_status.sh) that outputs text to standard stdout (supporting BBCode styling tags like [b] or [color=cyan]). Then register it under
 .I settings.plugins
 in
 .I bashmenu.yml:

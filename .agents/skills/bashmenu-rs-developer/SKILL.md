@@ -82,7 +82,7 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
   - Tests: Unit tests are colocated in modules (`#[cfg(test)] mod tests`); integration tests reside in `crates/<crate>/tests/` or top-level `tests/`.
   - Extension Scripts: Standalone games, plugins, and helper tools must reside in `scripts/`, never in root. Menu actions reference them via `{scripts_dir}/<name>`.
   - Notebooks: User notebooks and notes must reside in `notebooks/` (`{notebooks_dir}` / `{notebooks}`).
-- **Dependency Hygiene:** Keep external crate dependencies lean. Prefer pure Rust crates (`image` without C dependencies, `serde_yml`, `crossterm`, `ratatui`, `unicode-width`, `ropey`, `thiserror`). Avoid pulling heavy, slow-to-compile framework dependencies when standard library primitives or lightweight crates suffice.
+- **Dependency Hygiene:** Keep external crate dependencies lean. Prefer pure Rust crates (`image` without C dependencies, `serde_yml`, `crossterm`, `ratatui`, `unicode-width`, `thiserror`). Avoid pulling heavy, slow-to-compile framework dependencies when standard library primitives or lightweight crates suffice.
 - **Sub-Agent Delegation Policy:** Use local `opencode` CLI sparingly and strictly for small, low-risk draft tasks (test case drafts, isolated prototypes). Treat all output as untrusted draft code requiring strict review, linting, and automated test validation.
 - **Branching Discipline:** For structural overhauls (cross-platform compatibility, editor re-architecture, dependency reduction), always branch from git (e.g. `feat/<topic>`) and verify all tests and linters pass before merging.
 - **Ratatui UI Performance & Responsiveness Invariants:**
@@ -130,7 +130,7 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
 | `crates/bashmenu-cli` | Primary binary (`bashmenu`): main menu event loop, item dispatcher, subprocess supervisor. |
 | `crates/menuedit-cli` | Visual tree editor binary for `bashmenu.mnu` (invoked via `F4` or standalone). |
 | `crates/themeedit-cli` | Visual split-screen theme editor binary with 2D color and CP437 ASCII pickers (invoked via `F8` or standalone). |
-| `crates/bashedit-cli` | Standalone terminal text editor binary using `ropey` text buffer and swap-file management. |
+| `crates/bashedit-cli` | Standalone terminal text editor binary using Unicode line buffer (`EditorBuffer`) and swap-file management. |
 | `crates/bmpager-cli` | Standalone native terminal pager with CommonMark markdown and OSC 8 hyperlink rendering (`bmpager`). |
 | `crates/cheat-cli` | Cheatsheet search and terminal viewer binary (`cheat`). |
 | `crates/ymlcheck-cli` | Schema validation and linting tool for `bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`. |
@@ -138,8 +138,8 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
 | `bashmenu.yml` | Main Yaml configuration file (active theme, plugin layout, timeouts). |
 | `bashmenu.mnu` | Yaml menu hierarchy using label-as-key `items:` schema. |
 | `bashmenu.themes`| Theme palette, window borders, and divider definitions. |
-| `scripts/` | Extension scripts (`cheat.sh`, `rich.sh`, `pager.sh`, `webopen.sh`, plugins, games). |
-| `templates/` | Generic shell RC templates (`.bashrc`, `.vimrc`) free of personal hostnames, IPs, or absolute paths. |
+| `scripts/` | Extension scripts (`cheat.sh`, `webopen.sh`, `glyphs.sh`, `unicode.sh`, plugins, games). |
+| `templates/` | Shell configuration templates (`autoexec.sh.tmpl`, `bash_aliases.tmpl`) free of personal hostnames, IPs, or absolute paths. |
 | `tests/` | Workspace integration tests. |
 | `install.sh` / `uninstall.sh` | POSIX `/bin/sh` installer and uninstaller building with `cargo build --release` or downloading binaries. |
 
@@ -196,7 +196,7 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
 
 ## 5. Themes, Window Borders & Palette Standards
 - **Theme Selection, Alphabetical Ordering & Conversion:** Selecting a theme updates `theme:` in `bashmenu.yml`. Theme pickers (`ThemePickerModal`), theme cycling, and `save_themes()` must sort theme names alphabetically (case-insensitively). Convert theme color tokens (names, hex, 8-bit ANSI indices 0–255) into `ratatui::style::Color` variants (`Color::Rgb`, `Color::Indexed`, `Color::Reset`). Plugin rows render using `ResolvedThemeStyles.plugin` (`plugin` token, editable as `Plugin Text Color` in `themeedit`).
-- **Theme Editor Lifecycle & Wallpaper Color Derivation (`themeedit`):** Supports `<F2>` Switch, `<F3>` New (`Theme::monochrome()`), `<F4>` Delete, `<F5>` Auto-Derive Colors from Wallpaper (`derive_colors_from_wallpaper`), `<F6>` Rename, `<Ctrl+S>` Save, and `<Ctrl+A>` Save As. Auto-derivation and token editing must keep all three palette tiers (`256`, `16`, `8`) synchronized using perceptual downsampling (`downsample_palette_to_16`, `downsample_palette_to_8`) into canonical `COLOR_*` constants. View-specific sub-table overrides (`menu_editor`, `editor`, `modals`) are cleared on derivation to apply colors uniformly. Preview toasts must display both color representation and decimal 256 code (e.g. `#{r:02x}{g:02x}{b:02x} (256: {idx})`). Selecting a token flashes preview spans (`get_token_preview_spans`), clicking the preview focuses the token (`hit_test_preview`) with a toast notification, and wallpaper compositing applies across all preview modes (`Menu`, `TextEditor`, `Modals`, `MenuEditor`, `Toast`).
+- **Theme Editor Lifecycle & Wallpaper Color Derivation (`themeedit`):** Supports `[` / `]` Switch, `<F6>` / `<Ctrl+N>` New (`Theme::monochrome()`), `<F7>` / `<F2>` / `<Ctrl+R>` Rename, `<F4>` / `b` Wallpaper/Background Config, `<F5>` Auto-Derive Colors from Wallpaper (`derive_colors_from_wallpaper`), `<F8>` / `<Delete>` Delete, `<Ctrl+S>` Save, and `<Ctrl+A>` Save As. Auto-derivation and token editing must keep all three palette tiers (`256`, `16`, `8`) synchronized using perceptual downsampling (`downsample_palette_to_16`, `downsample_palette_to_8`) into canonical `COLOR_*` constants. View-specific sub-table overrides (`menu_editor`, `editor`, `modals`) are cleared on derivation to apply colors uniformly. Preview toasts must display both color representation and decimal 256 code (e.g. `#{r:02x}{g:02x}{b:02x} (256: {idx})`). Selecting a token flashes preview spans (`get_token_preview_spans`), clicking the preview focuses the token (`hit_test_preview`) with a toast notification, and wallpaper compositing applies across all preview modes (`Menu`, `TextEditor`, `Modals`, `MenuEditor`, `Toast`).
 - **Depth Constraints & Aesthetics:** Run `ymlcheck --themes bashmenu.themes` to validate schemas. 16-color mode indices must stay within `0..15` (or `COLOR_*`), 8-color within `0..7`. Maintain cohesive, low-fatigue palettes (e.g. `tokyo_night`, `nord`, `everforest`).
 - **Window Borders (`window:` in `bashmenu.themes`):**
   - Supported keys: `border_horizontal_top`, `border_horizontal_bottom`, `border_vertical_left`, `border_vertical_right` (fallbacks: `border_horizontal`, `border_vertical`), corners (`border_top_left`, `border_top_right`, `border_bottom_left`, `border_bottom_right`), tees (`left_tee`, `right_tee`, `top_tee`, `bottom_tee`), caps (`title_left_cap`, `title_right_cap`), and `shadow_char`.
@@ -218,7 +218,7 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
   - Raw `{ascii:NNN}` strings must NEVER appear in the user-facing menu options, indicators, or status lines.
 - **Theme Renaming, Deletion & Direct Save Invariants (`themeedit`):**
   - **Direct Save Invariant (<kbd>Ctrl+S</kbd>):** If `theme_name` is set to any valid name (existing or newly named), <kbd>Ctrl+S</kbd> must immediately serialize and save to disk. It must NEVER divert to "Save As" unless the theme is truly untitled (`theme_name.is_empty() || theme_name == "untitled"`). Only <kbd>Ctrl+A</kbd> opens "Save As".
-  - **Deletion:** Themes can be deleted from `bashmenu.themes` via <kbd>Ctrl+D</kbd> or <kbd>Delete</kbd>. Prompts confirmation via `ConfirmModal`. Invariants: Never allow deleting the only remaining theme; if deleting the active theme, safely fall back to another theme (e.g. `dracula`) and update `bashmenu.yml`.
+  - **Deletion:** Themes can be deleted from `bashmenu.themes` via <kbd>F8</kbd> or <kbd>Delete</kbd>. Prompts confirmation via `ConfirmModal`. Invariants: Never allow deleting the only remaining theme; if deleting the active theme, safely fall back to another theme (e.g. `dracula`) and update `bashmenu.yml`.
 
 ---
 
@@ -327,13 +327,14 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
   - Function keys `<F1>`, `<F2>`, `<F3>`, etc. listed in the help gutter must ALWAYS be listed in strictly ascending numerical order (from 1 to 12).
   - Dynamic gutter dimension balancing prevents help gutter width starvation.
 - **BBCode Rich Formatting Parser:**
-  - Bracketed tags: `[b]`, `[u]`, `[dim]`, `[reverse]`, `[color=...]`.
+  - Bracketed tags: `[b]`/`[bold]`, `[i]`/`[italic]`, `[u]`/`[underline]`, `[dim]`, `[s]`/`[strike]`, `[reverse]`/`[reversed]`/`[invert]`, `[color=...]`, `[fg=...]`, `[bg=...]`, `[on ...]`, `[<color>]`.
   - Parsed into `ratatui::text::Span` and `ratatui::style::Style` without intermediate HTML or heavyweight DOM structures.
 - **YAML Validation Tool (`ymlcheck`):**
-  - `ymlcheck <file>` validates syntax without schema checks.
+  - `ymlcheck <file>` (or `--yaml` / `-y`) validates syntax without schema checks.
   - `--themes` (`-t`) validates `bashmenu.themes` (palette depths, window, divider).
   - `--config` (`-c`) validates `bashmenu.yml`.
   - `--menu` (`-m`) validates `bashmenu.mnu` (items structure, dividers).
+  - `--shortcuts` (`-s` / `--shortcut`) validates `shortcuts.yml` (leader key, bindings, duplicate active keys, `window_percent`).
 
 ---
 

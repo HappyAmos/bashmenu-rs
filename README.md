@@ -68,17 +68,20 @@ bm
 
 Launch companion tools directly:
 ```bash
-# Validate configuration and theme files
-ymlcheck --config bashmenu.yml --themes bashmenu.themes --menu bashmenu.mnu --shortcuts shortcuts.yml
+# Validate configuration, theme, menu, and shortcut files
+ymlcheck --config bashmenu.yml
+ymlcheck --themes bashmenu.themes
+ymlcheck --menu bashmenu.mnu
+ymlcheck --shortcuts shortcuts.yml
 
 # Edit menu hierarchy
-menuedit bashmenu.mnu
+menuedit -f bashmenu.mnu
 
 # Edit keyboard shortcuts and leader chords
-shortcutedit shortcuts.yml
+shortcutedit -f shortcuts.yml
 
 # Edit themes and palettes with split-screen live preview
-themeedit dracula
+themeedit -t dracula
 
 # Edit text files with crash recovery
 bashedit script.sh

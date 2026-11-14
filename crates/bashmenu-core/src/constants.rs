@@ -91,10 +91,11 @@ pub const PLACEHOLDER_HELP_TEXT: &str = "\
 
 ── Special Encodings & Dynamic Macros ──
 {ascii:<code_num>}           │ CP437 ASCII character byte (e.g. {ascii:196} -> ─)
-{command:<cmd>}              │ Executes shell command and inserts output
+{command:<cmd>} / {cmd:<cmd>}│ Executes shell command (30s cache) and inserts output
 {toast:SECONDS:\"MESSAGE\"}    │ Displays non-blocking popup toast message
 {nf:<char>:<hex>:<emoji>}    │ Adaptive Nerd Font / Unicode / Emoji glyph
 {app.<key.path>}             │ Configuration key in bashmenu.yml (e.g. {app.theme})
+{env:<var_name>}             │ Environment variable value (e.g. {env:USER})
 {env} / {environment}        │ Environment inspection modal / overview table
 {info:<path>}                │ Renders Markdown file with YAML frontmatter (title, width, height)
 {<key.path>}                 │ Refers to nested key in bashmenu.yml (e.g. {user.postal_code})
@@ -140,9 +141,9 @@ pub const BASHEDIT_HELP_TEXT: &str = "\
 | `F9` / `Alt+W` | Toggle Soft-Wrap |
 | `^O` / `^R` | Open File Picker |
 | `^S` | Save File |
-| `^A` / `^Shift+S` | Save File As (Save Under New Name) |
+| `^A` | Save File As (Save Under New Name) |
 | `^N` / `^E` / `[ + ]` | New Tab / New File |
-| `Alt+Left/Right` / `Alt+[/]` / `Ctrl+Tab` | Switch Tabs (Prev / Next) |
+| `Alt+Left/Right` / `Alt+[/]` / `Ctrl+Tab` / `Ctrl+Shift+Tab` | Switch Tabs (Prev / Next) |
 | `Ctrl+Left` / `Ctrl+Right` | Move Word Left / Right |
 | `Ctrl+Up` / `Ctrl+Down` | Move Paragraph Up / Down |
 | `^W` | Where Is (Search text) |

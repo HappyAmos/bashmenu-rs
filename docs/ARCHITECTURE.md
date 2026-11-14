@@ -40,7 +40,7 @@ bashmenu-rs/
 ## 3. Subsystem Specifications
 
 ### 3.1 Data Models & Serialization (`bashmenu-core`)
-- **`config.rs`**: Loads, modifies, and serializes `bashmenu.yml` (`BashMenuConfig`). Always preserves the top-level `CONFIG_HEADER` documentation comments via `save_config()`. Supports `settings.transition` ("fade", "curtain", "instant", "none") and `settings.framebuffer` ("auto", "true", "false").
+- **`config.rs`**: Loads, modifies, and serializes `bashmenu.yml` (`BashMenuConfig`). Always preserves the top-level `CONFIG_HEADER` documentation comments via `save_config()`. Supports `settings.transition` (`"fade"`, `"curtain"`, `"dissolve"`, `"matrix"`, `"slide_left"`, `"slide_right"`, `"blinds"`, `"iris"`, `"wipe_down"`, `"instant"`, `"none"`), `settings.modal_animation` (`"zoom"`, `"none"`), and `settings.framebuffer` (`"auto"`, `"image"`, `"true"`, `"false"`).
 - **`menu.rs`**: Custom Serde deserializer mapping list-of-maps menu schemas into strongly-typed `MenuItem` vectors while retaining label-as-key YAML syntax. Supports nested submenus, commands, scripts, file editors, notebooks, toast popups, and confirmation dialogs. Provides `MenuItem::transition_enabled()` to allow individual items to opt out via `transition: false`.
 - **`theme.rs`**: Multi-tier theme models supporting 256 colors, TrueColor RGB hex, 16-color ANSI fallbacks, marquee configuration, CP437 ASCII translations, and custom box-drawing borders.
 - **`shortcuts.rs`**: Parses and serializes `shortcuts.yml` (`ShortcutsConfig`, `ShortcutEntry`). Enforces key normalization (`normalize_key_spec`), chord validation, and header comment preservation (`SHORTCUTS_HEADER`).
@@ -51,9 +51,9 @@ bashmenu-rs/
   1. CP437 ASCII `{ascii:NNN}` lookup (0..=255).
   2. Adaptive `{nf:[char]:[nerd]:[emoji]}` glyph resolver based on `use_nerd_fonts`.
   3. Environment variables `{env:NAME}`.
-  4. Runtime builtins (`{home}`, `{bashmenu_dir}`, `{dev_dir}`, `{scripts_dir}`, `{notebooks_dir}`, `{cache_dir}`, `{shortcuts_file}`, `{shortcuts}`).
+  4. Runtime builtins (`{home}`, `{bashmenu_dir}`, `{dev_dir}`, `{dev}`, `{scripts_dir}`, `{notebooks_dir}`, `{cache_dir}`, `{shortcuts_file}`, `{shortcuts}`).
   5. Dot-notation configuration paths (`{user.<key>}`, `{settings.<key>}`, `{app.<key>}`).
-  6. Dynamic directives: `{command:<cmd>}` (cached stdout), `{param}` / `{prompt}` (interactive input), `{file_picker}` / `{dir_picker}`, and `{toast:SECS:"MSG"}`.
+  6. Dynamic directives: `{command:<cmd>}` / `{cmd:<cmd>}` (30s cached stdout), `{env}` / `{environment}` (environment overview modal), `{info:<path>}` (Markdown modal), `{param}` / `{prompt}` (interactive input), `{file_picker}` / `{dir_picker}`, and `{toast:SECS:"MSG"}`.
 - **Strict 4-Column Icon Slot Invariant**:
   - `format_icon_slot()` guarantees visual width `vis_w + pad_w = 4` across all emojis, Nerd Font glyphs, and double-width characters.
 
@@ -77,7 +77,7 @@ bashmenu-rs/
 - **Direct Linux Framebuffer Engine (`framebuffer.rs`)**:
   - Self-contained `/dev/fb0` hardware rendering using Linux `ioctl(FBIOGET_VSCREENINFO)` / `ioctl(FBIOGET_FSCREENINFO)` and `mmap` for direct TrueColor and 16-bit RGB video RAM blitting on minimal Linux VT consoles.
 - **Visual Screen Transitions (`transition.rs` & `terminal.rs`)**:
-  - Synchronized DEC Mode 2026 transitions (`TransitionEffect::Fade`, `TransitionEffect::Curtain`, `TransitionEffect::Instant`, `TransitionEffect::None`) executed via `draw_with_transition` and `draw_with_transition_out`. Occurs on application launch, menu page/submenu navigation, notebook changes, paging, modal dialogs, and application switches.
+  - Synchronized DEC Mode 2026 transitions (`TransitionEffect`: `Fade`, `Curtain`, `Dissolve`, `Matrix`, `SlideLeft`, `SlideRight`, `Blinds`, `Iris`, `WipeDown`, `Instant`, `None`) executed via `draw_with_transition` and `draw_with_transition_out`, plus modal zoom animations (`ModalAnimation`: `Zoom`, `None`) via `draw_modal_grow` and `draw_modal_shrink`. Occurs on application launch, menu page/submenu navigation, notebook changes, paging, modal dialogs, and application switches.
 - **Adaptive Color Depth Fallback (`style.rs`)**:
   - Native `ColorTier` detection (`Color8`, `Color16`, `Color256`, `TrueColor`) inspecting `BASHMENU_COLOR_TIER`, `COLORTERM`, and `TERM`. Automatically maps TrueColor/256 palettes down to ANSI 16 and standard 8 colors using Euclidean RGB distance calculations when running on minimal consoles (`TERM=linux`).
 
@@ -97,7 +97,7 @@ bashmenu-rs/
 - **`menuedit`**: Visual menu hierarchy tree editor with submenu dive/return, add/edit/delete/move actions, and type mutation.
 - **`shortcutedit` (`menuedit --shortcuts`)**: Split-screen keyboard shortcuts editor with chord capture (`KeyCaptureModal`), leader configuration, and execution mode selection.
 - **`themeedit`**: Visual theme & palette editor with split-screen live preview, 2D color/ASCII pickers, wallpaper background configuration modal with cursor inversion, and `<Ctrl+S>` direct disk save.
-- **`bashedit`**: Full-screen terminal text editor utilizing rope buffers, colocated `.<filename>.swp` swap files, crash recovery prompts, and universal clipboard support.
+- **`bashedit`**: Full-screen terminal text editor utilizing Unicode line buffers (`Vec<String>`) with a bounded 100-snapshot undo/redo stack, colocated `.<filename>.swp` swap files, crash recovery prompts, and universal clipboard support.
 - **`bmpager`**: Standalone native terminal pager with CommonMark markdown parsing, fenced code block framing, OSC 8 clickable hyperlinks, search navigation, and vim-like keybindings.
 - **`cheat`**: High-performance interactive CLI Markdown cheatsheet search engine and viewer with syntax highlighting and instant query filtering.
 - **`ymlcheck`**: Standalone YAML schema validator and linter for `bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, and `shortcuts.yml`.
