@@ -262,6 +262,8 @@ pub struct ResolvedThemeStyles {
     pub toast_error: Color,
     /// Scrollbar track and thumb styling
     pub scrollbar: Style,
+    /// Modal dialog drop-shadow style
+    pub shadow: Style,
     /// Active terminal color capability tier
     pub tier: ColorTier,
 }
@@ -303,6 +305,7 @@ impl Default for ResolvedThemeStyles {
             toast_warning: Color::Rgb(255, 184, 108),
             toast_error: Color::Rgb(255, 85, 85),
             scrollbar: Style::default().fg(Color::Cyan),
+            shadow: Style::default().fg(Color::DarkGray).bg(Color::Black),
             tier: ColorTier::TrueColor,
         }
     }
@@ -559,6 +562,11 @@ impl ResolvedThemeStyles {
             }
             if let Some(st) = parse_style_pair_with_tier(p.get("scrollbar"), tier) {
                 resolved.scrollbar = st;
+            }
+            if let Some(st) = parse_style_pair_with_tier(p.get("shadow"), tier) {
+                resolved.shadow = Style::default()
+                    .fg(st.fg.unwrap_or(Color::DarkGray))
+                    .bg(st.bg.unwrap_or(Color::Black));
             }
             if let Some(c) = p
                 .get("toast_info")

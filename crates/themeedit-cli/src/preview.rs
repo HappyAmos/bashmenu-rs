@@ -426,7 +426,7 @@ pub fn render_preview_pane(
 
             // Modal Drop Shadow over wallpaper
             let shadow_char = '░';
-            let shadow_style = Style::default().fg(Color::DarkGray).bg(Color::Black);
+            let shadow_style = preview_styles.shadow;
             let max_bound_x = right_area.x + right_area.width.saturating_sub(1);
             let max_bound_y = right_area.y + right_area.height.saturating_sub(1);
             // Right shadow (2 columns wide)

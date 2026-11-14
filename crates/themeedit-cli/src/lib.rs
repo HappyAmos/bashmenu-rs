@@ -392,6 +392,10 @@ impl ThemeEditorState {
                 label: "Scrollbar Color".to_string(),
                 kind: TokenKind::Color("scrollbar".to_string()),
             },
+            TokenItem {
+                label: "Shadow Color".to_string(),
+                kind: TokenKind::Color("shadow".to_string()),
+            },
             // Borders
             TokenItem {
                 label: "Horizontal Border".to_string(),
@@ -589,6 +593,13 @@ impl ThemeEditorState {
             "window_close_button".to_string(),
             serde_yml::Value::Sequence(vec![
                 serde_yml::Value::Number(203.into()),
+                serde_yml::Value::Number((-1).into()),
+            ]),
+        );
+        colors.insert(
+            "shadow".to_string(),
+            serde_yml::Value::Sequence(vec![
+                serde_yml::Value::Number(236.into()),
                 serde_yml::Value::Number((-1).into()),
             ]),
         );
@@ -1054,6 +1065,7 @@ impl ThemeEditorState {
             "footer" => styles.footer.fg.unwrap_or(Color::DarkGray),
             "window_close_button" => styles.window_close_button.fg.unwrap_or(Color::Red),
             "scrollbar" => styles.scrollbar.fg.unwrap_or(Color::Cyan),
+            "shadow" => styles.shadow.fg.unwrap_or(Color::DarkGray),
             "toast_info" => styles.toast_info,
             "toast_warning" => styles.toast_warning,
             "toast_error" => styles.toast_error,
@@ -1202,6 +1214,7 @@ impl ThemeEditorState {
                 .map(color_to_u8)
                 .unwrap_or(255),
             "scrollbar" => styles.scrollbar.fg.map(color_to_u8).unwrap_or(255),
+            "shadow" => styles.shadow.fg.map(color_to_u8).unwrap_or(236),
             "toast_info" => color_to_u8(styles.toast_info),
             "toast_warning" => color_to_u8(styles.toast_warning),
             "toast_error" => color_to_u8(styles.toast_error),
@@ -1659,6 +1672,7 @@ impl ThemeEditorState {
                                 && (key == "close_button" || key == "close_btn" || key == "close"))
                             || (k == "title" && key == "header")
                             || (k == "footer" && key == "bottom_bar")
+                            || (k == "shadow" && (key == "shadow_color" || key == "drop_shadow"))
                     }
                     TokenKind::Border(k) => {
                         (k == "top_tee" && key == "gutter_top_tee")
@@ -1915,6 +1929,24 @@ pub fn get_token_preview_spans(
                     right_area.x + right_area.width.saturating_sub(1),
                     right_area.x + right_area.width,
                 ));
+            }
+        }
+        TokenKind::Color(key) if key == "shadow" => {
+            let p_avail_h = right_area.height.saturating_sub(4);
+            let mod_w = (p_avail_w.saturating_sub(4)).clamp(32, 50);
+            let mod_h = 12_u16.min(p_avail_h);
+            let mod_x = p_inner_x + (p_avail_w.saturating_sub(mod_w)) / 2;
+            let mod_y = content_start_y + (p_avail_h.saturating_sub(mod_h)) / 2;
+            let max_x = right_area.x + right_area.width.saturating_sub(1);
+            let max_y = right_area.y + right_area.height.saturating_sub(1);
+            for y in (mod_y + 1)..(mod_y + mod_h + 1) {
+                if y < max_y && mod_x + mod_w < max_x {
+                    spans.push((y, mod_x + mod_w, (mod_x + mod_w + 2).min(max_x)));
+                }
+            }
+            let bottom_y = mod_y + mod_h;
+            if bottom_y < max_y && mod_x + 2 < max_x {
+                spans.push((bottom_y, mod_x + 2, (mod_x + mod_w + 2).min(max_x)));
             }
         }
         TokenKind::ToastChar => {

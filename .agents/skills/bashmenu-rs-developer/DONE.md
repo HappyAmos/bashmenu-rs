@@ -1058,3 +1058,12 @@
 - [x] Removed dead `find_rich_script()` and `is_executable()` lookup code from `crates/cheat-cli/src/render.rs`, leaving `bmpager --markdown` -> raw stdout fallback.
 - [x] Removed obsolete `rich.sh` / `rich` references from `install.sh`, `uninstall.sh`, and `scripts/install_basics.sh`.
 - [x] Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, and `shellcheck *.sh scripts/*.sh` all pass with exit code 0.
+
+## Add Shadow Color Configuration Option to Theme Editor
+- [x] Added `shadow: Style` to `ResolvedThemeStyles` in `crates/bashmenu-tui/src/style.rs` (resolving theme `shadow: [fg, bg]` tokens with `DarkGray` on `Black` fallbacks) and wired modal drop shadows in `crates/bashmenu-tui/src/modals/frame.rs` to use `styles.shadow`.
+- [x] Added `"shadow"` default entry to `Theme::monochrome()` in `crates/bashmenu-core/src/theme.rs` and `ThemeEditorState::create_default_theme()` in `crates/themeedit-cli/src/lib.rs`.
+- [x] Added `"Shadow Color"` (`TokenKind::Color("shadow")`) token entry, color getters, alias lookup (`shadow_color`, `drop_shadow`), and `get_token_preview_spans` drop-shadow spans in `crates/themeedit-cli/src/lib.rs`.
+- [x] Wired `PreviewMode::Modals` shadow rendering in `crates/themeedit-cli/src/preview.rs`, modal-tab auto-switch, `"Pick Shadow Color"` picker title, and shadow hit-testing in `crates/themeedit-cli/src/main.rs`.
+- [x] Added `test_themeedit_shadow_color_token_and_preview` and updated `test_derive_colors_from_wallpaper` in `crates/themeedit-cli/tests/themeedit_test.rs`.
+- [x] Documented the `shadow` theme element in `bashmenu.md` and `bashmenu.1`.
+- [x] Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, `shellcheck *.sh scripts/*.sh`, and `ymlcheck --themes bashmenu.themes` all pass with exit code 0.

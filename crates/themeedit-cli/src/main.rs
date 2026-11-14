@@ -989,6 +989,11 @@ fn main() -> Result<()> {
                                                     )
                                                 {
                                                     state.preview_mode = PreviewMode::Toast;
+                                                } else if matches!(
+                                                    &token.kind,
+                                                    TokenKind::Color(ref k) if k == "shadow"
+                                                ) {
+                                                    state.preview_mode = PreviewMode::Modals;
                                                 }
                                                 let spans = get_token_preview_spans(
                                                     &token,
@@ -1609,6 +1614,8 @@ fn open_selected_token_picker(state: &mut ThemeEditorState, active_modal: &mut A
                 "Pick Window Close Button Color"
             } else if key == "footer" {
                 "Pick Footer Color"
+            } else if key == "shadow" {
+                "Pick Shadow Color"
             } else {
                 "Pick Theme Color"
             };
@@ -1858,10 +1865,9 @@ fn hit_test_preview(
         }
         PreviewMode::Modals => {
             let p_avail_w = right_area.width.saturating_sub(4);
-            let p_avail_h = right_area.height.saturating_sub(2);
+            let p_avail_h = right_area.height.saturating_sub(4);
             let mod_w = (p_avail_w.saturating_sub(4)).clamp(32, 50);
             let mod_h = 12_u16.min(p_avail_h);
-            let p_inner_y = right_area.y + 1;
             let mod_x = p_inner_x + (p_avail_w.saturating_sub(mod_w)) / 2;
             let mod_y = p_inner_y + (p_avail_h.saturating_sub(mod_h)) / 2;
             let m_div_y = mod_y + mod_h.saturating_sub(3);
@@ -1943,6 +1949,24 @@ fn hit_test_preview(
                     return Some(("text", row, mod_x + 18, mod_x + mod_w - 2));
                 }
                 return Some(("text", row, mod_x + 2, mod_x + mod_w - 2));
+            }
+            let max_bound_x = right_area.x + right_area.width.saturating_sub(1);
+            let max_bound_y = right_area.y + right_area.height.saturating_sub(1);
+            let right_shadow_end = (mod_x + mod_w + 2).min(max_bound_x);
+            if col >= mod_x + mod_w
+                && col < right_shadow_end
+                && row > mod_y
+                && row < (mod_y + mod_h + 1).min(max_bound_y)
+            {
+                return Some(("shadow", row, mod_x + mod_w, right_shadow_end));
+            }
+            let bottom_shadow_end = (mod_x + mod_w + 2).min(max_bound_x);
+            if row == mod_y + mod_h
+                && row < max_bound_y
+                && col >= mod_x + 2
+                && col < bottom_shadow_end
+            {
+                return Some(("shadow", row, mod_x + 2, bottom_shadow_end));
             }
             Some((
                 "background",

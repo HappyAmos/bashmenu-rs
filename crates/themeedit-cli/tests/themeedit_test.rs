@@ -1092,6 +1092,7 @@ fn test_derive_colors_from_wallpaper() {
         "help_text",
         "gutter",
         "scrollbar",
+        "shadow",
         "toast_info",
         "toast_warning",
         "toast_error",
@@ -1126,6 +1127,7 @@ fn test_derive_colors_from_wallpaper() {
         "help_text",
         "gutter",
         "scrollbar",
+        "shadow",
         "toast_info",
         "toast_warning",
         "toast_error",
@@ -2051,4 +2053,100 @@ fn test_themeedit_root_frame_background_color_matches_theme() {
     assert_eq!(buf[(10, 10)].bg, Color::Indexed(52));
     assert_eq!(buf[(40, 12)].bg, Color::Indexed(52));
     assert_eq!(buf[(79, 23)].bg, Color::Indexed(52));
+}
+
+#[test]
+fn test_themeedit_shadow_color_token_and_preview() {
+    use bashmenu_tui::ResolvedThemeStyles;
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::style::Color;
+    use themeedit_cli::{
+        get_token_preview_spans, render_preview_pane, PreviewMode, TokenCategory, TokenKind,
+    };
+
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(fixture_path, Some("dracula".to_string()));
+
+    // 1. Verify "Shadow Color" token exists under Colors category
+    let shadow_tok = state
+        .tokens
+        .iter()
+        .find(|t| matches!(&t.kind, TokenKind::Color(k) if k == "shadow"))
+        .cloned()
+        .expect("Shadow Color token must exist");
+    assert_eq!(shadow_tok.label, "Shadow Color");
+    assert_eq!(shadow_tok.category(), TokenCategory::Colors);
+
+    // 2. Selection by key and fallback aliases
+    assert!(state.select_token_by_key("shadow"));
+    assert_eq!(
+        state.current_selected_token().map(|t| &t.kind),
+        Some(&TokenKind::Color("shadow".to_string()))
+    );
+    assert!(state.select_token_by_key("shadow_color"));
+    assert_eq!(
+        state.current_selected_token().map(|t| &t.kind),
+        Some(&TokenKind::Color("shadow".to_string()))
+    );
+    assert!(state.select_token_by_key("drop_shadow"));
+    assert_eq!(
+        state.current_selected_token().map(|t| &t.kind),
+        Some(&TokenKind::Color("shadow".to_string()))
+    );
+
+    // 3. Initial dracula shadow color resolves to 236
+    assert_eq!(state.get_color_token_color("shadow"), Color::Indexed(236));
+    assert_eq!(state.get_color_token_u8("shadow"), 236);
+    assert_eq!(state.get_token_value_display(&shadow_tok), "Color 236");
+
+    // 4. Updating shadow token propagates to display, ResolvedThemeStyles, and Modals preview
+    state.set_color_token("shadow", 240);
+    assert!(state.is_modified);
+    assert_eq!(state.get_color_token_u8("shadow"), 240);
+    assert_eq!(state.get_token_value_display(&shadow_tok), "Color 240");
+
+    let styles = ResolvedThemeStyles::from_theme(&state.current_theme, true);
+    assert_eq!(styles.shadow.fg, Some(Color::Indexed(240)));
+
+    let right_area = Rect::new(40, 2, 60, 24);
+    let mut buf = Buffer::empty(Rect::new(0, 0, 110, 30));
+    let mut compositor = None;
+    render_preview_pane(
+        right_area,
+        &mut buf,
+        PreviewMode::Modals,
+        &styles,
+        &mut compositor,
+    );
+
+    let mut shadow_cells = 0;
+    for y in right_area.y..right_area.bottom() {
+        for x in right_area.x..right_area.right() {
+            let cell = &buf[(x, y)];
+            if cell.symbol() == "░" {
+                shadow_cells += 1;
+                assert_eq!(
+                    cell.fg,
+                    Color::Indexed(240),
+                    "Rendered modal drop-shadow cell at ({}, {}) must use updated shadow color",
+                    x,
+                    y
+                );
+            }
+        }
+    }
+    assert!(
+        shadow_cells > 0,
+        "PreviewMode::Modals must render '░' drop-shadow cells"
+    );
+
+    // 5. Preview spans cover modal drop-shadow cells
+    let spans = get_token_preview_spans(&shadow_tok, right_area, PreviewMode::Modals, &styles);
+    assert!(!spans.is_empty(), "Shadow preview spans must not be empty");
+
+    // 6. Verify create_default_theme includes shadow
+    let def_theme = ThemeEditorState::create_default_theme();
+    let def_c256 = def_theme.colors_256.as_ref().unwrap();
+    assert!(def_c256.contains_key("shadow"));
 }

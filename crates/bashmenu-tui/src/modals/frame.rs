@@ -44,7 +44,7 @@ pub fn render_animated_modal_frame(
     let h = box_rect.height;
 
     let shadow_char = '░';
-    let shadow_style = Style::default().fg(Color::DarkGray).bg(Color::Black);
+    let shadow_style = styles.shadow;
 
     // 1. Right Shadow (2 columns wide, starts at start_y + 1)
     let right_shadow_x = start_x + w;
@@ -101,7 +101,7 @@ pub fn render_modal_frame(
     let start_y = area.y + (area.height.saturating_sub(h + 1)) / 2;
 
     let shadow_char = '░';
-    let shadow_style = Style::default().fg(Color::DarkGray).bg(Color::Black);
+    let shadow_style = styles.shadow;
 
     // 1. Right Shadow (2 columns wide, starts at start_y + 1)
     let right_shadow_x = start_x + w;

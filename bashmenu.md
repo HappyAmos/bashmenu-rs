@@ -619,6 +619,7 @@ Color themes configure the visual palette for the main menu, visual menu editor,
 | `button_cancel` | Modal dialog cancel action button color. |
 | `button_success` | Modal dialog success action button color. |
 | `scrollbar` | Scroll bar thumb (foreground) and track (background) colors. |
+| `shadow` | Modal dialog and popup window drop-shadow color. |
 | `whitespace` | Non-visible whitespace characters (spaces, tabs, newlines) display color in the text editor. |
 | `window_close_button` | Close 'x' button in window title bars and modal dialogs. |
 
