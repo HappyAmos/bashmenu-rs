@@ -11,3 +11,4 @@ title: Current Bashmenu Environment
 | bashmenu.themes | {bashmenu_themes} |
 | shortcuts.yml | {shortcuts_yml} |
 | cheat.yml | {cheat_yml} |
+| Config Dir | {bashmenu_dir} |

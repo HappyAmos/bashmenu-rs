@@ -104,7 +104,7 @@ fn test_input_modal_typing_and_submit() {
 
 #[test]
 fn test_message_modal_dismiss() {
-    let modal = MessageModal::new("Alert", "File saved successfully.");
+    let mut modal = MessageModal::new("Alert", "File saved successfully.");
     let styles = ResolvedThemeStyles::default();
     let area = Rect::new(0, 0, 80, 24);
 
@@ -2035,4 +2035,135 @@ fn test_message_modal_percentage_dimensions() {
     let (w, h) = modal.dialog_dimensions(area);
     assert_eq!(w, 80);
     assert_eq!(h, 24);
+}
+
+#[test]
+fn test_message_modal_scrollbar_and_keyboard_mouse_scrolling() {
+    let styles = ResolvedThemeStyles::default();
+    let area = Rect::new(0, 0, 80, 24);
+
+    // 1. Short MessageModal: fits inside window -> NO scrollbar
+    let short_modal = MessageModal::new("Short Info", "Line 1\nLine 2");
+    let mut buf_short = Buffer::empty(area);
+    let inner_short = short_modal.render(area, &styles, &mut buf_short);
+    let sb_x_short = inner_short.x + inner_short.width - 1;
+    assert_eq!(buf_short[(sb_x_short + 1, inner_short.y + 1)].symbol(), "│");
+    assert_ne!(
+        buf_short[(sb_x_short, inner_short.y + 1)].symbol(),
+        "▲",
+        "Short MessageModal should not render scrollbar arrow"
+    );
+
+    // 2. Overflowing MessageModal: 30 lines in 50% height window -> renders scrollbar
+    let long_body = (1..=30)
+        .map(|i| format!("Info line {:02}", i))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let mut modal = MessageModal::new("Long Info", &long_body).with_dimensions(Some(60), Some(50));
+    let mut buf = Buffer::empty(area);
+    let inner = modal.render(area, &styles, &mut buf);
+
+    let sb_x = inner.x + inner.width - 1;
+    let content_start_y = inner.y + 1;
+    let content_h = inner.height.saturating_sub(3);
+    let down_arrow_y = content_start_y + content_h - 1;
+
+    assert_eq!(
+        buf[(sb_x + 1, content_start_y)].symbol(),
+        "│",
+        "Right border must remain intact next to scrollbar"
+    );
+    assert_eq!(buf[(sb_x, content_start_y)].symbol(), "▲");
+    assert_eq!(buf[(sb_x, down_arrow_y)].symbol(), "▼");
+
+    let mut found_thumb = false;
+    let mut found_track = false;
+    for y in (content_start_y + 1)..down_arrow_y {
+        let sym = buf[(sb_x, y)].symbol();
+        if sym == "█" {
+            found_thumb = true;
+        } else if sym == "░" {
+            found_track = true;
+        }
+    }
+    assert!(found_thumb, "Scrollbar thumb '█' must be rendered");
+    assert!(found_track, "Scrollbar track '░' must be rendered");
+
+    let initial_view = format!("{:?}", buf);
+    assert!(initial_view.contains("Info line 01"));
+    assert!(!initial_view.contains("Info line 10"));
+
+    // 3. Keyboard scrolling updates scroll_offset without dismissing
+    assert!(!modal.handle_key(KeyCode::Down));
+    assert_eq!(modal.scroll_offset, 1);
+
+    let mut buf_down = Buffer::empty(area);
+    modal.render(area, &styles, &mut buf_down);
+    let down_view = format!("{:?}", buf_down);
+    assert!(!down_view.contains("Info line 01"));
+    assert!(down_view.contains("Info line 02"));
+
+    assert!(!modal.handle_key(KeyCode::Up));
+    assert_eq!(modal.scroll_offset, 0);
+
+    assert!(!modal.handle_key(KeyCode::PageDown));
+    assert_eq!(modal.scroll_offset, content_h as usize);
+
+    assert!(!modal.handle_key(KeyCode::PageUp));
+    assert_eq!(modal.scroll_offset, 0);
+
+    assert!(!modal.handle_key(KeyCode::End));
+    let expected_max_scroll = 30 - content_h as usize;
+    assert_eq!(modal.scroll_offset, expected_max_scroll);
+
+    let mut buf_end = Buffer::empty(area);
+    modal.render(area, &styles, &mut buf_end);
+    let end_view = format!("{:?}", buf_end);
+    assert!(end_view.contains("Info line 30"));
+
+    assert!(!modal.handle_key(KeyCode::Home));
+    assert_eq!(modal.scroll_offset, 0);
+
+    // 4. Mouse wheel and scrollbar clicks update scroll_offset without dismissing
+    let wheel_down = MouseEvent {
+        kind: MouseEventKind::ScrollDown,
+        column: inner.x + 2,
+        row: content_start_y,
+        modifiers: KeyModifiers::NONE,
+    };
+    assert!(!modal.handle_mouse(wheel_down, area));
+    assert_eq!(modal.scroll_offset, 2);
+
+    let wheel_up = MouseEvent {
+        kind: MouseEventKind::ScrollUp,
+        column: inner.x + 2,
+        row: content_start_y,
+        modifiers: KeyModifiers::NONE,
+    };
+    assert!(!modal.handle_mouse(wheel_up, area));
+    assert_eq!(modal.scroll_offset, 0);
+
+    let click = |col: u16, row: u16| MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: col,
+        row,
+        modifiers: KeyModifiers::NONE,
+    };
+
+    assert!(!modal.handle_mouse(click(sb_x, down_arrow_y), area));
+    assert_eq!(modal.scroll_offset, 1);
+
+    assert!(!modal.handle_mouse(click(sb_x, content_start_y), area));
+    assert_eq!(modal.scroll_offset, 0);
+
+    // Click bottom of scrollbar track jumps to max scroll
+    assert!(!modal.handle_mouse(click(sb_x, down_arrow_y - 1), area));
+    assert_eq!(modal.scroll_offset, expected_max_scroll);
+
+    // 5. Clicking [ OK ] or [X] still dismisses the modal
+    assert!(modal.handle_mouse(
+        click(inner.x + inner.width / 2, inner.y + inner.height - 2),
+        area
+    ));
+    assert!(modal.handle_mouse(click(inner.x + inner.width - 2, inner.y - 1), area));
 }

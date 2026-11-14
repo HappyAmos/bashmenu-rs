@@ -1037,3 +1037,10 @@
 - [x] Fixed `clippy::needless_range_loop` in `crates/bashedit-cli/src/lib.rs` (`cut.extend(...)`).
 - [x] Verified GitHub Actions `Rust Application` workflow run `43338151588` completed with `success` (Formatting, Workspace Check, Tests, Clippy, and Shellcheck all passed).
 
+## Add Scrollbar and Keyboard/Mouse Scrolling to `{info}` (`MessageModal`) Modals
+- [x] Added `scroll_offset` and viewport tracking (`last_max_scroll`, `last_content_h`) to `MessageModal` in `crates/bashmenu-tui/src/modals/message.rs`.
+- [x] Implemented vertical scrollbar rendering (`▲`, `█`, `░`, `▼`) when rendered message lines exceed `content_h`, plus keyboard (`Up`/`Down`/`j`/`k`/`PageUp`/`PageDown`/`Home`/`End`) and mouse (scroll wheel, scrollbar arrow/track clicks, and left-drag) scrolling in `MessageModal::handle_key` and `MessageModal::handle_mouse`.
+- [x] Added `test_message_modal_scrollbar_and_keyboard_mouse_scrolling` in `crates/bashmenu-tui/tests/modals_test.rs` and updated `test_message_modal_dismiss`.
+- [x] Documented scrollbar and scrolling controls for `{info:<path>}` / `MessageModal` in `bashmenu.md`, `bashmenu.1`, and `.agents/rules/invariants.md`.
+- [x] Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, and `shellcheck *.sh scripts/*.sh` all pass with zero warnings.
+

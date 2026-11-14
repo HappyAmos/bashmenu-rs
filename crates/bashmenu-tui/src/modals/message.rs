@@ -7,6 +7,8 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 
+use std::cell::Cell;
+
 /// Simple message / alert modal dialog
 #[derive(Debug, Clone)]
 pub struct MessageModal {
@@ -18,6 +20,12 @@ pub struct MessageModal {
     pub width_percent: Option<u16>,
     /// Optional window height as percentage of terminal height (1..=100)
     pub height_percent: Option<u16>,
+    /// Vertical scroll offset in lines
+    pub scroll_offset: usize,
+    /// Maximum scroll offset recorded during the last layout/render pass
+    last_max_scroll: Cell<Option<usize>>,
+    /// Content viewport height recorded during the last layout/render pass
+    last_content_h: Cell<Option<usize>>,
 }
 
 impl MessageModal {
@@ -28,6 +36,9 @@ impl MessageModal {
             message: message.into(),
             width_percent: None,
             height_percent: None,
+            scroll_offset: 0,
+            last_max_scroll: Cell::new(None),
+            last_content_h: Cell::new(None),
         }
     }
 
@@ -43,16 +54,140 @@ impl MessageModal {
     }
 
     /// Handles keyboard input. Returns `true` when dismissed.
-    pub fn handle_key(&self, code: KeyCode) -> bool {
-        matches!(
-            code,
-            KeyCode::Enter | KeyCode::Esc | KeyCode::Char(' ') | KeyCode::Char('q')
-        )
+    pub fn handle_key(&mut self, code: KeyCode) -> bool {
+        match code {
+            KeyCode::Enter | KeyCode::Esc | KeyCode::Char(' ') | KeyCode::Char('q') => true,
+            KeyCode::Up | KeyCode::Char('k') => {
+                if let Some(max_s) = self.last_max_scroll.get() {
+                    self.scroll_offset = self.scroll_offset.min(max_s);
+                }
+                self.scroll_offset = self.scroll_offset.saturating_sub(1);
+                false
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                if let Some(max_s) = self.last_max_scroll.get() {
+                    self.scroll_offset = (self.scroll_offset.min(max_s) + 1).min(max_s);
+                } else {
+                    self.scroll_offset = self.scroll_offset.saturating_add(1);
+                }
+                false
+            }
+            KeyCode::PageUp => {
+                let step = self.last_content_h.get().unwrap_or(10).max(1);
+                if let Some(max_s) = self.last_max_scroll.get() {
+                    self.scroll_offset = self.scroll_offset.min(max_s);
+                }
+                self.scroll_offset = self.scroll_offset.saturating_sub(step);
+                false
+            }
+            KeyCode::PageDown => {
+                let step = self.last_content_h.get().unwrap_or(10).max(1);
+                if let Some(max_s) = self.last_max_scroll.get() {
+                    self.scroll_offset = self
+                        .scroll_offset
+                        .min(max_s)
+                        .saturating_add(step)
+                        .min(max_s);
+                } else {
+                    self.scroll_offset = self.scroll_offset.saturating_add(step);
+                }
+                false
+            }
+            KeyCode::Home => {
+                self.scroll_offset = 0;
+                false
+            }
+            KeyCode::End => {
+                self.scroll_offset = self.last_max_scroll.get().unwrap_or(usize::MAX);
+                false
+            }
+            _ => false,
+        }
     }
 
-    /// Handles immediate mouse click. Returns `true` when dismissed.
-    pub fn handle_mouse(&self, mouse: MouseEvent, _inner_area: Rect) -> bool {
-        mouse.kind == MouseEventKind::Down(MouseButton::Left)
+    /// Handles mouse scroll and scrollbar clicks. Returns `true` when dismissed.
+    pub fn handle_mouse(&mut self, mouse: MouseEvent, area: Rect) -> bool {
+        let (dialog_w, dialog_h) = self.dialog_dimensions(area);
+        let inner = super::frame::compute_modal_inner(area, dialog_w, dialog_h);
+        let content_h = inner.height.saturating_sub(3) as usize;
+        let avail_inner_w = inner.width.saturating_sub(4) as usize;
+        let total_lines = parse_markdown_message_lines(&self.message, avail_inner_w, None).len();
+        let max_scroll = total_lines.saturating_sub(content_h);
+        self.last_max_scroll.set(Some(max_scroll));
+        self.last_content_h.set(Some(content_h));
+
+        match mouse.kind {
+            MouseEventKind::ScrollUp => {
+                self.scroll_offset = self.scroll_offset.min(max_scroll).saturating_sub(2);
+                false
+            }
+            MouseEventKind::ScrollDown => {
+                self.scroll_offset = (self.scroll_offset.min(max_scroll) + 2).min(max_scroll);
+                false
+            }
+            MouseEventKind::Down(MouseButton::Left) => {
+                if total_lines > content_h && content_h > 0 && inner.width >= 4 {
+                    let sb_x = inner.x + inner.width.saturating_sub(1);
+                    let content_start_y = inner.y + 1;
+                    let content_end_y = content_start_y + content_h as u16;
+                    if mouse.column == sb_x
+                        && mouse.row >= content_start_y
+                        && mouse.row < content_end_y
+                    {
+                        if content_h >= 3 {
+                            if mouse.row == content_start_y {
+                                self.scroll_offset =
+                                    self.scroll_offset.min(max_scroll).saturating_sub(1);
+                            } else if mouse.row == content_end_y - 1 {
+                                self.scroll_offset =
+                                    (self.scroll_offset.min(max_scroll) + 1).min(max_scroll);
+                            } else if max_scroll > 0 {
+                                let track_len = content_h - 2;
+                                let rel_y = (mouse.row - (content_start_y + 1)) as usize;
+                                self.scroll_offset = if track_len <= 1 {
+                                    max_scroll
+                                } else {
+                                    (rel_y * max_scroll) / (track_len - 1)
+                                }
+                                .min(max_scroll);
+                            }
+                        } else if content_h == 2 {
+                            if mouse.row == content_start_y {
+                                self.scroll_offset =
+                                    self.scroll_offset.min(max_scroll).saturating_sub(1);
+                            } else {
+                                self.scroll_offset =
+                                    (self.scroll_offset.min(max_scroll) + 1).min(max_scroll);
+                            }
+                        }
+                        return false;
+                    }
+                }
+                true
+            }
+            MouseEventKind::Drag(MouseButton::Left) => {
+                if total_lines > content_h && content_h >= 3 && inner.width >= 4 && max_scroll > 0 {
+                    let sb_x = inner.x + inner.width.saturating_sub(1);
+                    let content_start_y = inner.y + 1;
+                    let content_end_y = content_start_y + content_h as u16;
+                    if mouse.column == sb_x
+                        && mouse.row > content_start_y
+                        && mouse.row < content_end_y - 1
+                    {
+                        let track_len = content_h - 2;
+                        let rel_y = (mouse.row - (content_start_y + 1)) as usize;
+                        self.scroll_offset = if track_len <= 1 {
+                            max_scroll
+                        } else {
+                            (rel_y * max_scroll) / (track_len - 1)
+                        }
+                        .min(max_scroll);
+                    }
+                }
+                false
+            }
+            _ => false,
+        }
     }
 
     /// Returns the target dialog dimensions for this modal.
@@ -100,17 +235,75 @@ impl MessageModal {
 
         let avail_inner_w = inner.width.saturating_sub(4) as usize;
         let lines = parse_markdown_message_lines(&self.message, avail_inner_w, Some(styles));
+        let content_h = inner.height.saturating_sub(3) as usize;
+        let total_lines = lines.len();
+        let max_scroll = total_lines.saturating_sub(content_h);
+        let eff_scroll = self.scroll_offset.min(max_scroll);
 
-        // 1. Render message (wrapped and clamped to visible inner area)
-        for (i, line) in lines.iter().enumerate() {
+        self.last_max_scroll.set(Some(max_scroll));
+        self.last_content_h.set(Some(content_h));
+
+        // 1. Render message (wrapped, scrolled, and clamped to visible inner area)
+        let avail_line_w = inner.width.saturating_sub(4);
+        for (i, line) in lines.iter().skip(eff_scroll).take(content_h).enumerate() {
             let y = inner.y + 1 + i as u16;
-            if y < inner.y + inner.height.saturating_sub(2) {
-                let avail_line_w = inner.width.saturating_sub(4);
-                buf.set_line(inner.x + 2, y, line, avail_line_w);
+            buf.set_line(inner.x + 2, y, line, avail_line_w);
+        }
+
+        // 2. Render scrollbar if message exceeds visible window height
+        if total_lines > content_h && content_h > 0 && inner.width >= 4 {
+            let sb_x = inner.x + inner.width.saturating_sub(1);
+            let content_start_y = inner.y + 1;
+            let sb_fg = styles
+                .scrollbar
+                .fg
+                .unwrap_or(styles.accent.fg.unwrap_or(Color::Cyan));
+            let sb_bg = styles.background;
+            let arrow_style = Style::default()
+                .fg(sb_fg)
+                .bg(sb_bg)
+                .add_modifier(Modifier::BOLD);
+            let thumb_style = Style::default().fg(sb_fg).bg(sb_bg);
+            let track_style = Style::default().fg(Color::DarkGray).bg(sb_bg);
+
+            if content_h >= 3 {
+                buf.set_string(sb_x, content_start_y, "▲", arrow_style);
+                buf.set_string(
+                    sb_x,
+                    content_start_y + content_h as u16 - 1,
+                    "▼",
+                    arrow_style,
+                );
+
+                let track_len = content_h - 2;
+                let thumb_size = ((track_len as f64 * content_h as f64) / total_lines as f64)
+                    .round()
+                    .clamp(1.0, track_len as f64) as usize;
+                let available_track = track_len.saturating_sub(thumb_size);
+                let scroll_ratio = if max_scroll > 0 {
+                    eff_scroll as f64 / max_scroll as f64
+                } else {
+                    0.0
+                };
+                let thumb_start = (scroll_ratio * available_track as f64).round() as usize;
+
+                for t_idx in 0..track_len {
+                    let y = content_start_y + 1 + t_idx as u16;
+                    if t_idx >= thumb_start && t_idx < thumb_start + thumb_size {
+                        buf.set_string(sb_x, y, "█", thumb_style);
+                    } else {
+                        buf.set_string(sb_x, y, "░", track_style);
+                    }
+                }
+            } else if content_h == 2 {
+                buf.set_string(sb_x, content_start_y, "▲", arrow_style);
+                buf.set_string(sb_x, content_start_y + 1, "▼", arrow_style);
+            } else if content_h == 1 {
+                buf.set_string(sb_x, content_start_y, "█", thumb_style);
             }
         }
 
-        // 2. Render [ OK ] button
+        // 3. Render [ OK ] button
         let btn_y = inner.y + inner.height.saturating_sub(2);
         let center_x = inner.x + inner.width / 2;
         let ok_x = center_x.saturating_sub(4).max(inner.x + 1);
