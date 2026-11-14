@@ -114,10 +114,6 @@ done
 ln -sf "$BIN_DIR/bashmenu" "$BIN_DIR/bm"
 echo "  [+] Created shortcut 'bm' -> $BIN_DIR/bm"
 
-# Install companion tool shortcuts
-ln -sf "$SCRIPT_DIR/scripts/rich.sh" "$BIN_DIR/rich"
-echo "  [+] Created shortcut 'rich' -> $BIN_DIR/rich"
-
 # Initialize user config directory if missing
 CONFIG_DIR="$HOME/.config/bashmenu"
 mkdir -p "$CONFIG_DIR"

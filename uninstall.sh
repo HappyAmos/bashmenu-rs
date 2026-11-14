@@ -48,7 +48,7 @@ echo "              Uninstalling BashMenu-RS                             "
 echo "==================================================================="
 
 echo "==> Removing binaries from $BIN_DIR..."
-for bin in bashmenu bm ymlcheck menuedit shortcutedit themeedit bashedit bmpager cheat rich; do
+for bin in bashmenu bm ymlcheck menuedit shortcutedit themeedit bashedit bmpager cheat; do
     target="$BIN_DIR/$bin"
     if [ -f "$target" ] || [ -L "$target" ]; then
         rm -f "$target"

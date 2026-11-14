@@ -123,7 +123,7 @@ get_solution_for_pkg() {
             echo "  - Issue: 'glow' is not in default repositories for many Linux distributions."
             echo "  - Solutions:"
             echo "      1. Run custom script: scripts/install_glow.sh"
-            echo "      2. Use built-in markdown viewer: scripts/rich.sh <file> | scripts/pager.sh"
+            echo "      2. Use built-in markdown viewer: bmpager --markdown <file>"
             echo "      3. Install using Homebrew: brew install glow"
             ;;
         gum)

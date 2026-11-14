@@ -103,13 +103,13 @@
   - `bashedit` (Swap-safe text editor)
   - `bmpager` (Native terminal pager with markdown support)
   - `cheat` (Interactive cheatsheet browser)
-- **Convenience Symlinks:** Must link `bm` -> `bashmenu` and `rich` -> `rich.sh`.
+- **Convenience Symlinks:** Must link `bm` -> `bashmenu`.
 - **Manual Page Installation:** Must install `bashmenu.1` to `$MAN_DIR` (`$HOME/.local/share/man/man1` or system equivalent).
 - **Configuration Seeding:** Must copy initial default configuration files (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `cheat.yml`) from project root into `~/.config/bashmenu/` without overwriting existing user files.
 - **Output Banner:** The summary of installed commands displayed to the user must explicitly list `cheat` along with all other tools.
 
 ### Uninstaller (`uninstall.sh`)
-- **Complete Binary Cleanup:** Must remove all installed binaries and symlinks (`bashmenu`, `bm`, `ymlcheck`, `menuedit`, `shortcutedit`, `themeedit`, `bashedit`, `bmpager`, `cheat`, `rich`) from `$BIN_DIR`.
+- **Complete Binary Cleanup:** Must remove all installed binaries and symlinks (`bashmenu`, `bm`, `ymlcheck`, `menuedit`, `shortcutedit`, `themeedit`, `bashedit`, `bmpager`, `cheat`) from `$BIN_DIR`.
 - **Manual Page Cleanup:** Must remove installed manual page `bashmenu.1` from `$MAN_DIR`.
 - **Settings Preservation:**
   - Interactive mode must prompt the user whether to keep their settings and notebooks in `~/.config/bashmenu` with a default of **Yes (Keep)** (`[Y/n]`).

@@ -297,7 +297,7 @@ The `cheat` standalone CLI tool searches, lists, and displays Markdown cheatshee
 | `-d`, `--directory` | Print the configured cheatsheets directory path. |
 | `-h`, `--help` | Print help information. |
 
-Configuration is stored in `~/.config/bashmenu/cheat.yml` (pointing to `dir: ~/cheat`, overridable via `CHEAT_CONFIG`). Cheatsheets are rendered via `rich.sh` when available, falling back to `bmpager --markdown` and then raw standard output.
+Configuration is stored in `~/.config/bashmenu/cheat.yml` (pointing to `dir: ~/cheat`, overridable via `CHEAT_CONFIG`). Cheatsheets are rendered via `bmpager --markdown` with raw standard output fallback.
 
 ### 3.7 Custom Keyboard Shortcuts Editor (`shortcutedit` / `menuedit --shortcuts`)
 `shortcutedit` (also accessible via `menuedit --shortcuts`, `shortcutedit [-f|--file <FILE>] [--local]`, or `F9` / `<leader> s` from the main menu) is a split-screen visual editor for `shortcuts.yml` (`{bashmenu_dir}/shortcuts.yml`).

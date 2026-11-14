@@ -313,12 +313,12 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
 - **Installer Lifecycle & Invariants (`install.sh`):**
   - Compiles release binaries across workspace via `cargo build --release --workspace`.
   - Installs all workspace binaries (`bashmenu`, `ymlcheck`, `menuedit`, `shortcutedit`, `themeedit`, `bashedit`, `bmpager`, `cheat`) into `$BIN_DIR`.
-  - Configures convenience symlinks (`bm` -> `bashmenu`, `rich` -> `rich.sh`).
+  - Configures convenience symlinks (`bm` -> `bashmenu`).
   - Installs `bashmenu.1` manual page into `$MAN_DIR` (`$HOME/.local/share/man/man1`).
   - Initializes user config (`~/.config/bashmenu`) without overwriting existing files.
   - Verification banner must list all installed commands, including `cheat`.
 - **Uninstaller Lifecycle & Invariants (`uninstall.sh`):**
-  - Removes all binaries and symlinks from `$BIN_DIR` (`bashmenu`, `bm`, `ymlcheck`, `menuedit`, `shortcutedit`, `themeedit`, `bashedit`, `bmpager`, `cheat`, `rich`).
+  - Removes all binaries and symlinks from `$BIN_DIR` (`bashmenu`, `bm`, `ymlcheck`, `menuedit`, `shortcutedit`, `themeedit`, `bashedit`, `bmpager`, `cheat`).
   - Removes installed manual page `bashmenu.1` from `$MAN_DIR` (`~/.local/share/man/man1`).
   - Preserves user settings and notebooks by default, prompting user (`[Y/n]`).
   - Supports `--keep-settings` / `--keep-config` (`-k`), `--remove-settings`, and `-y`/`--yes`.

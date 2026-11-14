@@ -1048,7 +1048,13 @@
 ## Documentation 1:1 Codebase Parity Audit & Sync
 - [x] Audited source code across all suite crates (`bashmenu-core`, `bashmenu-tui`, `bashmenu-cli`, `menuedit-cli`, `themeedit-cli`, `bashedit-cli`, `bmpager-cli`, `cheat-cli`, `ymlcheck-cli`) against all documentation and built-in help constants.
 - [x] Updated `crates/bashmenu-core/src/constants.rs` (`PLACEHOLDER_HELP_TEXT` with `{env:<var_name>}` and `{cmd:<cmd>}` 30s cache note; `BASHEDIT_HELP_TEXT` removing non-existent `^Shift+S` and adding `Ctrl+Shift+Tab`).
-- [x] Fixed `README.md` companion CLI examples (`ymlcheck` mutually exclusive mode invocations; `menuedit -f`, `shortcutedit -f`, `themeedit -t` flags), `assets/cheat.md` renderer fallback chain (`rich.sh` -> `bmpager --markdown` -> stdout), and `docs/ARCHITECTURE.md` (`Vec<String>` line buffers, all 11 transitions + `ModalAnimation`, `framebuffer: "image"`, `{dev}`, `{cmd:...}`, `{env}`, `{info:<path>}`).
+- [x] Fixed `README.md` companion CLI examples (`ymlcheck` mutually exclusive mode invocations; `menuedit -f`, `shortcutedit -f`, `themeedit -t` flags), `assets/cheat.md` renderer fallback chain (`bmpager --markdown` -> stdout), and `docs/ARCHITECTURE.md` (`Vec<String>` line buffers, all 11 transitions + `ModalAnimation`, `framebuffer: "image"`, `{dev}`, `{cmd:...}`, `{env}`, `{info:<path>}`).
 - [x] Synchronized `.agents/skills/bashmenu-rs-developer/SKILL.md` (`EditorBuffer`, actual `scripts/` and `templates/`, accurate `themeedit` bindings, BBCode tags, and `ymlcheck --shortcuts` / `--yaml`).
 - [x] Updated `bashmenu.md` and `bashmenu.1` for 1:1 parity across `bashmenu`, `menuedit`, `bashedit`, `themeedit`, `bmpager`, `cheat`, `shortcutedit`, `ymlcheck`, `bashmenu.yml` (plugin `sleep` in seconds), `bashmenu.mnu` (`items:` schema), Notebook/NoteViewer/NoteEditor actions, placeholders, and BBCode tags (removing unimplemented `[table]`/`[list]`/theme-token colors/backtick suppression and misplaced theme notes in Section 3.7).
+- [x] Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, and `shellcheck *.sh scripts/*.sh` all pass with exit code 0.
+
+## Remove Obsolete rich.sh References and Dead Lookup Code
+- [x] Removed obsolete `rich.sh` references from `assets/cheat.md`, `bashmenu.md`, `bashmenu.1`, `.agents/rules/invariants.md`, and `.agents/skills/bashmenu-rs-developer/SKILL.md` (and updated the prior `DONE.md` entry line 1051).
+- [x] Removed dead `find_rich_script()` and `is_executable()` lookup code from `crates/cheat-cli/src/render.rs`, leaving `bmpager --markdown` -> raw stdout fallback.
+- [x] Removed obsolete `rich.sh` / `rich` references from `install.sh`, `uninstall.sh`, and `scripts/install_basics.sh`.
 - [x] Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, and `shellcheck *.sh scripts/*.sh` all pass with exit code 0.
