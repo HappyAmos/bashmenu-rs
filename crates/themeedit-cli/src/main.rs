@@ -5,10 +5,10 @@
 //! Main Menu, Text Editor, Popup Windows, and Visual Menu Editor.
 
 use anyhow::Result;
-use bashmenu_core::{ToastNotification, ToastSeverity, ToastStyle};
+use bashmenu_core::{run_glyphs_search, ToastNotification, ToastSeverity, ToastStyle};
 use bashmenu_tui::{
     install_panic_hook, AsciiGridModal, BackgroundConfigAction, BackgroundConfigModal,
-    BackgroundFocus, ColorPickerModal, ConfirmModal, FilePickerModal, InputModal,
+    BackgroundFocus, ColorPickerModal, ConfirmModal, FilePickerModal, HelpModal, InputModal,
     ResolvedThemeStyles, TerminalGuard, ToastRack, WallpaperCompositor,
 };
 use clap::Parser;
@@ -87,6 +87,10 @@ enum ActiveModal {
     BackgroundConfig(BackgroundConfigModal),
     /// Wallpaper file browser launched from background configuration modal.
     BackgroundBrowse(Box<BackgroundConfigModal>, FilePickerModal),
+    /// Search modal for glyphs / nerd fonts.
+    GlyphSearch(InputModal),
+    /// Help / search results modal dialog.
+    Help(HelpModal),
 }
 
 /// Visual flash highlight entry: (start time instant, list of
@@ -224,6 +228,7 @@ fn main() -> Result<()> {
                     "[F8] Del",
                     "[Ctrl+S] Save",
                     "[Ctrl+A] Save As",
+                    "[Ctrl+P] Glyphs",
                     "[TAB] View",
                     "[q] Exit",
                 ];
@@ -486,6 +491,12 @@ fn main() -> Result<()> {
                     ActiveModal::BackgroundBrowse(_, modal) => {
                         modal.render(area, &preview_styles, buf);
                     }
+                    ActiveModal::GlyphSearch(modal) => {
+                        modal.render(area, &preview_styles, buf);
+                    }
+                    ActiveModal::Help(modal) => {
+                        modal.render(area, &preview_styles, buf);
+                    }
                     ActiveModal::None => {}
                 }
 
@@ -525,6 +536,7 @@ fn main() -> Result<()> {
             "[F8] Del",
             "[Ctrl+S] Save",
             "[Ctrl+A] Save As",
+            "[Ctrl+P] Glyphs",
             "[TAB] View",
             "[R-Click] Dropper",
             "[q] Exit",
@@ -613,6 +625,16 @@ fn main() -> Result<()> {
                 },
                 ActiveModal::IndicatorInput(modal) => match ev {
                     Event::Key(k) => {
+                        if k.modifiers.contains(KeyModifiers::CONTROL)
+                            && (k.code == KeyCode::Char('p') || k.code == KeyCode::Char('P'))
+                        {
+                            active_modal = ActiveModal::GlyphSearch(InputModal::new(
+                                "Search Nerd Font & Emoji",
+                                "Enter glyph search term (e.g. arrow, folder, python):",
+                                "",
+                            ));
+                            continue;
+                        }
                         if let Some(res) = modal.handle_key_with_modifiers(k.code, k.modifiers) {
                             if let Some(val) = res {
                                 state.set_indicator(val);
@@ -650,6 +672,16 @@ fn main() -> Result<()> {
                 },
                 ActiveModal::DefaultIconInput(modal) => match ev {
                     Event::Key(k) => {
+                        if k.modifiers.contains(KeyModifiers::CONTROL)
+                            && (k.code == KeyCode::Char('p') || k.code == KeyCode::Char('P'))
+                        {
+                            active_modal = ActiveModal::GlyphSearch(InputModal::new(
+                                "Search Nerd Font & Emoji",
+                                "Enter glyph search term (e.g. arrow, folder, python):",
+                                "",
+                            ));
+                            continue;
+                        }
                         if let Some(res) = modal.handle_key_with_modifiers(k.code, k.modifiers) {
                             if let Some(val) = res {
                                 state.set_default_icon(val);
@@ -1025,6 +1057,44 @@ fn main() -> Result<()> {
                         active_modal = ActiveModal::BackgroundConfig(*bg_modal.clone());
                     }
                 }
+                ActiveModal::GlyphSearch(modal) => match ev {
+                    Event::Key(k) => {
+                        if let Some(res) = modal.handle_key_with_modifiers(k.code, k.modifiers) {
+                            if let Some(term) = res {
+                                let output_text = run_glyphs_search(&term);
+                                active_modal = ActiveModal::Help(HelpModal::new(
+                                    format!("Nerd Font & Emoji: {}", term),
+                                    &output_text,
+                                ));
+                            } else {
+                                active_modal = ActiveModal::None;
+                            }
+                        }
+                    }
+                    Event::Mouse(m) => {
+                        if let Some(res) = modal.handle_mouse(m, area) {
+                            if let Some(term) = res {
+                                let output_text = run_glyphs_search(&term);
+                                active_modal = ActiveModal::Help(HelpModal::new(
+                                    format!("Nerd Font & Emoji: {}", term),
+                                    &output_text,
+                                ));
+                            } else {
+                                active_modal = ActiveModal::None;
+                            }
+                        }
+                    }
+                    _ => {}
+                },
+                ActiveModal::Help(modal) => match ev {
+                    Event::Key(k) if modal.handle_key(k.code) => {
+                        active_modal = ActiveModal::None;
+                    }
+                    Event::Mouse(m) if modal.handle_mouse(m, area) => {
+                        active_modal = ActiveModal::None;
+                    }
+                    _ => {}
+                },
                 ActiveModal::None => {
                     let bot_y = area.y + area.height - 1;
                     let footer_y = bot_y.saturating_sub(1);
@@ -1244,14 +1314,23 @@ fn main() -> Result<()> {
                                         .iter()
                                         .position(|&(s, e)| rel_col >= s && rel_col < e)
                                     {
-                                        if idx == 0 {
-                                            // [F5] Derive
-                                            trigger_derive_colors(
-                                                &state,
-                                                &mut active_modal,
-                                                &mut toast_rack,
-                                            );
-                                            continue;
+                                        if let Some(item_str) = bottom_items.get(idx) {
+                                            if item_str.contains("Derive") {
+                                                // [F5] Derive
+                                                trigger_derive_colors(
+                                                    &state,
+                                                    &mut active_modal,
+                                                    &mut toast_rack,
+                                                );
+                                                continue;
+                                            } else if item_str.contains("Glyphs") {
+                                                active_modal = ActiveModal::GlyphSearch(InputModal::new(
+                                                    "Search Nerd Font & Emoji",
+                                                    "Enter glyph search term (e.g. arrow, folder, python):",
+                                                    "",
+                                                ));
+                                                continue;
+                                            }
                                         }
                                     }
                                 }
@@ -1439,6 +1518,15 @@ fn main() -> Result<()> {
                                             severity: ToastSeverity::Information,
                                             timeout_secs: 1.5,
                                         });
+                                        continue;
+                                    }
+                                    KeyCode::Char('p') | KeyCode::Char('P') => {
+                                        // Ctrl+P opens Nerd Font / Emoji glyph search tool
+                                        active_modal = ActiveModal::GlyphSearch(InputModal::new(
+                                            "Search Nerd Font & Emoji",
+                                            "Enter glyph search term (e.g. arrow, folder, python):",
+                                            "",
+                                        ));
                                         continue;
                                     }
                                     _ => {}

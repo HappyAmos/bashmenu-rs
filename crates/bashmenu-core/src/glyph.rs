@@ -1,6 +1,8 @@
 //! CP437 ASCII translations, Nerd font / emoji adaptive glyph resolution,
 //! and 4-column icon padding calculations.
 
+use std::path::PathBuf;
+use std::process::Command;
 use unicode_width::UnicodeWidthStr;
 
 /// IBM PC CP437 character mapping table for codes 0..=255.
@@ -149,6 +151,51 @@ pub fn format_icon_slot(raw_icon: Option<&str>, use_nerd_fonts: bool) -> String 
         let pad = 4 - vis_w;
         format!("{}{}", normalized, " ".repeat(pad))
     }
+}
+
+/// Resolves filesystem path to an extension script (e.g. `glyphs.sh`).
+pub fn resolve_script_path(script_name: &str) -> Option<PathBuf> {
+    if let Ok(dir) = std::env::var("BASHMENU_DIR") {
+        let p = PathBuf::from(dir).join("scripts").join(script_name);
+        if p.exists() {
+            return Some(p);
+        }
+    }
+    if let Ok(home) = std::env::var("HOME") {
+        let p = PathBuf::from(home)
+            .join(".config/bashmenu/scripts")
+            .join(script_name);
+        if p.exists() {
+            return Some(p);
+        }
+    }
+    let local = PathBuf::from("scripts").join(script_name);
+    if local.exists() {
+        return Some(local);
+    }
+    let parent = PathBuf::from("..").join("scripts").join(script_name);
+    if parent.exists() {
+        return Some(parent);
+    }
+    None
+}
+
+/// Executes external `glyphs.sh` helper script if available, or returns a formatted
+/// fallback cheat sheet for adaptive Nerd Font directives.
+pub fn run_glyphs_search(term: &str) -> String {
+    if let Some(script_path) = resolve_script_path("glyphs.sh") {
+        if let Ok(output) = Command::new("bash").arg(script_path).arg(term).output() {
+            let res = String::from_utf8_lossy(&output.stdout).to_string();
+            if !res.trim().is_empty() {
+                return res;
+            }
+        }
+    }
+
+    format!(
+        "Glyph Search: '{}'\n\nUse adaptive nerd font directive in icons:\n{{nf:<char>:<nerd_hex>:<emoji>}}\n\nExamples:\n- {{nf:*:f015:🏠}} (Home)\n- {{nf:*:f07b:📁}} (Folder)\n- {{nf:*:e73c:🐍}} (Python)\n- {{nf:*:f120:💻}} (Terminal)\n- {{nf:*:f085:⚙️}} (Gear/Settings)",
+        term
+    )
 }
 
 #[cfg(test)]

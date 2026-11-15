@@ -1,3 +1,11 @@
+## Theme Editor `<Ctrl+P>` Shortcut to Launch Nerd Font & Emoji Search Tool
+- [x] Implemented `<ctrl> + <p>` (and `<ctrl> + <P>`) keyboard shortcut in `crates/themeedit-cli/src/main.rs` to launch the interactive Nerd Font & Emoji glyph search tool (`ActiveModal::GlyphSearch` / `InputModal`).
+- [x] Connected `run_glyphs_search(&term)` in `crates/bashmenu-core/src/glyph.rs` to execute `scripts/glyphs.sh` (or adaptive Nerd Font macro cheat sheet fallback), and displayed the formatted search results in a scrollable `HelpModal` dialog.
+- [x] Intercepted `<ctrl> + <p>` while editing `IndicatorInput` and `DefaultIconInput` modals, and added `[Ctrl+P] Glyphs` to the bottom gutter bar (`bottom_items`) with direct click support.
+- [x] Documented `<ctrl> + <p>` under the Theme Editor keybindings in `bashmenu.md` and `bashmenu.1`.
+- [x] Added integration test `test_themeedit_ctrl_p_nerd_font_search_and_bottom_gutter` in `crates/themeedit-cli/tests/themeedit_test.rs`.
+- [x] Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and full workspace tests pass. Built release binaries and installed to `~/.local/bin/`.
+
 ## Theme Default Icon Configuration, Menu Files Backfill & MenuEdit Parity
 - [x] Configured all 36 themes in `bashmenu.themes` and `~/.config/bashmenu/bashmenu.themes` with `default_icon: '{nf:>:#f105}'`.
 - [x] Backfilled missing `icon: '{nf:>:#f105}'` (and `{nf::#f048}` for Back items) across all un-iconified menu items in `bashmenu.mnu` and `~/.config/bashmenu/bashmenu.mnu` (including Experiments, Install, Media, and Testing Ground items).

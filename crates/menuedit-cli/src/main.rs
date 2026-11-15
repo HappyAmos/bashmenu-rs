@@ -2,8 +2,8 @@
 
 use anyhow::Result;
 use bashmenu_core::{
-    interpolate_placeholders, load_config, load_menu, save_menu, MacroContext, MenuItem,
-    MenuSchema, ToastNotification, ToastSeverity,
+    interpolate_placeholders, load_config, load_menu, run_glyphs_search, save_menu, MacroContext,
+    MenuItem, MenuSchema, ToastNotification, ToastSeverity,
 };
 use bashmenu_tui::{
     compute_modal_inner, install_panic_hook, AsciiGridModal, ConfirmModal, FilePickerModal,
@@ -23,7 +23,6 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Widget};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::time::Duration;
 
 /// Action identifiers triggered via keyboard shortcuts or mouse clicks on the footer gutter.
@@ -123,30 +122,6 @@ fn resolve_menu_path(target: &Path, local: bool) -> PathBuf {
     } else {
         bashmenu_core::resolve_app_path(target)
     }
-}
-
-/// Attempts to locate a named script in `$BASHMENU_DIR/scripts`, `~/.config/bashmenu/scripts`,
-/// or the local `./scripts/` directory.
-fn resolve_script_path(script_name: &str) -> Option<PathBuf> {
-    if let Ok(dir) = std::env::var("BASHMENU_DIR") {
-        let p = PathBuf::from(dir).join("scripts").join(script_name);
-        if p.exists() {
-            return Some(p);
-        }
-    }
-    if let Ok(home) = std::env::var("HOME") {
-        let p = PathBuf::from(home)
-            .join(".config/bashmenu/scripts")
-            .join(script_name);
-        if p.exists() {
-            return Some(p);
-        }
-    }
-    let local = PathBuf::from("scripts").join(script_name);
-    if local.exists() {
-        return Some(local);
-    }
-    None
 }
 
 /// Represents the active child modal spawned within an item editor modal.
@@ -1551,22 +1526,4 @@ fn main() -> Result<()> {
     }
 
     Ok(())
-}
-
-/// Executes the external `glyphs.sh` helper script if available, or returns a formatted
-/// fallback cheat sheet for adaptive Nerd Font directives.
-fn run_glyphs_search(term: &str) -> String {
-    if let Some(script_path) = resolve_script_path("glyphs.sh") {
-        if let Ok(output) = Command::new("bash").arg(script_path).arg(term).output() {
-            let res = String::from_utf8_lossy(&output.stdout).to_string();
-            if !res.trim().is_empty() {
-                return res;
-            }
-        }
-    }
-
-    format!(
-        "Glyph Search: '{}'\n\nUse adaptive nerd font directive in icons:\n{{nf:<char>:<nerd_hex>:<emoji>}}\n\nExamples:\n- {{nf:*:f015:🏠}} (Home)\n- {{nf:*:f07b:📁}} (Folder)\n- {{nf:*:e73c:🐍}} (Python)\n- {{nf:*:f120:💻}} (Terminal)\n- {{nf:*:f085:⚙️}} (Gear/Settings)",
-        term
-    )
 }

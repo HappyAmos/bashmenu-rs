@@ -248,6 +248,7 @@ The visual theme editor provides a split-screen interface featuring a collapsibl
 | `F8` / `Delete` | Delete current theme from `bashmenu.themes` (with confirmation modal); on activity tabs `2`-`7`, `Delete` or `Backspace` on a color token resets it to `-1` (`Inherit` from the main menu palette); when a Wallpaper token is focused, `Delete` or `Backspace` removes the wallpaper; when the `Indicator` token is focused, `Delete` resets the indicator to `> `. |
 | `Ctrl+S` | Save theme directly to `bashmenu.themes` (prompts Save As only if `untitled`). |
 | `Ctrl+A` | Save As under a new theme name. |
+| `Ctrl+P` | Launch the Nerd Font and Emoji glyph search tool (`glyphs.sh`). |
 | `Left Click` (Preview) | Focuses the clicked UI element's corresponding Theme Token in the tree and flashes its preview spans. |
 | `Right Click` (Preview) | **Color Dropper**: Samples the visible pixel color from the clicked location in the preview pane, copies the color code to the system clipboard, and assigns it directly to the currently selected Theme Token (if it is a color setting). |
 | `ESC` / `q` | Exit theme editor (prompts if unsaved changes exist). |

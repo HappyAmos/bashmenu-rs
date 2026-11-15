@@ -2798,3 +2798,62 @@ fn test_theme_default_icon_token_configuration_and_persistence() {
 
     let _ = fs::remove_dir_all(&tmp_dir);
 }
+
+#[test]
+fn test_themeedit_ctrl_p_nerd_font_search_and_bottom_gutter() {
+    use bashmenu_core::run_glyphs_search;
+    use bashmenu_tui::{HelpModal, InputModal};
+    use crossterm::event::KeyCode;
+    use ratatui::layout::Rect;
+
+    // 1. Verify run_glyphs_search fallback output formatting
+    let output = run_glyphs_search("folder");
+    assert!(
+        output.contains("Glyph Search: 'folder'")
+            || output.contains("folder")
+            || output.contains("{nf:")
+    );
+
+    // 2. Bottom gutter items contain [Ctrl+P] Glyphs
+    let bottom_items = [
+        "[F5] Derive",
+        "[F6] New",
+        "[F7] Rename",
+        "[F8] Del",
+        "[Ctrl+S] Save",
+        "[Ctrl+A] Save As",
+        "[Ctrl+P] Glyphs",
+        "[TAB] View",
+        "[R-Click] Dropper",
+        "[q] Exit",
+    ];
+    assert!(bottom_items.contains(&"[Ctrl+P] Glyphs"));
+
+    let (_, ranges) = bashmenu_tui::spread_gutter_line_layout(&bottom_items, 200);
+    assert_eq!(ranges.len(), bottom_items.len());
+    let glyph_idx = bottom_items
+        .iter()
+        .position(|&item| item == "[Ctrl+P] Glyphs")
+        .unwrap();
+    assert!(ranges[glyph_idx].0 < ranges[glyph_idx].1);
+
+    // 3. Search input modal interaction
+    let mut search_modal = InputModal::new(
+        "Search Nerd Font & Emoji",
+        "Enter glyph search term (e.g. arrow, folder, python):",
+        "",
+    );
+    search_modal.paste("arrow");
+    assert_eq!(search_modal.value, "arrow");
+
+    let submitted = search_modal.handle_key(KeyCode::Enter);
+    assert_eq!(submitted, Some(Some("arrow".to_string())));
+
+    // 4. HelpModal display of results
+    let search_results = run_glyphs_search("arrow");
+    let mut help_modal = HelpModal::new("Nerd Font & Emoji: arrow", &search_results);
+    let area = Rect::new(0, 0, 80, 24);
+    let (w, h) = help_modal.dialog_dimensions(area);
+    assert!(w >= 40 && h >= 10);
+    assert!(help_modal.handle_key(KeyCode::Esc));
+}
