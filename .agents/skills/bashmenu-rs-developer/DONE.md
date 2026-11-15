@@ -1,3 +1,9 @@
+## SKILL.md Condensation, Invariants Migration & DONE.md Audit
+- [x] Audited `DONE.md` update history against git commits and notes; backfilled missing documentation for the 7 Theme Editor preview and color picker bug fixes.
+- [x] Condensed `.agents/skills/bashmenu-rs-developer/SKILL.md` from 41.9 KB down to 15.3 KB without losing technical details, eliminating duplicate TODO directives and narrative rules that mirrored `.agents/rules/invariants.md`.
+- [x] Migrated Task Precedence (`CRITICAL` > `BUG` > `RESPONSIVENESS` > `UI` > `FEATURE` > `REQUEST` > `RESEARCH`) and Script Header Standard into `.agents/rules/invariants.md`, keeping total rule file size at 23,675 bytes (strictly <= 24,000 bytes).
+- [x] Re-evaluated and verified all rules and documentation across both files.
+
 ## Rules & Skills Invariants Update & Rules Budget Optimization
 - [x] Applied approved learning proposal: added Theme Editor Glyph Search Shortcut Invariant (`themeedit` `<ctrl> + <p>`) and Theme Default Icon & Universal Menu Item Fallback Invariant (`default_icon`) to `.agents/rules/invariants.md`.
 - [x] Streamlined and condensed narrative descriptions across `.agents/rules/invariants.md`, reducing total file size to 23,344 bytes (strictly within the Antigravity Customization System 24 KB / 24,000-byte per-file limit) while preserving all invariant names, technical contracts, keybindings, and rules.
@@ -45,6 +51,16 @@
 - [x] Updated preview pane hit-testing in `crates/themeedit-cli/src/main.rs` on the active menu row so clicking anywhere on the active item's text or shortcut returns `"highlight_text"`, focusing the "Highlight Text Color" token in the token list.
 - [x] Updated `get_token_preview_spans` in `crates/themeedit-cli/src/lib.rs` so `"shortcut_key"` spans only inactive menu item shortcuts, while `"highlight_text"` spans the entire active item line including its shortcut.
 - [x] Updated integration tests in `crates/themeedit-cli/tests/themeedit_test.rs` to verify active item shortcut color, background, and spans. Built release binaries and installed all 8 binaries to `~/.local/bin/`.
+
+## Theme Editor Preview & Color Picker Bug Fixes
+- [x] Shortcuts tab preview: restored missing second preview pane in `PreviewMode::Shortcuts` in `themeedit`.
+- [x] Editor tab help gutter: fixed `^X Exit` help key prefix to match configured help gutter text/key colors instead of mismatched default style.
+- [x] Color picker border width: widened `ColorPickerModal` window border so `"1: 256 Palette"` tab text does not exceed the modal frame.
+- [x] Color picker help gutter text color: applied active theme's `help_text` and `gutter` styles to color picker help legend.
+- [x] Toast tab background click autofocus & preview background isolation: clicking toast message background autofocuses on the toast style setting; preview pane background remains isolated from toast background changes.
+- [x] Shortcuts tab autofocus: clicking `[ Keyboard Shortcuts ]` title autofocuses to "Title Color", and clicking shortcut descriptions autofocuses to "Text Color".
+- [x] ThemeEdit pane row text colors: unified "Help Text Inherit" style to match "Background" and "Divider" label styling.
+- [x] Regression verified via `test_preview_fixes_shortcuts_panes_footers_themeedit_rows_and_toast_bg_isolation` in `crates/themeedit-cli/tests/themeedit_test.rs`.
 
 ## Paste Stalling Fix, Save As Dialog Input & Buttons, Config Dir Alias, Shortcut Highlight Color & Random Theme
 - [x] Fixed terminal paste stalling issue by enabling `crossterm = { version = "0.28", features = ["use-dev-tty"] }`, bypassing Crossterm issue #1142 (`mio` edge-triggered stall when TTY descriptor is not drained during large paste bursts); enabled bracketed paste mode (`EnableBracketedPaste` / `DisableBracketedPaste`) and sane terminal reset (`\x1b[?2004l`) in `crates/bashmenu-tui/src/terminal.rs`, and routed `Event::Paste` across all input and modal handlers.

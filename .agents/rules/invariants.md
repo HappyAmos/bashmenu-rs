@@ -63,6 +63,7 @@
   3. Tests: `cargo test --workspace`
   4. Shell Scripts: `shellcheck *.sh scripts/*.sh`
 - In terminal scripts, do not assume `/usr/local/bin` for non-root users; install user CLI tools to `$HOME/.local/bin`.
+- **Script Header Standard:** All shell scripts must begin with `#!/usr/bin/env bash` followed by a header comment (`SCRIPT: <name>.sh`, `DESCRIPTION: <summary>`).
 - **Shellcheck Scope Invariant:** Verify shell scripts using `shellcheck *.sh scripts/*.sh` so extension scripts in `scripts/` are checked alongside root scripts.
 - **Self-Contained Implementation & No External Tool Dependencies Invariant:** BashMenu must never rely on external tools or window managers (`kmscon`, `fbterm`, DEs) for core features. All functionality is native Rust within workspace crates. In environments lacking 24-bit TrueColor (e.g. Linux VT `TERM=linux`), the application detects capabilities and falls back to configured 16/8-color theme palette tiers.
 - **Cargo Integration Test Binary Scoping (`CARGO_BIN_EXE_<bin>`):** Cargo sets `env!("CARGO_BIN_EXE_<bin>")` only for binaries defined within the same crate. CLI integration tests for specific binaries (`bashedit`, `bashmenu`, `bmpager`) must be located inside that specific crate's `tests/` directory.
@@ -83,6 +84,7 @@
 
 ## 5. TODO Task Execution & Lifecycle Invariants (CRITICAL)
 - **Sequential TODO Execution:** Unless specifically labeled (`CRITICAL`) or explicitly instructed otherwise by the user, always tackle items from TODO lists (`~/.config/bashmenu/notebooks/notes.yml` under `'TODO (Agent: Allowed)'` or `.agents/skills/bashmenu-rs-developer/TODO.md`) strictly in sequential order, top to bottom. Complete each item fully (including verification, commit, push, and remote CI check) before moving to the next.
+- **Task Precedence:** Order of priority when tasks conflict is `CRITICAL` / `CRITICAL BUG`, then `BUG`, `RESPONSIVENESS`, `UI`, `FEATURE`, `REQUEST`, and `RESEARCH`.
 - **Add Unlisted Instructions:** If given an instruction not in a TODO list, you MUST add the instruction to the TODO list before working on it.
 - **Pending Marker (`PENDING`):** When working on a TODO item, you MUST mark it as `PENDING` (`- [ ] PENDING: ...`). When completed, remove the `PENDING` label and mark it as complete (`- [x] ...`).
 - **Log to `DONE.md` & Prune Finished Tasks:** Append a summary of every completed task to `.agents/skills/bashmenu-rs-developer/DONE.md`. When there are no more tasks to complete, remove finished (`- [x]`) tasks from the TODO list, and re-check the TODO list to ensure no new tasks were added.
