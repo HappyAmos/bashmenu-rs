@@ -6,8 +6,9 @@ use bashmenu_core::{
     MenuItem, MenuSchema, ToastNotification, ToastSeverity,
 };
 use bashmenu_tui::{
-    compute_modal_inner, install_panic_hook, AsciiGridModal, ConfirmModal, FilePickerModal,
-    HelpModal, InputModal, ResolvedThemeStyles, TerminalGuard, ThemeActivity, ToastRack,
+    compute_modal_inner, get_marquee_slice, install_panic_hook, AsciiGridModal, ConfirmModal,
+    FilePickerModal, HelpModal, InputModal, MarqueeTracker, ResolvedThemeStyles, TerminalGuard,
+    ThemeActivity, ToastRack,
 };
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers, MouseButton, MouseEventKind};
@@ -24,6 +25,7 @@ use ratatui::widgets::{Block, Borders, Widget};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
+use unicode_width::UnicodeWidthStr;
 
 /// Action identifiers triggered via keyboard shortcuts or mouse clicks on the footer gutter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -239,8 +241,14 @@ fn main() -> Result<()> {
             .max(0.0),
     );
     let mut footer_hover = bashmenu_tui::HelpGutterHover::with_duration(hover_duration);
+    let mut marquee_tracker = MarqueeTracker::default();
+    let mut last_selected_idx = selected_node_idx;
 
     loop {
+        if selected_node_idx != last_selected_idx {
+            marquee_tracker.reset();
+            last_selected_idx = selected_node_idx;
+        }
         let size = guard.terminal_mut().size()?;
         let area = Rect::new(0, 0, size.width, size.height);
 
@@ -274,7 +282,20 @@ fn main() -> Result<()> {
                 .map(|s| s.to_string_lossy().to_string())
                 .unwrap_or_else(|| "bashmenu.mnu".to_string());
             let mod_str = if is_modified { " (Modified)" } else { "" };
-            let title = format!("─[ Visual Menu Editor - {}{} ]", file_name, mod_str);
+            let title_raw = format!("─[ Visual Menu Editor - {}{} ]", file_name, mod_str);
+            let title_max_w = (area.width as usize).saturating_sub(6);
+            let title_vis = UnicodeWidthStr::width(title_raw.as_str());
+            let title = if title_vis > title_max_w && title_max_w > 0 {
+                get_marquee_slice(
+                    &title_raw,
+                    title_max_w,
+                    marquee_tracker.offset,
+                    &styles.marquee_char,
+                    styles.marquee_gap,
+                )
+            } else {
+                title_raw
+            };
 
             let root_block = Block::default()
                 .borders(Borders::ALL)
@@ -362,6 +383,22 @@ fn main() -> Result<()> {
                     )
                 };
 
+                let prefix_vis =
+                    node.depth * 2 + 2 + 6 + if node.item.is_divider() { 0 } else { 4 };
+                let avail_for_label = (tree_content_w as usize).saturating_sub(prefix_vis);
+                let label_vis = UnicodeWidthStr::width(label_text.as_str());
+                let disp_label = if is_sel && label_vis > avail_for_label && avail_for_label > 0 {
+                    get_marquee_slice(
+                        &label_text,
+                        avail_for_label,
+                        marquee_tracker.offset,
+                        &styles.marquee_char,
+                        styles.marquee_gap,
+                    )
+                } else {
+                    label_text
+                };
+
                 let line = Line::from(vec![
                     Span::styled(indent, row_style),
                     Span::styled(expand_icon, if is_sel { row_style } else { styles.accent }),
@@ -374,7 +411,7 @@ fn main() -> Result<()> {
                         },
                     ),
                     icon_span,
-                    Span::styled(label_text, row_style),
+                    Span::styled(disp_label, row_style),
                 ]);
 
                 buf.set_line(tree_rect.x + 1, row_y, &line, tree_content_w);
@@ -427,8 +464,19 @@ fn main() -> Result<()> {
                         styles.text
                     };
 
-                    let truncated: String = line.chars().take(insp_content_w as usize).collect();
-                    buf.set_string(insp_rect.x + 1, y, &truncated, line_style);
+                    let line_vis = UnicodeWidthStr::width(line.as_str());
+                    let disp_line = if line_vis > insp_content_w as usize && insp_content_w > 0 {
+                        get_marquee_slice(
+                            line,
+                            insp_content_w as usize,
+                            marquee_tracker.offset,
+                            &styles.marquee_char,
+                            styles.marquee_gap,
+                        )
+                    } else {
+                        line.chars().take(insp_content_w as usize).collect()
+                    };
+                    buf.set_string(insp_rect.x + 1, y, &disp_line, line_style);
                 }
             } else {
                 buf.set_string(
@@ -1518,10 +1566,9 @@ fn main() -> Result<()> {
                     }
                 }
             }
-        } else if matches!(active_modal, ActiveModal::None)
-            && footer_hover.check_hover_timeout(has_hidden && area.height >= 12)
-        {
-            // loop redraws
+        } else if matches!(active_modal, ActiveModal::None) {
+            marquee_tracker.tick();
+            let _ = footer_hover.check_hover_timeout(has_hidden && area.height >= 12);
         }
     }
 

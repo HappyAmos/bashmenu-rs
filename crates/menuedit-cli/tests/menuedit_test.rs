@@ -1970,3 +1970,25 @@ fn test_menuedit_unconfigured_item_defaults_to_theme_default_icon() {
     let glyph = resolve_glyph(DEFAULT_ITEM_ICON, true);
     assert!(preview_line.contains(&glyph) || preview_line.contains('>'));
 }
+
+#[test]
+fn test_menuedit_marquee_overflow_on_tree_and_inspector() {
+    use bashmenu_tui::{get_marquee_slice, MarqueeTracker};
+
+    let label = "Very Long Menu Item Label That Exceeds Tree Column Width";
+    let avail_for_label = 20;
+
+    let mut tracker = MarqueeTracker::default();
+    let s0 = get_marquee_slice(label, avail_for_label, tracker.offset, "•", 3);
+    assert_eq!(s0, "Very Long Menu Item ");
+
+    // Advance past pause
+    for _ in 0..4 {
+        assert!(!tracker.tick());
+    }
+    assert!(tracker.tick());
+    assert_eq!(tracker.offset, 1);
+
+    let s1 = get_marquee_slice(label, avail_for_label, tracker.offset, "•", 3);
+    assert_ne!(s0, s1);
+}

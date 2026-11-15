@@ -1137,7 +1137,18 @@ impl MenuView {
         let title_body = format!(" {} ", title_raw);
         let title_cap_len = b.title_left_cap.chars().count() + b.title_right_cap.chars().count();
         let max_body_w = w.saturating_sub(6 + title_cap_len);
-        let display_title_body: String = title_body.chars().take(max_body_w).collect();
+        let title_vis = visible_text_len(&title_body);
+        let display_title_body: String = if title_vis > max_body_w && max_body_w > 0 {
+            get_marquee_slice(
+                &title_body,
+                max_body_w,
+                self.marquee_tracker.offset,
+                &self.styles.marquee_char,
+                self.styles.marquee_gap,
+            )
+        } else {
+            title_body.chars().take(max_body_w).collect()
+        };
         let title_len = title_cap_len + display_title_body.chars().count();
 
         let left_b = 2.max((w.saturating_sub(title_len)) / 2);
@@ -1470,7 +1481,19 @@ impl MenuView {
                         );
                     }
                 } else {
-                    let spans = parse_bbcode_spans(&prow.text, self.styles.plugin);
+                    let text_vis = visible_text_len(&prow.text);
+                    let text_to_render = if text_vis > avail_w && avail_w > 0 {
+                        get_marquee_slice(
+                            &prow.text,
+                            avail_w,
+                            self.marquee_tracker.offset,
+                            &self.styles.marquee_char,
+                            self.styles.marquee_gap,
+                        )
+                    } else {
+                        prow.text.clone()
+                    };
+                    let spans = parse_bbcode_spans(&text_to_render, self.styles.plugin);
                     buf.set_line(inner_x, py, &Line::from(spans), avail_w as u16);
                 }
             }

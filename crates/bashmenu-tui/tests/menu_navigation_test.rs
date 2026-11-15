@@ -923,6 +923,62 @@ fn test_menu_marquee_scrolling_and_reset() {
 }
 
 #[test]
+fn test_menu_plugin_rows_and_title_marquee_when_exceeding_width() {
+    use bashmenu_core::PluginDisplayRow;
+
+    let schema = MenuSchema {
+        version: "0.0.1".to_string(),
+        title: "A Very Extremely Long Menu Title That Exceeds Window Width".to_string(),
+        items: vec![MenuItem {
+            label: "Item 1".to_string(),
+            r#type: MenuItemType::Command,
+            command: Some("echo 1".to_string()),
+            ..Default::default()
+        }],
+        extra: Default::default(),
+    };
+
+    let styles = ResolvedThemeStyles::default();
+    let mut view = MenuView::new(schema, styles, false, String::new());
+    view.set_plugin_rows(vec![PluginDisplayRow {
+        text: "Long plugin output row that exceeds the available menu viewport width".to_string(),
+        is_divider: false,
+    }]);
+
+    let area = Rect::new(0, 0, 40, 15);
+    let mut buf0 = Buffer::empty(area);
+    view.render(area, &mut buf0);
+
+    // Initial render at offset 0
+    let title_line_0: String = (0..area.width)
+        .map(|x| buf0[(x, 0)].symbol().to_string())
+        .collect();
+    let plugin_line_0: String = (0..area.width)
+        .map(|x| buf0[(x, 10)].symbol().to_string())
+        .collect();
+
+    // Advance marquee past pause ticks
+    for _ in 0..4 {
+        assert!(!view.tick_marquee());
+    }
+    assert!(view.tick_marquee());
+
+    let mut buf1 = Buffer::empty(area);
+    view.render(area, &mut buf1);
+
+    let title_line_1: String = (0..area.width)
+        .map(|x| buf1[(x, 0)].symbol().to_string())
+        .collect();
+    let plugin_line_1: String = (0..area.width)
+        .map(|x| buf1[(x, 10)].symbol().to_string())
+        .collect();
+
+    // The overflowing title and plugin lines must have marqueed
+    assert_ne!(title_line_0, title_line_1);
+    assert_ne!(plugin_line_0, plugin_line_1);
+}
+
+#[test]
 fn test_toast_rack_rendering_and_interaction() {
     use bashmenu_core::{ToastNotification, ToastSeverity};
     use bashmenu_tui::ToastRack;

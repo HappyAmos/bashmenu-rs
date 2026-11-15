@@ -2491,3 +2491,23 @@ fn test_message_modal_scrollbar_and_keyboard_mouse_scrolling() {
     ));
     assert!(modal.handle_mouse(click(inner.x + inner.width - 2, inner.y - 1), area));
 }
+
+#[test]
+fn test_text_input_horizontal_scrolling_does_not_marquee() {
+    use bashmenu_tui::TextInput;
+
+    let mut input = TextInput::new("A very long input string that exceeds width");
+    let inner_w = 10;
+
+    // Moving cursor to start gives scroll offset 0
+    input.cursor = 0;
+    let scroll_0 = input.scroll_for_width(inner_w);
+    assert_eq!(scroll_0, 0);
+
+    // Navigating right advances scroll_for_width based strictly on cursor position, never marqueeing
+    input.cursor = 15;
+    let scroll_15 = input.scroll_for_width(inner_w);
+    assert!(scroll_15 > 0);
+    assert!(input.cursor >= scroll_15);
+    assert!(input.cursor < scroll_15 + inner_w);
+}

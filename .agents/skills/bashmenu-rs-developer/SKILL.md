@@ -25,7 +25,7 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
   - Terminal safety: panic hook, flicker-free alternate screen suspension (`guard.suspend_keep_alt`), DEC Mode 2026 redraws, and tab stop traversal order (top-to-bottom, left-to-right).
   - Theme editor `<Ctrl+P>` glyph search and theme `default_icon` fallback.
   - Colocated swap files (`.<filename>.swp`) in `bashedit`.
-  - Installer (`install.sh`) and uninstaller (`uninstall.sh`) contracts.
+  - Installer (`install.sh`) and uninstaller (`uninstall.s0000h`) contracts.
 - **Pre-Commit Verification Suite:** Always verify before committing:
   ```bash
   cargo fmt --all --check
@@ -78,10 +78,13 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
   - Status gutter takes layout precedence over help gutter in narrow terminals.
   - Function keys `<F1>` through `<F12>` listed in help gutters must ALWAYS be in strictly ascending numerical order. Omit `[UP/DN]: Nav` across all views.
   - Sizing formula: `gutter_rows = std::cmp::min(2, std::cmp::max(1, std::cmp::max(help_lines.len(), status_lines.len())))`. Total rendered lines strictly equals terminal height `h`.
-- **50/50 Dual Marquee Partition Contract:**
+- **Universal Marquee Overflow Invariant & 50/50 Partition Contract:**
+  - Text in panels, windows, viewports, lists, and titles (e.g. menu items, plugin rows, tree nodes, inspector lines, sidebar tokens, preview panes) exceeding panel or window width margins must marquee using the active theme's `marquee.char` and `marquee.gap`.
+  - Input text boxes (`TextInput`) are explicitly exempted and scroll horizontally via cursor navigation without marqueeing.
   - With `[...]` brackets: `avail_w` splits 50/50 around center (left: `0..center-2`, center margin: 4 spaces, right: `center+2..avail_w`). Selected items scroll overflowing text simultaneously after a 4-tick (1.0s) delay; unselected truncate with `…`.
   - Without brackets: Option text uses full width up to `avail_w`.
   - Marquee pauses while any modal dialog is active.
+  - Any test, whether menu item or description in coinciding pane must enable marquee for data that exceeds panel or window width.
 - **Toasts (`{toast:SECONDS:"MESSAGE"}`):** Bottom-right rack (`max_w = (avail_w / 2).clamp(28, 60)`), left accent block `▌` (`\u{258c}`), theme panel background, bold title, dismisses on timeout or mouse click.
 
 ---

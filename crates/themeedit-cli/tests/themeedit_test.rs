@@ -2857,3 +2857,24 @@ fn test_themeedit_ctrl_p_nerd_font_search_and_bottom_gutter() {
     assert!(w >= 40 && h >= 10);
     assert!(help_modal.handle_key(KeyCode::Esc));
 }
+
+#[test]
+fn test_themeedit_marquee_overflow_on_tokens_sidebar() {
+    use bashmenu_tui::{get_marquee_slice, MarqueeTracker};
+
+    let token_label = "Highlight Text Color In Long Verbose Format";
+    let sidebar_w = 20;
+
+    let mut tracker = MarqueeTracker::default();
+    let s0 = get_marquee_slice(token_label, sidebar_w, tracker.offset, "•", 3);
+    assert_eq!(s0, "Highlight Text Color");
+
+    for _ in 0..4 {
+        assert!(!tracker.tick());
+    }
+    assert!(tracker.tick());
+    assert_eq!(tracker.offset, 1);
+
+    let s1 = get_marquee_slice(token_label, sidebar_w, tracker.offset, "•", 3);
+    assert_ne!(s0, s1);
+}

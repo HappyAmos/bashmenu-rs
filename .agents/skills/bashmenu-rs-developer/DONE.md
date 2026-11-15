@@ -1,3 +1,16 @@
+## Universal Marquee Overflow Invariant & Multi-Panel Enforcement
+- [x] Formalized Universal Marquee Overflow Invariant in `.agents/rules/invariants.md` (kept within 24KB limit at 23,877 bytes) and `.agents/skills/bashmenu-rs-developer/SKILL.md`: text in panels, windows, viewports, lists, and titles exceeding width margins must always marquee using the theme's `marquee.char` and `marquee.gap`, with explicit exemption for input text boxes (`TextInput`).
+- [x] Enforced marquee in `bashmenu` (`MenuView`):
+  - Plugin panel output rows exceeding available width (`avail_w`) marquee horizontally.
+  - Window header title exceeding available top border width (`max_body_w`) marquees horizontally.
+- [x] Enforced marquee in `menuedit-cli`:
+  - Selected menu tree node labels exceeding tree panel width marquee horizontally.
+  - Property inspector lines exceeding inspector width (`insp_content_w`) marquee horizontally.
+  - Root editor window title exceeding top border width marquees horizontally.
+- [x] Enforced marquee in `themeedit-cli`:
+  - Selected theme tokens in sidebar exceeding left panel width marquee horizontally.
+- [x] Added unit and integration tests across `bashmenu-tui`, `menuedit-cli`, and `themeedit-cli` verifying panel marqueeing and verifying `TextInput` maintains cursor offset navigation without marqueeing.
+
 ## SKILL.md Condensation, Invariants Migration & DONE.md Audit
 - [x] Audited `DONE.md` update history against git commits and notes; backfilled missing documentation for the 7 Theme Editor preview and color picker bug fixes.
 - [x] Condensed `.agents/skills/bashmenu-rs-developer/SKILL.md` from 41.9 KB down to 15.3 KB without losing technical details, eliminating duplicate TODO directives and narrative rules that mirrored `.agents/rules/invariants.md`.

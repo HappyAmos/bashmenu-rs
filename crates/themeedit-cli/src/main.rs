@@ -7,9 +7,10 @@
 use anyhow::Result;
 use bashmenu_core::{run_glyphs_search, ToastNotification, ToastSeverity, ToastStyle};
 use bashmenu_tui::{
-    install_panic_hook, AsciiGridModal, BackgroundConfigAction, BackgroundConfigModal,
-    BackgroundFocus, ColorPickerModal, ConfirmModal, FilePickerModal, HelpModal, InputModal,
-    ResolvedThemeStyles, TerminalGuard, ToastRack, WallpaperCompositor,
+    get_marquee_slice, install_panic_hook, AsciiGridModal, BackgroundConfigAction,
+    BackgroundConfigModal, BackgroundFocus, ColorPickerModal, ConfirmModal, FilePickerModal,
+    HelpModal, InputModal, MarqueeTracker, ResolvedThemeStyles, TerminalGuard, ToastRack,
+    WallpaperCompositor,
 };
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers, MouseButton, MouseEventKind};
@@ -181,8 +182,15 @@ fn main() -> Result<()> {
     let mut footer_hover = bashmenu_tui::HelpGutterHover::with_duration(
         std::time::Duration::from_secs_f64(delay_secs.max(0.0)),
     );
+    let mut marquee_tracker = MarqueeTracker::default();
+    let mut last_selected_row = state.selected_row;
 
     loop {
+        if state.selected_row != last_selected_row {
+            marquee_tracker.reset();
+            last_selected_row = state.selected_row;
+            need_redraw = true;
+        }
         let size = guard.terminal_mut().size()?;
         let area = Rect::new(0, 0, size.width, size.height);
 
@@ -370,10 +378,26 @@ fn main() -> Result<()> {
                                 Style::default().fg(Color::White)
                             };
                             let label_text = format!("{}{:<20} {}", cursor, token.label, val_str);
+                            let label_vis =
+                                unicode_width::UnicodeWidthStr::width(label_text.as_str());
+                            let disp_text = if is_sel
+                                && label_vis > left_area.width as usize
+                                && left_area.width > 0
+                            {
+                                get_marquee_slice(
+                                    &label_text,
+                                    left_area.width as usize,
+                                    marquee_tracker.offset,
+                                    &preview_styles.marquee_char,
+                                    preview_styles.marquee_gap,
+                                )
+                            } else {
+                                label_text
+                            };
                             buf.set_line(
                                 left_area.x,
                                 row_y,
-                                &Line::from(vec![Span::styled(label_text, row_style)]),
+                                &Line::from(vec![Span::styled(disp_text, row_style)]),
                                 left_area.width,
                             );
                         }
@@ -1844,6 +1868,9 @@ fn main() -> Result<()> {
                 }
             }
         } else {
+            if matches!(active_modal, ActiveModal::None) && marquee_tracker.tick() {
+                need_redraw = true;
+            }
             if matches!(active_modal, ActiveModal::None)
                 && footer_hover.check_hover_timeout(has_hidden && area.height >= 12)
             {
