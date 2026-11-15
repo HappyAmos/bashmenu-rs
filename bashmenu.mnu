@@ -66,12 +66,14 @@ items:
       - '{divider}': null
       - Discover New proot Containers:
           type: script
+          icon: '{nf:>:#f105}'
           script: '{scripts_dir}/webopen.sh https://hub.docker.com/categories/operating-systems'
           interactive: true
           quiet: true
           alt_buffer: true
       - Install proot-distro Container:
           type: command
+          icon: '{nf:>:#f105}'
           command: proot-distro install {param}
           prompt: 'Name of the proot-distro to install [name:tag]:'
           interactive: false
@@ -80,6 +82,7 @@ items:
           stream: true
       - List Installed proot-distro's:
           type: command
+          icon: '{nf:>:#f105}'
           command: proot-distro list
           interactive: false
           quiet: true
@@ -87,6 +90,7 @@ items:
           stream: true
       - Remove Installed proot-distro:
           type: command
+          icon: '{nf:>:#f105}'
           command: proot-distro remove {param}
           prompt: 'Name of proot-distro to remove:'
           interactive: false
@@ -95,6 +99,7 @@ items:
           stream: true
       - Run proot-distro Container:
           type: command
+          icon: '{nf:>:#f105}'
           command: proot-distro login {param}
           prompt: 'Name of the proot-distro to run:'
           interactive: true
@@ -197,6 +202,7 @@ items:
           external: true
       - Install KCChase and CMatrix Terminal Screensavers:
           type: command
+          icon: '{nf:>:#f105}'
           interactive: true
           quiet: false
           alt_buffer: true
@@ -342,6 +348,7 @@ items:
       - '{divider}': null
       - Back To Main Menu:
           type: back
+          icon: '{nf::#f048}'
           interactive: true
           quiet: false
           alt_buffer: true

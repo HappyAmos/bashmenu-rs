@@ -182,12 +182,20 @@ pub fn format_inspector_text(
         lines.push(format!("Expanded Title: {}", exp_title));
     }
 
+    let raw_icon = item
+        .icon
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or(bashmenu_core::DEFAULT_ITEM_ICON);
+
     if let Some(ref icon) = item.icon {
         lines.push(format!("Icon/Glyph: {}", icon));
         let exp_icon = interpolate_placeholders(icon, &ctx);
         if exp_icon != *icon {
             lines.push(format!("Expanded Icon: {}", exp_icon));
         }
+    } else {
+        lines.push(format!("Icon/Glyph: {} (Theme Default)", raw_icon));
     }
 
     let action = item

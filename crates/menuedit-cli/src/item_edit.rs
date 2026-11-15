@@ -755,7 +755,11 @@ impl ItemEditModal {
             .unwrap_or("{window_width}");
 
         let title_val = item.label.as_str();
-        let icon_val = item.icon.as_deref().unwrap_or_default();
+        let icon_val = item
+            .icon
+            .as_deref()
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or(bashmenu_core::DEFAULT_ITEM_ICON);
 
         let action_val = item
             .action
@@ -1766,7 +1770,11 @@ impl ItemEditModal {
         let tabstop = self.tabstop_input.as_string().trim().to_string();
 
         item.label = title;
-        item.icon = if icon.is_empty() { None } else { Some(icon) };
+        item.icon = if icon.is_empty() {
+            Some(bashmenu_core::DEFAULT_ITEM_ICON.to_string())
+        } else {
+            Some(icon)
+        };
 
         if self.is_confirm() {
             item.r#type = MenuItemType::Confirm;
@@ -2927,18 +2935,14 @@ pub fn render_item_preview_line(item: &MenuItem, avail_w: usize) -> String {
     let left_clean = strip_bbcode(left_raw);
     let right_clean = strip_bbcode(right_raw);
 
-    let exp_icon = item
+    let raw_icon = item
         .icon
         .as_deref()
-        .map(|ic| interpolate_placeholders(ic, &ctx))
-        .unwrap_or_default();
-    let icon_str = if !exp_icon.is_empty() {
-        let vis_w = visible_text_len(&exp_icon);
-        let pad_w = 4_usize.saturating_sub(vis_w).max(1);
-        format!("{}{}", exp_icon, " ".repeat(pad_w))
-    } else {
-        "    ".to_string()
-    };
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or(bashmenu_core::DEFAULT_ITEM_ICON);
+    let exp_icon = interpolate_placeholders(raw_icon, &ctx);
+    let use_nerd = cfg.settings.use_nerd_fonts.unwrap_or(true);
+    let icon_str = bashmenu_core::format_icon_slot(Some(&exp_icon), use_nerd);
 
     let prefix = format!("  1.  {}", icon_str);
     let prefix_len = visible_text_len(&prefix);

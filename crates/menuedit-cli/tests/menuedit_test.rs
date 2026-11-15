@@ -1935,3 +1935,38 @@ fn test_menuedit_new_item_adopts_default_icon() {
     let saved_item = modal.build_updated_item();
     assert_eq!(saved_item.icon.as_deref(), Some(default_icon.as_str()));
 }
+
+#[test]
+fn test_menuedit_unconfigured_item_defaults_to_theme_default_icon() {
+    use bashmenu_core::{resolve_glyph, DEFAULT_ITEM_ICON};
+    use menuedit_cli::{format_inspector_text, render_item_preview_line, ItemEditModal};
+
+    // Item without icon configured
+    let item_without_icon = MenuItem {
+        label: "Unconfigured Command".to_string(),
+        r#type: MenuItemType::Command,
+        command: Some("echo test".to_string()),
+        icon: None,
+        ..Default::default()
+    };
+
+    // 1. ItemEditModal defaults icon_input to DEFAULT_ITEM_ICON
+    let modal = ItemEditModal::new(&item_without_icon);
+    assert_eq!(modal.icon_input.as_string(), DEFAULT_ITEM_ICON);
+
+    let saved_item = modal.build_updated_item();
+    assert_eq!(saved_item.icon.as_deref(), Some(DEFAULT_ITEM_ICON));
+
+    // 2. format_inspector_text displays (Theme Default)
+    let inspector_lines = format_inspector_text(&item_without_icon, None, 60);
+    let inspector_joined = inspector_lines.join("\n");
+    assert!(inspector_joined.contains(&format!(
+        "Icon/Glyph: {} (Theme Default)",
+        DEFAULT_ITEM_ICON
+    )));
+
+    // 3. render_item_preview_line formats with default icon
+    let preview_line = render_item_preview_line(&item_without_icon, 60);
+    let glyph = resolve_glyph(DEFAULT_ITEM_ICON, true);
+    assert!(preview_line.contains(&glyph) || preview_line.contains('>'));
+}

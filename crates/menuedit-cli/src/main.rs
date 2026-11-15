@@ -2,7 +2,8 @@
 
 use anyhow::Result;
 use bashmenu_core::{
-    load_config, load_menu, save_menu, MenuItem, MenuSchema, ToastNotification, ToastSeverity,
+    interpolate_placeholders, load_config, load_menu, save_menu, MacroContext, MenuItem,
+    MenuSchema, ToastNotification, ToastSeverity,
 };
 use bashmenu_tui::{
     compute_modal_inner, install_panic_hook, AsciiGridModal, ConfirmModal, FilePickerModal,
@@ -357,16 +358,33 @@ fn main() -> Result<()> {
                 };
 
                 let badge = get_type_badge(&node.item);
-                let label_text = if node.item.is_divider() {
-                    "──────────────── [Divider]".to_string()
-                } else {
-                    node.item.label.clone()
-                };
-
                 let row_style = if is_sel {
                     styles.highlight.add_modifier(Modifier::BOLD)
                 } else {
                     styles.text
+                };
+
+                let (icon_span, label_text) = if node.item.is_divider() {
+                    (Span::raw(""), "──────────────── [Divider]".to_string())
+                } else {
+                    let default_icon_str = styles.default_icon.as_str();
+                    let raw_icon = node
+                        .item
+                        .icon
+                        .as_deref()
+                        .filter(|s| !s.trim().is_empty())
+                        .unwrap_or(default_icon_str);
+                    let exp_icon = if let Some(ref c) = cfg {
+                        let ctx = MacroContext::new(c);
+                        interpolate_placeholders(raw_icon, &ctx)
+                    } else {
+                        raw_icon.to_string()
+                    };
+                    let icon_slot = bashmenu_core::format_icon_slot(Some(&exp_icon), use_nerd);
+                    (
+                        Span::styled(icon_slot, if is_sel { row_style } else { styles.accent }),
+                        node.item.label.clone(),
+                    )
                 };
 
                 let line = Line::from(vec![
@@ -380,6 +398,7 @@ fn main() -> Result<()> {
                             styles.shortcut_key
                         },
                     ),
+                    icon_span,
                     Span::styled(label_text, row_style),
                 ]);
 

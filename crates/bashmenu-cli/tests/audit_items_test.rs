@@ -237,3 +237,44 @@ fn test_theme_picker_includes_random_option() {
     let picker_random = ThemePickerModal::new(themes, "[ Random ]").with_random_option();
     assert_eq!(picker_random.selected_idx, 0);
 }
+
+#[test]
+fn test_all_themes_define_default_icon_and_menu_items_have_icons() {
+    let repo_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
+    let themes_path = repo_root.join("bashmenu.themes");
+    let themes = bashmenu_core::load_themes(&themes_path).expect("bashmenu.themes must load");
+
+    assert!(!themes.is_empty(), "Themes collection must not be empty");
+    for (name, theme) in &themes {
+        assert_eq!(
+            theme.default_icon.as_deref(),
+            Some(bashmenu_core::DEFAULT_ITEM_ICON),
+            "Theme '{}' must explicitly define default_icon matching DEFAULT_ITEM_ICON",
+            name
+        );
+        assert_eq!(
+            theme.resolved_default_icon(),
+            bashmenu_core::DEFAULT_ITEM_ICON,
+            "Theme '{}' resolved_default_icon must match DEFAULT_ITEM_ICON",
+            name
+        );
+    }
+
+    let menu_path = repo_root.join("bashmenu.mnu");
+    let menu = bashmenu_core::load_menu(&menu_path).expect("bashmenu.mnu must load");
+    fn assert_items_have_icons(items: &[bashmenu_core::MenuItem]) {
+        for it in items {
+            if !it.is_divider() {
+                assert!(
+                    it.icon.is_some() && !it.icon.as_deref().unwrap().trim().is_empty(),
+                    "Menu item '{}' must have an explicitly configured icon",
+                    it.label
+                );
+            }
+            if let Some(ref sub) = it.submenu {
+                assert_items_have_icons(&sub.items);
+            }
+        }
+    }
+    assert_items_have_icons(&menu.items);
+}

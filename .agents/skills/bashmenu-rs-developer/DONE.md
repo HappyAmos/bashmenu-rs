@@ -1,3 +1,13 @@
+## Theme Default Icon Configuration, Menu Files Backfill & MenuEdit Parity
+- [x] Configured all 36 themes in `bashmenu.themes` and `~/.config/bashmenu/bashmenu.themes` with `default_icon: '{nf:>:#f105}'`.
+- [x] Backfilled missing `icon: '{nf:>:#f105}'` (and `{nf::#f048}` for Back items) across all un-iconified menu items in `bashmenu.mnu` and `~/.config/bashmenu/bashmenu.mnu` (including Experiments, Install, Media, and Testing Ground items).
+- [x] Updated `menuedit-cli`:
+  - Visual tree view in `crates/menuedit-cli/src/main.rs`: each non-divider tree node renders its icon slot (using `format_icon_slot`), falling back to `styles.default_icon` for items without an icon.
+  - Property Inspector in `crates/menuedit-cli/src/lib.rs`: when an item has no explicit icon, displays `Icon/Glyph: {nf:>:#f105} (Theme Default)`.
+  - Item editor in `crates/menuedit-cli/src/item_edit.rs`: `ItemEditModal::new` prefills `DEFAULT_ITEM_ICON` when editing items without an icon, `build_updated_item` ensures a default icon is persisted, and `render_item_preview_line` resolves and displays the default nerd font icon.
+- [x] Added integration tests `test_menuedit_unconfigured_item_defaults_to_theme_default_icon` in `crates/menuedit-cli/tests/menuedit_test.rs` and `test_all_themes_define_default_icon_and_menu_items_have_icons` in `crates/bashmenu-cli/tests/audit_items_test.rs`.
+- [x] Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, and `shellcheck *.sh scripts/*.sh` all pass. Built release binaries and installed all 7 to `~/.local/bin/`.
+
 ## File Picker Relative Path Resolution & Parent Traversal Out of Project Root
 - [x] Fixed `FilePickerModal::new` in `crates/bashmenu-tui/src/modals/file_picker.rs`: resolved relative starting directories (such as `Path::new(".")`) into absolute canonical paths (`std::env::current_dir().join(start_dir).canonicalize()`). This keeps the file browser defaulting to the project directory upon launch as before, while properly providing the `.. (Parent Directory)` option so users can ascend cleanly out of the project root and navigate to any directory across the filesystem.
 - [x] Added integration test `test_file_picker_relative_dot_resolves_parent_navigation` in `crates/bashmenu-tui/tests/modals_test.rs` verifying that `current_dir` resolves to an absolute path, presents `.. (Parent Directory)`, navigates up to the parent directory on Enter, and continues offering parent traversal until reaching the filesystem root `/`.

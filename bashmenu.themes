@@ -3,6 +3,7 @@ abstract:
     char: •
     gap: 4
   indicator: '{nf:>:#f0b5b}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -918,6 +919,7 @@ alaska-mountain:
     char: •
     gap: 5
   indicator: '{nf:@::}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -1839,6 +1841,7 @@ alaska-train:
     char: •
     gap: 5
   indicator: '{nf:@:#f238:}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -2760,6 +2763,7 @@ amber_crt:
     char: '-'
     gap: 4
   indicator: '{nf:>:#f0379:}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -3675,6 +3679,7 @@ black-eyed-susans:
     char: •
     gap: 4
   indicator: '{nf::#f0d08}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -4590,6 +4595,7 @@ canopy:
     char: ' '
     gap: 4
   indicator: '{nf:>:#eee9:}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -5511,6 +5517,7 @@ cyberpunk:
     char: »
     gap: 4
   indicator: '{nf:>:#f07c0:}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ━
     border_vertical: ┃
@@ -6423,6 +6430,7 @@ dayscape:
     char: •
     gap: 5
   indicator: '{nf:@::}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -7353,6 +7361,7 @@ dracula:
     char: •
     gap: 4
   indicator: '{nf:@::}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -8262,6 +8271,7 @@ everforest:
     char: •
     gap: 4
   indicator: '{nf:^:#f06aa:}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -9174,6 +9184,7 @@ fall-tree:
     char: •
     gap: 5
   indicator: '{nf:@::}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -10095,6 +10106,7 @@ gruvbox:
     char: •
     gap: 4
   indicator: '{nf:&:#f0c6b:}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -11009,6 +11021,7 @@ happysun:
     char: •
     gap: 5
   indicator: '{nf:@::}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -11930,6 +11943,7 @@ hotdog_stand:
     char: '!'
     gap: 4
   indicator: '{nf:o.O:#e251:}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -12844,6 +12858,7 @@ industry:
     char: '|'
     gap: 4
   indicator: '{nf:#:#f0b46:}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: '{ascii:205}'
     border_vertical: '{ascii:186}'
@@ -13758,6 +13773,7 @@ lighthouse:
     char: •
     gap: 5
   indicator: '{nf:@::}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -14679,6 +14695,7 @@ matrix:
     char: •
     gap: 5
   indicator: '{nf:->:#f0628:}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -15593,6 +15610,7 @@ monochrome:
     char: ' '
     gap: 4
   indicator: '{nf:>:#eee9:}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -16505,6 +16523,7 @@ moonrise:
     char: •
     gap: 5
   indicator: '{nf:@:#f186:}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -17426,6 +17445,7 @@ morning-glory:
     char: •
     gap: 4
   indicator: '{nf:@:#f09f1}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -18341,6 +18361,7 @@ mountain:
     char: ''
     gap: 4
   indicator: '▶ '
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -19262,6 +19283,7 @@ nightscape:
     char: •
     gap: 5
   indicator: '{nf:@::}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -20183,6 +20205,7 @@ nord:
     char: ·
     gap: 4
   indicator: '{nf:#::}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -21097,6 +21120,7 @@ pacman:
     char: •
     gap: 3
   indicator: '{nf:):#f0baf:}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: '{ascii:223}'
     border_vertical: '{ascii:221}'
@@ -22016,6 +22040,7 @@ pinetree:
     char: •
     gap: 5
   indicator: '{nf:@::}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -22937,6 +22962,7 @@ portman-1:
     char: •
     gap: 4
   indicator: '{nf:=:#e21c}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -23852,6 +23878,7 @@ portman-2:
     char: •
     gap: 4
   indicator: '{nf:=:#f1bb}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -24767,6 +24794,7 @@ qbasic:
     char: '{ascii:32}'
     gap: 4
   indicator: '{ascii:240}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: '{ascii:205}'
     border_vertical: '{ascii:186}'
@@ -25682,6 +25710,7 @@ redgyle:
     char: •
     gap: 5
   indicator: '{nf:@::}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -26603,6 +26632,7 @@ rose_pine:
     char: ◇
     gap: 4
   indicator: '{nf:*:#f0851:}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -27517,6 +27547,7 @@ skagway:
     char: •
     gap: 5
   indicator: '{nf:@::}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -28438,6 +28469,7 @@ synthwave:
     char: ★
     gap: 4
   indicator: '{nf:>:#f147d:}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -29352,6 +29384,7 @@ tangyle:
     char: •
     gap: 5
   indicator: '{nf:@::}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -30273,6 +30306,7 @@ tokyo_night:
     char: ◆
     gap: 4
   indicator: '{nf:*:#f0766:}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -31187,6 +31221,7 @@ twilight:
     char: '~'
     gap: 4
   indicator: '{nf:*:◆}'
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
@@ -32108,6 +32143,7 @@ weave:
     char: •
     gap: 4
   indicator: '> '
+  default_icon: '{nf:>:#f105}'
   window:
     border_horizontal: ─
     border_vertical: │
