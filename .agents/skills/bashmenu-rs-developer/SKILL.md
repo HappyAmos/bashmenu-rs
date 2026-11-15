@@ -92,6 +92,13 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
   - **Pre-Baked / Cached Background Compositing:** In live preview widgets and main menus, cache base composited cell buffers. On cursor movement or highlight flashes, modify only the affected row cells rather than re-rendering background wallpapers or full canvas structures.
   - **Universal Selection & Clipboard (`bashmenu_tui::clipboard`):** All single-line (`TextInput`) and multi-line text inputs (`bashedit`, `NoteEditorModal`, `menuedit` multi-line fields) must support `Shift + Left/Right/Up/Down/Home/End` selection anchoring and `Ctrl+C`, `Ctrl+V`, `Ctrl+X`.
 - **Theme Palette & Token Parity:** `highlight: [fg, bg]` sets index 1 for background bar and index 0 for text foreground. `ThemeEditorState::tokens` must maintain 1:1 parity with `ResolvedThemeStyles` for all visual tokens (`title`, `window_close_button`, `footer`, etc.).
+- **Theme Editor Glyph Search Shortcut Invariant (`themeedit` <kbd>Ctrl+P</kbd>):**
+  - In `themeedit`, pressing <kbd>Ctrl+P</kbd> or clicking `[Ctrl+P] Glyphs` in the footer gutter opens the Nerd Font & Emoji search dialog (`InputModal` titled "Search Nerd Font & Emoji").
+  - Executing search runs `run_glyphs_search(&term)` via `scripts/glyphs.sh` (or adaptive fallback cheat sheet) and displays results in `HelpModal`.
+  - Shortcut is intercepted inside `IndicatorInput` and `DefaultIconInput` modals.
+- **Theme Default Icon & Universal Menu Item Fallback Invariant (`default_icon`):**
+  - Every theme in `bashmenu.themes` must specify `default_icon: '{nf:>:#f105}'`.
+  - All menu items lacking an explicitly configured icon must adopt the active theme's `default_icon` across `bashmenu` (`MenuView`), `menuedit` (tree hierarchy row icon slots, property inspector, item editor prefill and live preview), and `themeedit` (preview menu item 3 icon slot).
 - **Inactivity Timeout Reset Contract:** Returning from external tools, subshells, editors, and companion CLI commands must reset `last_activity = Instant::now()`.
 - **Horizontal Text Scrolling & Modal Viewports:** `TextInput` tracks `scroll_offset` to guarantee cursor visibility on navigation; item type modals dynamically size and scroll.
 - **Screen Transition Ubiquity & Zero-Dimension Guard:**

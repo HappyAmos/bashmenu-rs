@@ -1,3 +1,9 @@
+## Rules & Skills Invariants Update & Rules Budget Optimization
+- [x] Applied approved learning proposal: added Theme Editor Glyph Search Shortcut Invariant (`themeedit` `<ctrl> + <p>`) and Theme Default Icon & Universal Menu Item Fallback Invariant (`default_icon`) to `.agents/rules/invariants.md`.
+- [x] Streamlined and condensed narrative descriptions across `.agents/rules/invariants.md`, reducing total file size to 23,344 bytes (strictly within the Antigravity Customization System 24 KB / 24,000-byte per-file limit) while preserving all invariant names, technical contracts, keybindings, and rules.
+- [x] Updated `.agents/skills/bashmenu-rs-developer/SKILL.md` Section 2 to include Theme Editor `<ctrl> + <p>` glyph search and theme `default_icon` fallback developer invariants.
+- [x] Cleared completed learning task from `~/.config/bashmenu/notebooks/notes.yml` under `'TODO (Agent: Allowed):'`.
+
 ## Theme Editor `<Ctrl+P>` Shortcut to Launch Nerd Font & Emoji Search Tool
 - [x] Implemented `<ctrl> + <p>` (and `<ctrl> + <P>`) keyboard shortcut in `crates/themeedit-cli/src/main.rs` to launch the interactive Nerd Font & Emoji glyph search tool (`ActiveModal::GlyphSearch` / `InputModal`).
 - [x] Connected `run_glyphs_search(&term)` in `crates/bashmenu-core/src/glyph.rs` to execute `scripts/glyphs.sh` (or adaptive Nerd Font macro cheat sheet fallback), and displayed the formatted search results in a scrollable `HelpModal` dialog.
