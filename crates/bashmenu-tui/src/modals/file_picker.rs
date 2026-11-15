@@ -69,10 +69,21 @@ pub struct FilePickerModal {
 
 impl FilePickerModal {
     /// Constructs a new file picker starting at the specified path.
+    ///
+    /// Resolves relative paths (such as `Path::new(".")`) to absolute paths so
+    /// that parent traversal (`..`) can ascend out of the project directory.
     pub fn new(title: impl Into<String>, start_dir: &Path, only_dirs: bool) -> Self {
-        let current_dir = if start_dir.is_dir() {
+        let abs_start = if start_dir.is_absolute() {
             start_dir.to_path_buf()
-        } else if let Some(parent) = start_dir.parent() {
+        } else {
+            std::env::current_dir()
+                .map(|cwd| cwd.join(start_dir))
+                .unwrap_or_else(|_| start_dir.to_path_buf())
+        };
+        let canonical = abs_start.canonicalize().unwrap_or(abs_start);
+        let current_dir = if canonical.is_dir() {
+            canonical
+        } else if let Some(parent) = canonical.parent() {
             if parent.is_dir() {
                 parent.to_path_buf()
             } else {

@@ -322,6 +322,50 @@ fn test_file_picker_navigation() {
 }
 
 #[test]
+fn test_file_picker_relative_dot_resolves_parent_navigation() {
+    // When initialized with Path::new("."), picker must resolve to absolute path
+    // and provide ".. (Parent Directory)" allowing traversal outside project root.
+    let mut picker = FilePickerModal::new("Browse Directory", Path::new("."), false);
+    assert!(
+        picker.current_dir.is_absolute(),
+        "current_dir must be resolved to absolute path: {:?}",
+        picker.current_dir
+    );
+
+    // Initial item 0 must be ".. (Parent Directory)" when not at filesystem root
+    picker.selected_idx = 0;
+    assert_eq!(
+        picker.selected_item_name(),
+        Some(".. (Parent Directory)"),
+        "Picker initialized with '.' must offer '.. (Parent Directory)'"
+    );
+
+    let initial_dir = picker.current_dir.clone();
+    let expected_parent = initial_dir.parent().unwrap().to_path_buf();
+
+    // Select ".. (Parent Directory)" and press Enter to navigate up
+    let res = picker.handle_key(KeyCode::Enter);
+    assert!(
+        res.is_none(),
+        "Entering parent folder remains inside picker"
+    );
+    assert_eq!(
+        picker.current_dir, expected_parent,
+        "current_dir must advance to parent directory"
+    );
+
+    // In parent directory, ".. (Parent Directory)" must continue offering traversal
+    if expected_parent.parent().is_some() {
+        picker.selected_idx = 0;
+        assert_eq!(
+            picker.selected_item_name(),
+            Some(".. (Parent Directory)"),
+            "Parent directory listing must continue offering parent traversal"
+        );
+    }
+}
+
+#[test]
 fn test_file_picker_save_as_mode() {
     let temp_dir = std::env::temp_dir().join(format!("bm_test_fp_save_as_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&temp_dir);

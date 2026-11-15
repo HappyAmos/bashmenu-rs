@@ -1,3 +1,8 @@
+## File Picker Relative Path Resolution & Parent Traversal Out of Project Root
+- [x] Fixed `FilePickerModal::new` in `crates/bashmenu-tui/src/modals/file_picker.rs`: resolved relative starting directories (such as `Path::new(".")`) into absolute canonical paths (`std::env::current_dir().join(start_dir).canonicalize()`). This keeps the file browser defaulting to the project directory upon launch as before, while properly providing the `.. (Parent Directory)` option so users can ascend cleanly out of the project root and navigate to any directory across the filesystem.
+- [x] Added integration test `test_file_picker_relative_dot_resolves_parent_navigation` in `crates/bashmenu-tui/tests/modals_test.rs` verifying that `current_dir` resolves to an absolute path, presents `.. (Parent Directory)`, navigates up to the parent directory on Enter, and continues offering parent traversal until reaching the filesystem root `/`.
+- [x] Verified all tests pass, `cargo clippy` passes with zero warnings, formatted with `cargo fmt`, and reinstalled all 8 release binaries to `~/.local/bin/`.
+
 ## Generic Nerd Font Default Icon Theme Setting & MenuEdit Auto-Assign
 - [x] Added `default_icon` theme setting to `Theme` in `crates/bashmenu-core/src/theme.rs` (with default fallback constant `DEFAULT_ITEM_ICON: &str = "{nf:>:#f105}"`) and exposed `resolved_default_icon()` and `DEFAULT_ITEM_ICON` via `bashmenu-core/src/lib.rs`.
 - [x] Updated `ResolvedThemeStyles` in `crates/bashmenu-tui/src/style.rs` to include `default_icon` extracted from active theme, and updated `MenuView` in `crates/bashmenu-tui/src/menu_view.rs` to automatically fall back to `self.styles.default_icon` for menu items without an explicitly configured icon (`item.icon == None` or whitespace).
