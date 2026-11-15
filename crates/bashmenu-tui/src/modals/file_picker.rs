@@ -21,6 +21,19 @@ struct DirItem {
     path: PathBuf,
 }
 
+/// Focus state within the Save As file picker dialog.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FilePickerFocus {
+    /// File and directory list
+    List,
+    /// File name text input box
+    FileNameInput,
+    /// Save button
+    SaveButton,
+    /// Cancel button
+    CancelButton,
+}
+
 /// Interactive file and directory picker dialog
 #[derive(Debug, Clone)]
 pub struct FilePickerModal {
@@ -44,6 +57,14 @@ pub struct FilePickerModal {
     pub new_name_input: String,
     /// Whether hidden files and directories (dotfiles) are displayed
     pub show_hidden: bool,
+    /// Whether modal is operating as a 'Save As' destination picker dialog
+    pub is_save_as: bool,
+    /// Text input buffer for the destination file name in Save As mode
+    pub file_name_input: String,
+    /// Cursor position in characters within `file_name_input`
+    pub input_cursor_pos: usize,
+    /// Currently focused control in Save As mode
+    pub focused_control: FilePickerFocus,
 }
 
 impl FilePickerModal {
@@ -72,6 +93,10 @@ impl FilePickerModal {
             creating_new: false,
             new_name_input: String::new(),
             show_hidden: false,
+            is_save_as: false,
+            file_name_input: String::new(),
+            input_cursor_pos: 0,
+            focused_control: FilePickerFocus::List,
         };
         picker.refresh_entries();
         picker
@@ -90,7 +115,70 @@ impl FilePickerModal {
         self
     }
 
-    /// Toggles visibility of hidden dotfile entries and refreshes directory listing.
+    /// Configures modal as a 'Save As' dialog with a dedicated file name input
+    /// box and Save/Cancel buttons.
+    pub fn with_save_as(mut self, save_as: bool) -> Self {
+        self.is_save_as = save_as;
+        self
+    }
+
+    /// Sets the initial file name shown in the Save As text input box.
+    pub fn with_file_name(mut self, name: &str) -> Self {
+        self.file_name_input = name.to_string();
+        self.input_cursor_pos = self.file_name_input.chars().count();
+        self
+    }
+
+    /// Handles clipboard paste event into active text field
+    pub fn handle_paste(&mut self, text: &str) {
+        let clean: String = text.chars().filter(|c| *c != '\n' && *c != '\r').collect();
+        if clean.is_empty() {
+            return;
+        }
+        if self.is_save_as {
+            let mut chars: Vec<char> = self.file_name_input.chars().collect();
+            let pos = self.input_cursor_pos.min(chars.len());
+            for (i, ch) in clean.chars().enumerate() {
+                chars.insert(pos + i, ch);
+            }
+            self.input_cursor_pos += clean.chars().count();
+            self.file_name_input = chars.into_iter().collect();
+        } else if self.creating_new {
+            self.new_name_input.push_str(&clean);
+        }
+    }
+
+    /// Confirms saving the file in the selected directory using the entered
+    /// file name.
+    pub fn confirm_save(&mut self) -> Option<Option<PathBuf>> {
+        let trimmed = self.file_name_input.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+        let target_dir = if let Some(item) = self.items.get(self.selected_idx) {
+            if item.is_dir && item.name != ".. (Parent Directory)" {
+                item.path.clone()
+            } else {
+                self.current_dir.clone()
+            }
+        } else {
+            self.current_dir.clone()
+        };
+        Some(Some(target_dir.join(trimmed)))
+    }
+
+    /// Returns total number of discovered items in currently navigated directory
+    pub fn item_count(&self) -> usize {
+        self.items.len()
+    }
+
+    /// Returns display name of currently selected item, if any
+    pub fn selected_item_name(&self) -> Option<&str> {
+        self.items.get(self.selected_idx).map(|i| i.name.as_str())
+    }
+
+    /// Toggles visibility of hidden dotfile entries and refreshes directory
+    /// listing.
     pub fn toggle_hidden(&mut self) {
         self.show_hidden = !self.show_hidden;
         let prev_path = self.items.get(self.selected_idx).map(|i| i.path.clone());
@@ -173,7 +261,201 @@ impl FilePickerModal {
         code: KeyCode,
         modifiers: crossterm::event::KeyModifiers,
     ) -> Option<Option<PathBuf>> {
-        if self.creating_new {
+        if self.is_save_as {
+            if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
+                match code {
+                    KeyCode::Char('v') | KeyCode::Char('V') => {
+                        if let Some(text) = crate::clipboard::get_clipboard_text() {
+                            self.handle_paste(&text);
+                        }
+                        return None;
+                    }
+                    KeyCode::Char('c') | KeyCode::Char('C') => {
+                        if !self.file_name_input.is_empty() {
+                            crate::clipboard::set_clipboard_text(&self.file_name_input);
+                        }
+                        return None;
+                    }
+                    KeyCode::Char('u') | KeyCode::Char('U') => {
+                        self.file_name_input.clear();
+                        self.input_cursor_pos = 0;
+                        return None;
+                    }
+                    KeyCode::Char('a') | KeyCode::Char('A') => {
+                        self.input_cursor_pos = 0;
+                        return None;
+                    }
+                    KeyCode::Char('e') | KeyCode::Char('E') => {
+                        self.input_cursor_pos = self.file_name_input.chars().count();
+                        return None;
+                    }
+                    KeyCode::Char('h') | KeyCode::Char('H') => {
+                        self.toggle_hidden();
+                        return None;
+                    }
+                    _ => {}
+                }
+            }
+
+            match code {
+                KeyCode::Esc => return Some(None),
+                KeyCode::Tab => {
+                    self.focused_control = match self.focused_control {
+                        FilePickerFocus::FileNameInput => FilePickerFocus::SaveButton,
+                        FilePickerFocus::SaveButton => FilePickerFocus::CancelButton,
+                        FilePickerFocus::CancelButton => FilePickerFocus::List,
+                        FilePickerFocus::List => FilePickerFocus::FileNameInput,
+                    };
+                    return None;
+                }
+                KeyCode::BackTab => {
+                    self.focused_control = match self.focused_control {
+                        FilePickerFocus::FileNameInput => FilePickerFocus::List,
+                        FilePickerFocus::List => FilePickerFocus::CancelButton,
+                        FilePickerFocus::CancelButton => FilePickerFocus::SaveButton,
+                        FilePickerFocus::SaveButton => FilePickerFocus::FileNameInput,
+                    };
+                    return None;
+                }
+                _ => {}
+            }
+
+            match self.focused_control {
+                FilePickerFocus::FileNameInput => {
+                    let char_count = self.file_name_input.chars().count();
+                    if self.input_cursor_pos > char_count {
+                        self.input_cursor_pos = char_count;
+                    }
+                    match code {
+                        KeyCode::Enter => self.confirm_save(),
+                        KeyCode::Up => {
+                            self.focused_control = FilePickerFocus::List;
+                            None
+                        }
+                        KeyCode::Down => {
+                            self.focused_control = FilePickerFocus::SaveButton;
+                            None
+                        }
+                        KeyCode::Left => {
+                            if self.input_cursor_pos > 0 {
+                                self.input_cursor_pos -= 1;
+                            }
+                            None
+                        }
+                        KeyCode::Right => {
+                            if self.input_cursor_pos < char_count {
+                                self.input_cursor_pos += 1;
+                            }
+                            None
+                        }
+                        KeyCode::Home => {
+                            self.input_cursor_pos = 0;
+                            None
+                        }
+                        KeyCode::End => {
+                            self.input_cursor_pos = char_count;
+                            None
+                        }
+                        KeyCode::Backspace => {
+                            if self.input_cursor_pos > 0 {
+                                let mut chars: Vec<char> = self.file_name_input.chars().collect();
+                                chars.remove(self.input_cursor_pos - 1);
+                                self.file_name_input = chars.into_iter().collect();
+                                self.input_cursor_pos -= 1;
+                            }
+                            None
+                        }
+                        KeyCode::Delete => {
+                            if self.input_cursor_pos < char_count {
+                                let mut chars: Vec<char> = self.file_name_input.chars().collect();
+                                chars.remove(self.input_cursor_pos);
+                                self.file_name_input = chars.into_iter().collect();
+                            }
+                            None
+                        }
+                        KeyCode::Char(c) => {
+                            let mut chars: Vec<char> = self.file_name_input.chars().collect();
+                            let pos = self.input_cursor_pos.min(chars.len());
+                            chars.insert(pos, c);
+                            self.file_name_input = chars.into_iter().collect();
+                            self.input_cursor_pos += 1;
+                            None
+                        }
+                        _ => None,
+                    }
+                }
+                FilePickerFocus::SaveButton => match code {
+                    KeyCode::Enter | KeyCode::Char(' ') => self.confirm_save(),
+                    KeyCode::Right => {
+                        self.focused_control = FilePickerFocus::CancelButton;
+                        None
+                    }
+                    KeyCode::Left | KeyCode::Up => {
+                        self.focused_control = FilePickerFocus::FileNameInput;
+                        None
+                    }
+                    _ => None,
+                },
+                FilePickerFocus::CancelButton => match code {
+                    KeyCode::Enter | KeyCode::Char(' ') => Some(None),
+                    KeyCode::Left => {
+                        self.focused_control = FilePickerFocus::SaveButton;
+                        None
+                    }
+                    KeyCode::Up => {
+                        self.focused_control = FilePickerFocus::FileNameInput;
+                        None
+                    }
+                    _ => None,
+                },
+                FilePickerFocus::List => match code {
+                    KeyCode::Up | KeyCode::Char('k') => {
+                        if self.selected_idx > 0 {
+                            self.selected_idx -= 1;
+                            if let Some(item) = self.items.get(self.selected_idx) {
+                                if !item.is_dir {
+                                    self.file_name_input = item.name.clone();
+                                    self.input_cursor_pos = self.file_name_input.chars().count();
+                                }
+                            }
+                        }
+                        None
+                    }
+                    KeyCode::Down | KeyCode::Char('j') => {
+                        if !self.items.is_empty() && self.selected_idx + 1 < self.items.len() {
+                            self.selected_idx += 1;
+                            if let Some(item) = self.items.get(self.selected_idx) {
+                                if !item.is_dir {
+                                    self.file_name_input = item.name.clone();
+                                    self.input_cursor_pos = self.file_name_input.chars().count();
+                                }
+                            }
+                        } else {
+                            self.focused_control = FilePickerFocus::FileNameInput;
+                        }
+                        None
+                    }
+                    KeyCode::Enter => {
+                        if let Some(item) = self.items.get(self.selected_idx) {
+                            if item.is_dir {
+                                self.activate_selected()
+                            } else {
+                                self.file_name_input = item.name.clone();
+                                self.input_cursor_pos = self.file_name_input.chars().count();
+                                self.confirm_save()
+                            }
+                        } else {
+                            None
+                        }
+                    }
+                    KeyCode::Char('h') | KeyCode::Char('H') | KeyCode::Char('.') => {
+                        self.toggle_hidden();
+                        None
+                    }
+                    _ => None,
+                },
+            }
+        } else if self.creating_new {
             if modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
                 match code {
                     KeyCode::Char('v') | KeyCode::Char('V') => {
@@ -271,14 +553,17 @@ impl FilePickerModal {
     /// Returns the target dialog dimensions for this modal.
     pub fn dialog_dimensions(&self, area: Rect) -> (u16, u16) {
         let dialog_w = 70.min(area.width.saturating_sub(4));
-        let dialog_h = 22.min(area.height.saturating_sub(2));
+        let dialog_h = if self.is_save_as {
+            24.min(area.height.saturating_sub(2))
+        } else {
+            22.min(area.height.saturating_sub(2))
+        };
         (dialog_w, dialog_h)
     }
 
     /// Handles immediate mouse interaction
     pub fn handle_mouse(&mut self, mouse: MouseEvent, area: Rect) -> Option<Option<PathBuf>> {
-        let dialog_w = 70.min(area.width.saturating_sub(4));
-        let dialog_h = 22.min(area.height.saturating_sub(2));
+        let (dialog_w, dialog_h) = self.dialog_dimensions(area);
         let inner_area = super::frame::compute_modal_inner(area, dialog_w, dialog_h);
 
         if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
@@ -287,53 +572,108 @@ impl FilePickerModal {
             if super::frame::is_close_button_clicked(inner_area, row, col) {
                 return Some(None);
             }
-            let list_start_y = inner_area.y + 2;
-            let list_h = inner_area.height.saturating_sub(4);
 
-            if row >= list_start_y && row < list_start_y + list_h {
-                let clicked_idx = self.scroll_offset + (row - list_start_y) as usize;
-                if clicked_idx < self.items.len() {
-                    self.selected_idx = clicked_idx;
-                    return self.activate_selected();
-                }
-            } else if !self.creating_new {
+            if self.is_save_as {
+                let list_start_y = inner_area.y + 2;
+                let list_h = inner_area.height.saturating_sub(6);
+                let input_y = inner_area.y + inner_area.height.saturating_sub(3);
                 let btn_y = inner_area.y + inner_area.height.saturating_sub(1);
-                if row == btn_y {
+
+                if row >= list_start_y && row < list_start_y + list_h {
+                    let clicked_idx = self.scroll_offset + (row - list_start_y) as usize;
+                    if clicked_idx < self.items.len() {
+                        let is_already_selected = self.selected_idx == clicked_idx;
+                        self.selected_idx = clicked_idx;
+                        self.focused_control = FilePickerFocus::List;
+                        let item = &self.items[clicked_idx];
+                        if item.is_dir {
+                            if is_already_selected {
+                                return self.activate_selected();
+                            }
+                        } else {
+                            self.file_name_input = item.name.clone();
+                            self.input_cursor_pos = self.file_name_input.chars().count();
+                            if is_already_selected {
+                                return self.confirm_save();
+                            }
+                        }
+                    }
+                } else if row == input_y {
+                    self.focused_control = FilePickerFocus::FileNameInput;
+                    let label_len = " File name: [ ".len() as u16;
+                    let input_start_x = inner_area.x + 2 + label_len;
+                    if col >= input_start_x {
+                        let click_offset = (col - input_start_x) as usize;
+                        let char_count = self.file_name_input.chars().count();
+                        self.input_cursor_pos = click_offset.min(char_count);
+                    }
+                } else if row == btn_y {
                     let rel_x = col.saturating_sub(inner_area.x + 2) as usize;
                     let hidden_tag = if self.show_hidden {
                         "[h] Hide Hidden"
                     } else {
                         "[h] Show Hidden"
                     };
-                    let bottom_str = if self.allow_new {
-                        format!(
-                            "[Enter] Select   {}   [n] New File   [Esc] Cancel",
-                            hidden_tag
-                        )
-                    } else {
-                        format!("[Enter] Select   {}   [Esc] Cancel", hidden_tag)
-                    };
-                    if let Some(pos) = bottom_str.find("[Esc]") {
-                        if rel_x >= pos {
-                            return Some(None);
-                        }
+                    if rel_x < 10 {
+                        self.focused_control = FilePickerFocus::SaveButton;
+                        return self.confirm_save();
+                    } else if (11..23).contains(&rel_x) {
+                        self.focused_control = FilePickerFocus::CancelButton;
+                        return Some(None);
+                    } else if rel_x >= 25 && rel_x < 25 + hidden_tag.len() + 2 {
+                        self.toggle_hidden();
+                        return None;
                     }
-                    if let Some(pos) = bottom_str.find("[n] New File") {
-                        if rel_x >= pos && rel_x < pos + 12 && self.allow_new {
-                            self.creating_new = true;
-                            self.new_name_input.clear();
-                            return None;
-                        }
+                }
+            } else {
+                let list_start_y = inner_area.y + 2;
+                let list_h = inner_area.height.saturating_sub(4);
+
+                if row >= list_start_y && row < list_start_y + list_h {
+                    let clicked_idx = self.scroll_offset + (row - list_start_y) as usize;
+                    if clicked_idx < self.items.len() {
+                        self.selected_idx = clicked_idx;
+                        return self.activate_selected();
                     }
-                    if let Some(pos) = bottom_str.find(hidden_tag) {
-                        if rel_x >= pos && rel_x < pos + hidden_tag.len() {
-                            self.toggle_hidden();
-                            return None;
+                } else if !self.creating_new {
+                    let btn_y = inner_area.y + inner_area.height.saturating_sub(1);
+                    if row == btn_y {
+                        let rel_x = col.saturating_sub(inner_area.x + 2) as usize;
+                        let hidden_tag = if self.show_hidden {
+                            "[h] Hide Hidden"
+                        } else {
+                            "[h] Show Hidden"
+                        };
+                        let bottom_str = if self.allow_new {
+                            format!(
+                                "[Enter] Select   {}   [n] New File   [Esc] Cancel",
+                                hidden_tag
+                            )
+                        } else {
+                            format!("[Enter] Select   {}   [Esc] Cancel", hidden_tag)
+                        };
+                        if let Some(pos) = bottom_str.find("[Esc]") {
+                            if rel_x >= pos {
+                                return Some(None);
+                            }
                         }
-                    }
-                    if let Some(pos) = bottom_str.find("[Enter] Select") {
-                        if rel_x >= pos && rel_x < pos + 14 {
-                            return self.activate_selected();
+                        if let Some(pos) = bottom_str.find("[n] New File") {
+                            if rel_x >= pos && rel_x < pos + 12 && self.allow_new {
+                                self.creating_new = true;
+                                self.new_name_input.clear();
+                                return None;
+                            }
+                        }
+                        if let Some(pos) = bottom_str.find(hidden_tag) {
+                            if rel_x >= pos && rel_x < pos + hidden_tag.len() {
+                                self.toggle_hidden();
+                                return None;
+                            }
+                        }
+                        if let Some(pos) = bottom_str.find("[Enter] Select") {
+                            if rel_x >= pos && rel_x < pos + 14 {
+                                return self.activate_selected();
+                            }
                         }
                     }
                 }
@@ -348,7 +688,8 @@ impl FilePickerModal {
         None
     }
 
-    /// Activates selected directory item (entering subfolder) or selected file (returning chosen path).
+    /// Activates selected directory item (entering subfolder) or selected file
+    /// (returning chosen path).
     fn activate_selected(&mut self) -> Option<Option<PathBuf>> {
         if self.items.is_empty() {
             return None;
@@ -366,9 +707,7 @@ impl FilePickerModal {
 
     /// Renders file picker dialog
     pub fn render(&mut self, area: Rect, styles: &ResolvedThemeStyles, buf: &mut Buffer) -> Rect {
-        let dialog_w = 70.min(area.width.saturating_sub(4));
-        let dialog_h = 22.min(area.height.saturating_sub(2));
-
+        let (dialog_w, dialog_h) = self.dialog_dimensions(area);
         let inner = render_modal_frame(area, dialog_w, dialog_h, &self.title, styles, buf);
 
         // 1. Current Directory Path Banner
@@ -384,7 +723,11 @@ impl FilePickerModal {
 
         // 2. Entries Viewport List
         let list_y = inner.y + 2;
-        let list_h = inner.height.saturating_sub(4) as usize;
+        let list_h = if self.is_save_as {
+            inner.height.saturating_sub(6) as usize
+        } else {
+            inner.height.saturating_sub(4) as usize
+        };
         let list_w = inner.width.saturating_sub(2) as usize;
 
         if self.selected_idx < self.scroll_offset {
@@ -426,29 +769,119 @@ impl FilePickerModal {
             buf.set_line(inner.x + 1, row_y, &line, list_w as u16);
         }
 
-        // 3. Bottom controls / New File input
-        let btn_y = inner.y + inner.height.saturating_sub(1);
-        let ctrl_w = inner.width.saturating_sub(4) as usize;
-        if self.creating_new {
-            let prompt = format!(" New file name: [{}]_ ", self.new_name_input);
-            let clipped_prompt: String = prompt.chars().take(ctrl_w).collect();
-            buf.set_string(inner.x + 2, btn_y, &clipped_prompt, styles.highlight);
-        } else {
+        // 3. Bottom controls / Save As inputs
+        if self.is_save_as {
+            let sep_y = inner.y + inner.height.saturating_sub(4);
+            let sep_w = inner.width.saturating_sub(2) as usize;
+            buf.set_string(inner.x + 1, sep_y, "─".repeat(sep_w), styles.footer);
+
+            let input_y = inner.y + inner.height.saturating_sub(3);
+            let is_input_focused = self.focused_control == FilePickerFocus::FileNameInput;
+            let input_label = " File name: [ ";
+            buf.set_string(
+                inner.x + 2,
+                input_y,
+                input_label,
+                if is_input_focused {
+                    styles.accent.add_modifier(Modifier::BOLD)
+                } else {
+                    styles.text
+                },
+            );
+
+            let input_content_x = inner.x + 2 + input_label.len() as u16;
+            let max_input_w = inner.width.saturating_sub(4 + input_label.len() as u16 + 2) as usize;
+
+            let chars: Vec<char> = self.file_name_input.chars().collect();
+            let cursor_pos = self.input_cursor_pos.min(chars.len());
+
+            let mut input_spans = Vec::new();
+            if is_input_focused {
+                let pre: String = chars[..cursor_pos].iter().collect();
+                let cursor_ch = chars.get(cursor_pos).copied().unwrap_or(' ');
+                let post: String = if cursor_pos < chars.len() {
+                    chars[cursor_pos + 1..].iter().collect()
+                } else {
+                    String::new()
+                };
+
+                input_spans.push(Span::styled(pre, styles.highlight));
+                input_spans.push(Span::styled(
+                    cursor_ch.to_string(),
+                    styles.highlight.add_modifier(Modifier::REVERSED),
+                ));
+                input_spans.push(Span::styled(post, styles.highlight));
+            } else {
+                input_spans.push(Span::styled(&self.file_name_input, styles.text));
+            }
+            input_spans.push(Span::styled(
+                " ]",
+                if is_input_focused {
+                    styles.accent.add_modifier(Modifier::BOLD)
+                } else {
+                    styles.text
+                },
+            ));
+
+            let input_line = Line::from(input_spans);
+            buf.set_line(
+                input_content_x,
+                input_y,
+                &input_line,
+                max_input_w as u16 + 2,
+            );
+
+            let btn_y = inner.y + inner.height.saturating_sub(1);
+            let save_focused = self.focused_control == FilePickerFocus::SaveButton;
+            let cancel_focused = self.focused_control == FilePickerFocus::CancelButton;
+
+            let save_style = if save_focused {
+                styles.highlight.add_modifier(Modifier::BOLD)
+            } else {
+                styles.accent.add_modifier(Modifier::BOLD)
+            };
+            let cancel_style = if cancel_focused {
+                styles.highlight.add_modifier(Modifier::BOLD)
+            } else {
+                styles.text
+            };
+
+            buf.set_string(inner.x + 2, btn_y, "[ Save ]", save_style);
+            buf.set_string(inner.x + 13, btn_y, "[ Cancel ]", cancel_style);
+
             let hidden_tag = if self.show_hidden {
                 "[h] Hide Hidden"
             } else {
                 "[h] Show Hidden"
             };
-            let bottom_str = if self.allow_new {
-                format!(
-                    "[Enter] Select   {}   [n] New File   [Esc] Cancel",
-                    hidden_tag
-                )
+            let hidden_x = (inner.x + inner.width).saturating_sub(hidden_tag.len() as u16 + 2);
+            if hidden_x > inner.x + 25 {
+                buf.set_string(hidden_x, btn_y, hidden_tag, styles.gutter);
+            }
+        } else {
+            let btn_y = inner.y + inner.height.saturating_sub(1);
+            let ctrl_w = inner.width.saturating_sub(4) as usize;
+            if self.creating_new {
+                let prompt = format!(" New file name: [{}]_ ", self.new_name_input);
+                let clipped_prompt: String = prompt.chars().take(ctrl_w).collect();
+                buf.set_string(inner.x + 2, btn_y, &clipped_prompt, styles.highlight);
             } else {
-                format!("[Enter] Select   {}   [Esc] Cancel", hidden_tag)
-            };
-            let clipped_bottom: String = bottom_str.chars().take(ctrl_w).collect();
-            buf.set_string(inner.x + 2, btn_y, &clipped_bottom, styles.gutter);
+                let hidden_tag = if self.show_hidden {
+                    "[h] Hide Hidden"
+                } else {
+                    "[h] Show Hidden"
+                };
+                let bottom_str = if self.allow_new {
+                    format!(
+                        "[Enter] Select   {}   [n] New File   [Esc] Cancel",
+                        hidden_tag
+                    )
+                } else {
+                    format!("[Enter] Select   {}   [Esc] Cancel", hidden_tag)
+                };
+                let clipped_bottom: String = bottom_str.chars().take(ctrl_w).collect();
+                buf.set_string(inner.x + 2, btn_y, &clipped_bottom, styles.gutter);
+            }
         }
 
         inner

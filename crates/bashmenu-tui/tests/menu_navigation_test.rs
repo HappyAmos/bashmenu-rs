@@ -409,8 +409,8 @@ fn test_bbcode_placeholder_and_right_aligned_brackets() {
                 "Expanded path must be present in label: {}",
                 line_str
             );
-            // Verify bracket is right-aligned: ends near column 78 (before border at 79)
-            let trimmed = line_str[..79].trim_end();
+            // Verify bracket is right-aligned: ends near right margin (before border at 79)
+            let trimmed = line_str.trim_end_matches(['│', ' ']);
             assert!(
                 trimmed.ends_with(']'),
                 "Square bracket must be right-aligned near the right margin: {}",
@@ -566,9 +566,19 @@ fn test_menu_highlight_bar_unbroken_full_width() {
         "Shortcut key number '1' must be highlighted"
     );
     assert_eq!(
+        buf[(9, row_y)].fg,
+        Color::Black,
+        "Shortcut key on active item must adopt Highlight Text Color"
+    );
+    assert_eq!(
         buf[(10, row_y)].bg,
         Color::Cyan,
         "Shortcut key dot '.' must be highlighted"
+    );
+    assert_eq!(
+        buf[(10, row_y)].fg,
+        Color::Black,
+        "Shortcut key dot on active item must adopt Highlight Text Color"
     );
     assert_eq!(
         buf[(11, row_y)].bg,
@@ -1441,4 +1451,52 @@ fn test_framed_toast_style_rendering() {
         .filter(|&y| (0..area.width).any(|x| buf_bar[(x, y)].symbol() == "▌"))
         .count();
     assert_eq!(bar_rows, 4);
+}
+
+#[test]
+fn test_menu_view_default_icon_fallback_for_items_without_icon() {
+    use bashmenu_core::{MenuItem, MenuItemType, MenuSchema};
+
+    let item_with_icon = MenuItem {
+        label: "Item With Icon".to_string(),
+        r#type: MenuItemType::Command,
+        command: Some("echo 1".to_string()),
+        icon: Some("🚀".to_string()),
+        ..Default::default()
+    };
+    let item_without_icon = MenuItem {
+        label: "Item Without Icon".to_string(),
+        r#type: MenuItemType::Command,
+        command: Some("echo 2".to_string()),
+        icon: None,
+        ..Default::default()
+    };
+
+    let schema = MenuSchema {
+        title: "Test Menu".to_string(),
+        items: vec![item_with_icon, item_without_icon],
+        ..Default::default()
+    };
+
+    let styles = ResolvedThemeStyles {
+        default_icon: "{nf:>:#f105}".to_string(),
+        ..Default::default()
+    };
+
+    let mut view = MenuView::new(schema, styles, false, "Status".to_string());
+    let area = Rect::new(0, 0, 80, 24);
+    let mut buf = Buffer::empty(area);
+    view.render(area, &mut buf);
+
+    // Verify row 2 (index 1: item without icon) rendered with fallback '>'
+    let mut row2_text = String::new();
+    for x in 0..area.width {
+        row2_text.push_str(buf[(x, 3)].symbol());
+    }
+    assert!(
+        row2_text.contains('>'),
+        "Item without icon must fall back to default icon glyph: {}",
+        row2_text
+    );
+    assert!(row2_text.contains("Item Without Icon"));
 }

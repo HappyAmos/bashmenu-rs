@@ -16,18 +16,46 @@ pub struct ThemePickerModal {
     pub selected_idx: usize,
     /// Vertical scroll offset in lines
     pub scroll_offset: usize,
+    /// Currently configured theme name for selection restoration
+    pub current_theme: String,
 }
 
 impl ThemePickerModal {
     /// Constructs a theme picker modal with alphabetically sorted theme names.
     pub fn new(mut themes: Vec<String>, current_theme: &str) -> Self {
         Self::sort_themes(&mut themes);
-        let selected_idx = themes.iter().position(|t| t == current_theme).unwrap_or(0);
+        let selected_idx = themes
+            .iter()
+            .position(|t| t.eq_ignore_ascii_case(current_theme))
+            .unwrap_or(0);
         Self {
             themes,
             selected_idx,
             scroll_offset: selected_idx.saturating_sub(5),
+            current_theme: current_theme.to_string(),
         }
+    }
+
+    /// Builder method to ensure '[ Random ]' option is present at the top of
+    /// the theme list.
+    pub fn with_random_option(mut self) -> Self {
+        self.themes
+            .retain(|t| !bashmenu_core::is_random_theme_spec(t));
+        Self::sort_themes(&mut self.themes);
+        self.themes
+            .insert(0, bashmenu_core::RANDOM_THEME_LABEL.to_string());
+        if bashmenu_core::is_random_theme_spec(&self.current_theme) {
+            self.selected_idx = 0;
+            self.scroll_offset = 0;
+        } else if let Some(pos) = self
+            .themes
+            .iter()
+            .position(|t| t.eq_ignore_ascii_case(&self.current_theme))
+        {
+            self.selected_idx = pos;
+            self.scroll_offset = pos.saturating_sub(5);
+        }
+        self
     }
 
     /// Sorts theme names alphabetically (case-insensitively, with deterministic tie-breaking).

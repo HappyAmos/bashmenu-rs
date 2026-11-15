@@ -619,6 +619,7 @@ fn main() -> Result<()> {
                                     } else {
                                         let mut it = MenuItem {
                                             label: format!("New {}", chosen_type),
+                                            icon: Some(styles.default_icon.clone()),
                                             ..Default::default()
                                         };
                                         mutate_item_type(&mut it, &chosen_type);

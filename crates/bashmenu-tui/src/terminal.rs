@@ -1,7 +1,9 @@
 //! Terminal lifecycle management, raw mode setup, and subprocess suspension.
 
 use crossterm::cursor::{Hide, Show};
-use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture};
+use crossterm::event::{
+    self, DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
+};
 use crossterm::execute;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
@@ -97,9 +99,15 @@ impl TerminalGuard {
         enable_raw_mode()?;
         let mut stdout = BufWriter::new(io::stdout());
         if keep_alt_on_drop {
-            execute!(stdout, EnableMouseCapture, Hide)?;
+            execute!(stdout, EnableBracketedPaste, EnableMouseCapture, Hide)?;
         } else {
-            execute!(stdout, EnterAlternateScreen, EnableMouseCapture, Hide)?;
+            execute!(
+                stdout,
+                EnterAlternateScreen,
+                EnableBracketedPaste,
+                EnableMouseCapture,
+                Hide
+            )?;
         }
         let _ = stdout.flush();
         let suppress_stdout = Arc::new(AtomicBool::new(false));
@@ -932,7 +940,12 @@ impl TerminalGuard {
         }
 
         disable_raw_mode()?;
-        execute!(self.terminal.backend_mut(), DisableMouseCapture, Show)?;
+        execute!(
+            self.terminal.backend_mut(),
+            DisableBracketedPaste,
+            DisableMouseCapture,
+            Show
+        )?;
         let _ = self.terminal.backend_mut().flush();
 
         let prev_env = std::env::var("BASHMENU_CHILD_ALT").ok();
@@ -950,6 +963,7 @@ impl TerminalGuard {
         execute!(
             self.terminal.backend_mut(),
             EnterAlternateScreen,
+            EnableBracketedPaste,
             EnableMouseCapture,
             Hide
         )?;
@@ -987,6 +1001,7 @@ impl TerminalGuard {
         execute!(
             self.terminal.backend_mut(),
             LeaveAlternateScreen,
+            DisableBracketedPaste,
             DisableMouseCapture,
             Show
         )?;
@@ -1001,6 +1016,7 @@ impl TerminalGuard {
         execute!(
             self.terminal.backend_mut(),
             EnterAlternateScreen,
+            EnableBracketedPaste,
             EnableMouseCapture,
             Hide
         )?;
@@ -1102,11 +1118,16 @@ impl Drop for TerminalGuard {
         }
 
         if self.keep_alt_on_drop {
-            let _ = execute!(self.terminal.backend_mut(), DisableMouseCapture);
+            let _ = execute!(
+                self.terminal.backend_mut(),
+                DisableBracketedPaste,
+                DisableMouseCapture
+            );
         } else {
             let _ = execute!(
                 self.terminal.backend_mut(),
                 LeaveAlternateScreen,
+                DisableBracketedPaste,
                 DisableMouseCapture,
                 Show
             );
@@ -1159,6 +1180,8 @@ pub fn ensure_terminal_sane() {
             }
         }
     }
+    let _ = io::stdout().write_all(b"\x1b[?2004l");
+    let _ = io::stdout().flush();
 }
 
 /// No-op fallback for non-unix targets.

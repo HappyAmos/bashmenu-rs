@@ -238,9 +238,12 @@ fn make_save_as_modal(tab: &EditorBuffer) -> FilePickerModal {
         .and_then(|p| p.parent())
         .map(|p| p.to_path_buf())
         .unwrap_or(home_dir);
-    let mut picker = FilePickerModal::new("Save File As", &start_dir, false).with_allow_new(true);
+    let mut picker = FilePickerModal::new("Save File As", &start_dir, false).with_save_as(true);
     if let Some(ref path) = tab.file_path {
         picker = picker.with_initial_selection(path);
+        if let Some(fname) = path.file_name().and_then(|s| s.to_str()) {
+            picker = picker.with_file_name(fname);
+        }
     }
     picker
 }
@@ -1916,8 +1919,12 @@ fn handle_active_modal(
         }
         ActiveModal::SaveAs(modal) => {
             let submitted = match ev {
-                Event::Key(k) => modal.handle_key(k.code),
+                Event::Key(k) => modal.handle_key_with_modifiers(k.code, k.modifiers),
                 Event::Mouse(m) => modal.handle_mouse(*m, area),
+                Event::Paste(text) => {
+                    modal.handle_paste(text);
+                    None
+                }
                 _ => None,
             };
             if let Some(opt_path) = submitted {
@@ -1935,6 +1942,10 @@ fn handle_active_modal(
             let submitted = match ev {
                 Event::Key(k) => modal.handle_key_with_modifiers(k.code, k.modifiers),
                 Event::Mouse(m) => modal.handle_mouse(*m, area),
+                Event::Paste(text) => {
+                    modal.paste(text);
+                    None
+                }
                 _ => None,
             };
             if let Some(opt_query) = submitted {
@@ -1950,8 +1961,12 @@ fn handle_active_modal(
         }
         ActiveModal::OpenFile(modal) => {
             let chosen = match ev {
-                Event::Key(k) => modal.handle_key(k.code),
+                Event::Key(k) => modal.handle_key_with_modifiers(k.code, k.modifiers),
                 Event::Mouse(m) => modal.handle_mouse(*m, area),
+                Event::Paste(text) => {
+                    modal.handle_paste(text);
+                    None
+                }
                 _ => None,
             };
             if let Some(opt_path) = chosen {

@@ -1915,3 +1915,23 @@ fn test_menuedit_insert_and_delete_keys() {
     assert!(is_delete_key(KeyCode::Delete));
     assert!(!is_delete_key(KeyCode::Char('x')));
 }
+
+#[test]
+fn test_menuedit_new_item_adopts_default_icon() {
+    use bashmenu_core::DEFAULT_ITEM_ICON;
+    use menuedit_cli::ItemEditModal;
+
+    let default_icon = DEFAULT_ITEM_ICON.to_string();
+    let new_item = MenuItem {
+        label: "New command".to_string(),
+        r#type: MenuItemType::Command,
+        icon: Some(default_icon.clone()),
+        ..Default::default()
+    };
+
+    let modal = ItemEditModal::new(&new_item);
+    assert_eq!(modal.icon_input.as_string(), default_icon);
+
+    let saved_item = modal.build_updated_item();
+    assert_eq!(saved_item.icon.as_deref(), Some(default_icon.as_str()));
+}

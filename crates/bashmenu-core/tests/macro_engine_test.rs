@@ -35,6 +35,19 @@ fn test_status_gutter_interpolation() {
 }
 
 #[test]
+fn test_config_dir_alias_to_bashmenu_dir() {
+    let config = BashMenuConfig::default();
+    let mut ctx = MacroContext::new(&config);
+    ctx.bashmenu_dir = std::path::PathBuf::from("/etc/bashmenu_custom");
+
+    let result = interpolate_placeholders("Path: {config_dir}/scripts", &ctx);
+    assert_eq!(result, "Path: /etc/bashmenu_custom/scripts");
+
+    let both = interpolate_placeholders("{bashmenu_dir} == {config_dir}", &ctx);
+    assert_eq!(both, "/etc/bashmenu_custom == /etc/bashmenu_custom");
+}
+
+#[test]
 fn test_icon_slot_4_columns_strict_invariant() {
     // 2-column emoji (rocket, game, globe)
     for emoji in &["🚀", "🎮", "🌐"] {

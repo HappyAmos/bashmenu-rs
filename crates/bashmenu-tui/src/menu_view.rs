@@ -17,7 +17,7 @@ use bashmenu_core::{
 use crossterm::event::{KeyCode, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Color, Modifier};
 use ratatui::text::{Line, Span};
 
 /// Outcome of handling a user input event
@@ -1268,10 +1268,12 @@ impl MenuView {
                 "  "
             };
 
-            let resolved_icon = item
+            let raw_icon = item
                 .icon
                 .as_deref()
-                .map(|ic| interpolate_placeholders(ic, &macro_ctx));
+                .filter(|s| !s.trim().is_empty())
+                .unwrap_or(self.styles.default_icon.as_str());
+            let resolved_icon = Some(interpolate_placeholders(raw_icon, &macro_ctx));
             let icon_slot = format_icon_slot(resolved_icon.as_deref(), self.use_nerd_fonts);
 
             let shortcut = if self.show_shortcuts {
@@ -1309,10 +1311,7 @@ impl MenuView {
             ];
             if !shortcut.is_empty() {
                 let sc_style = if is_active {
-                    Style::default()
-                        .fg(self.styles.shortcut_key.fg.unwrap_or(Color::Magenta))
-                        .bg(self.styles.highlight.bg.unwrap_or(Color::Cyan))
-                        .add_modifier(Modifier::BOLD)
+                    self.styles.highlight.add_modifier(Modifier::BOLD)
                 } else {
                     self.styles.shortcut_key
                 };

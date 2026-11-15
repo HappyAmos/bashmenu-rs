@@ -217,3 +217,23 @@ fn test_env_environment_info_modal_formatting() {
         h
     );
 }
+
+#[test]
+fn test_theme_picker_includes_random_option() {
+    use bashmenu_tui::ThemePickerModal;
+
+    let themes = vec!["nord".to_string(), "dracula".to_string()];
+    let picker = ThemePickerModal::new(themes.clone(), "nord").with_random_option();
+    // [ Random ] must be at index 0 (top of the list) in brackets
+    assert_eq!(
+        picker.themes[0], "[ Random ]",
+        "ThemePickerModal with_random_option must place '[ Random ]' at top of list"
+    );
+    assert_eq!(picker.themes[1], "dracula");
+    assert_eq!(picker.themes[2], "nord");
+    assert_eq!(picker.selected_idx, 2); // "nord" selected
+
+    // When initialized with "[ Random ]", selected_idx should be 0
+    let picker_random = ThemePickerModal::new(themes, "[ Random ]").with_random_option();
+    assert_eq!(picker_random.selected_idx, 0);
+}

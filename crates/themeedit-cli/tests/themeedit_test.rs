@@ -1709,14 +1709,14 @@ fn test_themeedit_highlight_text_token_configuration() {
     assert_eq!(styles.highlight.fg, Some(Color::Indexed(46)));
     assert_eq!(styles.highlight.bg, init_styles.highlight.bg);
 
-    // 6. Preview spans for highlight_text flash the text span
+    // 6. Preview spans for highlight_text flash the entire text and shortcut span
     let right_area = Rect::new(30, 0, 50, 20);
     let spans = get_token_preview_spans(&text_token, right_area, PreviewMode::Menu, &styles);
     assert_eq!(spans.len(), 1);
     let (sy, sx1, sx2) = spans[0];
     assert_eq!(sy, right_area.y + 2);
     assert_eq!(sx1, right_area.x + 4);
-    assert_eq!(sx2, right_area.x + 26);
+    assert_eq!(sx2, right_area.x + 30);
 }
 
 #[test]
@@ -1885,13 +1885,17 @@ fn test_preview_faux_plugin_uniform_color_and_shortcuts() {
         }
     }
 
-    // 2. Verify shortcut numbers/letters are rendered on all menu items with shortcut_key color
+    // 2. Verify active item shortcut adopts highlight text color, while inactive items use shortcut_key color
     let content_start_y = area.y + 2;
-    // Active Item 1 shortcut "1."
+    // Active Item 1 shortcut "1." adopts highlight text color
     assert_eq!(buf[(p_inner_x + 6, content_start_y)].symbol(), "1");
     assert_eq!(
         buf[(p_inner_x + 6, content_start_y)].fg,
-        styles.shortcut_key.fg.unwrap()
+        styles.highlight.fg.unwrap()
+    );
+    assert_eq!(
+        buf[(p_inner_x + 6, content_start_y)].bg,
+        styles.highlight.bg.unwrap()
     );
     // Inactive Item 2 shortcut "2."
     assert_eq!(buf[(p_inner_x + 6, content_start_y + 1)].symbol(), "2");
@@ -1912,26 +1916,38 @@ fn test_preview_faux_plugin_uniform_color_and_shortcuts() {
         styles.shortcut_key.fg.unwrap()
     );
 
-    // 3. Verify get_token_preview_spans for shortcut_key returns menu item shortcut spans
+    // 3. Verify get_token_preview_spans for shortcut_key returns only inactive menu item shortcut spans
     let sc_token = state
         .tokens
         .iter()
         .find(|t| t.label.contains("Shortcut Gutter"))
         .unwrap();
     let spans = get_token_preview_spans(sc_token, area, PreviewMode::Menu, &styles);
-    assert_eq!(spans.len(), 4);
-    assert_eq!(spans[0], (content_start_y, p_inner_x + 6, p_inner_x + 9));
+    assert_eq!(spans.len(), 3);
     assert_eq!(
-        spans[1],
+        spans[0],
         (content_start_y + 1, p_inner_x + 6, p_inner_x + 9)
     );
     assert_eq!(
-        spans[2],
+        spans[1],
         (content_start_y + 2, p_inner_x + 6, p_inner_x + 9)
     );
     assert_eq!(
-        spans[3],
+        spans[2],
         (content_start_y + 4, p_inner_x + 6, p_inner_x + 9)
+    );
+
+    // 4. Verify get_token_preview_spans for highlight_text covers active item including shortcut
+    let hl_text_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label.contains("Highlight Text Color"))
+        .unwrap();
+    let hl_text_spans = get_token_preview_spans(hl_text_token, area, PreviewMode::Menu, &styles);
+    assert_eq!(hl_text_spans.len(), 1);
+    assert_eq!(
+        hl_text_spans[0],
+        (content_start_y, p_inner_x + 2, p_inner_x + 28)
     );
 }
 
@@ -2720,4 +2736,65 @@ fn test_derive_colors_confirmation_modal_and_execution() {
     let res = state.derive_colors_from_wallpaper();
     assert!(res.is_ok());
     assert!(state.is_modified);
+}
+
+#[test]
+fn test_theme_default_icon_token_configuration_and_persistence() {
+    use bashmenu_core::DEFAULT_ITEM_ICON;
+    use bashmenu_tui::ResolvedThemeStyles;
+    use ratatui::layout::Rect;
+    use themeedit_cli::{get_token_preview_spans, PreviewMode, TokenCategory, TokenKind};
+
+    let tmp_dir = std::env::temp_dir().join(format!("theme_def_icon_test_{}", std::process::id()));
+    let _ = fs::create_dir_all(&tmp_dir);
+    let tmp_file = tmp_dir.join("bashmenu.themes");
+
+    let fixture_path = get_fixture_path("bashmenu.themes");
+    fs::copy(&fixture_path, &tmp_file).unwrap();
+
+    let mut state = ThemeEditorState::new(tmp_file.clone(), Some("dracula".to_string()));
+
+    // 1. Verify Default Icon token is categorized under Theme:
+    let icon_token = state
+        .tokens
+        .iter()
+        .find(|t| t.label == "Default Icon")
+        .cloned()
+        .expect("Default Icon token must exist");
+    assert_eq!(icon_token.category(), TokenCategory::Theme);
+    assert_eq!(icon_token.kind, TokenKind::DefaultIcon);
+
+    // 2. Default display falls back to DEFAULT_ITEM_ICON
+    let display_initial = state.get_token_value_display(&icon_token);
+    assert!(display_initial.contains(DEFAULT_ITEM_ICON));
+
+    // 3. Select token by key aliases
+    assert!(state.select_token_by_key("default_icon"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Default Icon");
+    assert!(state.select_token_by_key("icon"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Default Icon");
+
+    // 4. Update default icon
+    state.set_default_icon("{nf:*:#f005}".to_string());
+    assert!(state.is_modified);
+    assert_eq!(state.current_theme.resolved_default_icon(), "{nf:*:#f005}");
+
+    // 5. Save and roundtrip persistence
+    state.save_to_disk().unwrap();
+    let reloaded = ThemeEditorState::new(tmp_file, Some("dracula".to_string()));
+    assert_eq!(
+        reloaded.current_theme.resolved_default_icon(),
+        "{nf:*:#f005}"
+    );
+
+    // 6. Preview spans match item 3 icon slot (4 columns)
+    let area = Rect::new(0, 0, 80, 24);
+    let styles = ResolvedThemeStyles::from_theme(&reloaded.current_theme, true);
+    let spans = get_token_preview_spans(&icon_token, area, PreviewMode::Menu, &styles);
+    assert_eq!(spans.len(), 1);
+    assert_eq!(spans[0].0, area.y + 4); // content_start_y + 2
+    assert_eq!(spans[0].1, area.x + 4); // p_inner_x + 2
+    assert_eq!(spans[0].2, area.x + 8); // p_inner_x + 6
+
+    let _ = fs::remove_dir_all(&tmp_dir);
 }

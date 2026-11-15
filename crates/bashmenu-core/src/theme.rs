@@ -396,6 +396,10 @@ pub struct Theme {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub indicator: Option<String>,
 
+    /// Default menu item icon for items without an explicitly configured icon
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_icon: Option<String>,
+
     /// Window borders and frame glyphs
     #[serde(skip_serializing_if = "Option::is_none")]
     pub window: Option<WindowBorders>,
@@ -447,6 +451,15 @@ impl Theme {
         None
     }
 
+    /// Resolves the default icon for menu items, falling back to
+    /// `DEFAULT_ITEM_ICON`.
+    pub fn resolved_default_icon(&self) -> &str {
+        self.default_icon
+            .as_deref()
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or(DEFAULT_ITEM_ICON)
+    }
+
     /// Creates a base monochrome theme with clean single-line borders,
     /// white-on-black/transparent text, and standard indicators.
     pub fn monochrome() -> Self {
@@ -466,6 +479,7 @@ impl Theme {
         };
         t.window = Some(borders);
         t.indicator = Some("> ".to_string());
+        t.default_icon = Some(DEFAULT_ITEM_ICON.to_string());
         t.divider = Some(DividerConfig {
             char: Some("─".to_string()),
             length: Some("{window_width}".to_string()),
@@ -515,6 +529,21 @@ impl Theme {
         t.colors_256 = Some(colors);
         t
     }
+}
+
+/// Default menu item glyph for items without an explicitly configured icon.
+pub const DEFAULT_ITEM_ICON: &str = "{nf:>:#f105}";
+
+/// Special identifier constant for pseudo-random theme selection.
+pub const RANDOM_THEME_LABEL: &str = "[ Random ]";
+
+/// Checks if a theme string specifies random theme selection.
+/// Matches "[ Random ]", "[Random]", or "Random" (case-insensitively).
+pub fn is_random_theme_spec(name: &str) -> bool {
+    let trimmed = name.trim();
+    trimmed.eq_ignore_ascii_case("[ Random ]")
+        || trimmed.eq_ignore_ascii_case("[Random]")
+        || trimmed.eq_ignore_ascii_case("Random")
 }
 
 /// Type alias for all loaded themes mapped by theme name
@@ -572,5 +601,24 @@ mod tests {
             assert!(dracula.colors_256.is_some());
             assert!(dracula.window.is_some());
         }
+    }
+
+    #[test]
+    fn test_theme_default_icon_resolution() {
+        let mut theme = Theme::default();
+        assert_eq!(theme.default_icon, None);
+        assert_eq!(theme.resolved_default_icon(), DEFAULT_ITEM_ICON);
+        assert_eq!(DEFAULT_ITEM_ICON, "{nf:>:#f105}");
+
+        theme.default_icon = Some("{nf:*:#f005}".to_string());
+        assert_eq!(theme.resolved_default_icon(), "{nf:*:#f005}");
+
+        // Empty or whitespace falls back to default
+        theme.default_icon = Some("   ".to_string());
+        assert_eq!(theme.resolved_default_icon(), DEFAULT_ITEM_ICON);
+
+        let mono = Theme::monochrome();
+        assert_eq!(mono.resolved_default_icon(), DEFAULT_ITEM_ICON);
+        assert_eq!(mono.default_icon.as_deref(), Some(DEFAULT_ITEM_ICON));
     }
 }

@@ -20,6 +20,7 @@
 //!    notifications.
 
 use anyhow::Result;
+use bashmenu_core::theme::Theme;
 use bashmenu_core::{
     add_or_update_note, build_notebook_submenu, clear_command_cache, delete_note, extract_toasts,
     get_note_by_title, interpolate_placeholders, load_config, load_menu, load_notebook,
@@ -38,6 +39,7 @@ use bashmenu_tui::{
 };
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode};
+use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -261,6 +263,37 @@ fn locate_tool(name: &str) -> PathBuf {
     PathBuf::from(name)
 }
 
+/// Selects a pseudo-random theme from available themes, skipping random specs.
+fn pick_random_theme(themes: &HashMap<String, Theme>) -> Option<(&str, &Theme)> {
+    let eligible: Vec<(&str, &Theme)> = themes
+        .iter()
+        .filter(|(k, _)| !bashmenu_core::is_random_theme_spec(k))
+        .map(|(k, v)| (k.as_str(), v))
+        .collect();
+    if eligible.is_empty() {
+        return None;
+    }
+    let seed = if let Ok(mut f) = fs::File::open("/dev/urandom") {
+        use std::io::Read;
+        let mut buf = [0u8; 8];
+        if f.read_exact(&mut buf).is_ok() {
+            u64::from_ne_bytes(buf)
+        } else {
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos() as u64)
+                .unwrap_or(42)
+        }
+    } else {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos() as u64)
+            .unwrap_or(42)
+    };
+    let idx = (seed as usize) % eligible.len();
+    Some(eligible[idx])
+}
+
 /// Main application entrypoint for `bashmenu`.
 fn main() -> Result<()> {
     // 1. Terminal Panic Recovery Hook Invariant
@@ -432,7 +465,11 @@ fn main() -> Result<()> {
 
     let mut use_nerd =
         config.settings.use_nerd_fonts.unwrap_or(true) && !on_linux_console && fb_device.is_none();
-    let active_theme = themes.get(&config.theme);
+    let active_theme = if bashmenu_core::is_random_theme_spec(&config.theme) {
+        pick_random_theme(&themes).map(|(_, t)| t)
+    } else {
+        themes.get(&config.theme)
+    };
     let (mut styles, mut modal_styles, mut toast_styles) =
         resolve_bashmenu_styles(active_theme, use_nerd, config.settings.toast_timeout);
 
@@ -856,7 +893,12 @@ fn main() -> Result<()> {
                             config.theme = new_theme;
                             save_config_or_toast(&config_path, &config, &mut toast_rack);
                             menu_view.set_config(config.clone());
-                            if let Some(t) = themes.get(&config.theme) {
+                            let resolved_t = if bashmenu_core::is_random_theme_spec(&config.theme) {
+                                pick_random_theme(&themes).map(|(_, t)| t)
+                            } else {
+                                themes.get(&config.theme)
+                            };
+                            if let Some(t) = resolved_t {
                                 (styles, modal_styles, toast_styles) = resolve_bashmenu_styles(
                                     Some(t),
                                     use_nerd,
@@ -878,6 +920,10 @@ fn main() -> Result<()> {
                     let submitted = match ev {
                         Event::Key(key) => modal.handle_key_with_modifiers(key.code, key.modifiers),
                         Event::Mouse(mouse) => modal.handle_mouse(mouse, area),
+                        Event::Paste(text) => {
+                            modal.paste(text.as_str());
+                            None
+                        }
                         _ => None,
                     };
                     if let Some(opt_val) = submitted {
@@ -1078,6 +1124,10 @@ fn main() -> Result<()> {
                     let action = match ev {
                         Event::Key(key) => modal.handle_key(key.code, key.modifiers),
                         Event::Mouse(mouse) => modal.handle_mouse(mouse, area),
+                        Event::Paste(text) => {
+                            modal.paste_text(text.as_str());
+                            NoteEditorAction::None
+                        }
                         _ => NoteEditorAction::None,
                     };
                     match action {
@@ -1139,6 +1189,10 @@ fn main() -> Result<()> {
                     let submitted = match ev {
                         Event::Key(key) => modal.handle_key_with_modifiers(key.code, key.modifiers),
                         Event::Mouse(mouse) => modal.handle_mouse(mouse, area),
+                        Event::Paste(text) => {
+                            modal.paste(text.as_str());
+                            None
+                        }
                         _ => None,
                     };
                     if let Some(opt_val) = submitted {
@@ -1160,6 +1214,10 @@ fn main() -> Result<()> {
                     let submitted = match ev {
                         Event::Key(key) => modal.handle_key_with_modifiers(key.code, key.modifiers),
                         Event::Mouse(mouse) => modal.handle_mouse(mouse, area),
+                        Event::Paste(text) => {
+                            modal.paste(text.as_str());
+                            None
+                        }
                         _ => None,
                     };
                     if let Some(opt_val) = submitted {
@@ -1455,7 +1513,13 @@ fn main() -> Result<()> {
                                     && !guard.has_framebuffer();
                                 use_nerd = unf;
                                 menu_view.set_use_nerd_fonts(unf);
-                                if let Some(t) = themes.get(&config.theme) {
+                                let resolved_t =
+                                    if bashmenu_core::is_random_theme_spec(&config.theme) {
+                                        pick_random_theme(&themes).map(|(_, t)| t)
+                                    } else {
+                                        themes.get(&config.theme)
+                                    };
+                                if let Some(t) = resolved_t {
                                     (styles, modal_styles, toast_styles) = resolve_bashmenu_styles(
                                         Some(t),
                                         use_nerd,
@@ -1481,6 +1545,10 @@ fn main() -> Result<()> {
                     let submitted = match ev {
                         Event::Key(key) => modal.handle_key_with_modifiers(key.code, key.modifiers),
                         Event::Mouse(mouse) => modal.handle_mouse(mouse, area),
+                        Event::Paste(text) => {
+                            modal.paste(text.as_str());
+                            None
+                        }
                         _ => None,
                     };
                     if let Some(opt_val) = submitted {
@@ -1507,7 +1575,13 @@ fn main() -> Result<()> {
                                 || key_path == "app.settings.toast_timeout"
                                 || key_path == "app.settings.toast.timeout"
                             {
-                                if let Some(t) = themes.get(&config.theme) {
+                                let resolved_t =
+                                    if bashmenu_core::is_random_theme_spec(&config.theme) {
+                                        pick_random_theme(&themes).map(|(_, t)| t)
+                                    } else {
+                                        themes.get(&config.theme)
+                                    };
+                                if let Some(t) = resolved_t {
                                     (styles, modal_styles, toast_styles) = resolve_bashmenu_styles(
                                         Some(t),
                                         use_nerd,
@@ -1533,6 +1607,10 @@ fn main() -> Result<()> {
                     let submitted = match ev {
                         Event::Key(key) => modal.handle_key_with_modifiers(key.code, key.modifiers),
                         Event::Mouse(mouse) => modal.handle_mouse(mouse, area),
+                        Event::Paste(text) => {
+                            modal.paste(text.as_str());
+                            None
+                        }
                         _ => None,
                     };
                     if let Some(opt_val) = submitted {
@@ -1612,8 +1690,12 @@ fn main() -> Result<()> {
                 }
                 ActiveModal::ItemFilePicker(item, is_dir, modal) => {
                     let chosen = match ev {
-                        Event::Key(key) => modal.handle_key(key.code),
+                        Event::Key(key) => modal.handle_key_with_modifiers(key.code, key.modifiers),
                         Event::Mouse(mouse) => modal.handle_mouse(mouse, area),
+                        Event::Paste(text) => {
+                            modal.handle_paste(text.as_str());
+                            None
+                        }
                         _ => None,
                     };
                     if let Some(opt_path) = chosen {
@@ -1930,10 +2012,10 @@ fn main() -> Result<()> {
                         }
                         MenuAction::ThemeSelector => {
                             let theme_names: Vec<String> = themes.keys().cloned().collect();
-                            active_modal = ActiveModal::ThemePicker(ThemePickerModal::new(
-                                theme_names,
-                                &config.theme,
-                            ));
+                            active_modal = ActiveModal::ThemePicker(
+                                ThemePickerModal::new(theme_names, &config.theme)
+                                    .with_random_option(),
+                            );
                         }
                         MenuAction::LaunchEditor => {
                             let editor_bin = locate_tool("bashedit");
@@ -2028,7 +2110,12 @@ fn main() -> Result<()> {
                             if let Ok(new_themes) = load_themes(&themes_path) {
                                 themes = new_themes;
                             }
-                            let active_theme = themes.get(&config.theme);
+                            let active_theme = if bashmenu_core::is_random_theme_spec(&config.theme)
+                            {
+                                pick_random_theme(&themes).map(|(_, t)| t)
+                            } else {
+                                themes.get(&config.theme)
+                            };
                             (styles, modal_styles, toast_styles) = resolve_bashmenu_styles(
                                 active_theme,
                                 use_nerd,
@@ -2364,10 +2451,10 @@ fn main() -> Result<()> {
                                 || matches!(item.r#type, MenuItemType::Other(ref s) if s == "theme_selector")
                             {
                                 let theme_names: Vec<String> = themes.keys().cloned().collect();
-                                active_modal = ActiveModal::ThemePicker(ThemePickerModal::new(
-                                    theme_names,
-                                    &config.theme,
-                                ));
+                                active_modal = ActiveModal::ThemePicker(
+                                    ThemePickerModal::new(theme_names, &config.theme)
+                                        .with_random_option(),
+                                );
                             } else if item.r#type == MenuItemType::Confirm
                                 || matches!(item.r#type, MenuItemType::Other(ref s) if s == "confirm")
                             {

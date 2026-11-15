@@ -227,12 +227,9 @@ pub fn render_preview_pane_with_base(
             let content_start_y = p_inner_y;
             let content_avail_h = gt_y.saturating_sub(content_start_y) as usize;
 
-            // Active item
+            // Active item: shortcut text adopts highlight text color matching bashmenu
             let ind = &preview_styles.indicator_symbol;
-            let active_sc_style = Style::default()
-                .fg(preview_styles.shortcut_key.fg.unwrap_or(Color::Magenta))
-                .bg(preview_styles.highlight.bg.unwrap_or(Color::Cyan))
-                .add_modifier(Modifier::BOLD);
+            let active_sc_style = preview_styles.highlight.add_modifier(Modifier::BOLD);
             let mut active_spans = vec![
                 Span::styled(ind, preview_styles.highlight),
                 Span::styled("🚀  ", preview_styles.highlight),
@@ -274,10 +271,12 @@ pub fn render_preview_pane_with_base(
             ]);
             buf.set_line(p_inner_x, content_start_y + 1, &normal_line, p_avail_w);
 
-            // Inactive item 3
+            // Inactive item 3: uses theme default icon for items without an explicit icon
+            let item3_icon =
+                bashmenu_core::format_icon_slot(Some(&preview_styles.default_icon), true);
             let normal_line2 = Line::from(vec![
                 Span::raw("  "),
-                Span::styled("⚙   ", preview_styles.text),
+                Span::styled(item3_icon, preview_styles.text),
                 Span::styled("3. ", preview_styles.shortcut_key),
                 Span::styled("System Configuration", preview_styles.text),
             ]);

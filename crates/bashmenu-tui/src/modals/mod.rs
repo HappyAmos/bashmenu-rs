@@ -22,7 +22,7 @@ pub use background_config::{
 };
 pub use color_picker::{ColorPickerModal, ColorPickerTab};
 pub use confirm::{ConfirmChoice, ConfirmModal};
-pub use file_picker::FilePickerModal;
+pub use file_picker::{FilePickerFocus, FilePickerModal};
 pub use frame::{
     compute_modal_inner, compute_modal_rect, draw_box_drop_shadow, is_close_button_clicked,
     render_animated_modal_frame, render_modal_frame,

@@ -348,6 +348,8 @@ pub struct ResolvedThemeStyles {
     pub window_close_button: Style,
     /// Selection indicator symbol (e.g. `> `)
     pub indicator_symbol: String,
+    /// Default menu item icon glyph definition (e.g. `"{nf:>:#f105}"`)
+    pub default_icon: String,
     /// Resolved box-drawing glyphs for window borders
     pub borders: ResolvedWindowBorders,
     /// Visual layout style for toast notification popups
@@ -402,6 +404,7 @@ impl Default for ResolvedThemeStyles {
             marquee_gap: 4,
             window_close_button: Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
             indicator_symbol: "► ".to_string(),
+            default_icon: bashmenu_core::DEFAULT_ITEM_ICON.to_string(),
             borders: ResolvedWindowBorders::default(),
             toast_style: bashmenu_core::ToastStyle::default(),
             toast_bar_char: "▌".to_string(),
@@ -781,6 +784,8 @@ impl ResolvedThemeStyles {
             }
         }
 
+        resolved.default_icon = theme.resolved_default_icon().to_string();
+
         // Divider configuration
         if let Some(div) = &theme.divider {
             if let Some(ch) = &div.char {
@@ -967,5 +972,18 @@ mod tests {
         let styles = ResolvedThemeStyles::from_theme_with_tier(&theme, false, ColorTier::Color8);
         assert_eq!(styles.title.fg, Some(Color::Magenta));
         assert_eq!(styles.border, Color::Cyan);
+    }
+
+    #[test]
+    fn test_resolved_theme_styles_default_icon() {
+        let styles = ResolvedThemeStyles::default();
+        assert_eq!(styles.default_icon, bashmenu_core::DEFAULT_ITEM_ICON);
+
+        let theme = Theme {
+            default_icon: Some("{nf:*:#f005}".to_string()),
+            ..Default::default()
+        };
+        let resolved = ResolvedThemeStyles::from_theme(&theme, true);
+        assert_eq!(resolved.default_icon, "{nf:*:#f005}");
     }
 }

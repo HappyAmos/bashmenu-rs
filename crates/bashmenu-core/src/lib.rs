@@ -46,7 +46,8 @@ pub use shortcuts::{
     save_shortcuts, validate_key_spec, ShortcutEntry, ShortcutsConfig, SHORTCUTS_HEADER,
 };
 pub use theme::{
-    activity_override_tokens, default_activity_overrides_map, is_scalar_color_token, load_themes,
-    save_themes, DividerConfig, MarqueeConfig, Theme, ThemeCollection, ToastConfig, ToastStyle,
-    WallpaperConfig, WallpaperSetting, WindowBorders, ACTIVITY_OVERRIDE_KEYS,
+    activity_override_tokens, default_activity_overrides_map, is_random_theme_spec,
+    is_scalar_color_token, load_themes, save_themes, DividerConfig, MarqueeConfig, Theme,
+    ThemeCollection, ToastConfig, ToastStyle, WallpaperConfig, WallpaperSetting, WindowBorders,
+    ACTIVITY_OVERRIDE_KEYS, DEFAULT_ITEM_ICON, RANDOM_THEME_LABEL,
 };

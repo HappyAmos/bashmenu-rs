@@ -372,6 +372,71 @@ fn test_save_as_file_picker_workflow() {
 }
 
 #[test]
+fn test_bashedit_save_as_dialog_with_input_box_and_buttons() {
+    use bashmenu_tui::{FilePickerFocus, FilePickerModal};
+    use crossterm::event::{KeyCode, KeyModifiers};
+
+    let tmp_dir = std::env::temp_dir().join(format!("bashedit_saveas_gui_{}", std::process::id()));
+    let _ = fs::remove_dir_all(&tmp_dir);
+    fs::create_dir_all(&tmp_dir).unwrap();
+
+    let sub_folder = tmp_dir.join("docs");
+    fs::create_dir_all(&sub_folder).unwrap();
+
+    let mut buf = EditorBuffer::new_empty();
+    buf.insert_char('A');
+    buf.insert_char('B');
+    buf.insert_char('C');
+
+    // Simulate opening Save As modal via with_save_as
+    let mut picker = FilePickerModal::new("Save File As", &tmp_dir, false)
+        .with_save_as(true)
+        .with_file_name("untitled.txt");
+
+    assert!(picker.is_save_as);
+    // Dialog loads with focus on top control: List
+    assert_eq!(picker.focused_control, FilePickerFocus::List);
+    assert_eq!(picker.file_name_input, "untitled.txt");
+
+    // Hit Tab to jump immediately to "File name:" input field
+    picker.handle_key(KeyCode::Tab);
+    assert_eq!(picker.focused_control, FilePickerFocus::FileNameInput);
+
+    // Clear file name and enter "my_script.sh"
+    picker.handle_key_with_modifiers(KeyCode::Char('u'), KeyModifiers::CONTROL);
+    assert_eq!(picker.file_name_input, "");
+
+    for c in "my_script.sh".chars() {
+        picker.handle_key(KeyCode::Char(c));
+    }
+    assert_eq!(picker.file_name_input, "my_script.sh");
+
+    // Select the "docs" folder in the file browser area
+    picker.focused_control = FilePickerFocus::List;
+    while picker.selected_item_name() != Some("docs")
+        && picker.selected_idx + 1 < picker.item_count()
+    {
+        picker.handle_key(KeyCode::Down);
+    }
+    assert_eq!(picker.selected_item_name(), Some("docs"));
+
+    // Switch focus back to the text input box and press Enter to confirm saving
+    picker.focused_control = FilePickerFocus::FileNameInput;
+    let chosen = picker.handle_key(KeyCode::Enter);
+    assert_eq!(chosen, Some(Some(sub_folder.join("my_script.sh"))));
+
+    let final_path = chosen.unwrap().unwrap();
+    buf.set_file_path(final_path.clone());
+    buf.save_to_disk().unwrap();
+    assert!(final_path.exists());
+    assert_eq!(fs::read_to_string(&final_path).unwrap(), "ABC");
+
+    // Clean up
+    let _ = fs::remove_file(&final_path);
+    let _ = fs::remove_dir_all(&tmp_dir);
+}
+
+#[test]
 fn test_editor_buffer_shift_directional_selection() {
     let mut buf = EditorBuffer::new_empty();
     buf.lines = vec!["Line 1: abc".to_string(), "Line 2: def".to_string()];

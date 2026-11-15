@@ -42,11 +42,11 @@ pub use modals::{
     compute_modal_inner, compute_modal_rect, draw_box_drop_shadow, is_close_button_clicked,
     render_animated_modal_frame, render_modal_frame, wrap_prompt_text, AsciiGridModal,
     BackgroundConfigAction, BackgroundConfigModal, BackgroundFocus, ColorGridModal,
-    ColorPickerModal, ColorPickerTab, ConfirmChoice, ConfirmModal, FilePickerModal, HelpModal,
-    InputModal, MessageModal, NoteConflictChoice, NoteConflictModal, NoteEditorAction,
-    NoteEditorModal, NoteViewerAction, NoteViewerModal, RadioModal, StreamOutputAction,
-    StreamOutputModal, StreamOutputMsg, ThemePickerModal, ToggleChoice, ToggleModal, MODE_OPTIONS,
-    SCALING_OPTIONS,
+    ColorPickerModal, ColorPickerTab, ConfirmChoice, ConfirmModal, FilePickerFocus,
+    FilePickerModal, HelpModal, InputModal, MessageModal, NoteConflictChoice, NoteConflictModal,
+    NoteEditorAction, NoteEditorModal, NoteViewerAction, NoteViewerModal, RadioModal,
+    StreamOutputAction, StreamOutputModal, StreamOutputMsg, ThemePickerModal, ToggleChoice,
+    ToggleModal, MODE_OPTIONS, SCALING_OPTIONS,
 };
 pub use shortcuts_overlay::{key_event_to_token, ShortcutDispatchResult, ShortcutDispatcher};
 pub use style::{

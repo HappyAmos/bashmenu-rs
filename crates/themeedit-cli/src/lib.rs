@@ -68,6 +68,8 @@ pub enum TokenKind {
     Border(String),
     /// Active selection indicator symbol
     Indicator,
+    /// Default menu item icon glyph definition (e.g., "{nf:>:#f105}")
+    DefaultIcon,
     /// Section divider rule character
     DividerChar,
     /// Section divider rule length expression
@@ -116,6 +118,7 @@ impl TokenItem {
             | TokenKind::WallpaperClustering
             | TokenKind::WallpaperQuantization
             | TokenKind::Indicator
+            | TokenKind::DefaultIcon
             | TokenKind::DividerChar
             | TokenKind::DividerLength
             | TokenKind::MarqueeChar
@@ -366,6 +369,10 @@ impl ThemeEditorState {
                 kind: TokenKind::Indicator,
             },
             TokenItem {
+                label: "Default Icon".to_string(),
+                kind: TokenKind::DefaultIcon,
+            },
+            TokenItem {
                 label: "Wallpaper Image".to_string(),
                 kind: TokenKind::WallpaperImage,
             },
@@ -605,6 +612,7 @@ impl ThemeEditorState {
         };
         t.window = Some(borders);
         t.indicator = Some("> ".to_string());
+        t.default_icon = Some(bashmenu_core::DEFAULT_ITEM_ICON.to_string());
 
         let mut colors = HashMap::new();
         colors.insert(
@@ -773,6 +781,15 @@ impl ThemeEditorState {
             }
             TokenKind::Indicator => {
                 let raw = self.current_theme.indicator.as_deref().unwrap_or("> ");
+                let resolved = bashmenu_core::resolve_glyph(raw, true);
+                if resolved != raw {
+                    format!("'{}' ({})", resolved, raw)
+                } else {
+                    format!("'{}'", raw)
+                }
+            }
+            TokenKind::DefaultIcon => {
+                let raw = self.current_theme.resolved_default_icon();
                 let resolved = bashmenu_core::resolve_glyph(raw, true);
                 if resolved != raw {
                     format!("'{}' ({})", resolved, raw)
@@ -1169,6 +1186,18 @@ impl ThemeEditorState {
         self.current_theme.indicator = Some(val.clone());
         self.is_modified = true;
         self.status_message = format!("Updated indicator symbol to '{}'", val);
+    }
+
+    /// Updates default menu item icon (e.g. `"{nf:>:#f105}"`).
+    pub fn set_default_icon(&mut self, icon: String) {
+        let trimmed = icon.trim().to_string();
+        self.current_theme.default_icon = if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.clone())
+        };
+        self.is_modified = true;
+        self.status_message = format!("Updated default icon to '{}'", trimmed);
     }
 
     /// Updates the character glyph used for divider rules.
@@ -1575,6 +1604,9 @@ impl ThemeEditorState {
                 TokenKind::Border(k) => k == key,
                 TokenKind::Indicator => {
                     key == "indicator" || key == "selection_indicator" || key == "cursor_indicator"
+                }
+                TokenKind::DefaultIcon => {
+                    key == "default_icon" || key == "icon" || key == "menu_icon"
                 }
                 TokenKind::DividerChar => key == "divider_char",
                 TokenKind::DividerLength => key == "divider_length",
@@ -2241,7 +2273,7 @@ pub fn get_token_preview_spans(
             spans.push((content_start_y, p_inner_x, p_inner_x + p_avail_w));
         }
         TokenKind::Color(key) if key == "highlight_text" => {
-            spans.push((content_start_y, p_inner_x + 2, p_inner_x + 24));
+            spans.push((content_start_y, p_inner_x + 2, p_inner_x + 28));
         }
         TokenKind::Color(key) if key == "selection" => {
             if mode == PreviewMode::TextEditor {
@@ -2273,8 +2305,7 @@ pub fn get_token_preview_spans(
             spans.push((content_start_y + 1, p_inner_x + 25, p_inner_x + 28));
         }
         TokenKind::Color(key) if key == "shortcut_key" => {
-            // Shortcut keys in menu items
-            spans.push((content_start_y, p_inner_x + 6, p_inner_x + 9));
+            // Shortcut keys in inactive menu items (active item shortcut adopts highlight_text)
             spans.push((content_start_y + 1, p_inner_x + 6, p_inner_x + 9));
             spans.push((content_start_y + 2, p_inner_x + 6, p_inner_x + 9));
             spans.push((content_start_y + 4, p_inner_x + 6, p_inner_x + 9));
@@ -2282,6 +2313,9 @@ pub fn get_token_preview_spans(
         TokenKind::Indicator => {
             let ind_w = preview_styles.indicator_symbol.width().max(2) as u16;
             spans.push((content_start_y, p_inner_x, p_inner_x + ind_w));
+        }
+        TokenKind::DefaultIcon => {
+            spans.push((content_start_y + 2, p_inner_x + 2, p_inner_x + 6));
         }
         TokenKind::Color(key) if key == "divider" => {
             spans.push((content_start_y + 3, p_inner_x, p_inner_x + p_avail_w));

@@ -27,6 +27,7 @@ pub const PLACEHOLDER_HELP_TEXT: &str = "\
 {dev_dir}                    │ Repository root directory where project resides
 {dev}                        │ Alias for {dev_dir}
 {bashmenu_dir}               │ Application root directory
+{config_dir}                 │ Alias for {bashmenu_dir}
 {scripts_dir}                │ Scripts directory path
 {scripts}                    │ Alias for {scripts_dir}
 {templates_dir}              │ Templates directory path

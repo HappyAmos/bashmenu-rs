@@ -75,6 +75,21 @@ impl InputModal {
         }
     }
 
+    /// Pastes text at cursor position, replacing active selection if present.
+    pub fn paste(&mut self, text: &str) {
+        self.delete_selection();
+        let clean: String = text.chars().filter(|c| *c != '\n' && *c != '\r').collect();
+        if !clean.is_empty() {
+            let mut chars: Vec<char> = self.value.chars().collect();
+            let pos = self.cursor_pos.min(chars.len());
+            for (idx, ch) in clean.chars().enumerate() {
+                chars.insert(pos + idx, ch);
+            }
+            self.cursor_pos = pos + clean.chars().count();
+            self.value = chars.into_iter().collect();
+        }
+    }
+
     /// Handles keyboard input with modifiers.
     pub fn handle_key_with_modifiers(
         &mut self,
@@ -116,17 +131,7 @@ impl InputModal {
                 }
                 KeyCode::Char('v') | KeyCode::Char('V') => {
                     if let Some(text) = crate::clipboard::get_clipboard_text() {
-                        self.delete_selection();
-                        let clean: String =
-                            text.chars().filter(|c| *c != '\n' && *c != '\r').collect();
-                        if !clean.is_empty() {
-                            let mut chars: Vec<char> = self.value.chars().collect();
-                            for (idx, ch) in clean.chars().enumerate() {
-                                chars.insert(self.cursor_pos + idx, ch);
-                            }
-                            self.cursor_pos += clean.chars().count();
-                            self.value = chars.into_iter().collect();
-                        }
+                        self.paste(&text);
                     }
                     return None;
                 }

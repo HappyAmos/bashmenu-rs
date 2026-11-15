@@ -71,6 +71,8 @@ enum ActiveModal {
     AsciiPicker(String, AsciiGridModal),
     /// Selection indicator configuration dialog.
     IndicatorInput(InputModal),
+    /// Default menu item icon configuration dialog.
+    DefaultIconInput(InputModal),
     /// "Save As" theme name input dialog.
     SaveAs(InputModal),
     /// "New Theme" name input dialog.
@@ -460,6 +462,9 @@ fn main() -> Result<()> {
                     ActiveModal::IndicatorInput(modal) => {
                         modal.render(area, &preview_styles, buf);
                     }
+                    ActiveModal::DefaultIconInput(modal) => {
+                        modal.render(area, &preview_styles, buf);
+                    }
                     ActiveModal::SaveAs(modal) => {
                         modal.render(area, &preview_styles, buf);
                     }
@@ -633,6 +638,43 @@ fn main() -> Result<()> {
                                     message: format!(
                                         "Indicator set to '{}'",
                                         state.current_theme.indicator.as_deref().unwrap_or("> ")
+                                    ),
+                                    severity: ToastSeverity::Information,
+                                    timeout_secs: 2.0,
+                                });
+                            }
+                            active_modal = ActiveModal::None;
+                        }
+                    }
+                    _ => {}
+                },
+                ActiveModal::DefaultIconInput(modal) => match ev {
+                    Event::Key(k) => {
+                        if let Some(res) = modal.handle_key_with_modifiers(k.code, k.modifiers) {
+                            if let Some(val) = res {
+                                state.set_default_icon(val);
+                                toast_rack.add(ToastNotification {
+                                    title: Some("Theme Editor".to_string()),
+                                    message: format!(
+                                        "Default icon set to '{}'",
+                                        state.current_theme.resolved_default_icon()
+                                    ),
+                                    severity: ToastSeverity::Information,
+                                    timeout_secs: 2.0,
+                                });
+                            }
+                            active_modal = ActiveModal::None;
+                        }
+                    }
+                    Event::Mouse(m) => {
+                        if let Some(res) = modal.handle_mouse(m, area) {
+                            if let Some(val) = res {
+                                state.set_default_icon(val);
+                                toast_rack.add(ToastNotification {
+                                    title: Some("Theme Editor".to_string()),
+                                    message: format!(
+                                        "Default icon set to '{}'",
+                                        state.current_theme.resolved_default_icon()
                                     ),
                                     severity: ToastSeverity::Information,
                                     timeout_secs: 2.0,
@@ -1635,6 +1677,22 @@ fn main() -> Result<()> {
                                             severity: ToastSeverity::Information,
                                             timeout_secs: 2.0,
                                         });
+                                    } else if matches!(
+                                        state.tokens[state.selected_idx].kind,
+                                        TokenKind::DefaultIcon
+                                    ) {
+                                        state.set_default_icon(
+                                            bashmenu_core::DEFAULT_ITEM_ICON.to_string(),
+                                        );
+                                        toast_rack.add(ToastNotification {
+                                            title: Some("Theme Editor".to_string()),
+                                            message: format!(
+                                                "Default icon reset to '{}'",
+                                                bashmenu_core::DEFAULT_ITEM_ICON
+                                            ),
+                                            severity: ToastSeverity::Information,
+                                            timeout_secs: 2.0,
+                                        });
                                     } else {
                                         active_modal =
                                             ActiveModal::ConfirmDelete(ConfirmModal::new(
@@ -1774,6 +1832,14 @@ fn open_selected_token_picker(state: &mut ThemeEditorState, active_modal: &mut A
             *active_modal = ActiveModal::IndicatorInput(InputModal::new(
                 "Configure Indicator",
                 "Enter indicator symbol (e.g. '> ', '▶ ', '{ascii:240}', '{nf:...}'):",
+                current_val,
+            ));
+        }
+        TokenKind::DefaultIcon => {
+            let current_val = state.current_theme.resolved_default_icon();
+            *active_modal = ActiveModal::DefaultIconInput(InputModal::new(
+                "Configure Default Icon",
+                "Enter default menu item icon (e.g. '{nf:>:#f105}'):",
                 current_val,
             ));
         }
@@ -1971,7 +2037,10 @@ fn hit_test_preview_with_style(
                 return Some(("text", row, p_inner_x, p_inner_x + p_avail_w));
             }
             if row == content_start_y + 2 {
-                // Item 3: System Configuration
+                // Item 3: System Configuration (icon slot uses default_icon)
+                if col >= p_inner_x + 2 && col < p_inner_x + 6 {
+                    return Some(("default_icon", row, p_inner_x + 2, p_inner_x + 6));
+                }
                 if col >= p_inner_x + 6 && col < p_inner_x + 9 {
                     return Some(("shortcut_key", row, p_inner_x + 6, p_inner_x + 9));
                 }

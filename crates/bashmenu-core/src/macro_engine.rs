@@ -1579,11 +1579,10 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
         direct_map.insert("{dev_dir}", dev_str.clone());
         direct_map.insert("{dev}", dev_str);
     }
-    if res.contains("{bashmenu_dir}") {
-        direct_map.insert(
-            "{bashmenu_dir}",
-            ctx.bashmenu_dir.to_string_lossy().to_string(),
-        );
+    if res.contains("{bashmenu_dir}") || res.contains("{config_dir}") {
+        let bm_dir = ctx.bashmenu_dir.to_string_lossy().to_string();
+        direct_map.insert("{bashmenu_dir}", bm_dir.clone());
+        direct_map.insert("{config_dir}", bm_dir);
     }
     if res.contains("{scripts_dir}") || res.contains("{scripts}") {
         let scripts_dir = ctx

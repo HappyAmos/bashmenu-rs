@@ -387,19 +387,14 @@ pub fn format_inspector_text(
     let left_clean = strip_bbcode(left_raw);
     let right_clean = strip_bbcode(right_raw);
 
-    let exp_icon = item
+    let use_nerd = effective_cfg.settings.use_nerd_fonts.unwrap_or(true);
+    let raw_icon = item
         .icon
         .as_deref()
-        .map(|ic| interpolate_placeholders(ic, &ctx))
-        .unwrap_or_default();
-
-    let icon_str = if !exp_icon.is_empty() {
-        let vis_w = visible_text_len(&exp_icon);
-        let pad_w = 4_usize.saturating_sub(vis_w).max(1);
-        format!("{}{}", exp_icon, " ".repeat(pad_w))
-    } else {
-        "    ".to_string()
-    };
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or(bashmenu_core::DEFAULT_ITEM_ICON);
+    let exp_icon = interpolate_placeholders(raw_icon, &ctx);
+    let icon_str = bashmenu_core::format_icon_slot(Some(&exp_icon), use_nerd);
 
     let prefix = format!("  1.  {}", icon_str);
     let prefix_len = visible_text_len(&prefix);

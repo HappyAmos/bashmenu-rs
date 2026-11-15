@@ -322,6 +322,125 @@ fn test_file_picker_navigation() {
 }
 
 #[test]
+fn test_file_picker_save_as_mode() {
+    let temp_dir = std::env::temp_dir().join(format!("bm_test_fp_save_as_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&temp_dir);
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    let sub_dir = temp_dir.join("subfolder");
+    std::fs::create_dir_all(&sub_dir).unwrap();
+    std::fs::write(temp_dir.join("existing.txt"), "hello").unwrap();
+
+    let mut picker = FilePickerModal::new("Save File As", &temp_dir, false)
+        .with_save_as(true)
+        .with_file_name("default.txt");
+
+    assert!(picker.is_save_as);
+    assert_eq!(picker.file_name_input, "default.txt");
+    // Initial focus starts on the top control: File Browser List
+    assert_eq!(picker.focused_control, bashmenu_tui::FilePickerFocus::List);
+
+    // Tab sequence (top to bottom, left to right):
+    // 1. Jump to "File name:" input field
+    picker.handle_key(KeyCode::Tab);
+    assert_eq!(
+        picker.focused_control,
+        bashmenu_tui::FilePickerFocus::FileNameInput
+    );
+    // 2. Jump to [ Save ] button
+    picker.handle_key(KeyCode::Tab);
+    assert_eq!(
+        picker.focused_control,
+        bashmenu_tui::FilePickerFocus::SaveButton
+    );
+    // 3. Jump to [ Cancel ] button
+    picker.handle_key(KeyCode::Tab);
+    assert_eq!(
+        picker.focused_control,
+        bashmenu_tui::FilePickerFocus::CancelButton
+    );
+    // 4. Cycle back to File Browser List
+    picker.handle_key(KeyCode::Tab);
+    assert_eq!(picker.focused_control, bashmenu_tui::FilePickerFocus::List);
+    // Jump back to FileNameInput for text editing
+    picker.handle_key(KeyCode::Tab);
+    assert_eq!(
+        picker.focused_control,
+        bashmenu_tui::FilePickerFocus::FileNameInput
+    );
+
+    let styles = ResolvedThemeStyles::default();
+    let area = Rect::new(0, 0, 80, 24);
+    let mut buf = Buffer::empty(area);
+    let inner = picker.render(area, &styles, &mut buf);
+    let rendered = format!("{:?}", buf);
+
+    assert!(rendered.contains("Save File As"));
+    assert!(rendered.contains("File name:"));
+    assert!(rendered.contains("[ Save ]"));
+    assert!(rendered.contains("[ Cancel ]"));
+
+    // Test typing in input box
+    picker.handle_key(KeyCode::Backspace);
+    picker.handle_key(KeyCode::Backspace);
+    picker.handle_key(KeyCode::Backspace);
+    picker.handle_key(KeyCode::Backspace);
+    for c in ".md".chars() {
+        picker.handle_key(KeyCode::Char(c));
+    }
+    assert_eq!(picker.file_name_input, "default.md");
+
+    // Press enter in input box -> saves to current dir
+    let res = picker.handle_key(KeyCode::Enter);
+    assert_eq!(res, Some(Some(temp_dir.join("default.md"))));
+
+    // Test selecting a subfolder in the browser area and saving
+    let mut picker2 = FilePickerModal::new("Save File As", &temp_dir, false)
+        .with_save_as(true)
+        .with_file_name("my_file.rs");
+
+    // Switch focus to list and find subfolder
+    picker2.focused_control = bashmenu_tui::FilePickerFocus::List;
+    while picker2.selected_item_name() != Some("subfolder")
+        && picker2.selected_idx + 1 < picker2.item_count()
+    {
+        picker2.handle_key(KeyCode::Down);
+    }
+    assert_eq!(picker2.selected_item_name(), Some("subfolder"));
+
+    // Switch focus to FileNameInput and press enter
+    picker2.focused_control = bashmenu_tui::FilePickerFocus::FileNameInput;
+    let res2 = picker2.handle_key(KeyCode::Enter);
+    assert_eq!(res2, Some(Some(sub_dir.join("my_file.rs"))));
+
+    // Test clicking [ Save ] button with mouse
+    let btn_y = inner.y + inner.height - 1;
+    let save_click = MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: inner.x + 4,
+        row: btn_y,
+        modifiers: KeyModifiers::NONE,
+    };
+    let mut picker3 = FilePickerModal::new("Save File As", &temp_dir, false)
+        .with_save_as(true)
+        .with_file_name("button_saved.txt");
+    let res3 = picker3.handle_mouse(save_click, area);
+    assert_eq!(res3, Some(Some(temp_dir.join("button_saved.txt"))));
+
+    // Test clicking [ Cancel ] button with mouse
+    let cancel_click = MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: inner.x + 15,
+        row: btn_y,
+        modifiers: KeyModifiers::NONE,
+    };
+    let res_cancel = picker3.handle_mouse(cancel_click, area);
+    assert_eq!(res_cancel, Some(None));
+
+    // Clean up
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
 fn test_note_viewer_footer_wrapping() {
     use bashmenu_tui::{NoteViewerAction, NoteViewerModal};
 
