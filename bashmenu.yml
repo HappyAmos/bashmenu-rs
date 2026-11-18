@@ -20,6 +20,7 @@ settings:
   help_gutter_delay: 2.0
   tab_to_spaces: true
   tabstop: 4
+  # locale: "en_US"
   show_menu_shortcuts: true
   use_nerd_fonts: true
   nerd_font_width: auto

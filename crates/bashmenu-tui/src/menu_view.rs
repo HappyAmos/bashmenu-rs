@@ -11,7 +11,7 @@ use crate::marquee::{get_marquee_slice, MarqueeTracker};
 use crate::style::ResolvedThemeStyles;
 use crate::wallpaper::{composite_buffer, WallpaperCompositor};
 use bashmenu_core::{
-    format_icon_slot, interpolate_placeholders, BashMenuConfig, MacroContext, MenuItem,
+    format_icon_slot, interpolate_placeholders, t, BashMenuConfig, MacroContext, MenuItem,
     MenuItemType, MenuSchema, PluginDisplayRow, ShortcutEntry, WallpaperConfig,
 };
 use crossterm::event::{KeyCode, MouseButton, MouseEvent, MouseEventKind};
@@ -732,13 +732,35 @@ impl MenuView {
     }
 
     /// Returns the raw contextual help string for the current menu level or mode.
-    fn get_help_raw(&self) -> &'static str {
+    fn get_help_raw(&self) -> String {
+        let help = t!("common.gutters.help");
+        let themes = t!("common.gutters.themes");
+        let editor = t!("common.gutters.editor");
+        let edit = t!("common.gutters.edit");
+        let refresh = t!("common.gutters.refresh");
+        let keys = t!("common.gutters.keys");
+        let gutter = t!("common.gutters.gutter");
+        let themeedit = t!("common.gutters.themeedit");
+        let shortcutedit = t!("common.gutters.shortcutedit");
+        let back = t!("common.gutters.back");
+
         if self.is_current_notebook() {
-            "[N]: New Note | [ENTER]: Read | [M]: Rename | [D]: Delete | [F1]: Help | [F2]: Themes | [F7]: Gutter | [F8]: ThemeEdit | [F9]: ShortcutEdit | [ESC]: Back"
+            let new_note = t!("common.gutters.new_note");
+            let read = t!("common.gutters.read_note");
+            let rename = t!("common.gutters.rename_note");
+            let delete = t!("common.gutters.delete_note");
+            format!(
+                "[N]: {new_note} | [ENTER]: {read} | [M]: {rename} | [D]: {delete} | [F1]: {help} | [F2]: {themes} | [F7]: {gutter} | [F8]: {themeedit} | [F9]: {shortcutedit} | [ESC]: {back}"
+            )
         } else if self.show_shortcuts {
-            "[F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [F8]: ThemeEdit | [F9]: ShortcutEdit | [ESC]: Back"
+            format!(
+                "[F1]: {help} | [F2]: {themes} | [F3]: {editor} | [F4]: {edit} | [F5]: {refresh} | [F6]: {keys} | [F7]: {gutter} | [F8]: {themeedit} | [F9]: {shortcutedit} | [ESC]: {back}"
+            )
         } else {
-            "[ENTER]: Select | [F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [F8]: ThemeEdit | [F9]: ShortcutEdit | [ESC]: Back"
+            let select = t!("common.gutters.select");
+            format!(
+                "[ENTER]: {select} | [F1]: {help} | [F2]: {themes} | [F3]: {editor} | [F4]: {edit} | [F5]: {refresh} | [F6]: {keys} | [F7]: {gutter} | [F8]: {themeedit} | [F9]: {shortcutedit} | [ESC]: {back}"
+            )
         }
     }
 
@@ -798,31 +820,71 @@ impl MenuView {
         }
 
         // 2. Contextual menu actions
-        if tok.contains("[F1]") || tok.contains("Help") {
+        if tok.contains("[F1]") || tok.contains("Help") || tok.contains(&t!("common.gutters.help"))
+        {
             MenuAction::Help
-        } else if tok.contains("[F2]") || tok.contains("Themes") {
+        } else if tok.contains("[F2]")
+            || tok.contains("Themes")
+            || tok.contains(&t!("common.gutters.themes"))
+        {
             MenuAction::ThemeSelector
-        } else if tok.contains("[F3]") || tok.contains("Editor") {
+        } else if tok.contains("[F3]")
+            || tok.contains("Editor")
+            || tok.contains(&t!("common.gutters.editor"))
+        {
             MenuAction::LaunchEditor
-        } else if tok.contains("[F8]") || tok.contains("ThemeEdit") {
+        } else if tok.contains("[F8]")
+            || tok.contains("ThemeEdit")
+            || tok.contains(&t!("common.gutters.themeedit"))
+        {
             MenuAction::LaunchThemeEditor
-        } else if tok.contains("[F9]") || tok.contains("Shortcut") {
+        } else if tok.contains("[F9]")
+            || tok.contains("Shortcut")
+            || tok.contains(&t!("common.gutters.shortcutedit"))
+        {
             MenuAction::LaunchShortcutEditor
-        } else if tok.contains("[F4]") || tok.contains("Edit") {
+        } else if tok.contains("[F4]")
+            || tok.contains("Edit")
+            || tok.contains(&t!("common.gutters.edit"))
+        {
             MenuAction::EditMenu
-        } else if tok.contains("[F5]") || tok.contains("Refresh") {
+        } else if tok.contains("[F5]")
+            || tok.contains("Refresh")
+            || tok.contains(&t!("common.gutters.refresh"))
+        {
             MenuAction::Reload
-        } else if tok.contains("[F6]") || tok.contains("Keys") {
+        } else if tok.contains("[F6]")
+            || tok.contains("Keys")
+            || tok.contains(&t!("common.gutters.keys"))
+        {
             MenuAction::ToggleShortcuts
-        } else if tok.contains("[F7]") || tok.contains("Gutter") {
+        } else if tok.contains("[F7]")
+            || tok.contains("Gutter")
+            || tok.contains(&t!("common.gutters.gutter"))
+        {
             MenuAction::ConfigureGutter
-        } else if tok.contains("[ESC]") || tok.contains(": Back") || tok.ends_with(" Back") {
+        } else if tok.contains("[ESC]")
+            || tok.contains(": Back")
+            || tok.ends_with(" Back")
+            || tok.contains(&t!("common.gutters.back"))
+        {
             self.go_back()
-        } else if tok.contains("[ENTER]") || tok.contains("Select") || tok.contains("Read") {
+        } else if tok.contains("[ENTER]")
+            || tok.contains("Select")
+            || tok.contains("Read")
+            || tok.contains(&t!("common.gutters.select"))
+            || tok.contains(&t!("common.gutters.read_note"))
+        {
             self.activate_selected()
-        } else if tok.contains("[N]") || tok.contains("New Note") {
+        } else if tok.contains("[N]")
+            || tok.contains("New Note")
+            || tok.contains(&t!("common.gutters.new_note"))
+        {
             MenuAction::NewNote(String::new())
-        } else if tok.contains("[M]") || tok.contains("Rename") {
+        } else if tok.contains("[M]")
+            || tok.contains("Rename")
+            || tok.contains(&t!("common.gutters.rename_note"))
+        {
             if let Some(item) = self
                 .current_level()
                 .items
@@ -832,7 +894,10 @@ impl MenuView {
             } else {
                 MenuAction::None
             }
-        } else if tok.contains("[D]") || tok.contains("Delete") {
+        } else if tok.contains("[D]")
+            || tok.contains("Delete")
+            || tok.contains(&t!("common.gutters.delete_note"))
+        {
             if let Some(item) = self
                 .current_level()
                 .items

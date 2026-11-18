@@ -48,6 +48,22 @@ fn test_user_config_isolation_and_vanilla_separation() {
 }
 
 #[test]
+fn test_bashmenu_locale_cli_flag_in_help() {
+    let bin = env!("CARGO_BIN_EXE_bashmenu");
+    let output = Command::new(bin)
+        .arg("--help")
+        .output()
+        .expect("bashmenu --help must run");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("-l, --locale") || stdout.contains("--locale <LOCALE>"),
+        "Help output must document --locale / -l flag: {}",
+        stdout
+    );
+}
+
+#[test]
 fn test_search_nerd_font_and_emoji_menu_item_streaming() {
     let repo_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
     let menu_path = repo_root.join("bashmenu.mnu");

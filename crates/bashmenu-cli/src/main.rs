@@ -129,6 +129,10 @@ struct Cli {
     /// Render full-resolution TrueColor background images directly via framebuffer
     #[arg(short, long)]
     image: bool,
+
+    /// Override active locale (e.g. "en_US", "es_ES", or path to YAML locale file)
+    #[arg(short, long)]
+    locale: Option<String>,
 }
 
 /// Active popup modal dialog currently being presented in the main menu loop.
@@ -329,6 +333,19 @@ fn main() -> Result<()> {
             BashMenuConfig::default()
         }
     };
+
+    // Initialize active locale (CLI flag > config.settings.locale > LC_ALL > LC_MESSAGES > LANG)
+    let locale_target = cli
+        .locale
+        .or_else(|| config.settings.locale.clone())
+        .or_else(|| std::env::var("LC_ALL").ok())
+        .or_else(|| std::env::var("LC_MESSAGES").ok())
+        .or_else(|| std::env::var("LANG").ok());
+
+    if let Some(ref loc) = locale_target {
+        let clean_loc = loc.split('.').next().unwrap_or(loc);
+        let _ = bashmenu_core::set_locale(clean_loc);
+    }
 
     if let Some(t) = cli.theme {
         config.theme = t;
@@ -2266,36 +2283,35 @@ fn main() -> Result<()> {
                             }
                         },
                         MenuAction::NewNote(filepath) => {
+                            let title = bashmenu_core::t!("bashmenu.new_note_title");
+                            let prompt = bashmenu_core::t!("bashmenu.new_note_prompt");
                             active_modal = ActiveModal::NewNoteTitle(
                                 filepath,
-                                InputModal::new("New Note", "Enter note title:", ""),
+                                InputModal::new(&title, &prompt, ""),
                             );
                         }
                         MenuAction::RenameNote(old_title) => {
                             if let Some(filepath) = menu_view.current_notebook_file() {
+                                let title = bashmenu_core::t!("bashmenu.rename_note_title");
+                                let prompt = bashmenu_core::t!("bashmenu.rename_note_prompt");
                                 active_modal = ActiveModal::RenameNoteTitle(
                                     filepath.to_string(),
                                     old_title.clone(),
-                                    InputModal::new(
-                                        "Rename Note",
-                                        "Enter new note title:",
-                                        &old_title,
-                                    ),
+                                    InputModal::new(&title, &prompt, &old_title),
                                 );
                             }
                         }
                         MenuAction::DeleteNote(note_title) => {
                             if let Some(filepath) = menu_view.current_notebook_file() {
+                                let title = bashmenu_core::t!("bashmenu.delete_note_title");
+                                let msg = bashmenu_core::t!(
+                                    "bashmenu.delete_note_confirm",
+                                    title => &note_title
+                                );
                                 active_modal = ActiveModal::ConfirmDeleteNote(
                                     filepath.to_string(),
                                     note_title.clone(),
-                                    ConfirmModal::new(
-                                        "Delete Note",
-                                        format!(
-                                            "Are you sure you want to delete note '{}'?",
-                                            note_title
-                                        ),
-                                    ),
+                                    ConfirmModal::new(&title, msg),
                                 );
                             }
                         }

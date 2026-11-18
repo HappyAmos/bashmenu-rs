@@ -161,8 +161,23 @@ pub fn resolve_locale_path(code: &str) -> Option<PathBuf> {
         search_dirs.push(PathBuf::from(home).join(".config/bashmenu/locales"));
     }
 
-    // 3. Current working directory ./locales
-    search_dirs.push(PathBuf::from("locales"));
+    // 3. Current working directory and ancestors
+    if let Ok(cwd) = std::env::current_dir() {
+        let mut curr = Some(cwd.as_path());
+        while let Some(dir) = curr {
+            search_dirs.push(dir.join("locales"));
+            curr = dir.parent();
+        }
+    }
+
+    // 4. Cargo manifest directory and ancestors (for test runners and dev builds)
+    if let Ok(manifest) = std::env::var("CARGO_MANIFEST_DIR") {
+        let mut curr = Some(Path::new(&manifest));
+        while let Some(dir) = curr {
+            search_dirs.push(dir.join("locales"));
+            curr = dir.parent();
+        }
+    }
 
     for dir in search_dirs {
         for fname in &filenames {

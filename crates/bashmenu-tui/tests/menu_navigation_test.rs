@@ -1556,3 +1556,40 @@ fn test_menu_view_default_icon_fallback_for_items_without_icon() {
     );
     assert!(row2_text.contains("Item Without Icon"));
 }
+
+#[test]
+fn test_menu_view_help_gutter_localization() {
+    let _ = bashmenu_core::set_locale("en_US");
+    let schema = MenuSchema::default();
+    let styles = ResolvedThemeStyles::default();
+    let view = MenuView::new(schema, styles, false, String::new());
+
+    let en_tokens = view.get_help_tokens();
+    assert!(
+        en_tokens.iter().any(|t| t.contains("[F1]: Help")),
+        "Default tokens must contain English Help: {:?}",
+        en_tokens
+    );
+    assert!(
+        en_tokens.iter().any(|t| t.contains("[ESC]: Back")),
+        "Default tokens must contain English Back: {:?}",
+        en_tokens
+    );
+
+    // Switch to Spanish
+    let _ = bashmenu_core::set_locale("es_ES");
+    let es_tokens = view.get_help_tokens();
+    assert!(
+        es_tokens.iter().any(|t| t.contains("[F1]: Ayuda")),
+        "Spanish tokens must contain Ayuda: {:?}",
+        es_tokens
+    );
+    assert!(
+        es_tokens.iter().any(|t| t.contains("[ESC]: Atrás")),
+        "Spanish tokens must contain Atrás: {:?}",
+        es_tokens
+    );
+
+    // Restore to en_US
+    let _ = bashmenu_core::set_locale("en_US");
+}

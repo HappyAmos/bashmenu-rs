@@ -2,6 +2,7 @@
 
 use super::frame::render_modal_frame;
 use crate::style::ResolvedThemeStyles;
+use bashmenu_core::t;
 use crossterm::event::{KeyCode, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -155,7 +156,9 @@ impl ThemePickerModal {
                         return Some(Some(self.themes[target_idx].clone()));
                     }
                 } else if row == footer_y {
-                    let footer_text = " [Enter] Select  [Esc] Cancel ";
+                    let select_lbl = t!("common.gutters.select");
+                    let cancel_lbl = t!("common.buttons.cancel");
+                    let footer_text = format!(" [Enter] {select_lbl}  [Esc] {cancel_lbl} ");
                     let avail_footer_w = inner_area.width.saturating_sub(2) as usize;
                     let clipped_footer: String = footer_text.chars().take(avail_footer_w).collect();
                     let footer_x = (inner_area.x + inner_area.width)
@@ -186,7 +189,8 @@ impl ThemePickerModal {
         let dialog_w = 46.min(area.width.saturating_sub(4));
         let dialog_h = 16.min(area.height.saturating_sub(4)).max(8);
 
-        let inner = render_modal_frame(area, dialog_w, dialog_h, "Theme Selector", styles, buf);
+        let title = t!("bashmenu.theme_picker_title");
+        let inner = render_modal_frame(area, dialog_w, dialog_h, &title, styles, buf);
         let list_h = inner.height.saturating_sub(2) as usize;
 
         // Keep scroll offset tracking selected index
@@ -219,7 +223,9 @@ impl ThemePickerModal {
 
         // Footer
         let footer_y = inner.y + inner.height.saturating_sub(1);
-        let footer_text = " [Enter] Select  [Esc] Cancel ";
+        let select_lbl = t!("common.gutters.select");
+        let cancel_lbl = t!("common.buttons.cancel");
+        let footer_text = format!(" [Enter] {select_lbl}  [Esc] {cancel_lbl} ");
         let avail_footer_w = inner.width.saturating_sub(2) as usize;
         let clipped_footer: String = footer_text.chars().take(avail_footer_w).collect();
         let footer_x = (inner.x + inner.width).saturating_sub(clipped_footer.len() as u16 + 1);

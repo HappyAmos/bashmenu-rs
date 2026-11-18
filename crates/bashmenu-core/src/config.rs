@@ -123,6 +123,10 @@ pub struct Settings {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub framebuffer: Option<String>,
 
+    /// Active locale identifier (e.g. "en_US", "es_ES")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub locale: Option<String>,
+
     /// Additional arbitrary user-defined settings preserved across saves
     #[serde(flatten)]
     pub extra: HashMap<String, serde_yml::Value>,
@@ -498,6 +502,19 @@ impl BashMenuConfig {
                 self.settings.framebuffer = match &value {
                     serde_yml::Value::String(s) => Some(s.clone()),
                     serde_yml::Value::Bool(b) => Some(b.to_string()),
+                    _ => None,
+                };
+            }
+            "settings.locale" | "locale" => {
+                self.settings.locale = match &value {
+                    serde_yml::Value::String(s) => {
+                        let trimmed = s.trim();
+                        if trimmed.is_empty() {
+                            None
+                        } else {
+                            Some(trimmed.to_string())
+                        }
+                    }
                     _ => None,
                 };
             }
