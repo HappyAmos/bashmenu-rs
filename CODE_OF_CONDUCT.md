@@ -27,6 +27,6 @@ The following behaviors are incompatible with participation in this project:
 Project maintainers are responsible for maintaining a constructive environment and reserve the right to remove or moderate comments, close issues or pull requests, or suspend access for conduct that violates these standards.
 
 If you observe or experience behavior that violates these guidelines, please contact the maintainer directly at:
-**adiamond1978@gmail.com**
+**happyamos-rs@anglernook.com**
 
 All reports will be reviewed promptly and kept confidential.

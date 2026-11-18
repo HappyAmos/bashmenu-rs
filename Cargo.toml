@@ -16,7 +16,7 @@ resolver = "2"
 version = "0.1.2"
 edition = "2021"
 license = "MIT"
-authors = ["Andrew <adiamond1978@gmail.com>"]
+authors = ["Andrew <happyamos-rs@anglernook.com>"]
 repository = "https://github.com/HappyAmos/bashmenu-rs"
 
 [workspace.dependencies]

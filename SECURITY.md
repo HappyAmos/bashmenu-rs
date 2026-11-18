@@ -22,7 +22,7 @@ BashMenu-RS is a terminal menu launcher and companion tool suite designed to exe
 
 If you discover a security vulnerability in BashMenu-RS, please report it privately rather than creating a public GitHub issue.
 
-- **Email:** Send details to **adiamond1978@gmail.com** with the subject line `[SECURITY] BashMenu-RS Vulnerability Report`.
+- **Email:** Send details to **happyamos-rs@anglernook.com** with the subject line `[SECURITY] BashMenu-RS Vulnerability Report`.
 - **Details to Include:**
   - Description of the issue and potential impact.
   - Minimal reproducible example, test case, or step-by-step reproduction instructions.
