@@ -29,6 +29,8 @@ pub struct PagerArgs {
     pub markdown: bool,
     /// Whether to soft-wrap non-markdown plain/ANSI text to terminal width
     pub wrap_text: bool,
+    /// Override active locale (e.g. "en_US", "es_ES")
+    pub locale: Option<String>,
 }
 
 impl Default for PagerArgs {
@@ -47,6 +49,7 @@ impl Default for PagerArgs {
             start_pattern: None,
             markdown: false,
             wrap_text: false,
+            locale: None,
         }
     }
 }
@@ -73,7 +76,8 @@ Options:\n  \
   --system-editor   Use system default editor ($EDITOR / $VISUAL).\n  \
   --max-lines=N     Store at most N input lines (default 1000000).\n  \
   --file=PATH       Associated file path to open when editing piped streams.\n  \
-  --reload-cmd=CMD  Command to refresh spool after editing piped streams.\n\n\
+  --reload-cmd=CMD  Command to refresh spool after editing piped streams.\n  \
+  -l, --locale=LOC  Override active localization language code.\n\n\
 Keys:\n  \
   DOWN j            Next line            UP k            Previous line\n  \
   SPACE f PgDn      Next page            b PgUp          Previous page\n  \
@@ -158,6 +162,14 @@ pub fn parse_cli_args() -> Result<PagerArgs, String> {
                 return Err("--reload-cmd needs a value".to_string());
             }
             args.reload_cmd = Some(raw_args[i].clone());
+        } else if let Some(val) = arg.strip_prefix("--locale=") {
+            args.locale = Some(val.to_string());
+        } else if arg == "-l" || arg == "--locale" {
+            i += 1;
+            if i >= raw_args.len() {
+                return Err("--locale needs a value".to_string());
+            }
+            args.locale = Some(raw_args[i].clone());
         } else if let Some(pat) = arg.strip_prefix("+/") {
             args.start_pattern = Some(pat.to_string());
         } else if let Some(line_str) = arg.strip_prefix('+') {

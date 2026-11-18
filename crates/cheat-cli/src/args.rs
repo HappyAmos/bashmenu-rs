@@ -33,6 +33,10 @@ pub struct CliArgs {
     /// Print the configured cheatsheets directory path.
     #[arg(short = 'd', long = "directory")]
     pub directory: bool,
+
+    /// Override active locale (e.g. "en_US", "es_ES", or path to YAML locale file)
+    #[arg(short = 'L', long = "locale")]
+    pub locale: Option<String>,
 }
 
 impl CliArgs {

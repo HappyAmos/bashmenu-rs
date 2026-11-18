@@ -93,8 +93,19 @@ bashedit:
   status_read_only: "[SL]"
   status_modified: "[+]"
   status_legend: "Línea {line}, Col {col} | Car {char}"
-  search_prompt: "Buscar: "
-  saved_file: "Guardado {file}"
+  search_title: "Buscar (Dónde está)"
+  search_prompt: "Buscar texto:"
+  open_file_title: "Abrir archivo"
+  saved_file: "Guardado '{file}' en el disco"
+  line_col_indicator: "Línea {line}/{total}, Col {col}"
+  swap_collision_title: "¡Colisión de archivo swap detectada!"
+  swap_recovery_title: "¡Recuperación de fallo: archivo swap encontrado!"
+  swap_exists_info: "Existe un archivo swap: ./{file}.swp"
+  swap_pid_info: "Creado por PID: {pid} (El proceso está {status})"
+  swap_options_prompt: "Presione: [R]ecuperar  [D]esechar swap  [O]Solo lectura  [Q]Salir"
+  swap_status_recovered: "Se recuperaron {count} líneas del swap"
+  swap_status_deleted: "Archivo swap obsoleto eliminado"
+  swap_status_readonly: "Abierto en modo de solo lectura"
   read_only_notice: "El archivo está abierto en modo de solo lectura"
 
 menuedit:
@@ -129,11 +140,15 @@ bmpager:
   match_count: "[{current} de {total}]"
   help_title: "Ayuda del visor"
   line_indicator: "Línea {line}/{total}"
+  pattern_not_found: "patrón no encontrado: {pattern}"
+  no_previous_search: "no hay patrón de búsqueda anterior"
 
 cheat:
   search_prompt: "Buscar hojas de trucos..."
   no_cheats_found: "No se encontraron hojas de trucos"
   category_label: "Categoría: {category}"
+  no_files_found: "No se encontraron archivos markdown bajo {dir}"
+  no_match_query: "Ningún archivo markdown coincide con '{query}' bajo {dir}"
 
 ymlcheck:
   valid_config: "La configuración es válida."

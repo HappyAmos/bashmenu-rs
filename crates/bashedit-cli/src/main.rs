@@ -8,7 +8,7 @@ use bashedit_cli::{
     read_swap_file, remove_swap_file, EditorBuffer, SwapHeader, VisualLine,
 };
 use bashmenu_core::{
-    load_config, load_themes, ToastNotification, ToastSeverity, BASHEDIT_HELP_TEXT,
+    load_config, load_themes, t, ToastNotification, ToastSeverity, BASHEDIT_HELP_TEXT,
     MARKDOWN_REFERENCE_TEXT, PLACEHOLDER_HELP_TEXT,
 };
 use bashmenu_tui::{
@@ -71,6 +71,10 @@ struct Cli {
     /// Load and save configuration files in current working directory
     #[arg(long)]
     local: bool,
+
+    /// Override active locale (e.g. "en_US", "es_ES", or path to YAML locale file)
+    #[arg(short = 'L', long = "locale")]
+    locale: Option<String>,
 }
 
 /// Action identifiers triggered by keyboard shortcuts or clicking in
@@ -267,6 +271,20 @@ fn main() -> Result<()> {
         bashmenu_core::resolve_app_path(Path::new("bashmenu.themes"))
     };
     let config = load_config(&config_path).unwrap_or_default();
+
+    // Initialize active locale (CLI flag > config.settings.locale > LC_ALL > LC_MESSAGES > LANG)
+    let locale_target = cli
+        .locale
+        .or_else(|| config.settings.locale.clone())
+        .or_else(|| std::env::var("LC_ALL").ok())
+        .or_else(|| std::env::var("LC_MESSAGES").ok())
+        .or_else(|| std::env::var("LANG").ok());
+
+    if let Some(ref loc) = locale_target {
+        let clean_loc = loc.split('.').next().unwrap_or(loc);
+        let _ = bashmenu_core::set_locale(clean_loc);
+    }
+
     let themes = load_themes(&themes_path).unwrap_or_default();
     let use_nerd = config.settings.use_nerd_fonts.unwrap_or(false);
 
@@ -716,11 +734,17 @@ fn main() -> Result<()> {
                 "[Clean]"
             };
 
+            let cur_line = (active_tab.cursor_row + 1).to_string();
+            let total_l = active_tab.lines.len().to_string();
+            let cur_col = (active_tab.cursor_col + 1).to_string();
             let pos_str = format!(
-                "  Line {}/{}, Col {}  ",
-                active_tab.cursor_row + 1,
-                active_tab.lines.len(),
-                active_tab.cursor_col + 1
+                "  {}  ",
+                t!(
+                    "bashedit.line_col_indicator",
+                    line => &cur_line,
+                    total => &total_l,
+                    col => &cur_col
+                )
             );
             buf.set_string(inner_x, status_y, &pos_str, styles.text);
 
@@ -922,7 +946,7 @@ fn main() -> Result<()> {
                                             .unwrap_or_else(|_| PathBuf::from("."))
                                     });
                                 active_modal = ActiveModal::OpenFile(FilePickerModal::new(
-                                    "Open File",
+                                    t!("bashedit.open_file_title"),
                                     &current_dir,
                                     false,
                                 ));
@@ -930,8 +954,8 @@ fn main() -> Result<()> {
                             }
                             KeyCode::Char('w') => {
                                 active_modal = ActiveModal::Search(InputModal::new(
-                                    "Where Is (Search)",
-                                    "Search for text:",
+                                    t!("bashedit.search_title"),
+                                    t!("bashedit.search_prompt"),
                                     "",
                                 ));
                                 continue;
@@ -1444,8 +1468,8 @@ fn main() -> Result<()> {
                                     }
                                     FooterAction::Search => {
                                         active_modal = ActiveModal::Search(InputModal::new(
-                                            "Where Is (Search)",
-                                            "Search for text:",
+                                            t!("bashedit.search_title"),
+                                            t!("bashedit.search_prompt"),
                                             "",
                                         ));
                                     }
@@ -1583,11 +1607,12 @@ fn render_modal(
             header, tab_idx, ..
         } => {
             let is_running = is_pid_running(header.pid);
-            let prompt_title = if is_running {
-                " Swap File Collision Detected! "
+            let raw_title = if is_running {
+                t!("bashedit.swap_collision_title")
             } else {
-                " Crash Recovery: Swap File Found! "
+                t!("bashedit.swap_recovery_title")
             };
+            let prompt_title = format!(" {} ", raw_title);
 
             let dialog_w = 64;
             let dialog_h = 10;
@@ -1595,7 +1620,7 @@ fn render_modal(
                 area,
                 dialog_w,
                 dialog_h,
-                prompt_title,
+                &prompt_title,
                 styles,
                 buf,
             );
@@ -1606,13 +1631,11 @@ fn render_modal(
                 .and_then(|p| p.file_name())
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_else(|| "buffer".to_string());
-            let info_line1 = format!("A swap file exists: ./{}.swp", file_display);
-            let info_line2 = format!(
-                "Created by PID: {} (Process is {})",
-                header.pid,
-                if is_running { "RUNNING" } else { "TERMINATED" }
-            );
-            let options_line = "Press: [R]ecover edits  [D]elete swap  [O]pen read-only  [Q]uit";
+            let info_line1 = t!("bashedit.swap_exists_info", file => &file_display);
+            let pid_str = header.pid.to_string();
+            let status_str = if is_running { "RUNNING" } else { "TERMINATED" };
+            let info_line2 = t!("bashedit.swap_pid_info", pid => &pid_str, status => status_str);
+            let options_line = t!("bashedit.swap_options_prompt");
 
             let avail_w = inner.width.saturating_sub(4) as usize;
             let clipped1: String = info_line1.chars().take(avail_w).collect();
@@ -1695,7 +1718,7 @@ fn show_save_toast(toast_rack: &mut ToastRack, res: Result<()>, tab: &EditorBuff
         Ok(_) => {
             toast_rack.add(ToastNotification {
                 title: Some("Save File".to_string()),
-                message: format!("Saved '{}' to disk", name),
+                message: t!("bashedit.saved_file", file => &name),
                 severity: ToastSeverity::Information,
                 timeout_secs: 2.0,
             });
@@ -1735,22 +1758,23 @@ fn handle_active_modal(
                         let tab = &mut tabs[*tab_idx];
                         tab.lines = recovered_lines.clone();
                         tab.is_modified = true;
+                        let count_str = tab.lines.len().to_string();
                         tab.status_message =
-                            format!("Recovered {} lines from swap", tab.lines.len());
+                            t!("bashedit.swap_status_recovered", count => &count_str);
                         *active_modal = ActiveModal::None;
                         return true;
                     }
                     KeyCode::Char('d') | KeyCode::Char('D') => {
                         let tab = &mut tabs[*tab_idx];
                         remove_swap_file(&tab.swap_path);
-                        tab.status_message = "Deleted stale swap file".to_string();
+                        tab.status_message = t!("bashedit.swap_status_deleted");
                         *active_modal = ActiveModal::None;
                         return true;
                     }
                     KeyCode::Char('o') | KeyCode::Char('O') => {
                         let tab = &mut tabs[*tab_idx];
                         tab.is_read_only = true;
-                        tab.status_message = "Opened in Read-Only mode".to_string();
+                        tab.status_message = t!("bashedit.swap_status_readonly");
                         *active_modal = ActiveModal::None;
                         return true;
                     }
@@ -1802,8 +1826,9 @@ fn handle_active_modal(
                                 let tab = &mut tabs[*tab_idx];
                                 tab.lines = recovered_lines.clone();
                                 tab.is_modified = true;
+                                let count_str = tab.lines.len().to_string();
                                 tab.status_message =
-                                    format!("Recovered {} lines from swap", tab.lines.len());
+                                    t!("bashedit.swap_status_recovered", count => &count_str);
                                 *active_modal = ActiveModal::None;
                                 return true;
                             }
@@ -1812,7 +1837,7 @@ fn handle_active_modal(
                             if rel_x >= pos && rel_x < pos + 13 {
                                 let tab = &mut tabs[*tab_idx];
                                 remove_swap_file(&tab.swap_path);
-                                tab.status_message = "Deleted stale swap file".to_string();
+                                tab.status_message = t!("bashedit.swap_status_deleted");
                                 *active_modal = ActiveModal::None;
                                 return true;
                             }
@@ -1821,7 +1846,7 @@ fn handle_active_modal(
                             if rel_x >= pos && rel_x < pos + 17 {
                                 let tab = &mut tabs[*tab_idx];
                                 tab.is_read_only = true;
-                                tab.status_message = "Opened in Read-Only mode".to_string();
+                                tab.status_message = t!("bashedit.swap_status_readonly");
                                 *active_modal = ActiveModal::None;
                                 return true;
                             }

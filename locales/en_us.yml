@@ -95,8 +95,19 @@ bashedit:
   status_read_only: "[RO]"
   status_modified: "[+]"
   status_legend: "Line {line}, Col {col} | Char {char}"
-  search_prompt: "Find: "
-  saved_file: "Saved {file}"
+  search_title: "Where Is (Search)"
+  search_prompt: "Search for text:"
+  open_file_title: "Open File"
+  saved_file: "Saved '{file}' to disk"
+  line_col_indicator: "Line {line}/{total}, Col {col}"
+  swap_collision_title: "Swap File Collision Detected!"
+  swap_recovery_title: "Crash Recovery: Swap File Found!"
+  swap_exists_info: "A swap file exists: ./{file}.swp"
+  swap_pid_info: "Created by PID: {pid} (Process is {status})"
+  swap_options_prompt: "Press: [R]ecover edits  [D]elete swap  [O]pen read-only  [Q]uit"
+  swap_status_recovered: "Recovered {count} lines from swap"
+  swap_status_deleted: "Deleted stale swap file"
+  swap_status_readonly: "Opened in Read-Only mode"
   read_only_notice: "File is open in read-only mode"
 
 menuedit:
@@ -131,11 +142,15 @@ bmpager:
   match_count: "[{current} of {total}]"
   help_title: "Pager Help"
   line_indicator: "Line {line}/{total}"
+  pattern_not_found: "pattern not found: {pattern}"
+  no_previous_search: "no previous search pattern"
 
 cheat:
   search_prompt: "Search cheatsheets..."
   no_cheats_found: "No matching cheatsheets found"
   category_label: "Category: {category}"
+  no_files_found: "No markdown files found under {dir}"
+  no_match_query: "No markdown file matched '{query}' under {dir}"
 
 ymlcheck:
   valid_config: "Configuration is valid."

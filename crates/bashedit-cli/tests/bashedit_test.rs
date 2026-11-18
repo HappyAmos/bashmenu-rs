@@ -480,6 +480,22 @@ fn test_bashedit_cli_whitespace_and_tab_flags() {
 }
 
 #[test]
+fn test_bashedit_cli_locale_flag() {
+    let bin = env!("CARGO_BIN_EXE_bashedit");
+    let output = std::process::Command::new(bin)
+        .arg("--help")
+        .output()
+        .expect("bashedit --help must run");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("-L, --locale") || stdout.contains("--locale <LOCALE>"),
+        "Help output must document -L / --locale flag: {}",
+        stdout
+    );
+}
+
+#[test]
 fn test_wrap_line_ranges() {
     // Empty line
     let empty: Vec<char> = "".chars().collect();

@@ -10,6 +10,7 @@ mod frontmatter;
 mod render;
 
 use args::CliArgs;
+use bashmenu_core::t;
 use cheatsheet::{find_markdown_files, find_single_match, print_file_list, search_cheatsheets};
 use clap::{CommandFactory, Parser};
 use config::{get_config_path, get_root_directory};
@@ -19,6 +20,20 @@ use std::process::exit;
 /// CLI entrypoint for `cheat`.
 fn main() {
     let args = CliArgs::parse();
+
+    // Initialize active locale (CLI flag > LC_ALL > LC_MESSAGES > LANG)
+    let locale_target = args
+        .locale
+        .as_ref()
+        .cloned()
+        .or_else(|| std::env::var("LC_ALL").ok())
+        .or_else(|| std::env::var("LC_MESSAGES").ok())
+        .or_else(|| std::env::var("LANG").ok());
+
+    if let Some(ref loc) = locale_target {
+        let clean_loc = loc.split('.').next().unwrap_or(loc);
+        let _ = bashmenu_core::set_locale(clean_loc);
+    }
 
     // 1. Locate or create configuration file
     let config_path = match get_config_path() {
@@ -54,7 +69,8 @@ fn main() {
         // Case 1: Unfiltered listing mode
         if list_query.is_none() {
             if md_files.is_empty() {
-                println!("No markdown files found under {}", root_dir.display());
+                let dir_str = root_dir.display().to_string();
+                println!("{}", t!("cheat.no_files_found", dir => &dir_str));
                 return;
             }
             print_file_list(&md_files, &root_dir);
@@ -65,9 +81,10 @@ fn main() {
         if let Some(query) = list_query {
             let matches = search_cheatsheets(&md_files, &root_dir, &query);
             if matches.is_empty() {
+                let dir_str = root_dir.display().to_string();
                 eprintln!(
-                    "No markdown file matched '{query}' under {}",
-                    root_dir.display()
+                    "{}",
+                    t!("cheat.no_match_query", query => &query, dir => &dir_str)
                 );
                 exit(1);
             }
@@ -94,9 +111,10 @@ fn main() {
             display_markdown(&file);
         }
         None => {
+            let dir_str = root_dir.display().to_string();
             eprintln!(
-                "No markdown file matched '{query}' under {}",
-                root_dir.display()
+                "{}",
+                t!("cheat.no_match_query", query => query, dir => &dir_str)
             );
             exit(1);
         }

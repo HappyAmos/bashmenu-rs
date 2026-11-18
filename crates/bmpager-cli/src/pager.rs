@@ -5,6 +5,7 @@ use crate::args::PagerArgs;
 use crate::editor::open_editor;
 use crate::help::show_help_modal;
 use crate::links::{extract_links, open_external_url, resolve_anchor};
+use bashmenu_core::t;
 use crossterm::cursor::{Hide, Show};
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use crossterm::execute;
@@ -476,7 +477,7 @@ impl Pager {
             self.top_line = target;
             self.message = format!("/{}", pat);
         } else {
-            self.message = format!("pattern not found: {}", pat);
+            self.message = t!("bmpager.pattern_not_found", pattern => pat);
         }
     }
 
@@ -484,7 +485,7 @@ impl Pager {
     /// wrapping around the document boundaries if necessary.
     fn search_next(&mut self, dir: i32) {
         if self.last_search.is_empty() {
-            self.message = "no previous search pattern".to_string();
+            self.message = t!("bmpager.no_previous_search");
             return;
         }
 
