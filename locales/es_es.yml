@@ -1,0 +1,128 @@
+# ==============================================================================
+# BashMenu-RS Tabla de Cadenas en Español (España)
+# ==============================================================================
+# Traducción de referencia para la comunidad en Español (es_ES).
+# ==============================================================================
+
+meta:
+  locale: "es_ES"
+  name: "Español (España)"
+  version: "1.0"
+
+common:
+  buttons:
+    yes: "Sí"
+    no: "No"
+    cancel: "Cancelar"
+    save: "Guardar"
+    save_as: "Guardar como"
+    overwrite: "Sobrescribir"
+    overwrite_disk: "Sobrescribir disco"
+    reload: "Recargar"
+    reload_disk: "Recargar disco"
+    save_as_copy: "Guardar como copia"
+    close: "Cerrar"
+    ok: "Aceptar"
+    apply: "Aplicar"
+    delete: "Eliminar"
+    edit: "Editar"
+    insert: "Insertar"
+    merge: "Fusionar"
+    copy: "Copiar"
+    dismiss: "Descartar"
+  gutters:
+    help: "Ayuda"
+    edit: "Editar"
+    back: "Atrás"
+    quit: "Salir"
+    select: "Seleccionar"
+    nav: "Navegar"
+    search: "Buscar"
+    save: "Guardar"
+    refresh: "Actualizar"
+  dialogs:
+    confirm_title: "Confirmación"
+    error_title: "Error"
+    warning_title: "Advertencia"
+    info_title: "Información"
+    file_picker_title: "Seleccionar archivo"
+    dir_picker_title: "Seleccionar directorio"
+    input_title: "Entrada"
+    save_as_title: "Guardar como"
+    filename_label: "Nombre de archivo:"
+    search_prompt: "Buscar: "
+    select_current_dir: "Seleccionar directorio actual"
+    show_hidden: "Mostrar ocultos"
+    hide_hidden: "Ocultar ocultos"
+    new_file: "Nuevo archivo"
+
+bashmenu:
+  search_placeholder: "Escriba para filtrar elementos del menú..."
+  no_items_found: "No se encontraron elementos coincidentes"
+  screensaver_hint: "Presione cualquier tecla para reanudar"
+  env_title: "Información del entorno"
+  theme_picker_title: "Seleccionar tema"
+  theme_applied: "Tema '{theme}' aplicado"
+  command_running: "Ejecutando comando..."
+  unnamed_menu: "Menú Principal"
+
+bashedit:
+  swap_detected_title: "Archivo Swap Detectado"
+  swap_detected_msg: "Existe un archivo swap para este documento. Puede indicar un cierre inesperado o una sesión concurrente."
+  swap_btn_recover: "[R]ecuperar"
+  swap_btn_readonly: "[O] Solo lectura"
+  swap_btn_edit: "[E] Editar de todos modos"
+  swap_btn_delete: "[D] Eliminar swap"
+  swap_btn_quit: "[Q] Salir"
+  status_read_only: "[SL]"
+  status_modified: "[+]"
+  status_legend: "Línea {line}, Col {col} | Car {char}"
+  search_prompt: "Buscar: "
+  saved_file: "Guardado {file}"
+  read_only_notice: "El archivo está abierto en modo de solo lectura"
+
+menuedit:
+  inspector_title: "Inspector de elementos"
+  prop_label: "Etiqueta"
+  prop_action: "Acción"
+  prop_type: "Tipo"
+  prop_icon: "Icono"
+  prop_shortcut: "Atajo"
+  prop_desc: "Descripción"
+  add_node_title: "Añadir nuevo elemento"
+  delete_confirm_msg: "¿Está seguro de que desea eliminar este elemento del menú?"
+  type_command: "Comando"
+  type_script: "Script"
+  type_submenu: "Submenú"
+  type_toggle: "Interruptor"
+  type_radio: "Radio"
+  type_confirm: "Confirmar"
+  type_notebook: "Cuaderno"
+
+themeedit:
+  title: "Editor de Temas y Paletas"
+  tab_tokens: "Tokens"
+  tab_preview: "Vista previa"
+  f5_derive: "[F5] Derivar colores"
+  ctrl_p_glyphs: "[Ctrl+P] Glifos"
+  delete_theme_confirm: "¿Está seguro de que desea eliminar el tema '{theme}'?"
+  cannot_delete_last_theme: "No se puede eliminar el único tema restante"
+
+bmpager:
+  search_prompt: "Buscar: "
+  match_count: "[{current} de {total}]"
+  help_title: "Ayuda del visor"
+  line_indicator: "Línea {line}/{total}"
+
+cheat:
+  search_prompt: "Buscar hojas de trucos..."
+  no_cheats_found: "No se encontraron hojas de trucos"
+  category_label: "Categoría: {category}"
+
+ymlcheck:
+  valid_config: "La configuración es válida."
+  valid_theme: "Las definiciones de tema son válidas."
+  valid_menu: "La definición del menú es válida."
+  valid_shortcuts: "La configuración de atajos es válida."
+  valid_locale: "La tabla de cadenas de idioma es válida."
+  error_prefix: "Error de validación:"

@@ -2,6 +2,7 @@
 
 use super::frame::render_modal_frame;
 use crate::style::ResolvedThemeStyles;
+use bashmenu_core::t;
 use crossterm::event::{KeyCode, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -310,7 +311,7 @@ impl MessageModal {
         let right_bound = inner.x + inner.width;
 
         if ok_x < right_bound {
-            let ok_str = " [ OK ] ";
+            let ok_str = format!(" [ {} ] ", t!("common.buttons.ok"));
             let max_ok = (right_bound - ok_x) as usize;
             let clipped_ok: String = ok_str.chars().take(max_ok).collect();
             buf.set_string(

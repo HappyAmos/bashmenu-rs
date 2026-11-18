@@ -2,6 +2,7 @@
 
 use super::frame::render_modal_frame;
 use crate::style::ResolvedThemeStyles;
+use bashmenu_core::t;
 use crossterm::event::{KeyCode, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -22,13 +23,7 @@ pub enum NoteConflictChoice {
     Cancel,
 }
 
-const BUTTON_LABELS: [&str; 5] = [
-    "[ Merge ]",
-    "[ Overwrite Disk ]",
-    "[ Reload Disk ]",
-    "[ Save As Copy ]",
-    "[ Cancel ]",
-];
+const BUTTON_COUNT: usize = 5;
 
 /// Interactive modal presented when concurrent external edits conflict with
 /// local changes.
@@ -80,14 +75,14 @@ editing it.\nChoose how to resolve this concurrent change:"
         match code {
             KeyCode::Left | KeyCode::Up | KeyCode::BackTab => {
                 if self.selected_index == 0 {
-                    self.selected_index = BUTTON_LABELS.len() - 1;
+                    self.selected_index = BUTTON_COUNT - 1;
                 } else {
                     self.selected_index -= 1;
                 }
                 None
             }
             KeyCode::Right | KeyCode::Down | KeyCode::Tab => {
-                self.selected_index = (self.selected_index + 1) % BUTTON_LABELS.len();
+                self.selected_index = (self.selected_index + 1) % BUTTON_COUNT;
                 None
             }
             KeyCode::Char('m') | KeyCode::Char('M') => Some(NoteConflictChoice::Merge),
@@ -109,19 +104,31 @@ editing it.\nChoose how to resolve this concurrent change:"
     }
 
     /// Selects appropriately sized button labels for the available width.
-    fn button_labels(&self, inner_width: u16) -> [&'static str; 5] {
+    fn button_labels(&self, inner_width: u16) -> [String; 5] {
         if inner_width >= 68 {
-            BUTTON_LABELS
+            [
+                format!("[ {} ]", t!("common.buttons.merge")),
+                format!("[ {} ]", t!("common.buttons.overwrite_disk")),
+                format!("[ {} ]", t!("common.buttons.reload_disk")),
+                format!("[ {} ]", t!("common.buttons.save_as_copy")),
+                format!("[ {} ]", t!("common.buttons.cancel")),
+            ]
         } else if inner_width >= 50 {
             [
-                "[ Merge ]",
-                "[ Overwrite ]",
-                "[ Reload ]",
-                "[ Save Copy ]",
-                "[ Cancel ]",
+                format!("[ {} ]", t!("common.buttons.merge")),
+                format!("[ {} ]", t!("common.buttons.overwrite")),
+                format!("[ {} ]", t!("common.buttons.reload")),
+                format!("[ {} ]", t!("common.buttons.save")),
+                format!("[ {} ]", t!("common.buttons.cancel")),
             ]
         } else {
-            ["[Merge]", "[Over]", "[Reload]", "[Copy]", "[Cancel]"]
+            [
+                format!("[{}]", t!("common.buttons.merge")),
+                format!("[{}]", t!("common.buttons.overwrite")),
+                format!("[{}]", t!("common.buttons.reload")),
+                format!("[{}]", t!("common.buttons.copy")),
+                format!("[{}]", t!("common.buttons.cancel")),
+            ]
         }
     }
 
@@ -240,7 +247,7 @@ editing it.\nChoose how to resolve this concurrent change:"
                 break;
             }
             let is_cur = idx == self.selected_index;
-            let label = labels[idx];
+            let label = &labels[idx];
             let max_w = (right_bound - start_x) as usize;
             let clipped_label: String = label.chars().take(max_w).collect();
             let st = if is_cur {

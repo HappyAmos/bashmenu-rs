@@ -2,6 +2,7 @@
 
 use super::frame::render_modal_frame;
 use crate::style::ResolvedThemeStyles;
+use bashmenu_core::t;
 use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -449,8 +450,10 @@ impl InputModal {
         let center_x = inner.x + inner.width / 2;
         let right_bound = inner.x + inner.width;
 
-        let ok_str = " [ OK ] ";
-        let cancel_str = " [ Cancel ] ";
+        let ok_label = t!("common.buttons.ok");
+        let cancel_label = t!("common.buttons.cancel");
+        let ok_str = format!(" [ {} ] ", ok_label);
+        let cancel_str = format!(" [ {} ] ", cancel_label);
 
         let ok_x = center_x.saturating_sub(12).max(inner.x + 1);
         let cancel_x = (center_x + 2).max(ok_x + ok_str.len() as u16 + 1);

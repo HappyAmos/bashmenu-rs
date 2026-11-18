@@ -307,4 +307,24 @@ bashedit:
         );
         assert_eq!(legend, "Line 1, Col 2 | Char A");
     }
+
+    #[test]
+    fn test_es_es_locale_completeness() {
+        let en_map = parse_and_flatten_yaml(DEFAULT_EN_US_YAML).unwrap();
+        let es_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../locales/es_es.yml");
+        assert!(es_path.is_file(), "locales/es_es.yml must exist");
+        let es_content = std::fs::read_to_string(&es_path).unwrap();
+        let es_map = parse_and_flatten_yaml(&es_content).unwrap();
+
+        for key in en_map.keys() {
+            if key == "meta.locale" || key == "meta.name" {
+                continue;
+            }
+            assert!(
+                es_map.contains_key(key),
+                "Missing key in locales/es_es.yml: {}",
+                key
+            );
+        }
+    }
 }

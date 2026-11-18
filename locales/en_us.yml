@@ -19,7 +19,10 @@ common:
     save: "Save"
     save_as: "Save As"
     overwrite: "Overwrite"
+    overwrite_disk: "Overwrite Disk"
     reload: "Reload"
+    reload_disk: "Reload Disk"
+    save_as_copy: "Save As Copy"
     close: "Close"
     ok: "OK"
     apply: "Apply"
@@ -50,6 +53,10 @@ common:
     save_as_title: "Save As"
     filename_label: "File name:"
     search_prompt: "Search: "
+    select_current_dir: "Select Current Directory"
+    show_hidden: "Show Hidden"
+    hide_hidden: "Hide Hidden"
+    new_file: "New File"
 
 bashmenu:
   search_placeholder: "Type to filter menu items..."

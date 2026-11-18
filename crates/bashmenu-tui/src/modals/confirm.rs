@@ -2,6 +2,7 @@
 
 use super::frame::render_modal_frame;
 use crate::style::ResolvedThemeStyles;
+use bashmenu_core::t;
 use crossterm::event::{KeyCode, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -185,25 +186,29 @@ impl ConfirmModal {
             }
         }
 
-        // 2. Render Action Buttons [ Yes ] [  No ] [ Cancel ]
+        // 2. Render Action Buttons [ Yes ] [ No ] [ Cancel ]
         let btn_y = inner.y + inner.height.saturating_sub(2);
         let total_btns_w: u16 = 34;
         let start_x = inner.x + inner.width.saturating_sub(total_btns_w) / 2;
 
+        let yes_label = t!("common.buttons.yes");
+        let no_label = t!("common.buttons.no");
+        let cancel_label = t!("common.buttons.cancel");
+
         let yes_str = if self.selected_index == 0 {
-            " [ Yes ] "
+            format!(" [ {} ] ", yes_label)
         } else {
-            "   Yes   "
+            format!("   {}   ", yes_label)
         };
         let no_str = if self.selected_index == 1 {
-            " [  No ] "
+            format!(" [ {} ] ", no_label)
         } else {
-            "    No   "
+            format!("   {}   ", no_label)
         };
         let cancel_str = if self.selected_index == 2 {
-            " [ Cancel ] "
+            format!(" [ {} ] ", cancel_label)
         } else {
-            "   Cancel   "
+            format!("   {}   ", cancel_label)
         };
 
         let yes_style = if self.selected_index == 0 {

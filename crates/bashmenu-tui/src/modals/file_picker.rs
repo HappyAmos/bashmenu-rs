@@ -2,6 +2,7 @@
 
 use super::frame::render_modal_frame;
 use crate::style::ResolvedThemeStyles;
+use bashmenu_core::t;
 use crossterm::event::{KeyCode, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -220,7 +221,7 @@ impl FilePickerModal {
         // Current directory selection for directory pickers
         if self.only_dirs {
             self.items.push(DirItem {
-                name: "[ Select Current Directory ]".to_string(),
+                name: format!("[ {} ]", t!("common.dialogs.select_current_dir")),
                 is_dir: false,
                 path: self.current_dir.clone(),
             });
@@ -620,18 +621,26 @@ impl FilePickerModal {
                     }
                 } else if row == btn_y {
                     let rel_x = col.saturating_sub(inner_area.x + 2) as usize;
+                    let save_btn_str = format!("[ {} ]", t!("common.buttons.save"));
+                    let cancel_btn_str = format!("[ {} ]", t!("common.buttons.cancel"));
                     let hidden_tag = if self.show_hidden {
-                        "[h] Hide Hidden"
+                        format!("[h] {}", t!("common.dialogs.hide_hidden"))
                     } else {
-                        "[h] Show Hidden"
+                        format!("[h] {}", t!("common.dialogs.show_hidden"))
                     };
-                    if rel_x < 10 {
+                    let save_w = save_btn_str.len();
+                    let cancel_start = save_w + 2;
+                    let cancel_w = cancel_btn_str.len();
+                    let hidden_start =
+                        (inner_area.width as usize).saturating_sub(hidden_tag.len() + 2);
+
+                    if rel_x < save_w {
                         self.focused_control = FilePickerFocus::SaveButton;
                         return self.confirm_save();
-                    } else if (11..23).contains(&rel_x) {
+                    } else if rel_x >= cancel_start && rel_x < cancel_start + cancel_w {
                         self.focused_control = FilePickerFocus::CancelButton;
                         return Some(None);
-                    } else if rel_x >= 25 && rel_x < 25 + hidden_tag.len() + 2 {
+                    } else if col >= inner_area.x + hidden_start as u16 {
                         self.toggle_hidden();
                         return None;
                     }
@@ -651,38 +660,41 @@ impl FilePickerModal {
                     if row == btn_y {
                         let rel_x = col.saturating_sub(inner_area.x + 2) as usize;
                         let hidden_tag = if self.show_hidden {
-                            "[h] Hide Hidden"
+                            format!("[h] {}", t!("common.dialogs.hide_hidden"))
                         } else {
-                            "[h] Show Hidden"
+                            format!("[h] {}", t!("common.dialogs.show_hidden"))
                         };
+                        let select_hint = format!("[Enter] {}", t!("common.gutters.select"));
+                        let cancel_hint = format!("[Esc] {}", t!("common.gutters.back"));
+                        let new_hint = format!("[n] {}", t!("common.dialogs.new_file"));
                         let bottom_str = if self.allow_new {
                             format!(
-                                "[Enter] Select   {}   [n] New File   [Esc] Cancel",
-                                hidden_tag
+                                "{}   {}   {}   {}",
+                                select_hint, hidden_tag, new_hint, cancel_hint
                             )
                         } else {
-                            format!("[Enter] Select   {}   [Esc] Cancel", hidden_tag)
+                            format!("{}   {}   {}", select_hint, hidden_tag, cancel_hint)
                         };
-                        if let Some(pos) = bottom_str.find("[Esc]") {
+                        if let Some(pos) = bottom_str.find(&cancel_hint) {
                             if rel_x >= pos {
                                 return Some(None);
                             }
                         }
-                        if let Some(pos) = bottom_str.find("[n] New File") {
-                            if rel_x >= pos && rel_x < pos + 12 && self.allow_new {
+                        if let Some(pos) = bottom_str.find(&new_hint) {
+                            if rel_x >= pos && rel_x < pos + new_hint.len() && self.allow_new {
                                 self.creating_new = true;
                                 self.new_name_input.clear();
                                 return None;
                             }
                         }
-                        if let Some(pos) = bottom_str.find(hidden_tag) {
+                        if let Some(pos) = bottom_str.find(&hidden_tag) {
                             if rel_x >= pos && rel_x < pos + hidden_tag.len() {
                                 self.toggle_hidden();
                                 return None;
                             }
                         }
-                        if let Some(pos) = bottom_str.find("[Enter] Select") {
-                            if rel_x >= pos && rel_x < pos + 14 {
+                        if let Some(pos) = bottom_str.find(&select_hint) {
+                            if rel_x >= pos && rel_x < pos + select_hint.len() {
                                 return self.activate_selected();
                             }
                         }
@@ -857,17 +869,20 @@ impl FilePickerModal {
                 styles.text
             };
 
-            buf.set_string(inner.x + 2, btn_y, "[ Save ]", save_style);
-            buf.set_string(inner.x + 13, btn_y, "[ Cancel ]", cancel_style);
+            let save_btn_str = format!("[ {} ]", t!("common.buttons.save"));
+            let cancel_btn_str = format!("[ {} ]", t!("common.buttons.cancel"));
+            buf.set_string(inner.x + 2, btn_y, &save_btn_str, save_style);
+            let cancel_x = inner.x + 2 + save_btn_str.len() as u16 + 2;
+            buf.set_string(cancel_x, btn_y, &cancel_btn_str, cancel_style);
 
             let hidden_tag = if self.show_hidden {
-                "[h] Hide Hidden"
+                format!("[h] {}", t!("common.dialogs.hide_hidden"))
             } else {
-                "[h] Show Hidden"
+                format!("[h] {}", t!("common.dialogs.show_hidden"))
             };
             let hidden_x = (inner.x + inner.width).saturating_sub(hidden_tag.len() as u16 + 2);
             if hidden_x > inner.x + 25 {
-                buf.set_string(hidden_x, btn_y, hidden_tag, styles.gutter);
+                buf.set_string(hidden_x, btn_y, &hidden_tag, styles.gutter);
             }
         } else {
             let btn_y = inner.y + inner.height.saturating_sub(1);
@@ -878,17 +893,20 @@ impl FilePickerModal {
                 buf.set_string(inner.x + 2, btn_y, &clipped_prompt, styles.highlight);
             } else {
                 let hidden_tag = if self.show_hidden {
-                    "[h] Hide Hidden"
+                    format!("[h] {}", t!("common.dialogs.hide_hidden"))
                 } else {
-                    "[h] Show Hidden"
+                    format!("[h] {}", t!("common.dialogs.show_hidden"))
                 };
+                let select_hint = format!("[Enter] {}", t!("common.gutters.select"));
+                let cancel_hint = format!("[Esc] {}", t!("common.gutters.back"));
+                let new_hint = format!("[n] {}", t!("common.dialogs.new_file"));
                 let bottom_str = if self.allow_new {
                     format!(
-                        "[Enter] Select   {}   [n] New File   [Esc] Cancel",
-                        hidden_tag
+                        "{}   {}   {}   {}",
+                        select_hint, hidden_tag, new_hint, cancel_hint
                     )
                 } else {
-                    format!("[Enter] Select   {}   [Esc] Cancel", hidden_tag)
+                    format!("{}   {}   {}", select_hint, hidden_tag, cancel_hint)
                 };
                 let clipped_bottom: String = bottom_str.chars().take(ctrl_w).collect();
                 buf.set_string(inner.x + 2, btn_y, &clipped_bottom, styles.gutter);
