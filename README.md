@@ -132,3 +132,10 @@ cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 shellcheck *.sh scripts/*.sh
 ```
+
+---
+
+## Community & Security
+
+- **Code of Conduct:** Please review our [Community Guidelines](CODE_OF_CONDUCT.md) for participation standards.
+- **Security Policy:** To report security concerns privately, please consult our [Security Policy](SECURITY.md).
