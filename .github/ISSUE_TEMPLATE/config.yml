@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security Vulnerabilities
+    url: https://github.com/HappyAmos/bashmenu-rs/blob/main/SECURITY.md
+    about: Please report security vulnerabilities privately according to our security policy.
+  - name: Community Discussions & Ideas
+    url: https://github.com/HappyAmos/bashmenu-rs/discussions
+    about: Ask questions, share custom themes, and discuss ideas with the community.

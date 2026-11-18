@@ -119,23 +119,26 @@ For the complete user manual and specification, see [bashmenu.md](bashmenu.md).
 
 ---
 
-## Development & Testing
+## Development & Contributing
 
-Run all unit and integration tests:
-```bash
-cargo test --workspace
-```
+We welcome contributions! Please read our [Contributing Guide](CONTRIBUTING.md) to learn about our development workflow and architecture invariants.
 
-Run linters and formatting checks:
+You can run common developer tasks using the included `Makefile`:
 ```bash
-cargo fmt --all --check
-cargo clippy --workspace --all-targets -- -D warnings
-shellcheck *.sh scripts/*.sh
+# Run formatting, clippy, and shellcheck linters
+make check
+
+# Run the full pre-commit verification suite
+make verify
+
+# Run all unit and integration tests
+make test
 ```
 
 ---
 
 ## Community & Security
 
+- **Contributing Guide:** See [CONTRIBUTING.md](CONTRIBUTING.md) for developer setup and PR guidelines.
 - **Code of Conduct:** Please review our [Community Guidelines](CODE_OF_CONDUCT.md) for participation standards.
 - **Security Policy:** To report security concerns privately, please consult our [Security Policy](SECURITY.md).

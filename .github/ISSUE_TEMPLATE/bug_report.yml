@@ -1,0 +1,61 @@
+name: Bug Report
+description: Report a reproducible bug or unexpected behavior in BashMenu-RS
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report an issue! Please provide as much detail as possible to help us reproduce and resolve it quickly.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: Describe what happened and what you expected to happen instead...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps To Reproduce
+      description: Step-by-step instructions to reproduce the issue.
+      placeholder: |
+        1. Run `bashmenu` or companion binary `...`
+        2. Navigate to `...`
+        3. Press `<key>`
+        4. See error or unexpected display...
+    validations:
+      required: true
+
+  - type: input
+    id: binary
+    attributes:
+      label: Affected Tool / Binary
+      description: Which binary or crate is affected (e.g., bashmenu, bashedit, themeedit, menuedit, bmpager, cheat, ymlcheck)?
+      placeholder: e.g. bashmenu, themeedit
+    validations:
+      required: false
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment Details
+      description: Please share details about your system and terminal.
+      value: |
+        - **OS:** (e.g. Ubuntu 24.04, Arch Linux, macOS Sonoma, WSL2)
+        - **Terminal Emulator:** (e.g. Alacritty, Kitty, WezTerm, iTerm2, tmux)
+        - **$TERM / $COLORTERM:** (e.g. xterm-256color / truecolor)
+        - **Rust Version:** (if building from source: `rustc --version`)
+        - **BashMenu Version:** (e.g. from `bashmenu --version` or git commit)
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs_or_screenshots
+    attributes:
+      label: Screenshots, Screencasts, or Terminal Logs
+      description: Attach screenshots, terminal recordings, or relevant error output if applicable.
+    validations:
+      required: false
