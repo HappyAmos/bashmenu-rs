@@ -118,6 +118,20 @@ Shell scripts in the root directory or `scripts/` must:
 
 ---
 
+## Translating BashMenu (Localization)
+
+We welcome community translations! Contributing a new language requires zero Rust coding experience:
+
+1. **Copy the Canonical Template:** Copy [`locales/en_us.yml`](locales/en_us.yml) to `locales/<lang_code>.yml` (e.g. `locales/fr_fr.yml`, `locales/de_de.yml`, `locales/ja_jp.yml`).
+2. **Translate the Strings:** Translate the right-hand text values. Do **not** alter keys or dynamic placeholder variables (such as `{theme}`, `{line}`, `{file}`, `{title}`).
+3. **Validate Your Translation:** Use `ymlcheck` with the `-l` / `--locale` flag to automatically verify syntax, 100% key completeness, and placeholder variable parity:
+   ```bash
+   cargo run -p ymlcheck-cli -- -l locales/<lang_code>.yml
+   ```
+4. **Submit a Pull Request:** Once `ymlcheck` confirms 100% key parity, open a PR with your translation file!
+
+---
+
 ## Submitting Pull Requests
 
 1. **Fork & Branch:** Create a feature or bugfix branch with a descriptive name (e.g. `feat/new-theme`, `fix/pager-osc8-wrap`).

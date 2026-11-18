@@ -77,6 +77,16 @@ impl LocaleCatalog {
         let raw = self.get(key);
         interpolate_string(raw, vars)
     }
+
+    /// Returns the map of default canonical keys to strings.
+    pub fn default_strings(&self) -> &HashMap<String, String> {
+        &self.default_strings
+    }
+
+    /// Returns the map of active loaded keys to strings.
+    pub fn active_strings(&self) -> &HashMap<String, String> {
+        &self.active_strings
+    }
 }
 
 impl Default for LocaleCatalog {
@@ -205,7 +215,7 @@ pub fn interpolate_string(template: &str, vars: &[(&str, &str)]) -> String {
 }
 
 /// Parse a YAML string and recursively flatten mappings into dot-delimited paths.
-fn parse_and_flatten_yaml(content: &str) -> Result<HashMap<String, String>, serde_yml::Error> {
+pub fn parse_and_flatten_yaml(content: &str) -> Result<HashMap<String, String>, serde_yml::Error> {
     let value: serde_yml::Value = serde_yml::from_str(content)?;
     let mut map = HashMap::new();
     if let serde_yml::Value::Mapping(root) = value {

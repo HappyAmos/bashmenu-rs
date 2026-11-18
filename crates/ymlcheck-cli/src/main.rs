@@ -4,7 +4,7 @@
 
 use bashmenu_core::{
     activity_override_tokens, load_config, load_menu, load_shortcuts, load_themes,
-    validate_key_spec, ACTIVITY_OVERRIDE_KEYS,
+    parse_and_flatten_yaml, validate_key_spec, LocaleCatalog, ACTIVITY_OVERRIDE_KEYS,
 };
 use clap::{ArgGroup, Parser};
 use std::collections::HashSet;
@@ -136,7 +136,7 @@ const VALID_OPTION_TYPES: &[&str] = &[
 )]
 #[command(group(
     ArgGroup::new("mode")
-        .args(["themes", "config", "menu", "shortcuts", "yaml"])
+        .args(["themes", "config", "menu", "shortcuts", "locale", "yaml"])
 ))]
 struct Cli {
     /// Path to one or more YAML files to validate
@@ -158,6 +158,10 @@ struct Cli {
     /// Validate as a custom keyboard shortcuts file (shortcuts.yml)
     #[arg(short = 's', long = "shortcuts", alias = "shortcut")]
     shortcuts: bool,
+
+    /// Validate as a translation locale string table (e.g. locales/es_es.yml)
+    #[arg(short = 'l', long = "locale")]
+    locale: bool,
 
     /// Validate YAML syntax only with no schema enforcement (default)
     #[arg(short = 'y', long = "yaml")]
@@ -641,6 +645,124 @@ fn validate_shortcuts_file(path: &Path) -> bool {
     true
 }
 
+/// Validates a locale string table YAML against the canonical English schema and variable placeholders.
+fn validate_locale_file(path: &Path) -> bool {
+    println!("Validating locale string table: {}...", path.display());
+    let content = match fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(e) => {
+            println!("\n[ERROR] Could not read file '{}': {}", path.display(), e);
+            return false;
+        }
+    };
+
+    let target_map = match parse_and_flatten_yaml(&content) {
+        Ok(m) => m,
+        Err(e) => {
+            println!(
+                "\n[ERROR] YAML Syntax Error in '{}':\n{}",
+                path.display(),
+                e
+            );
+            return false;
+        }
+    };
+
+    let catalog = LocaleCatalog::new();
+    let default_map = catalog.default_strings();
+
+    let mut missing_keys: Vec<&String> = Vec::new();
+    let mut variable_mismatches: Vec<String> = Vec::new();
+
+    let extract_vars = |s: &str| -> HashSet<String> {
+        let mut vars = HashSet::new();
+        let mut chars = s.chars().peekable();
+        while let Some(ch) = chars.next() {
+            if ch == '{' {
+                let mut var_name = String::new();
+                for inner in chars.by_ref() {
+                    if inner == '}' {
+                        if !var_name.is_empty() {
+                            vars.insert(var_name);
+                        }
+                        break;
+                    }
+                    var_name.push(inner);
+                }
+            }
+        }
+        vars
+    };
+
+    for (key, default_val) in default_map {
+        if let Some(target_val) = target_map.get(key) {
+            let def_vars = extract_vars(default_val);
+            let target_vars = extract_vars(target_val);
+            if def_vars != target_vars {
+                variable_mismatches.push(format!(
+                    "Key '{}': expected placeholder variables {:?}, found {:?}",
+                    key, def_vars, target_vars
+                ));
+            }
+        } else {
+            missing_keys.push(key);
+        }
+    }
+
+    missing_keys.sort();
+    variable_mismatches.sort();
+
+    let mut passed = true;
+    if !missing_keys.is_empty() {
+        println!(
+            "\n[ERROR] Locale file '{}' is missing {} canonical key(s):",
+            path.display(),
+            missing_keys.len()
+        );
+        for k in &missing_keys {
+            println!("  - {}", k);
+        }
+        passed = false;
+    }
+
+    if !variable_mismatches.is_empty() {
+        println!(
+            "\n[ERROR] Locale file '{}' has {} variable interpolation mismatch(es):",
+            path.display(),
+            variable_mismatches.len()
+        );
+        for mismatch in &variable_mismatches {
+            println!("  - {}", mismatch);
+        }
+        passed = false;
+    }
+
+    let extra_keys: Vec<&String> = target_map
+        .keys()
+        .filter(|k| !default_map.contains_key(*k))
+        .collect();
+    if !extra_keys.is_empty() {
+        println!(
+            "\n[WARNING] Locale file '{}' defines {} unknown key(s) not in canonical en_us.yml:",
+            path.display(),
+            extra_keys.len()
+        );
+        for k in extra_keys {
+            println!("  + {}", k);
+        }
+    }
+
+    if passed {
+        println!(
+            "SUCCESS: '{}' is a valid locale string table with 100% key parity ({} keys validated)!",
+            path.display(),
+            target_map.len()
+        );
+    }
+
+    passed
+}
+
 /// CLI entrypoint for `ymlcheck`.
 fn main() {
     let cli = Cli::parse();
@@ -661,6 +783,8 @@ fn main() {
             validate_menu_file(file)
         } else if cli.shortcuts {
             validate_shortcuts_file(file)
+        } else if cli.locale {
+            validate_locale_file(file)
         } else {
             validate_yaml_syntax(file)
         };
