@@ -278,3 +278,28 @@ fn test_all_themes_define_default_icon_and_menu_items_have_icons() {
     }
     assert_items_have_icons(&menu.items);
 }
+
+#[test]
+fn test_random_theme_resolution_in_bashmenu() {
+    let repo_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
+    let themes_path = repo_root.join("bashmenu.themes");
+    let themes = bashmenu_core::load_themes(&themes_path).expect("bashmenu.themes must load");
+
+    let cfg_theme = "[ Random ]";
+    assert!(bashmenu_core::is_random_theme_spec(cfg_theme));
+
+    let (active_name, active_theme) = if bashmenu_core::is_random_theme_spec(cfg_theme) {
+        if let Some((name, t)) = bashmenu_core::pick_random_theme(&themes) {
+            (name.to_string(), Some(t))
+        } else {
+            (cfg_theme.to_string(), None)
+        }
+    } else {
+        (cfg_theme.to_string(), themes.get(cfg_theme))
+    };
+
+    assert_ne!(active_name, "[ Random ]");
+    assert_ne!(active_name, "Random");
+    assert!(themes.contains_key(&active_name));
+    assert!(active_theme.is_some());
+}

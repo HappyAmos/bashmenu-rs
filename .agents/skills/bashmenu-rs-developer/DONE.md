@@ -1196,3 +1196,9 @@
 - [x] Added `test_themeedit_shadow_color_token_and_preview` and updated `test_derive_colors_from_wallpaper` in `crates/themeedit-cli/tests/themeedit_test.rs`.
 - [x] Documented the `shadow` theme element in `bashmenu.md` and `bashmenu.1`.
 - [x] Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, `shellcheck *.sh scripts/*.sh`, and `ymlcheck --themes bashmenu.themes` all pass with exit code 0.
+
+- [x] Fixed random theme editor launch bug: When theme is set to `[ Random ]`, `bashmenu` resolves and tracks the active random theme name in `active_theme_name`, passing the active theme name (`-t <active_theme_name>`) upon `<F8>` or theme editor invocation rather than passing the literal `[ Random ]` string.
+- [x] Extracted `pick_random_theme` into `bashmenu-core` and exported it across the workspace.
+- [x] Hardened `themeedit-cli` so `ThemeEditorState::new` resolves random theme specs (`[ Random ]`, `[Random]`, `Random`) to an active loaded theme rather than reporting literal "Random" or creating a blank default theme.
+- [x] Prevented renaming or saving themes as reserved random keywords (`Random`, `[ Random ]`, `[Random]`) in `themeedit-cli`.
+- [x] Added unit and integration tests across `bashmenu-core`, `bashmenu-cli`, and `themeedit-cli` for random theme resolution and reservation.

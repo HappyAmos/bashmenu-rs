@@ -319,43 +319,75 @@ impl ThemeEditorState {
             ThemeCollection::default()
         };
 
-        let initial_name = target_theme
-            .filter(|n| !n.trim().is_empty())
-            .or_else(|| {
-                // Try reading active theme from bashmenu.yml if available
-                let cfg_path = bashmenu_core::resolve_app_path(Path::new("bashmenu.yml"));
-                if let Ok(cfg) = bashmenu_core::load_config(&cfg_path) {
-                    if themes.contains_key(&cfg.theme) {
-                        return Some(cfg.theme);
+        let target_is_random = target_theme
+            .as_deref()
+            .map(bashmenu_core::is_random_theme_spec)
+            .unwrap_or(false);
+
+        let initial_name = if target_is_random {
+            bashmenu_core::pick_random_theme(&themes)
+                .map(|(n, _)| n.to_string())
+                .or_else(|| {
+                    if themes.contains_key("dracula") {
+                        Some("dracula".to_string())
+                    } else {
+                        let mut sorted: Vec<_> = themes.keys().cloned().collect();
+                        sorted.sort_by(|a, b| {
+                            a.to_ascii_lowercase()
+                                .cmp(&b.to_ascii_lowercase())
+                                .then_with(|| a.cmp(b))
+                        });
+                        sorted.into_iter().next()
                     }
-                }
-                if let Ok(home) = std::env::var("HOME") {
-                    let cfg_path = PathBuf::from(home).join(".config/bashmenu/bashmenu.yml");
-                    if let Ok(cfg) = bashmenu_core::load_config(&cfg_path) {
-                        if themes.contains_key(&cfg.theme) {
-                            return Some(cfg.theme);
-                        }
-                    }
-                }
-                let cur_cfg = PathBuf::from("bashmenu.yml");
-                if let Ok(cfg) = bashmenu_core::load_config(&cur_cfg) {
-                    if themes.contains_key(&cfg.theme) {
-                        return Some(cfg.theme);
-                    }
-                }
-                if themes.contains_key("dracula") {
-                    Some("dracula".to_string())
+                })
+        } else {
+            target_theme.filter(|n| !n.trim().is_empty())
+        }
+        .or_else(|| {
+            let check_cfg = |cfg: &bashmenu_core::BashMenuConfig| -> Option<String> {
+                if bashmenu_core::is_random_theme_spec(&cfg.theme) {
+                    bashmenu_core::pick_random_theme(&themes).map(|(n, _)| n.to_string())
+                } else if themes.contains_key(&cfg.theme) {
+                    Some(cfg.theme.clone())
                 } else {
-                    let mut sorted: Vec<_> = themes.keys().cloned().collect();
-                    sorted.sort_by(|a, b| {
-                        a.to_ascii_lowercase()
-                            .cmp(&b.to_ascii_lowercase())
-                            .then_with(|| a.cmp(b))
-                    });
-                    sorted.into_iter().next()
+                    None
                 }
-            })
-            .unwrap_or_else(|| "dracula".to_string());
+            };
+
+            // Try reading active theme from bashmenu.yml if available
+            let cfg_path = bashmenu_core::resolve_app_path(Path::new("bashmenu.yml"));
+            if let Ok(cfg) = bashmenu_core::load_config(&cfg_path) {
+                if let Some(name) = check_cfg(&cfg) {
+                    return Some(name);
+                }
+            }
+            if let Ok(home) = std::env::var("HOME") {
+                let cfg_path = PathBuf::from(home).join(".config/bashmenu/bashmenu.yml");
+                if let Ok(cfg) = bashmenu_core::load_config(&cfg_path) {
+                    if let Some(name) = check_cfg(&cfg) {
+                        return Some(name);
+                    }
+                }
+            }
+            let cur_cfg = PathBuf::from("bashmenu.yml");
+            if let Ok(cfg) = bashmenu_core::load_config(&cur_cfg) {
+                if let Some(name) = check_cfg(&cfg) {
+                    return Some(name);
+                }
+            }
+            if themes.contains_key("dracula") {
+                Some("dracula".to_string())
+            } else {
+                let mut sorted: Vec<_> = themes.keys().cloned().collect();
+                sorted.sort_by(|a, b| {
+                    a.to_ascii_lowercase()
+                        .cmp(&b.to_ascii_lowercase())
+                        .then_with(|| a.cmp(b))
+                });
+                sorted.into_iter().next()
+            }
+        })
+        .unwrap_or_else(|| "dracula".to_string());
 
         let current_theme = themes
             .get(&initial_name)
@@ -1515,6 +1547,9 @@ impl ThemeEditorState {
         if trimmed.is_empty() {
             return Err("Theme name cannot be empty".to_string());
         }
+        if bashmenu_core::is_random_theme_spec(trimmed) {
+            return Err("Theme name cannot be reserved keyword 'Random'".to_string());
+        }
         if trimmed == self.current_name {
             self.name_input.set_text(&self.current_name);
             return Ok(());
@@ -1537,6 +1572,9 @@ impl ThemeEditorState {
         let trimmed = new_name.trim();
         if trimmed.is_empty() {
             return Err("Theme name cannot be empty".to_string());
+        }
+        if bashmenu_core::is_random_theme_spec(trimmed) {
+            return Err("Theme name cannot be reserved keyword 'Random'".to_string());
         }
         self.themes
             .insert(trimmed.to_string(), self.current_theme.clone());

@@ -549,6 +549,37 @@ pub fn is_random_theme_spec(name: &str) -> bool {
 /// Type alias for all loaded themes mapped by theme name
 pub type ThemeCollection = HashMap<String, Theme>;
 
+/// Selects a pseudo-random theme from available themes, skipping random specs.
+pub fn pick_random_theme(themes: &ThemeCollection) -> Option<(&str, &Theme)> {
+    let eligible: Vec<(&str, &Theme)> = themes
+        .iter()
+        .filter(|(k, _)| !is_random_theme_spec(k))
+        .map(|(k, v)| (k.as_str(), v))
+        .collect();
+    if eligible.is_empty() {
+        return None;
+    }
+    let seed = if let Ok(mut f) = fs::File::open("/dev/urandom") {
+        use std::io::Read;
+        let mut buf = [0u8; 8];
+        if f.read_exact(&mut buf).is_ok() {
+            u64::from_ne_bytes(buf)
+        } else {
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos() as u64)
+                .unwrap_or(42)
+        }
+    } else {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos() as u64)
+            .unwrap_or(42)
+    };
+    let idx = (seed as usize) % eligible.len();
+    Some(eligible[idx])
+}
+
 /// Loads and parses theme definitions from `bashmenu.themes`.
 pub fn load_themes<P: AsRef<Path>>(path: P) -> Result<ThemeCollection> {
     let p = path.as_ref();
@@ -620,5 +651,22 @@ mod tests {
         let mono = Theme::monochrome();
         assert_eq!(mono.resolved_default_icon(), DEFAULT_ITEM_ICON);
         assert_eq!(mono.default_icon.as_deref(), Some(DEFAULT_ITEM_ICON));
+    }
+
+    #[test]
+    fn test_pick_random_theme_skips_random_specs() {
+        let mut themes = ThemeCollection::new();
+        themes.insert("[ Random ]".to_string(), Theme::default());
+        themes.insert("Random".to_string(), Theme::default());
+        themes.insert("[Random]".to_string(), Theme::default());
+
+        // When only random specs are present, none should be eligible
+        assert!(pick_random_theme(&themes).is_none());
+
+        themes.insert("dracula".to_string(), Theme::default());
+        let picked = pick_random_theme(&themes);
+        assert!(picked.is_some());
+        let (name, _) = picked.unwrap();
+        assert_eq!(name, "dracula");
     }
 }

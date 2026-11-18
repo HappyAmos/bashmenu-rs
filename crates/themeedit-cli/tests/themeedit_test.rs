@@ -2878,3 +2878,44 @@ fn test_themeedit_marquee_overflow_on_tokens_sidebar() {
     let s1 = get_marquee_slice(token_label, sidebar_w, tracker.offset, "•", 3);
     assert_ne!(s0, s1);
 }
+
+#[test]
+fn test_themeedit_random_theme_resolution_and_reservation() {
+    let themes_path = PathBuf::from("../../bashmenu.themes");
+    assert!(themes_path.exists(), "bashmenu.themes fixture must exist");
+
+    // 1. Initializing with "[ Random ]" should resolve to an actual loaded theme, never literal "[ Random ]"
+    let state_random_bracket =
+        ThemeEditorState::new(themes_path.clone(), Some("[ Random ]".to_string()));
+    assert_ne!(state_random_bracket.current_name, "[ Random ]");
+    assert_ne!(state_random_bracket.current_name, "Random");
+    assert!(state_random_bracket
+        .themes
+        .contains_key(&state_random_bracket.current_name));
+    assert_eq!(
+        state_random_bracket.name_input.as_string(),
+        state_random_bracket.current_name
+    );
+
+    // 2. Initializing with "Random" should also resolve to an actual loaded theme
+    let state_random_plain = ThemeEditorState::new(themes_path.clone(), Some("Random".to_string()));
+    assert_ne!(state_random_plain.current_name, "Random");
+    assert_ne!(state_random_plain.current_name, "[ Random ]");
+    assert!(state_random_plain
+        .themes
+        .contains_key(&state_random_plain.current_name));
+
+    // 3. Renaming or Save As must reject reserved random keyword
+    let mut state = ThemeEditorState::new(themes_path.clone(), Some("dracula".to_string()));
+    assert_eq!(state.current_name, "dracula");
+
+    assert!(state.rename_theme("Random").is_err());
+    assert!(state.rename_theme("[ Random ]").is_err());
+    assert!(state.rename_theme("[Random]").is_err());
+    assert_eq!(state.current_name, "dracula");
+
+    assert!(state.save_as_theme("Random").is_err());
+    assert!(state.save_as_theme("[ Random ]").is_err());
+    assert!(state.save_as_theme("[Random]").is_err());
+    assert_eq!(state.current_name, "dracula");
+}

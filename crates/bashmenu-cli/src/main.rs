@@ -265,33 +265,7 @@ fn locate_tool(name: &str) -> PathBuf {
 
 /// Selects a pseudo-random theme from available themes, skipping random specs.
 fn pick_random_theme(themes: &HashMap<String, Theme>) -> Option<(&str, &Theme)> {
-    let eligible: Vec<(&str, &Theme)> = themes
-        .iter()
-        .filter(|(k, _)| !bashmenu_core::is_random_theme_spec(k))
-        .map(|(k, v)| (k.as_str(), v))
-        .collect();
-    if eligible.is_empty() {
-        return None;
-    }
-    let seed = if let Ok(mut f) = fs::File::open("/dev/urandom") {
-        use std::io::Read;
-        let mut buf = [0u8; 8];
-        if f.read_exact(&mut buf).is_ok() {
-            u64::from_ne_bytes(buf)
-        } else {
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_nanos() as u64)
-                .unwrap_or(42)
-        }
-    } else {
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_nanos() as u64)
-            .unwrap_or(42)
-    };
-    let idx = (seed as usize) % eligible.len();
-    Some(eligible[idx])
+    bashmenu_core::pick_random_theme(themes)
 }
 
 /// Main application entrypoint for `bashmenu`.
@@ -465,11 +439,16 @@ fn main() -> Result<()> {
 
     let mut use_nerd =
         config.settings.use_nerd_fonts.unwrap_or(true) && !on_linux_console && fb_device.is_none();
-    let active_theme = if bashmenu_core::is_random_theme_spec(&config.theme) {
-        pick_random_theme(&themes).map(|(_, t)| t)
-    } else {
-        themes.get(&config.theme)
-    };
+    let (mut active_theme_name, active_theme) =
+        if bashmenu_core::is_random_theme_spec(&config.theme) {
+            if let Some((name, t)) = pick_random_theme(&themes) {
+                (name.to_string(), Some(t))
+            } else {
+                (config.theme.clone(), None)
+            }
+        } else {
+            (config.theme.clone(), themes.get(&config.theme))
+        };
     let (mut styles, mut modal_styles, mut toast_styles) =
         resolve_bashmenu_styles(active_theme, use_nerd, config.settings.toast_timeout);
 
@@ -893,11 +872,17 @@ fn main() -> Result<()> {
                             config.theme = new_theme;
                             save_config_or_toast(&config_path, &config, &mut toast_rack);
                             menu_view.set_config(config.clone());
-                            let resolved_t = if bashmenu_core::is_random_theme_spec(&config.theme) {
-                                pick_random_theme(&themes).map(|(_, t)| t)
-                            } else {
-                                themes.get(&config.theme)
-                            };
+                            let (resolved_name, resolved_t) =
+                                if bashmenu_core::is_random_theme_spec(&config.theme) {
+                                    if let Some((name, t)) = pick_random_theme(&themes) {
+                                        (name.to_string(), Some(t))
+                                    } else {
+                                        (config.theme.clone(), None)
+                                    }
+                                } else {
+                                    (config.theme.clone(), themes.get(&config.theme))
+                                };
+                            active_theme_name = resolved_name;
                             if let Some(t) = resolved_t {
                                 (styles, modal_styles, toast_styles) = resolve_bashmenu_styles(
                                     Some(t),
@@ -1513,12 +1498,7 @@ fn main() -> Result<()> {
                                     && !guard.has_framebuffer();
                                 use_nerd = unf;
                                 menu_view.set_use_nerd_fonts(unf);
-                                let resolved_t =
-                                    if bashmenu_core::is_random_theme_spec(&config.theme) {
-                                        pick_random_theme(&themes).map(|(_, t)| t)
-                                    } else {
-                                        themes.get(&config.theme)
-                                    };
+                                let resolved_t = themes.get(&active_theme_name);
                                 if let Some(t) = resolved_t {
                                     (styles, modal_styles, toast_styles) = resolve_bashmenu_styles(
                                         Some(t),
@@ -1575,12 +1555,7 @@ fn main() -> Result<()> {
                                 || key_path == "app.settings.toast_timeout"
                                 || key_path == "app.settings.toast.timeout"
                             {
-                                let resolved_t =
-                                    if bashmenu_core::is_random_theme_spec(&config.theme) {
-                                        pick_random_theme(&themes).map(|(_, t)| t)
-                                    } else {
-                                        themes.get(&config.theme)
-                                    };
+                                let resolved_t = themes.get(&active_theme_name);
                                 if let Some(t) = resolved_t {
                                     (styles, modal_styles, toast_styles) = resolve_bashmenu_styles(
                                         Some(t),
@@ -1650,8 +1625,8 @@ fn main() -> Result<()> {
                                     if !guard.has_framebuffer() {
                                         if let Some(mut new_fb) = FramebufferDevice::open() {
                                             new_fb.set_image_mode(use_img);
-                                            let wp_cfg =
-                                                config.resolve_wallpaper(themes.get(&config.theme));
+                                            let wp_cfg = config
+                                                .resolve_wallpaper(themes.get(&active_theme_name));
                                             new_fb
                                                 .set_wallpaper(wp_cfg.as_ref(), styles.background);
                                             guard.set_framebuffer(Some(new_fb));
@@ -1664,8 +1639,8 @@ fn main() -> Result<()> {
                                         }
                                     } else if let Some(fb) = guard.framebuffer_mut() {
                                         fb.set_image_mode(use_img);
-                                        let wp_cfg =
-                                            config.resolve_wallpaper(themes.get(&config.theme));
+                                        let wp_cfg = config
+                                            .resolve_wallpaper(themes.get(&active_theme_name));
                                         fb.set_wallpaper(wp_cfg.as_ref(), styles.background);
                                     }
                                     menu_view.set_framebuffer_image_mode(
@@ -2110,12 +2085,17 @@ fn main() -> Result<()> {
                             if let Ok(new_themes) = load_themes(&themes_path) {
                                 themes = new_themes;
                             }
-                            let active_theme = if bashmenu_core::is_random_theme_spec(&config.theme)
-                            {
-                                pick_random_theme(&themes).map(|(_, t)| t)
-                            } else {
-                                themes.get(&config.theme)
-                            };
+                            let (resolved_name, active_theme) =
+                                if bashmenu_core::is_random_theme_spec(&config.theme) {
+                                    if let Some((name, t)) = pick_random_theme(&themes) {
+                                        (name.to_string(), Some(t))
+                                    } else {
+                                        (config.theme.clone(), None)
+                                    }
+                                } else {
+                                    (config.theme.clone(), themes.get(&config.theme))
+                                };
+                            active_theme_name = resolved_name;
                             (styles, modal_styles, toast_styles) = resolve_bashmenu_styles(
                                 active_theme,
                                 use_nerd,
@@ -2193,7 +2173,7 @@ fn main() -> Result<()> {
                                     .arg("-f")
                                     .arg(&themes_path)
                                     .arg("-t")
-                                    .arg(&config.theme)
+                                    .arg(&active_theme_name)
                                     .status();
                                 Ok(())
                             });
@@ -2726,7 +2706,7 @@ fn main() -> Result<()> {
                                             .arg("-f")
                                             .arg(&themes_path)
                                             .arg("-t")
-                                            .arg(&config.theme)
+                                            .arg(&active_theme_name)
                                             .status();
                                         Ok(())
                                     });
