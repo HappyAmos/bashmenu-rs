@@ -1,0 +1,123 @@
+# ==============================================================================
+# BashMenu-RS Canonical English (US) String Table
+# ==============================================================================
+# Translators: Copy this file to `locales/<lang_code>.yml` (e.g. `locales/es_es.yml`)
+# and translate the string values. Do not alter the key names or interpolation
+# variables (enclosed in {curly_brackets}).
+# ==============================================================================
+
+meta:
+  locale: "en_US"
+  name: "English (US)"
+  version: "1.0"
+
+common:
+  buttons:
+    yes: "Yes"
+    no: "No"
+    cancel: "Cancel"
+    save: "Save"
+    save_as: "Save As"
+    overwrite: "Overwrite"
+    reload: "Reload"
+    close: "Close"
+    ok: "OK"
+    apply: "Apply"
+    delete: "Delete"
+    edit: "Edit"
+    insert: "Insert"
+    merge: "Merge"
+    copy: "Copy"
+    dismiss: "Dismiss"
+  gutters:
+    help: "Help"
+    edit: "Edit"
+    back: "Back"
+    quit: "Quit"
+    select: "Select"
+    nav: "Nav"
+    search: "Search"
+    save: "Save"
+    refresh: "Refresh"
+  dialogs:
+    confirm_title: "Confirmation"
+    error_title: "Error"
+    warning_title: "Warning"
+    info_title: "Information"
+    file_picker_title: "Select File"
+    dir_picker_title: "Select Directory"
+    input_title: "Input"
+    save_as_title: "Save As"
+    filename_label: "File name:"
+    search_prompt: "Search: "
+
+bashmenu:
+  search_placeholder: "Type to filter menu items..."
+  no_items_found: "No matching menu items found"
+  screensaver_hint: "Press any key to resume"
+  env_title: "Environment Overview"
+  theme_picker_title: "Select Theme"
+  theme_applied: "Theme '{theme}' applied"
+  command_running: "Running command..."
+  unnamed_menu: "Main Menu"
+
+bashedit:
+  swap_detected_title: "Swap File Detected"
+  swap_detected_msg: "A swap file exists for this document. It may indicate a previous crash or concurrent editing session."
+  swap_btn_recover: "[R]ecover"
+  swap_btn_readonly: "[O]pen Read-Only"
+  swap_btn_edit: "[E]dit Anyway"
+  swap_btn_delete: "[D]elete Swap"
+  swap_btn_quit: "[Q]uit"
+  status_read_only: "[RO]"
+  status_modified: "[+]"
+  status_legend: "Line {line}, Col {col} | Char {char}"
+  search_prompt: "Find: "
+  saved_file: "Saved {file}"
+  read_only_notice: "File is open in read-only mode"
+
+menuedit:
+  inspector_title: "Item Inspector"
+  prop_label: "Label"
+  prop_action: "Action"
+  prop_type: "Type"
+  prop_icon: "Icon"
+  prop_shortcut: "Shortcut"
+  prop_desc: "Description"
+  add_node_title: "Add New Menu Item"
+  delete_confirm_msg: "Are you sure you want to delete this menu item?"
+  type_command: "Command"
+  type_script: "Script"
+  type_submenu: "Submenu"
+  type_toggle: "Toggle"
+  type_radio: "Radio"
+  type_confirm: "Confirm"
+  type_notebook: "Notebook"
+
+themeedit:
+  title: "Theme & Palette Editor"
+  tab_tokens: "Tokens"
+  tab_preview: "Preview"
+  f5_derive: "[F5] Derive Colors"
+  ctrl_p_glyphs: "[Ctrl+P] Glyphs"
+  delete_theme_confirm: "Are you sure you want to delete theme '{theme}'?"
+  cannot_delete_last_theme: "Cannot delete the sole remaining theme"
+
+bmpager:
+  search_prompt: "Search: "
+  match_count: "[{current} of {total}]"
+  help_title: "Pager Help"
+  line_indicator: "Line {line}/{total}"
+
+cheat:
+  search_prompt: "Search cheatsheets..."
+  no_cheats_found: "No matching cheatsheets found"
+  category_label: "Category: {category}"
+
+ymlcheck:
+  valid_config: "Configuration is valid."
+  valid_theme: "Theme definitions are valid."
+  valid_menu: "Menu definition is valid."
+  valid_shortcuts: "Shortcuts configuration is valid."
+  valid_locale: "Locale string table is valid."
+  error_prefix: "Validation error:"

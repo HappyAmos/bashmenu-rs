@@ -97,6 +97,9 @@ Whenever you add or modify a placeholder, macro, directive, or configuration att
 5. `bashmenu.md`: Complete reference documentation.
 6. `bashmenu.1`: Linux system manual page.
 
+### 4. Zero Hardcoded User-Facing Text Invariant
+All user-facing strings (button labels, modal titles, prompts, error notices, status gutters, inspector labels) must strictly resolve through the string table (`locales/en_us.yml`) via `t!(...)`. No raw user-facing string literals are permitted in TUI rendering or CLI message dispatch paths. This ensures all text can be translated into other languages seamlessly via a single locale file.
+
 ---
 
 ## Shell Script Guidelines

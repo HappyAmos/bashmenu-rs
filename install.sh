@@ -149,6 +149,10 @@ if [ -f "$SCRIPT_DIR/bashmenu.md" ]; then
     ln -sfn "$SCRIPT_DIR/bashmenu.md" "$CONFIG_DIR/bashmenu.md"
     echo "  [+] Symlinked bashmenu.md -> $CONFIG_DIR/bashmenu.md"
 fi
+if [ -d "$SCRIPT_DIR/locales" ]; then
+    ln -sfn "$SCRIPT_DIR/locales" "$CONFIG_DIR/locales"
+    echo "  [+] Symlinked locales -> $CONFIG_DIR/locales"
+fi
 
 # Initialize user notebooks directory if missing
 if [ -d "$SCRIPT_DIR/notebooks" ]; then

@@ -4,6 +4,7 @@ pub mod config;
 pub mod constants;
 pub mod error;
 pub mod glyph;
+pub mod i18n;
 pub mod macro_engine;
 pub mod menu;
 pub mod notebook;
@@ -20,6 +21,10 @@ pub use error::{BashMenuError, Result};
 pub use glyph::{
     cp437_to_char, format_icon_slot, normalize_variation_selectors, parse_ascii_val, resolve_glyph,
     resolve_script_path, run_glyphs_search, CP437_TABLE,
+};
+pub use i18n::{
+    current_locale, interpolate_string, resolve_locale_path, set_locale, translate, translate_with,
+    LocaleCatalog, DEFAULT_EN_US_YAML,
 };
 pub use macro_engine::{
     apply_dir_picker_macros, apply_file_picker_macros, clear_command_cache, detect_color_mode,
