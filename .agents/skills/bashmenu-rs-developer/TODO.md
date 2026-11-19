@@ -1,13 +1,12 @@
 # BashMenu-RS Development Roadmap & Tasks (TODO)
 
 ## 1. UI & Configuration Enhancements
-- [ ] **Marquee Speed Configuration Setting (`Options & Settings -> Bashmenu Settings -> Marquee Speed`):**
+- [x] **Marquee Speed Configuration Setting (`Options & Settings -> Bashmenu Settings -> Marquee Speed`):**
   - Add `marquee_speed` configuration setting in `bashmenu-core` (`BashMenuConfig` / `Settings` schema).
   - Support configurable interval/speed (e.g., tick intervals or milliseconds per step: Slow / Normal / Fast / Custom) for title and panel marquee scrolling.
   - Wire into `MenuView` and modal marquee timing logic in `bashmenu-tui`.
   - Add interactive radio/select modal in `bashmenu-cli` under `Options & Settings -> Bashmenu Settings -> Marquee Speed`.
   - Preserve settings persistence in `bashmenu.yml` preserving config comments.
-  - Extract all prompt labels and options into `locales/en_us.yml` and `locales/es_es.yml` (`t!(...)`).
   - Maintain universal 6-tier documentation parity (`bashmenu.md`, `bashmenu.1`, `HelpModal`, etc.).
 
 ## 2. Community & Contributor Infrastructure (Localization Direction)

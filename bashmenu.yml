@@ -58,4 +58,5 @@ settings:
   transition_speed: normal
   modal_animation: zoom
   modal_animation_speed: fast
+  marquee_speed: normal
   framebuffer: auto

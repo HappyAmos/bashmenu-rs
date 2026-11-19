@@ -704,6 +704,23 @@ items:
                   value: slow
                 key: settings.modal_animation_speed
                 title: Modal Animation Speed [{settings.modal_animation_speed}]
+            - Marquee Speed [{settings.marquee_speed}]:
+                type: radio
+                icon: '{nf::#f0e7}'
+                action: settings.marquee_speed
+                prompt: 'Select marquee scrolling speed for long text:'
+                interactive: true
+                quiet: false
+                alt_buffer: true
+                options:
+                - label: Fast (~125ms per step, snappy scroll)
+                  value: fast
+                - label: Normal (Recommended, ~250ms per step, standard scroll)
+                  value: normal
+                - label: Slow (Deliberate, ~500ms per step, relaxed scroll)
+                  value: slow
+                key: settings.marquee_speed
+                title: Marquee Speed [{settings.marquee_speed}]
             - Nerd Font Display Width [{settings.nerd_font_width}]:
                 type: config
                 icon: '{nf::#f07e}'
