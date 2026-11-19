@@ -119,6 +119,10 @@ pub struct Settings {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub modal_animation_speed: Option<String>,
 
+    /// Horizontal scrolling marquee speed ("fast", "normal", "slow", or milliseconds)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub marquee_speed: Option<String>,
+
     /// Direct Linux framebuffer (/dev/fb0) rendering ("auto", "true", "false")
     #[serde(skip_serializing_if = "Option::is_none")]
     pub framebuffer: Option<String>,
@@ -130,6 +134,35 @@ pub struct Settings {
     /// Additional arbitrary user-defined settings preserved across saves
     #[serde(flatten)]
     pub extra: HashMap<String, serde_yml::Value>,
+}
+
+impl Settings {
+    /// Returns the configured marquee scroll step interval duration.
+    ///
+    /// Presets:
+    /// - `"fast"`: ~125ms (~8 steps/sec, snappy scroll)
+    /// - `"normal"` (or default): ~250ms (~4 steps/sec, standard scroll)
+    /// - `"slow"`: ~500ms (~2 steps/sec, relaxed scroll)
+    /// - Numeric string (e.g. `"100"`): custom milliseconds clamped between 50ms and 2000ms.
+    pub fn marquee_speed_duration(&self) -> std::time::Duration {
+        match self
+            .marquee_speed
+            .as_deref()
+            .map(|s| s.trim().to_ascii_lowercase())
+            .as_deref()
+        {
+            Some("fast") => std::time::Duration::from_millis(125),
+            Some("slow") => std::time::Duration::from_millis(500),
+            Some("normal") | None => std::time::Duration::from_millis(250),
+            Some(val) => {
+                if let Ok(ms) = val.parse::<u64>() {
+                    std::time::Duration::from_millis(ms.clamp(50, 2000))
+                } else {
+                    std::time::Duration::from_millis(250)
+                }
+            }
+        }
+    }
 }
 
 /// Root configuration structure corresponding to `bashmenu.yml`.
@@ -493,6 +526,13 @@ impl BashMenuConfig {
             }
             "settings.modal_animation_speed" => {
                 self.settings.modal_animation_speed = match &value {
+                    serde_yml::Value::String(s) => Some(s.clone()),
+                    serde_yml::Value::Number(n) => Some(n.to_string()),
+                    _ => None,
+                };
+            }
+            "settings.marquee_speed" => {
+                self.settings.marquee_speed = match &value {
                     serde_yml::Value::String(s) => Some(s.clone()),
                     serde_yml::Value::Number(n) => Some(n.to_string()),
                     _ => None,
@@ -956,5 +996,46 @@ mod tests {
 
         let _ = fs::remove_file(&tmp);
         let _ = fs::remove_file(&bak);
+    }
+
+    #[test]
+    fn test_marquee_speed_config_and_duration() {
+        let mut config = BashMenuConfig::default();
+        assert_eq!(
+            config.settings.marquee_speed_duration(),
+            std::time::Duration::from_millis(250)
+        );
+
+        config.set_value(
+            "settings.marquee_speed",
+            serde_yml::Value::String("fast".to_string()),
+        );
+        assert_eq!(config.settings.marquee_speed.as_deref(), Some("fast"));
+        assert_eq!(
+            config.settings.marquee_speed_duration(),
+            std::time::Duration::from_millis(125)
+        );
+        assert_eq!(
+            config.get_value("settings.marquee_speed"),
+            Some("fast".to_string())
+        );
+
+        config.set_value(
+            "settings.marquee_speed",
+            serde_yml::Value::String("slow".to_string()),
+        );
+        assert_eq!(
+            config.settings.marquee_speed_duration(),
+            std::time::Duration::from_millis(500)
+        );
+
+        config.set_value(
+            "settings.marquee_speed",
+            serde_yml::Value::String("150".to_string()),
+        );
+        assert_eq!(
+            config.settings.marquee_speed_duration(),
+            std::time::Duration::from_millis(150)
+        );
     }
 }

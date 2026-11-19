@@ -628,8 +628,9 @@ fn main() -> Result<()> {
             last_plugin_check = Instant::now();
         }
 
-        // Periodic check to advance marquee ticker (250ms)
-        if last_marquee_tick.elapsed() >= Duration::from_millis(250) {
+        // Periodic check to advance marquee ticker (customizable via settings.marquee_speed)
+        let marquee_interval = config.settings.marquee_speed_duration();
+        if last_marquee_tick.elapsed() >= marquee_interval {
             if matches!(active_modal, ActiveModal::None)
                 && !shortcut_dispatcher.is_leader_pending()
                 && menu_view.tick_marquee()

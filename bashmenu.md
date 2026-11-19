@@ -540,6 +540,20 @@ settings:
 
 If `modal_animation_speed` is omitted from `bashmenu.yml`, it falls back to `settings.transition_speed` (or `fast`).
 
+#### Horizontal Text Marquee Speed (`settings.marquee_speed`):
+Text labels and titles exceeding available panel or dialog margins automatically marquee horizontally. The ticker step interval can be customized in `bashmenu.yml` or adjusted via **Options & Settings -> Bashmenu Settings -> Marquee Speed**:
+
+```yaml
+settings:
+  marquee_speed: normal        # Options: fast (~125ms), normal (~250ms), slow (~500ms), or milliseconds
+```
+
+| Marquee Speed | Interval | Behavior |
+| :--- | :--- | :--- |
+| `fast` | ~125 ms | Fast, snappy horizontal scrolling (~8 steps/sec). |
+| `normal` (Default) | ~250 ms | Standard recommended marquee cadence (~4 steps/sec). |
+| `slow` | ~500 ms | Deliberate, relaxed scrolling (~2 steps/sec). |
+
 *Disabling Transitions for Specific Commands:* Any command or script menu item
 can disable transitions by specifying `transition: false` in `bashmenu.mnu`:
 ```yaml
