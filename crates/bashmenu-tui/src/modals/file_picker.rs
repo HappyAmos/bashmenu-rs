@@ -168,7 +168,10 @@ impl FilePickerModal {
             return None;
         }
         let target_dir = if let Some(item) = self.items.get(self.selected_idx) {
-            if item.is_dir && item.name != ".. (Parent Directory)" {
+            if item.is_dir
+                && item.name != t!("common.dialogs.parent_dir")
+                && item.name != ".. (Parent Directory)"
+            {
                 item.path.clone()
             } else {
                 self.current_dir.clone()
@@ -230,7 +233,7 @@ impl FilePickerModal {
         // Parent directory item
         if let Some(parent) = self.current_dir.parent() {
             self.items.push(DirItem {
-                name: ".. (Parent Directory)".to_string(),
+                name: t!("common.dialogs.parent_dir"),
                 is_dir: true,
                 path: parent.to_path_buf(),
             });
@@ -612,7 +615,8 @@ impl FilePickerModal {
                     }
                 } else if row == input_y {
                     self.focused_control = FilePickerFocus::FileNameInput;
-                    let label_len = " File name: [ ".len() as u16;
+                    let input_label = format!(" {} [ ", t!("common.dialogs.filename_label"));
+                    let label_len = input_label.len() as u16;
                     let input_start_x = inner_area.x + 2 + label_len;
                     if col >= input_start_x {
                         let click_offset = (col - input_start_x) as usize;
@@ -735,7 +739,11 @@ impl FilePickerModal {
 
         // 1. Current Directory Path Banner
         let avail_banner_w = inner.width.saturating_sub(2) as usize;
-        let path_str = format!(" Dir: {} ", self.current_dir.display());
+        let path_str = format!(
+            " {} {} ",
+            t!("common.dialogs.dir_label"),
+            self.current_dir.display()
+        );
         let clipped_path: String = path_str.chars().take(avail_banner_w).collect();
         buf.set_string(
             inner.x + 1,
@@ -800,11 +808,11 @@ impl FilePickerModal {
 
             let input_y = inner.y + inner.height.saturating_sub(3);
             let is_input_focused = self.focused_control == FilePickerFocus::FileNameInput;
-            let input_label = " File name: [ ";
+            let input_label = format!(" {} [ ", t!("common.dialogs.filename_label"));
             buf.set_string(
                 inner.x + 2,
                 input_y,
-                input_label,
+                &input_label,
                 if is_input_focused {
                     styles.accent.add_modifier(Modifier::BOLD)
                 } else {
@@ -888,7 +896,13 @@ impl FilePickerModal {
             let btn_y = inner.y + inner.height.saturating_sub(1);
             let ctrl_w = inner.width.saturating_sub(4) as usize;
             if self.creating_new {
-                let prompt = format!(" New file name: [{}]_ ", self.new_name_input);
+                let prompt = format!(
+                    " {} ",
+                    t!(
+                        "common.dialogs.new_filename_prompt",
+                        name => &self.new_name_input
+                    )
+                );
                 let clipped_prompt: String = prompt.chars().take(ctrl_w).collect();
                 buf.set_string(inner.x + 2, btn_y, &clipped_prompt, styles.highlight);
             } else {

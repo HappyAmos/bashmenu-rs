@@ -2,6 +2,7 @@
 
 use super::frame::{compute_modal_inner, is_close_button_clicked, render_modal_frame};
 use crate::style::ResolvedThemeStyles;
+use bashmenu_core::t;
 use crossterm::event::{KeyCode, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -260,15 +261,18 @@ impl RadioModal {
         let ok_focused = self.focused_btn == Some(0);
         let cancel_focused = self.focused_btn == Some(1);
 
+        let ok_label = t!("common.buttons.ok");
+        let cancel_label = t!("common.buttons.cancel");
+
         let ok_str = if ok_focused {
-            " [  Ok  ] "
+            format!(" [  {}  ] ", ok_label)
         } else {
-            "    Ok    "
+            format!("    {}    ", ok_label)
         };
         let cancel_str = if cancel_focused {
-            " [ Cancel ] "
+            format!(" [ {} ] ", cancel_label)
         } else {
-            "   Cancel   "
+            format!("   {}   ", cancel_label)
         };
 
         let ok_style = if ok_focused {

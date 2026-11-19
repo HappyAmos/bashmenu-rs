@@ -106,7 +106,7 @@ impl Pager {
             if let Some(line) = found {
                 self.top_line = line;
             } else {
-                self.message = format!("pattern not found: {}", pat);
+                self.message = t!("bmpager.pattern_not_found", pattern => pat);
             }
         }
     }
@@ -217,7 +217,8 @@ impl Pager {
                 show_help_modal(self.args.strip_colors)?;
             }
             _ => {
-                self.message = format!("unbound key: {:?}", key.code);
+                let key_str = format!("{:?}", key.code);
+                self.message = t!("bmpager.unbound_key", key => &key_str);
                 clear_message = false;
             }
         }
@@ -520,7 +521,7 @@ impl Pager {
                 self.top_line = target;
                 self.message = format!("?{}", self.last_search);
             } else {
-                self.message = format!("pattern not found: {}", self.last_search);
+                self.message = t!("bmpager.pattern_not_found", pattern => &self.last_search);
             }
         }
     }
@@ -642,13 +643,13 @@ impl Pager {
                 resolve_anchor(&self.lines, &chosen.url, &chosen.text, chosen.line_no)
             {
                 self.top_line = target_line;
-                self.message = format!("jumped to {}", chosen.url);
+                self.message = t!("bmpager.jumped_to", target => &chosen.url);
             } else {
-                self.message = format!("anchor not found: {}", chosen.url);
+                self.message = t!("bmpager.anchor_not_found", target => &chosen.url);
             }
         } else if chosen.url.starts_with("http://") || chosen.url.starts_with("https://") {
             let _ = open_external_url(&chosen.url);
-            self.message = format!("opened {}", chosen.url);
+            self.message = t!("bmpager.opened", target => &chosen.url);
         } else if let Some(full_file) = crate::links::resolve_local_file(&chosen.url) {
             // Temporarily leave raw mode and alternate screen to launch child viewer
             execute!(stdout(), Show, LeaveAlternateScreen)?;
@@ -669,9 +670,9 @@ impl Pager {
             enable_raw_mode()?;
             execute!(stdout(), EnterAlternateScreen, Hide)?;
             stdout().flush()?;
-            self.message = format!("viewed {}", chosen.url);
+            self.message = t!("bmpager.viewed", target => &chosen.url);
         } else {
-            self.message = format!("file not found: {}", chosen.url);
+            self.message = t!("bmpager.file_not_found", target => &chosen.url);
         }
 
         Ok(())

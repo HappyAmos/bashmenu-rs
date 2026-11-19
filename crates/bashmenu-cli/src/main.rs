@@ -25,7 +25,7 @@ use bashmenu_core::{
     add_or_update_note, build_notebook_submenu, clear_command_cache, delete_note, extract_toasts,
     get_note_by_title, interpolate_placeholders, load_config, load_menu, load_notebook,
     load_shortcuts, load_themes, merge_note_content, rename_note, resolve_notebook_path,
-    resolve_shortcuts_path, save_config, save_notebook, BashMenuConfig, ConfirmAction,
+    resolve_shortcuts_path, save_config, save_notebook, t, BashMenuConfig, ConfirmAction,
     ExecutionMode, MacroContext, MenuItem, MenuItemType, MenuSchema, NoteItem, NoteSwapFile,
     PluginEngine, ShortcutsConfig, ToastNotification, ToastSeverity,
 };
@@ -61,7 +61,8 @@ fn push_error_toast(toast_rack: &mut ToastRack, title: &str, message: String, ti
 /// error toast.
 fn save_config_or_toast(path: &Path, config: &BashMenuConfig, toast_rack: &mut ToastRack) {
     if let Err(e) = save_config(path, config) {
-        push_error_toast(toast_rack, "Config Save Blocked", e.to_string(), 6.0);
+        let title = t!("bashmenu.toast_config_save_blocked");
+        push_error_toast(toast_rack, &title, e.to_string(), 6.0);
     }
 }
 
@@ -531,15 +532,9 @@ fn main() -> Result<()> {
     let mut last_interaction = Instant::now();
     let mut toast_rack = ToastRack::new();
     if let Some(err_msg) = startup_config_err {
-        push_error_toast(
-            &mut toast_rack,
-            "Config Syntax Error (bashmenu.yml)",
-            format!(
-                "{}\nFile preserved on disk; fix YAML syntax before saving settings.",
-                err_msg
-            ),
-            8.0,
-        );
+        let title = t!("bashmenu.toast_config_syntax_title");
+        let msg = t!("bashmenu.toast_config_syntax_msg", err => &err_msg);
+        push_error_toast(&mut toast_rack, &title, msg, 8.0);
     }
 
     if let Some(fb) = guard.framebuffer_mut() {
@@ -550,14 +545,14 @@ fn main() -> Result<()> {
         }
     } else if fb_perm_denied {
         toast_rack.add(ToastNotification::new(
-            "Cannot open /dev/fb0 (permission denied). Run 'sudo usermod -aG video $USER' or './install.sh' for TrueColor console graphics.".to_string(),
-            Some("Warning: Framebuffer Permission".to_string()),
+            t!("bashmenu.toast_fb_perm_msg"),
+            Some(t!("bashmenu.toast_fb_perm_title")),
             6.0,
         ));
     } else if use_fb_image_mode && in_desktop_term {
         toast_rack.add(ToastNotification::new(
-            "Full-resolution image mode (-i) requires a Linux console (/dev/fb0); using TrueColor character mode in desktop terminal.".to_string(),
-            Some("Desktop Terminal Mode".to_string()),
+            t!("bashmenu.toast_fb_desktop_msg"),
+            Some(t!("bashmenu.toast_fb_desktop_title")),
             4.5,
         ));
     }
@@ -970,11 +965,8 @@ fn main() -> Result<()> {
                             if let Some(existing_swp) = NoteSwapFile::load(p, &modal.title) {
                                 if existing_swp.pid != std::process::id() {
                                     toast_rack.add(ToastNotification::new(
-                                        format!(
-                                            "Swap file found (PID {}); concurrent session detected",
-                                            existing_swp.pid
-                                        ),
-                                        Some("Warning: Swap File".to_string()),
+                                        t!("bashmenu.notes_swap_detected", pid => existing_swp.pid),
+                                        Some(t!("common.dialogs.warning_title")),
                                         4.0,
                                     ));
                                 }
@@ -990,11 +982,8 @@ fn main() -> Result<()> {
                             if let Some(existing_swp) = NoteSwapFile::load(p, &modal.title) {
                                 if existing_swp.pid != std::process::id() {
                                     toast_rack.add(ToastNotification::new(
-                                        format!(
-                                            "Swap file found (PID {}); concurrent session detected",
-                                            existing_swp.pid
-                                        ),
-                                        Some("Warning: Swap File".to_string()),
+                                        t!("bashmenu.notes_swap_detected", pid => existing_swp.pid),
+                                        Some(t!("common.dialogs.warning_title")),
                                         4.0,
                                     ));
                                 }
@@ -1078,8 +1067,8 @@ fn main() -> Result<()> {
                                             modal.selected_line = 0;
                                             modal.scroll_offset = 0;
                                             toast_rack.add(ToastNotification::new(
-                                                "Notebook saved from editor",
-                                                Some("Note Updated".to_string()),
+                                                t!("bashmenu.notes_saved_from_editor"),
+                                                Some(t!("common.dialogs.info_title")),
                                                 3.0,
                                             ));
                                         }
@@ -1649,8 +1638,8 @@ fn main() -> Result<()> {
                                             guard.set_framebuffer(Some(new_fb));
                                         } else if bashmenu_tui::is_framebuffer_permission_denied() {
                                             toast_rack.add(ToastNotification::new(
-                                                "Cannot open /dev/fb0 (permission denied). Run 'sudo usermod -aG video $USER' or './install.sh'.".to_string(),
-                                                Some("Warning: Framebuffer Permission".to_string()),
+                                                t!("bashmenu.toast_fb_perm_msg"),
+                                                Some(t!("bashmenu.toast_fb_perm_title")),
                                                 5.0,
                                             ));
                                         }
@@ -1669,8 +1658,8 @@ fn main() -> Result<()> {
                                     guard.request_clear();
                                     if (fb_m == "true" || fb_m == "image") && in_desktop_term {
                                         toast_rack.add(ToastNotification::new(
-                                            "Saved framebuffer setting for Linux console (/dev/fb0); desktop terminal remains in TrueColor character mode.".to_string(),
-                                            Some("Desktop Terminal Guard".to_string()),
+                                            t!("bashmenu.toast_fb_desktop_guard_msg"),
+                                            Some(t!("bashmenu.toast_fb_desktop_guard_title")),
                                             4.5,
                                         ));
                                     }
@@ -1739,14 +1728,14 @@ fn main() -> Result<()> {
                                 ed.is_modified = true;
                                 if merge_res.has_conflicts {
                                     toast_rack.add(ToastNotification::new(
-                                        "Merge conflicts marked with <<<<<<< and >>>>>>>",
-                                        Some("Conflict Merge".to_string()),
+                                        t!("bashmenu.notes_merged_conflicts"),
+                                        Some(t!("common.dialogs.warning_title")),
                                         4.0,
                                     ));
                                 } else {
                                     toast_rack.add(ToastNotification::new(
-                                        "Cleanly merged non-conflicting changes",
-                                        Some("Merged Successfully".to_string()),
+                                        t!("bashmenu.notes_merged_clean"),
+                                        Some(t!("common.dialogs.info_title")),
                                         3.0,
                                     ));
                                 }
@@ -1774,8 +1763,8 @@ fn main() -> Result<()> {
                                     );
                                 }
                                 toast_rack.add(ToastNotification::new(
-                                    "Overwrote disk version with local changes",
-                                    Some("Note Overwritten".to_string()),
+                                    t!("bashmenu.notes_overwritten"),
+                                    Some(t!("common.dialogs.info_title")),
                                     3.0,
                                 ));
                                 active_modal = ActiveModal::NoteViewer(NoteViewerModal::new(
@@ -1787,8 +1776,8 @@ fn main() -> Result<()> {
                             NoteConflictChoice::Reload => {
                                 NoteSwapFile::remove(Path::new(&modal.filepath), &modal.note_title);
                                 toast_rack.add(ToastNotification::new(
-                                    "Discarded local changes and reloaded from disk",
-                                    Some("Note Reloaded".to_string()),
+                                    t!("bashmenu.notes_reloaded"),
+                                    Some(t!("common.dialogs.info_title")),
                                     3.0,
                                 ));
                                 active_modal = ActiveModal::NoteViewer(NoteViewerModal::new(
@@ -1820,8 +1809,8 @@ fn main() -> Result<()> {
                                     );
                                 }
                                 toast_rack.add(ToastNotification::new(
-                                    format!("Saved local edits as '{}'", copy_title),
-                                    Some("Saved As Copy".to_string()),
+                                    t!("bashmenu.notes_saved_copy", title => &copy_title),
+                                    Some(t!("common.dialogs.info_title")),
                                     3.0,
                                 ));
                                 active_modal = ActiveModal::NoteViewer(NoteViewerModal::new(
@@ -1904,9 +1893,10 @@ fn main() -> Result<()> {
                                 ShortcutDispatchResult::LeaderActivated
                                 | ShortcutDispatchResult::LeaderCancelled => MenuAction::None,
                                 ShortcutDispatchResult::LeaderUnbound(unbound) => {
+                                    let unbound_str = unbound.to_string();
                                     toast_rack.add(ToastNotification::new(
-                                        format!("Unbound leader key: '<leader> {}'", unbound),
-                                        Some("Leader Shortcut".to_string()),
+                                        t!("bashmenu.toast_unbound_leader_msg", key => &unbound_str),
+                                        Some(t!("bashmenu.toast_unbound_leader_title")),
                                         2.0,
                                     ));
                                     MenuAction::None
@@ -2071,12 +2061,11 @@ fn main() -> Result<()> {
                                     config = new_config;
                                 }
                                 Err(e) => {
-                                    push_error_toast(
-                                        &mut toast_rack,
-                                        "Config Reload Failed (bashmenu.yml)",
-                                        format!("YAML syntax error: {}", e),
-                                        8.0,
-                                    );
+                                    let title = t!("bashmenu.toast_config_reload_title");
+                                    let err_str = e.to_string();
+                                    let msg =
+                                        t!("bashmenu.toast_config_reload_msg", err => &err_str);
+                                    push_error_toast(&mut toast_rack, &title, msg, 8.0);
                                 }
                             }
                             use_nerd = config.settings.use_nerd_fonts.unwrap_or(true)

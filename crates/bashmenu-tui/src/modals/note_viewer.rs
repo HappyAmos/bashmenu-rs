@@ -2,6 +2,7 @@
 
 use super::frame::render_modal_frame;
 use crate::style::ResolvedThemeStyles;
+use bashmenu_core::t;
 use crossterm::event::{KeyCode, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -226,10 +227,12 @@ impl NoteViewerModal {
                     return NoteViewerAction::Close;
                 }
 
+                let hide_str = t!("bashmenu.note_viewer_hide_done");
+                let show_str = t!("bashmenu.note_viewer_show_done");
                 let toggle_action = if self.show_completed {
-                    "[H] Hide Done"
+                    hide_str.as_str()
                 } else {
-                    "[H] Show Done"
+                    show_str.as_str()
                 };
                 let footer_tokens = [
                     "[SPACE] Toggle",
@@ -366,10 +369,12 @@ impl NoteViewerModal {
         let modal_title = format!("Note: {}", self.title);
         let inner = render_modal_frame(area, dialog_w, dialog_h, &modal_title, styles, buf);
 
+        let hide_str = t!("bashmenu.note_viewer_hide_done");
+        let show_str = t!("bashmenu.note_viewer_show_done");
         let toggle_action = if self.show_completed {
-            "[H] Hide Done"
+            hide_str.as_str()
         } else {
-            "[H] Show Done"
+            show_str.as_str()
         };
         let footer_tokens = [
             "[SPACE] Toggle",

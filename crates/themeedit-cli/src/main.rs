@@ -132,16 +132,16 @@ fn trigger_derive_colors(
             ));
         } else {
             toast_rack.add(ToastNotification {
-                title: Some("Derive Theme Colors".to_string()),
-                message: format!("Wallpaper image file not found: {}", img_str),
+                title: Some(t!("themeedit.derive_colors_title")),
+                message: t!("themeedit.wallpaper_not_found", path => &img_str),
                 severity: ToastSeverity::Warning,
                 timeout_secs: 3.0,
             });
         }
     } else {
         toast_rack.add(ToastNotification {
-            title: Some("Derive Theme Colors".to_string()),
-            message: "No background wallpaper image configured on this theme".to_string(),
+            title: Some(t!("themeedit.derive_colors_title")),
+            message: t!("themeedit.no_wallpaper_configured"),
             severity: ToastSeverity::Warning,
             timeout_secs: 3.0,
         });
@@ -353,7 +353,12 @@ fn main() -> Result<()> {
                 } else {
                     ""
                 };
-                let list_title = format!(" Theme Tokens{}{}", scroll_up_ind, scroll_dn_ind);
+                let list_title = format!(
+                    " {}{}{}",
+                    t!("themeedit.theme_tokens_title"),
+                    scroll_up_ind,
+                    scroll_dn_ind
+                );
                 buf.set_string(
                     left_area.x,
                     left_area.y + 2,
@@ -766,19 +771,17 @@ fn main() -> Result<()> {
                                     match state.save_as_theme(trimmed) {
                                         Ok(_) => {
                                             toast_rack.add(ToastNotification {
-                                                title: Some("Save Theme As".to_string()),
-                                                message: format!(
-                                                    "Saved as new theme '{}' to disk",
-                                                    state.current_name
-                                                ),
+                                                title: Some(t!("themeedit.save_as_title")),
+                                                message: t!("themeedit.theme_saved_as", theme => &state.current_name),
                                                 severity: ToastSeverity::Information,
                                                 timeout_secs: 2.0,
                                             });
                                         }
                                         Err(e) => {
+                                            let err_str = e.to_string();
                                             toast_rack.add(ToastNotification {
-                                                title: Some("Error".to_string()),
-                                                message: format!("Failed to save theme: {}", e),
+                                                title: Some(t!("common.dialogs.error_title")),
+                                                message: t!("themeedit.save_failed", err => &err_str),
                                                 severity: ToastSeverity::Error,
                                                 timeout_secs: 3.0,
                                             });
@@ -797,19 +800,17 @@ fn main() -> Result<()> {
                                     match state.save_as_theme(trimmed) {
                                         Ok(_) => {
                                             toast_rack.add(ToastNotification {
-                                                title: Some("Save Theme As".to_string()),
-                                                message: format!(
-                                                    "Saved as new theme '{}' to disk",
-                                                    state.current_name
-                                                ),
+                                                title: Some(t!("themeedit.save_as_title")),
+                                                message: t!("themeedit.theme_saved_as", theme => &state.current_name),
                                                 severity: ToastSeverity::Information,
                                                 timeout_secs: 2.0,
                                             });
                                         }
                                         Err(e) => {
+                                            let err_str = e.to_string();
                                             toast_rack.add(ToastNotification {
-                                                title: Some("Error".to_string()),
-                                                message: format!("Failed to save theme: {}", e),
+                                                title: Some(t!("common.dialogs.error_title")),
+                                                message: t!("themeedit.save_failed", err => &err_str),
                                                 severity: ToastSeverity::Error,
                                                 timeout_secs: 3.0,
                                             });
@@ -831,18 +832,15 @@ fn main() -> Result<()> {
                                     match state.create_theme(trimmed) {
                                         Ok(_) => {
                                             toast_rack.add(ToastNotification {
-                                                title: Some("Theme Editor".to_string()),
-                                                message: format!(
-                                                    "Created new theme '{}' (monochrome base)",
-                                                    state.current_name
-                                                ),
+                                                title: Some(t!("themeedit.title")),
+                                                message: t!("themeedit.theme_created", theme => &state.current_name),
                                                 severity: ToastSeverity::Information,
                                                 timeout_secs: 2.0,
                                             });
                                         }
                                         Err(e) => {
                                             toast_rack.add(ToastNotification {
-                                                title: Some("Error".to_string()),
+                                                title: Some(t!("common.dialogs.error_title")),
                                                 message: e,
                                                 severity: ToastSeverity::Error,
                                                 timeout_secs: 3.0,
@@ -862,18 +860,15 @@ fn main() -> Result<()> {
                                     match state.create_theme(trimmed) {
                                         Ok(_) => {
                                             toast_rack.add(ToastNotification {
-                                                title: Some("Theme Editor".to_string()),
-                                                message: format!(
-                                                    "Created new theme '{}' (monochrome base)",
-                                                    state.current_name
-                                                ),
+                                                title: Some(t!("themeedit.title")),
+                                                message: t!("themeedit.theme_created", theme => &state.current_name),
                                                 severity: ToastSeverity::Information,
                                                 timeout_secs: 2.0,
                                             });
                                         }
                                         Err(e) => {
                                             toast_rack.add(ToastNotification {
-                                                title: Some("Error".to_string()),
+                                                title: Some(t!("common.dialogs.error_title")),
                                                 message: e,
                                                 severity: ToastSeverity::Error,
                                                 timeout_secs: 3.0,
@@ -895,15 +890,15 @@ fn main() -> Result<()> {
                                 match state.delete_theme(&to_del) {
                                     Ok(_) => {
                                         toast_rack.add(ToastNotification {
-                                            title: Some("Theme Editor".to_string()),
-                                            message: format!("Deleted theme '{}'", to_del),
+                                            title: Some(t!("themeedit.title")),
+                                            message: t!("themeedit.theme_deleted", theme => &to_del),
                                             severity: ToastSeverity::Information,
                                             timeout_secs: 2.0,
                                         });
                                     }
                                     Err(e) => {
                                         toast_rack.add(ToastNotification {
-                                            title: Some("Error".to_string()),
+                                            title: Some(t!("common.dialogs.error_title")),
                                             message: e,
                                             severity: ToastSeverity::Error,
                                             timeout_secs: 3.0,
@@ -921,15 +916,15 @@ fn main() -> Result<()> {
                                 match state.delete_theme(&to_del) {
                                     Ok(_) => {
                                         toast_rack.add(ToastNotification {
-                                            title: Some("Theme Editor".to_string()),
-                                            message: format!("Deleted theme '{}'", to_del),
+                                            title: Some(t!("themeedit.title")),
+                                            message: t!("themeedit.theme_deleted", theme => &to_del),
                                             severity: ToastSeverity::Information,
                                             timeout_secs: 2.0,
                                         });
                                     }
                                     Err(e) => {
                                         toast_rack.add(ToastNotification {
-                                            title: Some("Error".to_string()),
+                                            title: Some(t!("common.dialogs.error_title")),
                                             message: e,
                                             severity: ToastSeverity::Error,
                                             timeout_secs: 3.0,
@@ -949,18 +944,15 @@ fn main() -> Result<()> {
                                 match state.derive_colors_from_wallpaper() {
                                     Ok(fname) => {
                                         toast_rack.add(ToastNotification {
-                                            title: Some("Derive Theme Colors".to_string()),
-                                            message: format!(
-                                                "Derived theme colors from '{}'",
-                                                fname
-                                            ),
+                                            title: Some(t!("themeedit.derive_colors_title")),
+                                            message: t!("themeedit.colors_derived", file => &fname),
                                             severity: ToastSeverity::Information,
                                             timeout_secs: 2.5,
                                         });
                                     }
                                     Err(err) => {
                                         toast_rack.add(ToastNotification {
-                                            title: Some("Derive Theme Colors".to_string()),
+                                            title: Some(t!("themeedit.derive_colors_title")),
                                             message: err,
                                             severity: ToastSeverity::Warning,
                                             timeout_secs: 3.0,
@@ -977,18 +969,15 @@ fn main() -> Result<()> {
                                 match state.derive_colors_from_wallpaper() {
                                     Ok(fname) => {
                                         toast_rack.add(ToastNotification {
-                                            title: Some("Derive Theme Colors".to_string()),
-                                            message: format!(
-                                                "Derived theme colors from '{}'",
-                                                fname
-                                            ),
+                                            title: Some(t!("themeedit.derive_colors_title")),
+                                            message: t!("themeedit.colors_derived", file => &fname),
                                             severity: ToastSeverity::Information,
                                             timeout_secs: 2.5,
                                         });
                                     }
                                     Err(err) => {
                                         toast_rack.add(ToastNotification {
-                                            title: Some("Derive Theme Colors".to_string()),
+                                            title: Some(t!("themeedit.derive_colors_title")),
                                             message: err,
                                             severity: ToastSeverity::Warning,
                                             timeout_secs: 3.0,
@@ -1106,7 +1095,7 @@ fn main() -> Result<()> {
                             if let Some(term) = res {
                                 let output_text = run_glyphs_search(&term);
                                 active_modal = ActiveModal::Help(HelpModal::new(
-                                    format!("Nerd Font & Emoji: {}", term),
+                                    t!("themeedit.glyph_search_heading", term => &term),
                                     &output_text,
                                 ));
                             } else {
@@ -1119,7 +1108,7 @@ fn main() -> Result<()> {
                             if let Some(term) = res {
                                 let output_text = run_glyphs_search(&term);
                                 active_modal = ActiveModal::Help(HelpModal::new(
-                                    format!("Nerd Font & Emoji: {}", term),
+                                    t!("themeedit.glyph_search_heading", term => &term),
                                     &output_text,
                                 ));
                             } else {
@@ -1284,8 +1273,11 @@ fn main() -> Result<()> {
 
                                 // 2. Click on preview mode tab header
                                 let title_text = format!(
-                                    " Preview: {} (Click to Switch) ",
-                                    state.preview_mode.title()
+                                    " {} ",
+                                    t!(
+                                        "themeedit.preview_mode_switch",
+                                        mode => state.preview_mode.title()
+                                    )
                                 );
                                 let title_start = right_area.x + 3;
                                 let title_end = title_start + title_text.len() as u16;
@@ -1621,8 +1613,8 @@ fn main() -> Result<()> {
                                 KeyCode::Char('[') => {
                                     state.cycle_theme(false);
                                     toast_rack.add(ToastNotification {
-                                        title: Some("Theme Switcher".to_string()),
-                                        message: format!("Switched to '{}'", state.current_name),
+                                        title: Some(t!("bashmenu.theme_picker_title")),
+                                        message: t!("themeedit.theme_switched", theme => &state.current_name),
                                         severity: ToastSeverity::Information,
                                         timeout_secs: 1.5,
                                     });
@@ -1630,8 +1622,8 @@ fn main() -> Result<()> {
                                 KeyCode::Char(']') => {
                                     state.cycle_theme(true);
                                     toast_rack.add(ToastNotification {
-                                        title: Some("Theme Switcher".to_string()),
-                                        message: format!("Switched to '{}'", state.current_name),
+                                        title: Some(t!("bashmenu.theme_picker_title")),
+                                        message: t!("themeedit.theme_switched", theme => &state.current_name),
                                         severity: ToastSeverity::Information,
                                         timeout_secs: 1.5,
                                     });

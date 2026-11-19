@@ -3,6 +3,7 @@
 use super::frame::{is_close_button_clicked, render_modal_frame};
 use crate::ansi::ansi_to_line;
 use crate::style::ResolvedThemeStyles;
+use bashmenu_core::t;
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -130,7 +131,9 @@ impl StreamOutputModal {
             }
             Err(e) => {
                 self.is_running = false;
-                self.lines.push(format!("Failed to execute command: {}", e));
+                let err_str = e.to_string();
+                self.lines
+                    .push(t!("bashmenu.stream_exec_failed", err => &err_str));
                 self.exit_code = Some(1);
             }
         }
@@ -369,18 +372,15 @@ impl StreamOutputModal {
             .add_modifier(Modifier::BOLD);
 
         let footer_text = if self.is_running {
-            " ● Running...  [ESC]: Terminate / Close ".to_string()
+            t!("bashmenu.stream_running")
         } else if let Some(code) = self.exit_code {
             if code == 0 {
-                " ✔ Completed (Exit: 0)  [ESC/ENTER]: Close | [▲/▼/PgUp/PgDn]: Scroll ".to_string()
+                t!("bashmenu.stream_completed")
             } else {
-                format!(
-                    " ✘ Finished (Exit: {})  [ESC/ENTER]: Close | [▲/▼/PgUp/PgDn]: Scroll ",
-                    code
-                )
+                t!("bashmenu.stream_failed", code => code)
             }
         } else {
-            " [ESC/ENTER]: Close | [▲/▼/PgUp/PgDn]: Scroll ".to_string()
+            t!("bashmenu.stream_scroll")
         };
 
         let avail_footer_w = inner.width.saturating_sub(2) as usize;

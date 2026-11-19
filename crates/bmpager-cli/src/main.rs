@@ -9,6 +9,7 @@ mod markdown;
 mod pager;
 
 use args::parse_cli_args;
+use bashmenu_core::t;
 use pager::Pager;
 use std::io::{stdin, stdout, IsTerminal, Read};
 use std::process::exit;
@@ -48,7 +49,8 @@ fn main() {
     if !args.files.is_empty() {
         for f in &args.files {
             if !f.exists() {
-                eprintln!("bmpager: no such file: {}", f.display());
+                let p = f.display().to_string();
+                eprintln!("bmpager: {}", t!("bmpager.no_such_file", path => &p));
                 exit(2);
             }
             match std::fs::read_to_string(f) {
@@ -59,7 +61,12 @@ fn main() {
                     }
                 }
                 Err(err) => {
-                    eprintln!("bmpager: cannot read: {}: {}", f.display(), err);
+                    let p = f.display().to_string();
+                    let e = err.to_string();
+                    eprintln!(
+                        "bmpager: {}",
+                        t!("bmpager.cannot_read", path => &p, err => &e)
+                    );
                     exit(2);
                 }
             }
@@ -69,7 +76,8 @@ fn main() {
         exit(2);
     } else {
         if let Err(err) = stdin().read_to_string(&mut raw_content) {
-            eprintln!("bmpager: error reading stdin: {}", err);
+            let e = err.to_string();
+            eprintln!("bmpager: {}", t!("bmpager.error_stdin", err => &e));
             exit(2);
         }
     }
@@ -117,7 +125,10 @@ fn main() {
             }
         }
         if truncated {
-            eprintln!("bmpager: input truncated at {} lines", args.max_lines);
+            eprintln!(
+                "bmpager: {}",
+                t!("bmpager.input_truncated", count => args.max_lines)
+            );
         }
         exit(0);
     }
@@ -125,7 +136,7 @@ fn main() {
     // 7. Interactive full-screen Pager
     let mut pager = Pager::new(lines, args);
     if truncated {
-        pager.message = format!("stored only the first {} lines", pager.args.max_lines);
+        pager.message = t!("bmpager.stored_lines", count => pager.args.max_lines);
     }
 
     if let Err(err) = pager.run() {

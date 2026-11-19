@@ -3,6 +3,7 @@
 use super::frame::render_modal_frame;
 use super::note_viewer::wrap_footer_tokens;
 use crate::style::ResolvedThemeStyles;
+use bashmenu_core::t;
 use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -648,14 +649,18 @@ impl NoteEditorModal {
                     return NoteEditorAction::Cancel;
                 }
 
+                let btn_save = format!("[Ctrl+S] {}", t!("common.buttons.save"));
+                let btn_copy = format!("[Ctrl+C] {}", t!("common.buttons.copy"));
+                let btn_paste = format!("[Ctrl+V] {}", t!("common.buttons.paste"));
+                let btn_cancel = format!("[ESC] {}", t!("common.buttons.cancel"));
                 let footer_tokens = [
-                    "[Ctrl+S] Save",
+                    btn_save.as_str(),
                     "|",
-                    "[Ctrl+C] Copy",
+                    btn_copy.as_str(),
                     "|",
-                    "[Ctrl+V] Paste",
+                    btn_paste.as_str(),
                     "|",
-                    "[ESC] Cancel",
+                    btn_cancel.as_str(),
                 ];
                 let max_footer_w = inner.width.saturating_sub(4) as usize;
                 let footer_lines = wrap_footer_tokens(&footer_tokens, max_footer_w);
@@ -672,18 +677,18 @@ impl NoteEditorModal {
                         {
                             let rel_col = (mouse.column - footer_x) as usize;
                             let line_str = f_line.as_str();
-                            if let Some(pos) = line_str.find("[Ctrl+S] Save") {
-                                if rel_col >= pos && rel_col < pos + 13 {
+                            if let Some(pos) = line_str.find(&btn_save) {
+                                if rel_col >= pos && rel_col < pos + btn_save.len() {
                                     return NoteEditorAction::Save(self.lines.join("\n"));
                                 }
                             }
-                            if let Some(pos) = line_str.find("[ESC] Cancel") {
-                                if rel_col >= pos && rel_col < pos + 12 {
+                            if let Some(pos) = line_str.find(&btn_cancel) {
+                                if rel_col >= pos && rel_col < pos + btn_cancel.len() {
                                     return NoteEditorAction::Cancel;
                                 }
                             }
-                            if let Some(pos) = line_str.find("[Ctrl+C] Copy") {
-                                if rel_col >= pos && rel_col < pos + 13 {
+                            if let Some(pos) = line_str.find(&btn_copy) {
+                                if rel_col >= pos && rel_col < pos + btn_copy.len() {
                                     if let Some(text) = self.get_selected_text() {
                                         crate::clipboard::set_clipboard_text(&text);
                                     } else {
@@ -694,8 +699,8 @@ impl NoteEditorModal {
                                     return NoteEditorAction::None;
                                 }
                             }
-                            if let Some(pos) = line_str.find("[Ctrl+V] Paste") {
-                                if rel_col >= pos && rel_col < pos + 14 {
+                            if let Some(pos) = line_str.find(&btn_paste) {
+                                if rel_col >= pos && rel_col < pos + btn_paste.len() {
                                     if let Some(text) = crate::clipboard::get_clipboard_text() {
                                         self.paste_text(&text);
                                     }
@@ -891,18 +896,22 @@ impl NoteEditorModal {
         let dialog_w = (area.width.saturating_sub(4)).clamp(20, 84);
         let dialog_h = (area.height.saturating_sub(4)).clamp(14, 28);
 
-        let modal_title = format!("Edit Note: {}", self.title);
+        let modal_title = t!("bashmenu.note_edit_title", title => &self.title);
         let inner = render_modal_frame(area, dialog_w, dialog_h, &modal_title, styles, buf);
         self.last_inner_rect = inner;
 
+        let btn_save = format!("[Ctrl+S] {}", t!("common.buttons.save"));
+        let btn_copy = format!("[Ctrl+C] {}", t!("common.buttons.copy"));
+        let btn_paste = format!("[Ctrl+V] {}", t!("common.buttons.paste"));
+        let btn_cancel = format!("[ESC] {}", t!("common.buttons.cancel"));
         let footer_tokens = [
-            "[Ctrl+S] Save",
+            btn_save.as_str(),
             "|",
-            "[Ctrl+C] Copy",
+            btn_copy.as_str(),
             "|",
-            "[Ctrl+V] Paste",
+            btn_paste.as_str(),
             "|",
-            "[ESC] Cancel",
+            btn_cancel.as_str(),
         ];
         let max_footer_w = inner.width.saturating_sub(4) as usize;
         let footer_lines = wrap_footer_tokens(&footer_tokens, max_footer_w);

@@ -3,6 +3,7 @@
 pub mod swap;
 
 use anyhow::Result;
+use bashmenu_core::t;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -468,11 +469,11 @@ impl EditorBuffer {
                     let match_char_offset = remainder[..pos].chars().count();
                     self.cursor_row = start_row;
                     self.cursor_col = start_col + match_char_offset;
-                    self.status_message = format!(
-                        "Found '{}' at line {}, col {}",
-                        query,
-                        self.cursor_row + 1,
-                        self.cursor_col + 1
+                    self.status_message = t!(
+                        "bashedit.found_at",
+                        query => query,
+                        line => self.cursor_row + 1,
+                        col => self.cursor_col + 1
                     );
                     return true;
                 }
@@ -485,11 +486,11 @@ impl EditorBuffer {
                 let match_char_offset = self.lines[r][..pos].chars().count();
                 self.cursor_row = r;
                 self.cursor_col = match_char_offset;
-                self.status_message = format!(
-                    "Found '{}' at line {}, col {}",
-                    query,
-                    self.cursor_row + 1,
-                    self.cursor_col + 1
+                self.status_message = t!(
+                    "bashedit.found_at",
+                    query => query,
+                    line => self.cursor_row + 1,
+                    col => self.cursor_col + 1
                 );
                 return true;
             }
@@ -506,11 +507,11 @@ impl EditorBuffer {
                     let match_char_offset = prefix[..pos].chars().count();
                     self.cursor_row = r;
                     self.cursor_col = match_char_offset;
-                    self.status_message = format!(
-                        "Found '{}' at line {}, col {}",
-                        query,
-                        self.cursor_row + 1,
-                        self.cursor_col + 1
+                    self.status_message = t!(
+                        "bashedit.found_at",
+                        query => query,
+                        line => self.cursor_row + 1,
+                        col => self.cursor_col + 1
                     );
                     return true;
                 }
@@ -518,17 +519,17 @@ impl EditorBuffer {
                 let match_char_offset = line[..pos].chars().count();
                 self.cursor_row = r;
                 self.cursor_col = match_char_offset;
-                self.status_message = format!(
-                    "Found '{}' at line {}, col {}",
-                    query,
-                    self.cursor_row + 1,
-                    self.cursor_col + 1
+                self.status_message = t!(
+                    "bashedit.found_at",
+                    query => query,
+                    line => self.cursor_row + 1,
+                    col => self.cursor_col + 1
                 );
                 return true;
             }
         }
 
-        self.status_message = format!("'{}' not found", query);
+        self.status_message = t!("bashedit.not_found", query => query);
         false
     }
 

@@ -57,10 +57,8 @@ impl NoteConflictModal {
         base_content: &str,
     ) -> Self {
         Self {
-            title: format!("Conflict: {}", note_title),
-            message: "This note was modified externally while you were \
-editing it.\nChoose how to resolve this concurrent change:"
-                .to_string(),
+            title: t!("bashmenu.note_conflict_title", title => note_title),
+            message: t!("bashmenu.note_conflict_msg"),
             note_title: note_title.to_string(),
             local_content: local_content.to_string(),
             disk_content: disk_content.to_string(),

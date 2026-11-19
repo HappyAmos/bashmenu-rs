@@ -5,7 +5,7 @@
 //! live item and divider preview boxes, file browse triggers, and full footer shortcut keys.
 
 use bashmenu_core::{
-    interpolate_placeholders, BashMenuConfig, MacroContext, MenuItem, MenuItemType,
+    interpolate_placeholders, t, BashMenuConfig, MacroContext, MenuItem, MenuItemType,
 };
 use bashmenu_tui::{
     compute_modal_inner, is_close_button_clicked, render_modal_frame, split_label_brackets,
@@ -1173,15 +1173,15 @@ impl ItemEditModal {
     }
 
     /// Returns human-readable label header text for the action input field.
-    pub fn get_action_label_text(&self) -> &'static str {
+    pub fn get_action_label_text(&self) -> String {
         match self.current_type.as_str() {
-            "command" => "Shell Command (command):",
-            "script" => "Script Path (script):",
-            "editor" | "notebook" => "File to Edit (file):",
-            "config" | "toggle" | "radio" => "Configuration Key (key):",
-            "python" => "Python Expression / Routine (python):",
-            "submenu" => "Submenu Action / Submenu Title:",
-            _ => "Action / Command / Script / File / Key:",
+            "command" => t!("menuedit.action_lbl_command"),
+            "script" => t!("menuedit.action_lbl_script"),
+            "editor" | "notebook" => t!("menuedit.action_lbl_file"),
+            "config" | "toggle" | "radio" => t!("menuedit.action_lbl_config"),
+            "python" => t!("menuedit.action_lbl_python"),
+            "submenu" => t!("menuedit.action_lbl_submenu"),
+            _ => t!("menuedit.action_lbl_generic"),
         }
     }
 
@@ -1561,7 +1561,7 @@ impl ItemEditModal {
             }
 
             // Click [Change Type] button at top right
-            let type_btn_text = " [Change Type (CTRL+T)] ";
+            let type_btn_text = format!(" [{} (CTRL+T)] ", t!("menuedit.change_type"));
             let type_btn_x = (inner.x + inner.width).saturating_sub(type_btn_text.len() as u16 + 2);
             if is_left_down
                 && mouse.row == inner.y
@@ -1651,7 +1651,7 @@ impl ItemEditModal {
                             scroll_offset,
                             ..
                         } => {
-                            let browse_btn = " [Browse] ";
+                            let browse_btn = format!(" [{}] ", t!("common.buttons.browse"));
                             let inp_w = avail_w.saturating_sub(browse_btn.len() + 4);
                             let field_x = inner.x + 3;
                             let btn_x = inner.x + 2 + inp_w as u16 + 2;
@@ -2049,7 +2049,7 @@ impl ItemEditModal {
         let cur_ctrl = self.current_control();
 
         if self.is_divider() {
-            form_lines.push(FormRow::Label("Repeating Character (char):"));
+            form_lines.push(FormRow::Label(t!("menuedit.prop_repeating_char")));
             form_lines.push(FormRow::Input {
                 ctrl: FocusControl::CharInput,
                 text: self.char_input.as_string(),
@@ -2057,7 +2057,7 @@ impl ItemEditModal {
                 selection: self.char_input.selection_range(),
                 scroll_offset: self.char_input.scroll_offset,
             });
-            form_lines.push(FormRow::Label("Length Directive (length):"));
+            form_lines.push(FormRow::Label(t!("menuedit.prop_length_directive")));
             form_lines.push(FormRow::Input {
                 ctrl: FocusControl::LengthInput,
                 text: self.length_input.as_string(),
@@ -2065,7 +2065,7 @@ impl ItemEditModal {
                 selection: self.length_input.selection_range(),
                 scroll_offset: self.length_input.scroll_offset,
             });
-            form_lines.push(FormRow::Label("Preview:"));
+            form_lines.push(FormRow::Label(t!("menuedit.prop_preview")));
             // Live divider preview
             let preview_len = (inner_width.saturating_sub(6) as usize).min(60);
             let mut exp_c = self.char_input.as_string();
@@ -2088,7 +2088,7 @@ impl ItemEditModal {
             let div_preview: String = repeated.chars().take(preview_len).collect();
             form_lines.push(FormRow::PreviewBox(div_preview));
         } else {
-            form_lines.push(FormRow::Label("Title / Label:"));
+            form_lines.push(FormRow::Label(t!("menuedit.prop_title_label")));
             form_lines.push(FormRow::Input {
                 ctrl: FocusControl::TitleInput,
                 text: self.title_input.as_string(),
@@ -2097,7 +2097,7 @@ impl ItemEditModal {
                 scroll_offset: self.title_input.scroll_offset,
             });
 
-            form_lines.push(FormRow::Label("Icon / Glyph ({nf:<char>:<hex>:<emoji>}):"));
+            form_lines.push(FormRow::Label(t!("menuedit.prop_icon_glyph")));
             form_lines.push(FormRow::Input {
                 ctrl: FocusControl::IconInput,
                 text: self.icon_input.as_string(),
@@ -2107,7 +2107,7 @@ impl ItemEditModal {
             });
 
             if self.is_confirm() {
-                form_lines.push(FormRow::Label("Confirmation Message / Prompt Text:"));
+                form_lines.push(FormRow::Label(t!("menuedit.prop_confirm_msg")));
                 form_lines.push(FormRow::Input {
                     ctrl: FocusControl::PromptInput,
                     text: self.prompt_input.as_string(),
@@ -2116,7 +2116,7 @@ impl ItemEditModal {
                     scroll_offset: self.prompt_input.scroll_offset,
                 });
 
-                form_lines.push(FormRow::Label("On Yes Action (on_yes):"));
+                form_lines.push(FormRow::Label(t!("menuedit.prop_on_yes")));
                 form_lines.push(FormRow::InputWithBrowse {
                     input_ctrl: FocusControl::OnYesInput,
                     text: self.on_yes_input.as_string(),
@@ -2126,7 +2126,7 @@ impl ItemEditModal {
                     scroll_offset: self.on_yes_input.scroll_offset,
                 });
 
-                form_lines.push(FormRow::Label("On No Action (on_no):"));
+                form_lines.push(FormRow::Label(t!("menuedit.prop_on_no")));
                 form_lines.push(FormRow::InputWithBrowse {
                     input_ctrl: FocusControl::OnNoInput,
                     text: self.on_no_input.as_string(),
@@ -2158,11 +2158,11 @@ impl ItemEditModal {
 
                 if self.shows_prompt() {
                     let prompt_label = match self.current_type.as_str() {
-                        "command" | "script" => "Prompt Text (for {param} or file pickers):",
-                        "config" => "Config Prompt Message:",
-                        "toggle" => "Toggle Confirmation Prompt (optional):",
-                        "radio" => "Radio Dialog Title / Prompt:",
-                        _ => "Message / Prompt Text:",
+                        "command" | "script" => t!("menuedit.prop_prompt_param"),
+                        "config" => t!("menuedit.prop_prompt_config"),
+                        "toggle" => t!("menuedit.prop_prompt_toggle"),
+                        "radio" => t!("menuedit.prop_prompt_radio"),
+                        _ => t!("menuedit.prop_msg_prompt"),
                     };
                     form_lines.push(FormRow::Label(prompt_label));
                     form_lines.push(FormRow::Input {
@@ -2174,7 +2174,7 @@ impl ItemEditModal {
                     });
                 }
             } else if self.shows_prompt() {
-                form_lines.push(FormRow::Label("Message / Prompt Text:"));
+                form_lines.push(FormRow::Label(t!("menuedit.prop_msg_prompt")));
                 form_lines.push(FormRow::Input {
                     ctrl: FocusControl::PromptInput,
                     text: self.prompt_input.as_string(),
@@ -2185,9 +2185,7 @@ impl ItemEditModal {
             }
 
             if self.is_radio() {
-                form_lines.push(FormRow::Label(
-                    "Radio Options (one per line, e.g. 'Label = value' or 'value'):",
-                ));
+                form_lines.push(FormRow::Label(t!("menuedit.prop_radio_options")));
                 let v_rows = 5;
                 let scroll_r = self.radio_options_input.scroll_row;
                 let total_lines = self.radio_options_input.lines.len();
@@ -2240,7 +2238,7 @@ impl ItemEditModal {
             }
 
             if self.current_type == "inject_block" {
-                form_lines.push(FormRow::Label("Template Path (inject_block):"));
+                form_lines.push(FormRow::Label(t!("menuedit.prop_template_path")));
                 form_lines.push(FormRow::InputWithBrowse {
                     input_ctrl: FocusControl::TemplateInput,
                     text: self.template_input.as_string(),
@@ -2250,7 +2248,7 @@ impl ItemEditModal {
                     scroll_offset: self.template_input.scroll_offset,
                 });
 
-                form_lines.push(FormRow::Label("Target Path (inject_block):"));
+                form_lines.push(FormRow::Label(t!("menuedit.prop_target_path")));
                 form_lines.push(FormRow::InputWithBrowse {
                     input_ctrl: FocusControl::TargetInput,
                     text: self.target_input.as_string(),
@@ -2260,7 +2258,7 @@ impl ItemEditModal {
                     scroll_offset: self.target_input.scroll_offset,
                 });
 
-                form_lines.push(FormRow::Label("Block ID (inject_block):"));
+                form_lines.push(FormRow::Label(t!("menuedit.prop_block_id")));
                 form_lines.push(FormRow::Input {
                     ctrl: FocusControl::BlockIdInput,
                     text: self.block_id_input.as_string(),
@@ -2271,9 +2269,7 @@ impl ItemEditModal {
             }
 
             if self.shows_start_dir() {
-                form_lines.push(FormRow::Label(
-                    "Start Directory ({file_picker} / {dir_picker}):",
-                ));
+                form_lines.push(FormRow::Label(t!("menuedit.prop_start_dir")));
                 form_lines.push(FormRow::InputWithBrowse {
                     input_ctrl: FocusControl::StartDirInput,
                     text: self.start_dir_input.as_string(),
@@ -2285,7 +2281,7 @@ impl ItemEditModal {
             }
 
             if self.current_type == "editor" {
-                form_lines.push(FormRow::Label("Tabstop:"));
+                form_lines.push(FormRow::Label(t!("menuedit.prop_tabstop")));
                 form_lines.push(FormRow::Input {
                     ctrl: FocusControl::TabstopInput,
                     text: self.tabstop_input.as_string(),
@@ -2296,14 +2292,14 @@ impl ItemEditModal {
             }
 
             if self.is_executable() {
-                form_lines.push(FormRow::Label("Execution Mode:"));
+                form_lines.push(FormRow::Label(t!("menuedit.prop_exec_mode")));
                 form_lines.push(FormRow::ExecMode {
                     mode: self.exec_mode,
                     is_active: cur_ctrl == FocusControl::ExecModeSelector,
                 });
 
                 if self.exec_mode == 0 || self.exec_mode == 1 {
-                    form_lines.push(FormRow::Label("Window Size % (20-100):"));
+                    form_lines.push(FormRow::Label(t!("menuedit.prop_window_pct")));
                     form_lines.push(FormRow::Input {
                         ctrl: FocusControl::WindowPercentInput,
                         text: self.window_percent_input.as_string(),
@@ -2316,14 +2312,13 @@ impl ItemEditModal {
                 if self.exec_mode == 2 {
                     form_lines.push(FormRow::Checkbox {
                         ctrl: FocusControl::AltBufferChk,
-                        label: "Run in Alternate Screen Buffer (alt_buffer=true)",
+                        label: t!("menuedit.chk_alt_buffer"),
                         checked: self.alt_buffer,
                     });
                 }
                 form_lines.push(FormRow::Checkbox {
                     ctrl: FocusControl::QuietChk,
-                    label:
-                        "Quiet Mode - Suppress 'Press [ENTER] to return to menu...' (quiet=true)",
+                    label: t!("menuedit.chk_quiet"),
                     checked: self.quiet,
                 });
             }
@@ -2331,12 +2326,12 @@ impl ItemEditModal {
             if self.current_type == "editor" {
                 form_lines.push(FormRow::Checkbox {
                     ctrl: FocusControl::NoFormattingChk,
-                    label: "Disable Formatting (no_formatting=true)",
+                    label: t!("menuedit.chk_no_formatting"),
                     checked: self.no_formatting,
                 });
                 form_lines.push(FormRow::Checkbox {
                     ctrl: FocusControl::ShowWhitespaceChk,
-                    label: "Show Whitespace in Editor (show_whitespace=true)",
+                    label: t!("menuedit.chk_show_whitespace"),
                     checked: self.show_whitespace,
                 });
             }
@@ -2344,7 +2339,7 @@ impl ItemEditModal {
             if matches!(self.current_type.as_str(), "command" | "script") {
                 form_lines.push(FormRow::Checkbox {
                     ctrl: FocusControl::MaskedChk,
-                    label: "Mask Input (masked=true)",
+                    label: t!("menuedit.chk_masked"),
                     checked: self.masked,
                 });
             }
@@ -2352,17 +2347,17 @@ impl ItemEditModal {
             if !self.is_nav_type() {
                 form_lines.push(FormRow::Checkbox {
                     ctrl: FocusControl::RefreshChk,
-                    label: "Refresh Environment (refresh=true)",
+                    label: t!("menuedit.chk_refresh"),
                     checked: self.refresh,
                 });
                 form_lines.push(FormRow::Checkbox {
                     ctrl: FocusControl::ExternalChk,
-                    label: "External Execution (external=true)",
+                    label: t!("menuedit.chk_external"),
                     checked: self.external,
                 });
             }
 
-            form_lines.push(FormRow::Label("Preview:"));
+            form_lines.push(FormRow::Label(t!("menuedit.prop_preview")));
             // Live item preview
             let title = self.title_input.as_string();
             let icon = self.icon_input.as_string();
@@ -2388,7 +2383,13 @@ impl ItemEditModal {
         let dialog_w = 86.min(area.width.saturating_sub(4));
         let dialog_h = 32.min(area.height.saturating_sub(2));
 
-        let title_header = format!(" Edit Properties [{}] ", self.current_type.to_uppercase());
+        let title_header = format!(
+            " {} ",
+            t!(
+                "menuedit.edit_properties",
+                type => self.current_type.to_uppercase()
+            )
+        );
         let inner = render_modal_frame(area, dialog_w, dialog_h, &title_header, styles, buf);
 
         if inner.width < 30 || inner.height < 10 {
@@ -2400,7 +2401,11 @@ impl ItemEditModal {
         // 1. Top Type Header Row
         let type_row_y = inner.y;
         let is_type_btn_active = cur_ctrl == FocusControl::ChangeTypeBtn;
-        let type_str = format!(" Item Type: {:<36}", self.get_type_display_str());
+        let type_str = format!(
+            " {}: {:<36}",
+            t!("menuedit.prop_type"),
+            self.get_type_display_str()
+        );
         buf.set_string(
             inner.x + 1,
             type_row_y,
@@ -2408,7 +2413,7 @@ impl ItemEditModal {
             styles.text.add_modifier(Modifier::BOLD),
         );
 
-        let type_btn_text = " [Change Type (CTRL+T)] ";
+        let type_btn_text = format!(" [{} (CTRL+T)] ", t!("menuedit.change_type"));
         let type_btn_x = (inner.x + inner.width).saturating_sub(type_btn_text.len() as u16 + 2);
         let type_btn_style = if is_type_btn_active {
             styles.highlight.add_modifier(Modifier::BOLD)
@@ -2451,7 +2456,7 @@ impl ItemEditModal {
         // Ensure active text input cursor is horizontally visible
         let avail_w = inner.width.saturating_sub(4) as usize;
         let field_w = avail_w.saturating_sub(4);
-        let browse_btn = " [Browse] ";
+        let browse_btn = format!(" [{}] ", t!("common.buttons.browse"));
         let inp_w = avail_w.saturating_sub(browse_btn.len() + 4);
         let shows_action_browse = self.shows_action_browse();
         if let Some(inp) = self.get_text_input_mut(cur_ctrl) {
@@ -2501,8 +2506,8 @@ impl ItemEditModal {
         let is_save_active = cur_ctrl == FocusControl::SaveBtn;
         let is_cancel_active = cur_ctrl == FocusControl::CancelBtn;
 
-        let save_text = " [ Save Changes (CTRL+S) ] ";
-        let cancel_text = " [ Cancel (ESC) ] ";
+        let save_text = format!(" [ {} (CTRL+S) ] ", t!("common.buttons.save"));
+        let cancel_text = format!(" [ {} (ESC) ] ", t!("common.buttons.cancel"));
         let total_btn_w = save_text.len() + cancel_text.len() + 4;
         let start_btn_x = inner.x + (inner.width.saturating_sub(total_btn_w as u16)) / 2;
 
@@ -2517,11 +2522,11 @@ impl ItemEditModal {
             styles.footer
         };
 
-        buf.set_string(start_btn_x, btn_y, save_text, save_style);
+        buf.set_string(start_btn_x, btn_y, &save_text, save_style);
         buf.set_string(
             start_btn_x + save_text.len() as u16 + 4,
             btn_y,
-            cancel_text,
+            &cancel_text,
             cancel_style,
         );
 
@@ -2529,16 +2534,23 @@ impl ItemEditModal {
         let footer_y1 = inner.y + inner.height.saturating_sub(2);
         let footer_y2 = inner.y + inner.height.saturating_sub(1);
 
+        let h_help = format!("[F1] {}", t!("common.gutters.help"));
+        let h_save = format!("[CTRL+S / F2] {}", t!("common.buttons.save"));
+        let h_type = format!("[CTRL+T] {}", t!("menuedit.gutter_type"));
+        let h_ascii = format!("[CTRL+A / F3] {}", t!("menuedit.gutter_ascii"));
         let items_r1 = [
-            "[F1] Help",
-            "[CTRL+S / F2] Save",
-            "[CTRL+T] Type",
-            "[CTRL+A / F3] ASCII",
+            h_help.as_str(),
+            h_save.as_str(),
+            h_type.as_str(),
+            h_ascii.as_str(),
         ];
+        let h_glyphs = format!("[CTRL+N / F4] {}", t!("menuedit.gutter_glyphs"));
+        let h_placeholders = format!("[CTRL+P / F5] {}", t!("menuedit.gutter_placeholders"));
+        let h_cancel = format!("[ESC / C] {}", t!("common.buttons.cancel"));
         let items_r2 = [
-            "[CTRL+N / F4] Glyphs",
-            "[CTRL+P / F5] Placeholders",
-            "[ESC / C] Cancel",
+            h_glyphs.as_str(),
+            h_placeholders.as_str(),
+            h_cancel.as_str(),
         ];
 
         let footer_w = inner.width.saturating_sub(2) as usize;
@@ -2555,7 +2567,7 @@ impl ItemEditModal {
 /// Helper enum for form rows within the modal viewport
 pub enum FormRow {
     /// Static section heading or descriptor label
-    Label(&'static str),
+    Label(String),
     /// Single-line text input field
     Input {
         ctrl: FocusControl,
@@ -2589,7 +2601,7 @@ pub enum FormRow {
     /// Boolean checkbox toggle row
     Checkbox {
         ctrl: FocusControl,
-        label: &'static str,
+        label: String,
         checked: bool,
     },
     /// Live rendered preview container box
@@ -2811,7 +2823,7 @@ impl FormRow {
                 let is_inp_active = *input_ctrl == active_ctrl;
                 let is_btn_active = *btn_ctrl == active_ctrl;
 
-                let browse_btn = " [Browse] ";
+                let browse_btn = format!(" [{}] ", t!("common.buttons.browse"));
                 let inp_w = avail_w.saturating_sub(browse_btn.len() + 4);
 
                 let inp_style = if is_inp_active {
@@ -2882,9 +2894,9 @@ impl FormRow {
             }
             FormRow::ExecMode { mode, is_active } => {
                 let mode_str = match mode {
-                    0 => " ● 📡 Streaming Mode (interactive=false, live popup output) ",
-                    1 => " ● 💬 Interactive Mode (interactive=true, floating window) ",
-                    _ => " ● 🖥️ Console Mode (interactive=true, full-screen terminal) ",
+                    0 => format!(" ● 📡 {} ", t!("menuedit.mode_streaming")),
+                    1 => format!(" ● 💬 {} ", t!("menuedit.mode_interactive")),
+                    _ => format!(" ● 🖥️ {} ", t!("menuedit.mode_console")),
                 };
                 let style = if *is_active {
                     styles.highlight.add_modifier(Modifier::BOLD)

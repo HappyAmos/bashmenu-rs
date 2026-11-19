@@ -3,7 +3,7 @@
 use super::frame::{is_close_button_clicked, render_modal_frame};
 use crate::style::ResolvedThemeStyles;
 use crate::wallpaper::color_to_rgb;
-use bashmenu_core::cp437_to_char;
+use bashmenu_core::{cp437_to_char, t};
 use crossterm::event::{KeyCode, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -170,8 +170,14 @@ impl ColorGridModal {
             Span::styled(" [", styles.border),
             Span::styled("██", swatch_style),
             Span::styled("] ", styles.border),
-            Span::styled(format!("Color: {:03}", self.selected_code), num_style),
-            Span::styled("  (Enter: Select | Esc: Cancel) ", hint_style),
+            Span::styled(
+                t!(
+                    "common.dialogs.color_label",
+                    code => format!("{:03}", self.selected_code)
+                ),
+                num_style,
+            ),
+            Span::styled(format!("  {} ", t!("common.dialogs.grid_hint")), hint_style),
         ]);
         buf.set_line(
             inner.x + 2,
@@ -331,8 +337,14 @@ impl AsciiGridModal {
             Span::styled(" [ ", styles.border),
             Span::styled(format!("{}", cp437_to_char(self.selected_code)), char_style),
             Span::styled(" ] ", styles.border),
-            Span::styled(format!("ASCII: {:03}", self.selected_code), num_style),
-            Span::styled("  (Enter: Select | Esc: Cancel) ", hint_style),
+            Span::styled(
+                t!(
+                    "common.dialogs.ascii_label",
+                    code => format!("{:03}", self.selected_code)
+                ),
+                num_style,
+            ),
+            Span::styled(format!("  {} ", t!("common.dialogs.grid_hint")), hint_style),
         ]);
         buf.set_line(
             inner.x + 2,

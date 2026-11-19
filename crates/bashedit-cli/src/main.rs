@@ -850,12 +850,12 @@ fn main() -> Result<()> {
                         }
                         KeyCode::F(2) => {
                             show_whitespace = !show_whitespace;
-                            tabs[active_tab_idx].status_message = format!(
-                                "Whitespace display {}",
-                                if show_whitespace {
-                                    "enabled"
+                            tabs[active_tab_idx].status_message = t!(
+                                "bashedit.whitespace_display",
+                                status => if show_whitespace {
+                                    t!("bashedit.status_enabled")
                                 } else {
-                                    "disabled"
+                                    t!("bashedit.status_disabled")
                                 }
                             );
                             continue;
@@ -876,7 +876,7 @@ fn main() -> Result<()> {
                         }
                         KeyCode::F(5) => {
                             active_modal = ActiveModal::PlaceholdersHelp(HelpModal::new(
-                                "Available Placeholders & Macros",
+                                t!("bashedit.placeholders_title"),
                                 PLACEHOLDER_HELP_TEXT,
                             ));
                             continue;
@@ -887,28 +887,32 @@ fn main() -> Result<()> {
                         }
                         KeyCode::F(7) => {
                             show_line_numbers = !show_line_numbers;
-                            tabs[active_tab_idx].status_message = format!(
-                                "Line numbers {}",
-                                if show_line_numbers {
-                                    "enabled"
+                            tabs[active_tab_idx].status_message = t!(
+                                "bashedit.line_numbers_display",
+                                status => if show_line_numbers {
+                                    t!("bashedit.status_enabled")
                                 } else {
-                                    "disabled"
+                                    t!("bashedit.status_disabled")
                                 }
                             );
                             continue;
                         }
                         KeyCode::F(8) => {
                             active_modal = ActiveModal::MarkdownReference(HelpModal::new(
-                                "Markdown Syntax Reference",
+                                t!("bashedit.markdown_ref_title"),
                                 MARKDOWN_REFERENCE_TEXT,
                             ));
                             continue;
                         }
                         KeyCode::F(9) => {
                             soft_wrap = !soft_wrap;
-                            tabs[active_tab_idx].status_message = format!(
-                                "Soft wrap {}",
-                                if soft_wrap { "enabled" } else { "disabled" }
+                            tabs[active_tab_idx].status_message = t!(
+                                "bashedit.soft_wrap_display",
+                                status => if soft_wrap {
+                                    t!("bashedit.status_enabled")
+                                } else {
+                                    t!("bashedit.status_disabled")
+                                }
                             );
                             continue;
                         }
@@ -1105,21 +1109,25 @@ fn main() -> Result<()> {
                             }
                             KeyCode::Char('n') => {
                                 show_line_numbers = !show_line_numbers;
-                                tabs[active_tab_idx].status_message = format!(
-                                    "Line numbers {}",
-                                    if show_line_numbers {
-                                        "enabled"
+                                tabs[active_tab_idx].status_message = t!(
+                                    "bashedit.line_numbers_display",
+                                    status => if show_line_numbers {
+                                        t!("bashedit.status_enabled")
                                     } else {
-                                        "disabled"
+                                        t!("bashedit.status_disabled")
                                     }
                                 );
                                 continue;
                             }
                             KeyCode::Char('w') => {
                                 soft_wrap = !soft_wrap;
-                                tabs[active_tab_idx].status_message = format!(
-                                    "Soft wrap {}",
-                                    if soft_wrap { "enabled" } else { "disabled" }
+                                tabs[active_tab_idx].status_message = t!(
+                                    "bashedit.soft_wrap_display",
+                                    status => if soft_wrap {
+                                        t!("bashedit.status_enabled")
+                                    } else {
+                                        t!("bashedit.status_disabled")
+                                    }
                                 );
                                 continue;
                             }
@@ -1298,15 +1306,12 @@ fn main() -> Result<()> {
                                         .as_ref()
                                         .and_then(|p| p.file_name())
                                         .map(|n| n.to_string_lossy().to_string())
-                                        .unwrap_or_else(|| "Untitled".to_string());
+                                        .unwrap_or_else(|| t!("common.dialogs.untitled"));
                                     active_modal = ActiveModal::ConfirmCloseTab {
                                         tab_idx: target_idx,
                                         modal: ConfirmModal::new(
-                                            "Save Modified Tab?",
-                                            format!(
-                                                "Tab '{}' has unsaved changes. Save before closing?",
-                                                tab_name
-                                            ),
+                                            t!("bashedit.save_modified_tab_title"),
+                                            t!("bashedit.save_modified_tab_msg", tab => &tab_name),
                                         ),
                                     };
                                 } else {
@@ -1374,18 +1379,18 @@ fn main() -> Result<()> {
                                 match r.action {
                                     FooterAction::HelpManual => {
                                         active_modal = ActiveModal::HelpManual(HelpModal::new(
-                                            "BashEdit Manual",
+                                            t!("bashedit.help_manual_title"),
                                             BASHEDIT_HELP_TEXT,
                                         ));
                                     }
                                     FooterAction::ToggleWhitespace => {
                                         show_whitespace = !show_whitespace;
-                                        tabs[active_tab_idx].status_message = format!(
-                                            "Whitespace display {}",
-                                            if show_whitespace {
-                                                "enabled"
+                                        tabs[active_tab_idx].status_message = t!(
+                                            "bashedit.whitespace_display",
+                                            status => if show_whitespace {
+                                                t!("bashedit.status_enabled")
                                             } else {
-                                                "disabled"
+                                                t!("bashedit.status_disabled")
                                             }
                                         );
                                     }
@@ -1406,7 +1411,7 @@ fn main() -> Result<()> {
                                     FooterAction::PlaceholdersHelp => {
                                         active_modal =
                                             ActiveModal::PlaceholdersHelp(HelpModal::new(
-                                                "Available Placeholders & Macros",
+                                                t!("bashedit.placeholders_title"),
                                                 PLACEHOLDER_HELP_TEXT,
                                             ));
                                     }
@@ -1415,26 +1420,30 @@ fn main() -> Result<()> {
                                     }
                                     FooterAction::ToggleLineno => {
                                         show_line_numbers = !show_line_numbers;
-                                        tabs[active_tab_idx].status_message = format!(
-                                            "Line numbers {}",
-                                            if show_line_numbers {
-                                                "enabled"
+                                        tabs[active_tab_idx].status_message = t!(
+                                            "bashedit.line_numbers_display",
+                                            status => if show_line_numbers {
+                                                t!("bashedit.status_enabled")
                                             } else {
-                                                "disabled"
+                                                t!("bashedit.status_disabled")
                                             }
                                         );
                                     }
                                     FooterAction::ToggleWrap => {
                                         soft_wrap = !soft_wrap;
-                                        tabs[active_tab_idx].status_message = format!(
-                                            "Soft wrap {}",
-                                            if soft_wrap { "enabled" } else { "disabled" }
+                                        tabs[active_tab_idx].status_message = t!(
+                                            "bashedit.soft_wrap_display",
+                                            status => if soft_wrap {
+                                                t!("bashedit.status_enabled")
+                                            } else {
+                                                t!("bashedit.status_disabled")
+                                            }
                                         );
                                     }
                                     FooterAction::MarkdownReference => {
                                         active_modal =
                                             ActiveModal::MarkdownReference(HelpModal::new(
-                                                "Markdown Syntax Reference",
+                                                t!("bashedit.markdown_ref_title"),
                                                 MARKDOWN_REFERENCE_TEXT,
                                             ));
                                     }
@@ -1724,16 +1733,17 @@ fn show_save_toast(toast_rack: &mut ToastRack, res: Result<()>, tab: &EditorBuff
     match res {
         Ok(_) => {
             toast_rack.add(ToastNotification {
-                title: Some("Save File".to_string()),
+                title: Some(t!("common.dialogs.info_title")),
                 message: t!("bashedit.saved_file", file => &name),
                 severity: ToastSeverity::Information,
                 timeout_secs: 2.0,
             });
         }
         Err(e) => {
+            let err_str = e.to_string();
             toast_rack.add(ToastNotification {
-                title: Some("Error".to_string()),
-                message: format!("Failed to save: {}", e),
+                title: Some(t!("common.dialogs.error_title")),
+                message: t!("bashedit.save_failed", err => &err_str),
                 severity: ToastSeverity::Error,
                 timeout_secs: 3.0,
             });

@@ -2,6 +2,7 @@
 
 use super::frame::{compute_modal_inner, is_close_button_clicked, render_modal_frame};
 use crate::style::ResolvedThemeStyles;
+use bashmenu_core::t;
 use crossterm::event::{KeyCode, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -157,20 +158,24 @@ impl ToggleModal {
         let btn_y = inner.y + inner.height.saturating_sub(2);
         let third = inner.width / 3;
 
+        let true_label = t!("common.buttons.btn_true");
+        let false_label = t!("common.buttons.btn_false");
+        let cancel_label = t!("common.buttons.cancel");
+
         let true_str = if self.focused_idx == 0 {
-            " [  True  ] "
+            format!(" [  {}  ] ", true_label)
         } else {
-            "    True    "
+            format!("    {}    ", true_label)
         };
         let false_str = if self.focused_idx == 1 {
-            " [ False  ] "
+            format!(" [  {}  ] ", false_label)
         } else {
-            "   False    "
+            format!("    {}    ", false_label)
         };
         let cancel_str = if self.focused_idx == 2 {
-            " [ Cancel ] "
+            format!(" [  {}  ] ", cancel_label)
         } else {
-            "   Cancel   "
+            format!("    {}    ", cancel_label)
         };
 
         let true_style = if self.focused_idx == 0 {

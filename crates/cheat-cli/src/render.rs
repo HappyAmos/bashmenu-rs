@@ -1,5 +1,6 @@
 //! Cheatsheet rendering via `bmpager` or terminal stdout fallback.
 
+use bashmenu_core::t;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{exit, Command};
@@ -61,7 +62,12 @@ pub fn display_markdown(file_path: &Path) {
             print!("{content}");
         }
         Err(err) => {
-            eprintln!("Error reading {}: {}", file_path.display(), err);
+            let path_str = file_path.display().to_string();
+            let err_str = err.to_string();
+            eprintln!(
+                "{}",
+                t!("cheat.error_reading", path => &path_str, err => &err_str)
+            );
             exit(1);
         }
     }

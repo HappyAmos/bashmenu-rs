@@ -7,7 +7,7 @@
 use super::frame::render_modal_frame;
 use crate::style::ResolvedThemeStyles;
 use crate::text_input::TextInput;
-use bashmenu_core::WallpaperConfig;
+use bashmenu_core::{t, WallpaperConfig};
 use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -147,7 +147,7 @@ impl BackgroundConfigModal {
         let initial_quantization = format!("{}", cfg.quantization.max(1));
 
         Self {
-            title: "Configure Background Wallpaper".to_string(),
+            title: t!("themeedit.bg_config_title"),
             focus: BackgroundFocus::Image,
             image_input: TextInput::new(initial_img),
             opacity_input: TextInput::new(&initial_op),
@@ -535,11 +535,13 @@ impl BackgroundConfigModal {
         let avail_w = inner_area.width.saturating_sub(4) as usize;
 
         // 1. Wallpaper Image Path + Browse Button
-        buf.set_string(left_x, y_start, "Wallpaper Image File:", label_style);
-        let browse_w = 13_u16;
+        buf.set_string(left_x, y_start, t!("themeedit.bg_image_file"), label_style);
+        let browse_btn = t!("themeedit.bg_btn_browse");
+        let browse_w = browse_btn.len() as u16;
         let browse_x = inner_area.x + inner_area.width.saturating_sub(browse_w + 2);
         let inp_w = browse_x.saturating_sub(left_x + 1) as usize;
 
+        let ph = t!("themeedit.bg_image_none");
         render_text_input_field(
             buf,
             left_x,
@@ -549,7 +551,7 @@ impl BackgroundConfigModal {
             self.focus == BackgroundFocus::Image,
             normal_input_style,
             focused_input_style,
-            Some("(None / disabled)"),
+            Some(&ph),
         );
 
         let browse_st = if self.focus == BackgroundFocus::Browse {
@@ -557,14 +559,14 @@ impl BackgroundConfigModal {
         } else {
             btn_normal
         };
-        buf.set_string(browse_x, y_start + 1, "[ Browse... ]", browse_st);
+        buf.set_string(browse_x, y_start + 1, &browse_btn, browse_st);
 
         // 2. Opacity and Scaling Mode (Split columns)
         let col_w = (avail_w.saturating_sub(2)) / 2;
         let col2_x = left_x + col_w as u16 + 2;
 
-        buf.set_string(left_x, y_start + 2, "Opacity (0.0 to 1.0):", label_style);
-        buf.set_string(col2_x, y_start + 2, "Scaling Mode:", label_style);
+        buf.set_string(left_x, y_start + 2, t!("themeedit.bg_opacity"), label_style);
+        buf.set_string(col2_x, y_start + 2, t!("themeedit.bg_scaling"), label_style);
 
         render_text_input_field(
             buf,
@@ -597,11 +599,16 @@ impl BackgroundConfigModal {
         );
 
         // 3. Rendering Mode and Clustering (Split columns)
-        buf.set_string(left_x, y_start + 4, "Rendering Mode:", label_style);
+        buf.set_string(
+            left_x,
+            y_start + 4,
+            t!("themeedit.bg_rendering"),
+            label_style,
+        );
         buf.set_string(
             col2_x,
             y_start + 4,
-            "Clustering (0=none, 16-128):",
+            t!("themeedit.bg_clustering"),
             label_style,
         );
 
@@ -639,7 +646,7 @@ impl BackgroundConfigModal {
         buf.set_string(
             left_x,
             y_start + 6,
-            "Palette Quantization (1=off, 16-256):",
+            t!("themeedit.bg_quantization"),
             label_style,
         );
         render_text_input_field(
@@ -657,9 +664,6 @@ impl BackgroundConfigModal {
         // 5. Action Buttons Row: [ Apply ]   [ Remove Wallpaper ]   [ Cancel ]
         let btn_y = inner_area.y + inner_area.height.saturating_sub(2);
         let w = inner_area.width;
-        let b1_x = inner_area.x + 4;
-        let b2_x = inner_area.x + (w.saturating_sub(24)) / 2;
-        let b3_x = inner_area.x + w.saturating_sub(16);
 
         let b_apply_st = if self.focus == BackgroundFocus::Apply {
             btn_focused
@@ -677,9 +681,17 @@ impl BackgroundConfigModal {
             btn_normal
         };
 
-        buf.set_string(b1_x, btn_y, "[ Apply ]", b_apply_st);
-        buf.set_string(b2_x, btn_y, "[ Remove Wallpaper ]", b_remove_st);
-        buf.set_string(b3_x, btn_y, "[ Cancel ]", b_cancel_st);
+        let btn_apply = t!("themeedit.bg_btn_apply");
+        let btn_remove = t!("themeedit.bg_btn_remove");
+        let btn_cancel = t!("themeedit.bg_btn_cancel");
+
+        let b1_x = inner_area.x + 4;
+        let b2_x = inner_area.x + (w.saturating_sub(btn_remove.len() as u16)) / 2;
+        let b3_x = inner_area.x + w.saturating_sub(btn_cancel.len() as u16 + 4);
+
+        buf.set_string(b1_x, btn_y, &btn_apply, b_apply_st);
+        buf.set_string(b2_x, btn_y, &btn_remove, b_remove_st);
+        buf.set_string(b3_x, btn_y, &btn_cancel, b_cancel_st);
     }
 }
 

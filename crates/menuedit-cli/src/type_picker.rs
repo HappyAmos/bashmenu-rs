@@ -1,5 +1,6 @@
 //! Modal selector for changing menu item types.
 
+use bashmenu_core::t;
 use bashmenu_tui::{
     compute_modal_inner, is_close_button_clicked, render_modal_frame, ResolvedThemeStyles,
 };
@@ -175,14 +176,8 @@ impl ItemTypePickerModal {
         let dialog_w = 64.min(area.width.saturating_sub(4));
         let dialog_h = (ITEM_TYPES.len() as u16 + 4).min(area.height.saturating_sub(2));
 
-        let inner = render_modal_frame(
-            area,
-            dialog_w,
-            dialog_h,
-            " Select Menu Item Type ",
-            styles,
-            buf,
-        );
+        let title = format!(" {} ", t!("menuedit.type_picker_title"));
+        let inner = render_modal_frame(area, dialog_w, dialog_h, &title, styles, buf);
 
         let content_h = inner.height.saturating_sub(2) as usize;
 
@@ -239,7 +234,11 @@ impl ItemTypePickerModal {
 
         // Footer
         let footer_y = inner.y + inner.height.saturating_sub(1);
-        let footer_text = " [Enter] Select  [Esc] Cancel ";
+        let footer_text = format!(
+            " [Enter] {}  [Esc] {} ",
+            t!("common.buttons.select"),
+            t!("common.buttons.cancel")
+        );
         let avail_footer_w = inner.width.saturating_sub(2) as usize;
         let clipped_footer: String = footer_text.chars().take(avail_footer_w).collect();
         let footer_x = (inner.x + inner.width).saturating_sub(clipped_footer.len() as u16 + 1);
