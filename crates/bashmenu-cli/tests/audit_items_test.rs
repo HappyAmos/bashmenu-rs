@@ -64,6 +64,51 @@ fn test_bashmenu_locale_cli_flag_in_help() {
 }
 
 #[test]
+fn test_makefile_targets_and_dry_run() {
+    let repo_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
+    let makefile_path = repo_root.join("Makefile");
+    assert!(makefile_path.is_file(), "Makefile must exist at repo root");
+
+    // Run 'make help'
+    let output = Command::new("make")
+        .current_dir(&repo_root)
+        .arg("help")
+        .output()
+        .expect("make help must execute");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("make check"));
+    assert!(stdout.contains("make verify"));
+    assert!(stdout.contains("make locale-check"));
+    assert!(stdout.contains("make fmt"));
+    assert!(stdout.contains("make clippy"));
+
+    // Dry-run checks for key targets to ensure no makefile syntax errors
+    for target in &[
+        "check",
+        "verify",
+        "locale-check",
+        "fmt",
+        "clippy",
+        "shellcheck",
+        "build",
+    ] {
+        let dry_run = Command::new("make")
+            .current_dir(&repo_root)
+            .arg("-n")
+            .arg(target)
+            .output()
+            .unwrap_or_else(|_| panic!("make -n {} must run", target));
+        assert!(
+            dry_run.status.success(),
+            "make -n {} failed: {}",
+            target,
+            String::from_utf8_lossy(&dry_run.stderr)
+        );
+    }
+}
+
+#[test]
 fn test_search_nerd_font_and_emoji_menu_item_streaming() {
     let repo_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
     let menu_path = repo_root.join("bashmenu.mnu");

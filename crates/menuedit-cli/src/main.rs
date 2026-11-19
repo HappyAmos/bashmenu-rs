@@ -2,8 +2,8 @@
 
 use anyhow::Result;
 use bashmenu_core::{
-    interpolate_placeholders, load_config, load_menu, run_glyphs_search, save_menu, MacroContext,
-    MenuItem, MenuSchema, ToastNotification, ToastSeverity,
+    interpolate_placeholders, load_config, load_menu, run_glyphs_search, save_menu, t,
+    MacroContext, MenuItem, MenuSchema, ToastNotification, ToastSeverity,
 };
 use bashmenu_tui::{
     compute_modal_inner, get_marquee_slice, install_panic_hook, AsciiGridModal, ConfirmModal,
@@ -109,6 +109,10 @@ struct Cli {
     /// Launch in Keyboard Shortcuts editor mode (`shortcuts.yml`)
     #[arg(long)]
     shortcuts: bool,
+
+    /// Override interface display locale
+    #[arg(short = 'L', long = "locale")]
+    locale: Option<String>,
 }
 
 /// Resolves the filesystem path for the target menu file.
@@ -160,11 +164,96 @@ enum ActiveModal {
     GlyphSearch(InputModal),
 }
 
+fn get_footer_items() -> [(String, MenuEditFooterAction); 16] {
+    [
+        (
+            format!("[F1] {}", t!("common.gutters.help")),
+            MenuEditFooterAction::Help,
+        ),
+        (
+            format!("[F2] {}", t!("menuedit.gutter_toggle_all")),
+            MenuEditFooterAction::ToggleAll,
+        ),
+        (
+            format!("[F3] {}", t!("menuedit.gutter_ascii")),
+            MenuEditFooterAction::Ascii,
+        ),
+        (
+            format!("[F4] {}", t!("menuedit.gutter_glyphs")),
+            MenuEditFooterAction::Glyphs,
+        ),
+        (
+            format!("[F5] {}", t!("menuedit.gutter_placeholders")),
+            MenuEditFooterAction::Placeholders,
+        ),
+        (
+            format!("[a] {}", t!("menuedit.gutter_add")),
+            MenuEditFooterAction::Add,
+        ),
+        (
+            format!("[e/ENTER] {}", t!("common.gutters.edit")),
+            MenuEditFooterAction::Edit,
+        ),
+        (
+            format!("[t] {}", t!("menuedit.gutter_type")),
+            MenuEditFooterAction::Type,
+        ),
+        (
+            format!("[SPACE] {}", t!("menuedit.gutter_toggle")),
+            MenuEditFooterAction::Toggle,
+        ),
+        (
+            format!("[d] {}", t!("common.buttons.delete")),
+            MenuEditFooterAction::Delete,
+        ),
+        (
+            format!("[m] {}", t!("menuedit.gutter_move_down")),
+            MenuEditFooterAction::MoveDown,
+        ),
+        (
+            format!("[M] {}", t!("menuedit.gutter_move_up")),
+            MenuEditFooterAction::MoveUp,
+        ),
+        (
+            format!("[>] {}", t!("menuedit.gutter_indent")),
+            MenuEditFooterAction::Indent,
+        ),
+        (
+            format!("[<] {}", t!("menuedit.gutter_outdent")),
+            MenuEditFooterAction::Outdent,
+        ),
+        (
+            format!("[s] {}", t!("common.buttons.save")),
+            MenuEditFooterAction::Save,
+        ),
+        (
+            format!("[ESC/q] {}", t!("common.gutters.quit")),
+            MenuEditFooterAction::Exit,
+        ),
+    ]
+}
+
 /// Entry point for the Menu Editor TUI application (`menuedit`).
 fn main() -> Result<()> {
     install_panic_hook();
 
     let cli = Cli::parse();
+    let cfg_path = resolve_menu_path(Path::new("bashmenu.yml"), cli.local);
+    let cfg = load_config(&cfg_path).ok();
+
+    let locale_target = cli
+        .locale
+        .clone()
+        .or_else(|| cfg.as_ref().and_then(|c| c.settings.locale.clone()))
+        .or_else(|| std::env::var("LC_ALL").ok())
+        .or_else(|| std::env::var("LC_MESSAGES").ok())
+        .or_else(|| std::env::var("LANG").ok());
+
+    if let Some(ref loc) = locale_target {
+        let clean_loc = loc.split('.').next().unwrap_or(loc);
+        let _ = bashmenu_core::set_locale(clean_loc);
+    }
+
     if cli.shortcuts {
         let sp = if let Some(ref f) = cli.file {
             resolve_menu_path(f, cli.local)
@@ -191,8 +280,6 @@ fn main() -> Result<()> {
         }
     };
 
-    let cfg_path = resolve_menu_path(Path::new("bashmenu.yml"), cli.local);
-    let cfg = load_config(&cfg_path).ok();
     let themes_path = resolve_menu_path(Path::new("bashmenu.themes"), cli.local);
     let themes = bashmenu_core::load_themes(&themes_path).ok();
     let use_nerd = cfg
@@ -420,9 +507,10 @@ fn main() -> Result<()> {
             // Right Panel: Property Inspector
             let insp_x = inner_x + left_w;
             let insp_rect = Rect::new(insp_x, inner_y, right_w, avail_h.saturating_sub(1));
+            let insp_title = format!("───[ {} ]", t!("menuedit.inspector_title"));
             let insp_block = Block::default()
                 .borders(Borders::ALL)
-                .title("───[ Property Inspector ]")
+                .title(insp_title.as_str())
                 .border_style(styles.accent);
             insp_block.render(insp_rect, buf);
 
@@ -482,32 +570,14 @@ fn main() -> Result<()> {
                 buf.set_string(
                     insp_rect.x + 2,
                     insp_rect.y + 2,
-                    "No item selected",
+                    t!("menuedit.no_item_selected"),
                     styles.text,
                 );
             }
 
             // Footer (2 or 3 lines depending on hover expansion)
-            let items_all: [(&str, MenuEditFooterAction); 16] = [
-                ("[F1] Help", MenuEditFooterAction::Help),
-                ("[F2] Toggle All", MenuEditFooterAction::ToggleAll),
-                ("[F3] ASCII", MenuEditFooterAction::Ascii),
-                ("[F4] Glyphs", MenuEditFooterAction::Glyphs),
-                ("[F5] Placeholders", MenuEditFooterAction::Placeholders),
-                ("[a] Add", MenuEditFooterAction::Add),
-                ("[e/ENTER] Edit", MenuEditFooterAction::Edit),
-                ("[t] Type", MenuEditFooterAction::Type),
-                ("[SPACE] Toggle", MenuEditFooterAction::Toggle),
-                ("[d] Delete", MenuEditFooterAction::Delete),
-                ("[m] Move Dn", MenuEditFooterAction::MoveDown),
-                ("[M] Move Up", MenuEditFooterAction::MoveUp),
-                ("[>] Indent", MenuEditFooterAction::Indent),
-                ("[<] Outdent", MenuEditFooterAction::Outdent),
-                ("[s] Save", MenuEditFooterAction::Save),
-                ("[ESC/q] Exit", MenuEditFooterAction::Exit),
-            ];
-
-            let all_labels: Vec<&str> = items_all.iter().map(|(lbl, _)| *lbl).collect();
+            let items_all = get_footer_items();
+            let all_labels: Vec<&str> = items_all.iter().map(|(lbl, _)| lbl.as_str()).collect();
             let has_hidden = bashmenu_tui::has_hidden_gutter_text(&all_labels, avail_w as usize, 2);
             let is_expanded = footer_hover.is_expanded() && has_hidden && area.height >= 12;
             let footer_rows: usize = if is_expanded { 3 } else { 2 };
@@ -527,7 +597,9 @@ fn main() -> Result<()> {
                 };
                 buf.set_string(inner_x, row_y, &clipped_line, styles.footer);
                 for (tok_label, start, end) in ranges {
-                    if let Some((_, action)) = items_all.iter().find(|(lbl, _)| *lbl == tok_label) {
+                    if let Some((_, action)) =
+                        items_all.iter().find(|(lbl, _)| lbl.as_str() == tok_label)
+                    {
                         let screen_start = inner_x + start as u16;
                         let screen_end = inner_x + end as u16;
                         if screen_start < inner_x + avail_w {
@@ -600,24 +672,11 @@ fn main() -> Result<()> {
 
         toast_rack.tick();
 
-        let all_labels = [
-            "[F1] Help",
-            "[F2] Toggle All",
-            "[F3] ASCII",
-            "[F4] Glyphs",
-            "[F5] Placeholders",
-            "[a] Add",
-            "[e/ENTER] Edit",
-            "[t] Type",
-            "[SPACE] Toggle",
-            "[d] Delete",
-            "[m] Move Dn",
-            "[M] Move Up",
-            "[>] Indent",
-            "[<] Outdent",
-            "[s] Save",
-            "[ESC/q] Exit",
-        ];
+        let footer_items_outer = get_footer_items();
+        let all_labels: Vec<&str> = footer_items_outer
+            .iter()
+            .map(|(lbl, _)| lbl.as_str())
+            .collect();
         let avail_w = area.width.saturating_sub(4);
         let has_hidden = bashmenu_tui::has_hidden_gutter_text(&all_labels, avail_w as usize, 2);
 
@@ -853,15 +912,17 @@ fn main() -> Result<()> {
                                 ))));
                             }
                             ItemEditResult::ShowAscii => {
-                                *child_opt = Some(Box::new(ChildModal::AsciiPicker(
-                                    AsciiGridModal::new("ASCII Character Table", 196),
-                                )));
+                                *child_opt =
+                                    Some(Box::new(ChildModal::AsciiPicker(AsciiGridModal::new(
+                                        t!("common.dialogs.ascii_table_title"),
+                                        196,
+                                    ))));
                             }
                             ItemEditResult::ShowGlyphs => {
                                 *child_opt =
                                     Some(Box::new(ChildModal::GlyphSearch(InputModal::new(
-                                        "Search Nerd Font & Emoji",
-                                        "Enter glyph search term (e.g. arrow, folder, python):",
+                                        t!("common.dialogs.search_glyphs_title"),
+                                        t!("common.dialogs.search_glyphs_prompt"),
                                         "",
                                     ))));
                             }
@@ -1026,8 +1087,8 @@ fn main() -> Result<()> {
                                 if m.row == area.y && m.column >= area.x + area.width - 5 {
                                     if is_modified {
                                         active_modal = ActiveModal::ConfirmExit(ConfirmModal::new(
-                                            "Unsaved Changes",
-                                            "You have unsaved changes. Save before exiting?",
+                                            t!("common.dialogs.unsaved_changes_title"),
+                                            t!("common.dialogs.unsaved_changes_msg"),
                                         ));
                                     } else {
                                         break;
@@ -1056,16 +1117,19 @@ fn main() -> Result<()> {
                                             });
                                         }
                                         MenuEditFooterAction::Ascii => {
-                                            active_modal = ActiveModal::AsciiPicker(
-                                                AsciiGridModal::new("ASCII Character Table", 196),
-                                            );
+                                            active_modal =
+                                                ActiveModal::AsciiPicker(AsciiGridModal::new(
+                                                    t!("common.dialogs.ascii_table_title"),
+                                                    196,
+                                                ));
                                         }
                                         MenuEditFooterAction::Glyphs => {
-                                            active_modal = ActiveModal::GlyphSearch(InputModal::new(
-                                                "Search Nerd Font & Emoji",
-                                                "Enter glyph search term (e.g. arrow, folder, python):",
-                                                "",
-                                            ));
+                                            active_modal =
+                                                ActiveModal::GlyphSearch(InputModal::new(
+                                                    t!("common.dialogs.search_glyphs_title"),
+                                                    t!("common.dialogs.search_glyphs_prompt"),
+                                                    "",
+                                                ));
                                         }
                                         MenuEditFooterAction::Placeholders => {
                                             active_modal = ActiveModal::Help(HelpModal::new(
@@ -1115,10 +1179,10 @@ fn main() -> Result<()> {
                                             {
                                                 active_modal = ActiveModal::ConfirmDelete(
                                                     ConfirmModal::new(
-                                                        "Delete Item",
-                                                        format!(
-                                                            "Are you sure you want to delete '{}'?",
-                                                            node.item.label
+                                                        t!("menuedit.delete_item_title"),
+                                                        t!(
+                                                            "menuedit.delete_item_confirm",
+                                                            label => &node.item.label
                                                         ),
                                                     ),
                                                     node.path.clone(),
@@ -1243,8 +1307,8 @@ fn main() -> Result<()> {
                                             if is_modified {
                                                 active_modal =
                                                     ActiveModal::ConfirmExit(ConfirmModal::new(
-                                                        "Unsaved Changes",
-                                                        "You have unsaved changes. Save before exiting?",
+                                                        t!("common.dialogs.unsaved_changes_title"),
+                                                        t!("common.dialogs.unsaved_changes_msg"),
                                                     ));
                                             } else {
                                                 break;
@@ -1305,15 +1369,17 @@ fn main() -> Result<()> {
                                         continue;
                                     }
                                     KeyCode::Char('a') => {
-                                        active_modal = ActiveModal::AsciiPicker(
-                                            AsciiGridModal::new("ASCII Character Table", 196),
-                                        );
+                                        active_modal =
+                                            ActiveModal::AsciiPicker(AsciiGridModal::new(
+                                                t!("common.dialogs.ascii_table_title"),
+                                                196,
+                                            ));
                                         continue;
                                     }
                                     KeyCode::Char('n') => {
                                         active_modal = ActiveModal::GlyphSearch(InputModal::new(
-                                            "Search Nerd Font & Emoji",
-                                            "Enter glyph search term (e.g. arrow, folder, python):",
+                                            t!("common.dialogs.search_glyphs_title"),
+                                            t!("common.dialogs.search_glyphs_prompt"),
                                             "",
                                         ));
                                         continue;
@@ -1395,14 +1461,14 @@ fn main() -> Result<()> {
                                 }
                                 KeyCode::F(3) => {
                                     active_modal = ActiveModal::AsciiPicker(AsciiGridModal::new(
-                                        "ASCII Character Table",
+                                        t!("common.dialogs.ascii_table_title"),
                                         196,
                                     ));
                                 }
                                 KeyCode::F(4) => {
                                     active_modal = ActiveModal::GlyphSearch(InputModal::new(
-                                        "Search Nerd Font & Emoji",
-                                        "Enter glyph search term (e.g. arrow, folder, python):",
+                                        t!("common.dialogs.search_glyphs_title"),
+                                        t!("common.dialogs.search_glyphs_prompt"),
                                         "",
                                     ));
                                 }
@@ -1439,10 +1505,10 @@ fn main() -> Result<()> {
                                     if let Some(node) = visible_nodes.get(selected_node_idx) {
                                         active_modal = ActiveModal::ConfirmDelete(
                                             ConfirmModal::new(
-                                                "Delete Item",
-                                                format!(
-                                                    "Are you sure you want to delete '{}'?",
-                                                    node.item.label
+                                                t!("menuedit.delete_item_title"),
+                                                t!(
+                                                    "menuedit.delete_item_confirm",
+                                                    label => &node.item.label
                                                 ),
                                             ),
                                             node.path.clone(),
@@ -1552,8 +1618,8 @@ fn main() -> Result<()> {
                                 KeyCode::Esc | KeyCode::Char('q') => {
                                     if is_modified {
                                         active_modal = ActiveModal::ConfirmExit(ConfirmModal::new(
-                                            "Unsaved Changes",
-                                            "You have unsaved changes. Save before exiting?",
+                                            t!("common.dialogs.unsaved_changes_title"),
+                                            t!("common.dialogs.unsaved_changes_msg"),
                                         ));
                                     } else {
                                         break;

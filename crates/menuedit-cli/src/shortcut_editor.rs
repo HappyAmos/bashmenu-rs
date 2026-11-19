@@ -3,7 +3,7 @@
 use anyhow::Result;
 use bashmenu_core::{
     interpolate_placeholders, load_config, load_shortcuts, load_themes, normalize_key_spec,
-    resolve_app_path, save_shortcuts, validate_key_spec, BashMenuConfig, ExecutionMode,
+    resolve_app_path, save_shortcuts, t, validate_key_spec, BashMenuConfig, ExecutionMode,
     MacroContext, MenuItemType, ShortcutEntry, ShortcutsConfig, ToastNotification,
     PLACEHOLDER_HELP_TEXT,
 };
@@ -2236,10 +2236,11 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                             if let Some(entry) = state.selected_entry() {
                                 active_modal =
                                     ActiveShortcutModal::ConfirmDelete(ConfirmModal::new(
-                                        "Delete Shortcut",
-                                        format!(
-                                            "Delete shortcut '{}' ({})?",
-                                            entry.description, entry.key
+                                        t!("menuedit.delete_shortcut_title"),
+                                        t!(
+                                            "menuedit.delete_shortcut_confirm",
+                                            desc => &entry.description,
+                                            key => &entry.key
                                         ),
                                     ));
                             }
@@ -2283,8 +2284,8 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                         KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q') => {
                             if state.dirty {
                                 active_modal = ActiveShortcutModal::ConfirmExit(ConfirmModal::new(
-                                    "Unsaved Changes",
-                                    "Discard unsaved shortcut changes and exit?",
+                                    t!("common.dialogs.unsaved_changes_title"),
+                                    t!("common.dialogs.discard_exit_msg"),
                                 ));
                             } else {
                                 break;

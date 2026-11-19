@@ -1992,3 +1992,25 @@ fn test_menuedit_marquee_overflow_on_tree_and_inspector() {
     let s1 = get_marquee_slice(label, avail_for_label, tracker.offset, "•", 3);
     assert_ne!(s0, s1);
 }
+
+#[test]
+fn test_menuedit_cli_locale_flag() {
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_menuedit"))
+        .arg("--help")
+        .output()
+        .expect("failed to execute menuedit --help");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("--locale"));
+}
+
+#[test]
+fn test_shortcutedit_cli_locale_flag() {
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_shortcutedit"))
+        .arg("--help")
+        .output()
+        .expect("failed to execute shortcutedit --help");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("--locale"));
+}

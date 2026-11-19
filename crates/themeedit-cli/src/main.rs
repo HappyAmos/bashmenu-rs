@@ -5,7 +5,7 @@
 //! Main Menu, Text Editor, Popup Windows, and Visual Menu Editor.
 
 use anyhow::Result;
-use bashmenu_core::{run_glyphs_search, ToastNotification, ToastSeverity, ToastStyle};
+use bashmenu_core::{run_glyphs_search, t, ToastNotification, ToastSeverity, ToastStyle};
 use bashmenu_tui::{
     get_marquee_slice, install_panic_hook, AsciiGridModal, BackgroundConfigAction,
     BackgroundConfigModal, BackgroundFocus, ColorPickerModal, ConfirmModal, FilePickerModal,
@@ -46,6 +46,10 @@ struct Cli {
     /// Load and save theme files in current working directory
     #[arg(long)]
     local: bool,
+
+    /// Override interface display locale
+    #[arg(short = 'L', long = "locale")]
+    locale: Option<String>,
 }
 
 /// Resolves the file path for `bashmenu.themes`.
@@ -119,10 +123,11 @@ fn trigger_derive_colors(
                 .unwrap_or(&img_str)
                 .to_string();
             *active_modal = ActiveModal::ConfirmDerive(ConfirmModal::new(
-                "Derive Theme Colors",
-                format!(
-                    "Deriving colors from wallpaper '{}' will overwrite current color settings for theme '{}'. Proceed?",
-                    fname, state.current_name
+                t!("themeedit.derive_colors_title"),
+                t!(
+                    "themeedit.derive_colors_confirm",
+                    file => &fname,
+                    theme => &state.current_name
                 ),
             ));
         } else {
@@ -143,11 +148,45 @@ fn trigger_derive_colors(
     }
 }
 
+fn get_bottom_items() -> [String; 10] {
+    [
+        format!("[F5] {}", t!("themeedit.gutter_derive")),
+        format!("[F6] {}", t!("themeedit.gutter_new")),
+        format!("[F7] {}", t!("themeedit.gutter_rename")),
+        format!("[F8] {}", t!("themeedit.gutter_del")),
+        format!("[Ctrl+S] {}", t!("common.buttons.save")),
+        format!("[Ctrl+A] {}", t!("common.buttons.save_as")),
+        format!("[Ctrl+P] {}", t!("themeedit.gutter_glyphs")),
+        format!("[TAB] {}", t!("themeedit.gutter_view")),
+        format!("[R-Click] {}", t!("themeedit.gutter_dropper")),
+        format!("[q] {}", t!("common.gutters.quit")),
+    ]
+}
+
 /// Entry point for the theme editor TUI application (`themeedit`).
 fn main() -> Result<()> {
     install_panic_hook();
 
     let cli = Cli::parse();
+    let cfg_path = if cli.local {
+        PathBuf::from("./bashmenu.yml")
+    } else {
+        bashmenu_core::resolve_app_path(Path::new("bashmenu.yml"))
+    };
+    let cfg = bashmenu_core::load_config(&cfg_path).ok();
+    let locale_target = cli
+        .locale
+        .clone()
+        .or_else(|| cfg.as_ref().and_then(|c| c.settings.locale.clone()))
+        .or_else(|| std::env::var("LC_ALL").ok())
+        .or_else(|| std::env::var("LC_MESSAGES").ok())
+        .or_else(|| std::env::var("LANG").ok());
+
+    if let Some(ref loc) = locale_target {
+        let clean_loc = loc.split('.').next().unwrap_or(loc);
+        let _ = bashmenu_core::set_locale(clean_loc);
+    }
+
     let themes_path = if let Some(ref f) = cli.file {
         resolve_themes_path(f, cli.local)
     } else if cli.local {
@@ -174,11 +213,7 @@ fn main() -> Result<()> {
     let mut toast_rack = ToastRack::new();
     let mut is_editing_name = false;
     let mut preview_buffer = Buffer::empty(Rect::default());
-    let cfg_path = bashmenu_core::resolve_app_path(Path::new("bashmenu.yml"));
-    let delay_secs = bashmenu_core::load_config(&cfg_path)
-        .ok()
-        .map(|c| c.help_gutter_delay())
-        .unwrap_or(4.0);
+    let delay_secs = cfg.as_ref().map(|c| c.help_gutter_delay()).unwrap_or(4.0);
     let mut footer_hover = bashmenu_tui::HelpGutterHover::with_duration(
         std::time::Duration::from_secs_f64(delay_secs.max(0.0)),
     );
@@ -229,20 +264,11 @@ fn main() -> Result<()> {
 
                 // Split into Left Panel (Tokens) and Right Panel (Live Preview)
                 // Reserve bottom rows for gutter divider and gutter help bar
-                let bottom_items = [
-                    "[F5] Derive",
-                    "[F6] New",
-                    "[F7] Rename",
-                    "[F8] Del",
-                    "[Ctrl+S] Save",
-                    "[Ctrl+A] Save As",
-                    "[Ctrl+P] Glyphs",
-                    "[TAB] View",
-                    "[q] Exit",
-                ];
+                let bottom_items = get_bottom_items();
+                let bottom_items_str: Vec<&str> = bottom_items.iter().map(|s| s.as_str()).collect();
                 let bottom_avail_w = area.width.saturating_sub(4) as usize;
                 let has_hidden =
-                    bashmenu_tui::has_hidden_gutter_text(&bottom_items, bottom_avail_w, 1);
+                    bashmenu_tui::has_hidden_gutter_text(&bottom_items_str, bottom_avail_w, 1);
                 let is_expanded = footer_hover.is_expanded() && has_hidden && area.height >= 12;
                 let footer_rows: u16 = if is_expanded { 2 } else { 1 };
 
@@ -439,7 +465,7 @@ fn main() -> Result<()> {
 
                 if is_expanded {
                     let lines =
-                        bashmenu_tui::wrap_spread_help_gutter(&bottom_items, bottom_avail_w, 2);
+                        bashmenu_tui::wrap_spread_help_gutter(&bottom_items_str, bottom_avail_w, 2);
                     for (r_idx, line) in lines.iter().enumerate() {
                         let y = footer_y.saturating_sub((lines.len() - 1 - r_idx) as u16);
                         buf.set_string(area.x, y, &b.border_vertical_left, border_style);
@@ -466,7 +492,7 @@ fn main() -> Result<()> {
                         border_style,
                     );
                     let bottom_spread =
-                        bashmenu_tui::format_spread_gutter_line(&bottom_items, bottom_avail_w);
+                        bashmenu_tui::format_spread_gutter_line(&bottom_items_str, bottom_avail_w);
                     buf.set_string(
                         area.x + 2,
                         footer_y,
@@ -553,20 +579,10 @@ fn main() -> Result<()> {
             Duration::from_millis(50)
         };
 
-        let bottom_items = [
-            "[F5] Derive",
-            "[F6] New",
-            "[F7] Rename",
-            "[F8] Del",
-            "[Ctrl+S] Save",
-            "[Ctrl+A] Save As",
-            "[Ctrl+P] Glyphs",
-            "[TAB] View",
-            "[R-Click] Dropper",
-            "[q] Exit",
-        ];
+        let bottom_items = get_bottom_items();
+        let bottom_items_str: Vec<&str> = bottom_items.iter().map(|s| s.as_str()).collect();
         let bottom_avail_w = area.width.saturating_sub(4) as usize;
-        let has_hidden = bashmenu_tui::has_hidden_gutter_text(&bottom_items, bottom_avail_w, 1);
+        let has_hidden = bashmenu_tui::has_hidden_gutter_text(&bottom_items_str, bottom_avail_w, 1);
 
         if event::poll(poll_dur)? {
             let ev = event::read()?;
@@ -653,8 +669,8 @@ fn main() -> Result<()> {
                             && (k.code == KeyCode::Char('p') || k.code == KeyCode::Char('P'))
                         {
                             active_modal = ActiveModal::GlyphSearch(InputModal::new(
-                                "Search Nerd Font & Emoji",
-                                "Enter glyph search term (e.g. arrow, folder, python):",
+                                t!("common.dialogs.search_glyphs_title"),
+                                t!("common.dialogs.search_glyphs_prompt"),
                                 "",
                             ));
                             continue;
@@ -700,8 +716,8 @@ fn main() -> Result<()> {
                             && (k.code == KeyCode::Char('p') || k.code == KeyCode::Char('P'))
                         {
                             active_modal = ActiveModal::GlyphSearch(InputModal::new(
-                                "Search Nerd Font & Emoji",
-                                "Enter glyph search term (e.g. arrow, folder, python):",
+                                t!("common.dialogs.search_glyphs_title"),
+                                t!("common.dialogs.search_glyphs_prompt"),
                                 "",
                             ));
                             continue;
@@ -1035,8 +1051,11 @@ fn main() -> Result<()> {
                             } else {
                                 default_wallpaper_dir()
                             };
-                            let file_picker =
-                                FilePickerModal::new("Choose Wallpaper Image", &start_dir, false);
+                            let file_picker = FilePickerModal::new(
+                                t!("themeedit.choose_wallpaper_title"),
+                                &start_dir,
+                                false,
+                            );
                             active_modal =
                                 ActiveModal::BackgroundBrowse(Box::new(modal.clone()), file_picker);
                         }
@@ -1163,8 +1182,8 @@ fn main() -> Result<()> {
                                 if m.row == area.y && m.column >= area.x + area.width - 5 {
                                     if state.is_modified {
                                         active_modal = ActiveModal::ConfirmExit(ConfirmModal::new(
-                                            "Unsaved Changes",
-                                            "Discard unsaved changes and exit?",
+                                            t!("common.dialogs.unsaved_changes_title"),
+                                            t!("common.dialogs.discard_exit_msg"),
                                         ));
                                     } else {
                                         break;
@@ -1331,15 +1350,15 @@ fn main() -> Result<()> {
                                     let rel_col = (m.column - (area.x + 2)) as usize;
                                     let bottom_avail_w = area.width.saturating_sub(4) as usize;
                                     let (_, ranges) = bashmenu_tui::spread_gutter_line_layout(
-                                        &bottom_items,
+                                        &bottom_items_str,
                                         bottom_avail_w,
                                     );
                                     if let Some(idx) = ranges
                                         .iter()
                                         .position(|&(s, e)| rel_col >= s && rel_col < e)
                                     {
-                                        if let Some(item_str) = bottom_items.get(idx) {
-                                            if item_str.contains("Derive") {
+                                        if let Some(item_str) = bottom_items_str.get(idx) {
+                                            if item_str.contains("[F5]") {
                                                 // [F5] Derive
                                                 trigger_derive_colors(
                                                     &state,
@@ -1347,12 +1366,13 @@ fn main() -> Result<()> {
                                                     &mut toast_rack,
                                                 );
                                                 continue;
-                                            } else if item_str.contains("Glyphs") {
-                                                active_modal = ActiveModal::GlyphSearch(InputModal::new(
-                                                    "Search Nerd Font & Emoji",
-                                                    "Enter glyph search term (e.g. arrow, folder, python):",
-                                                    "",
-                                                ));
+                                            } else if item_str.contains("[Ctrl+P]") {
+                                                active_modal =
+                                                    ActiveModal::GlyphSearch(InputModal::new(
+                                                        t!("common.dialogs.search_glyphs_title"),
+                                                        t!("common.dialogs.search_glyphs_prompt"),
+                                                        "",
+                                                    ));
                                                 continue;
                                             }
                                         }
@@ -1479,8 +1499,8 @@ fn main() -> Result<()> {
                                             || state.current_name == "untitled"
                                         {
                                             active_modal = ActiveModal::SaveAs(InputModal::new(
-                                                "Save Theme As",
-                                                "Enter theme name:",
+                                                t!("themeedit.save_as_title"),
+                                                t!("themeedit.save_as_prompt"),
                                                 &state.current_name,
                                             ));
                                         } else {
@@ -1514,8 +1534,8 @@ fn main() -> Result<()> {
                                     KeyCode::Char('a') => {
                                         // Ctrl+A opens Save As dialog
                                         active_modal = ActiveModal::SaveAs(InputModal::new(
-                                            "Save Theme As",
-                                            "Enter new theme name:",
+                                            t!("themeedit.save_as_title"),
+                                            t!("themeedit.new_theme_prompt"),
                                             &state.current_name,
                                         ));
                                         continue;
@@ -1523,8 +1543,8 @@ fn main() -> Result<()> {
                                     KeyCode::Char('n') => {
                                         // Ctrl+N creates new theme with base monochrome theme
                                         active_modal = ActiveModal::NewTheme(InputModal::new(
-                                            "Create New Theme",
-                                            "Enter new theme name:",
+                                            t!("themeedit.new_theme_title"),
+                                            t!("themeedit.new_theme_prompt"),
                                             "",
                                         ));
                                         continue;
@@ -1547,8 +1567,8 @@ fn main() -> Result<()> {
                                     KeyCode::Char('p') | KeyCode::Char('P') => {
                                         // Ctrl+P opens Nerd Font / Emoji glyph search tool
                                         active_modal = ActiveModal::GlyphSearch(InputModal::new(
-                                            "Search Nerd Font & Emoji",
-                                            "Enter glyph search term (e.g. arrow, folder, python):",
+                                            t!("common.dialogs.search_glyphs_title"),
+                                            t!("common.dialogs.search_glyphs_prompt"),
                                             "",
                                         ));
                                         continue;
@@ -1569,8 +1589,8 @@ fn main() -> Result<()> {
                                 KeyCode::F(6) => {
                                     // F6 creates new theme
                                     active_modal = ActiveModal::NewTheme(InputModal::new(
-                                        "Create New Theme",
-                                        "Enter new theme name:",
+                                        t!("themeedit.new_theme_title"),
+                                        t!("themeedit.new_theme_prompt"),
                                         "",
                                     ));
                                 }
@@ -1591,10 +1611,10 @@ fn main() -> Result<()> {
                                 KeyCode::F(8) => {
                                     // F8 deletes current theme with confirmation
                                     active_modal = ActiveModal::ConfirmDelete(ConfirmModal::new(
-                                        "Delete Theme",
-                                        format!(
-                                            "Are you sure you want to delete theme '{}'?",
-                                            state.current_name
+                                        t!("themeedit.delete_theme_title"),
+                                        t!(
+                                            "themeedit.delete_theme_confirm",
+                                            theme => &state.current_name
                                         ),
                                     ));
                                 }
@@ -1808,10 +1828,10 @@ fn main() -> Result<()> {
                                     } else {
                                         active_modal =
                                             ActiveModal::ConfirmDelete(ConfirmModal::new(
-                                                "Delete Theme",
-                                                format!(
-                                                    "Are you sure you want to delete theme '{}'?",
-                                                    state.current_name
+                                                t!("themeedit.delete_theme_title"),
+                                                t!(
+                                                    "themeedit.delete_theme_confirm",
+                                                    theme => &state.current_name
                                                 ),
                                             ));
                                     }
@@ -1853,8 +1873,8 @@ fn main() -> Result<()> {
                                 KeyCode::Esc | KeyCode::Char('q') => {
                                     if state.is_modified {
                                         active_modal = ActiveModal::ConfirmExit(ConfirmModal::new(
-                                            "Unsaved Changes",
-                                            "Discard unsaved changes and exit?",
+                                            t!("common.dialogs.unsaved_changes_title"),
+                                            t!("common.dialogs.discard_exit_msg"),
                                         ));
                                     } else {
                                         break;
@@ -1939,29 +1959,31 @@ fn open_selected_token_picker(state: &mut ThemeEditorState, active_modal: &mut A
             );
         }
         TokenKind::Border(key) => {
-            *active_modal =
-                ActiveModal::AsciiPicker(key, AsciiGridModal::new("Pick CP437 Border Char", 196));
+            *active_modal = ActiveModal::AsciiPicker(
+                key,
+                AsciiGridModal::new(t!("themeedit.border_char_title"), 196),
+            );
         }
         TokenKind::Indicator => {
             let current_val = state.current_theme.indicator.as_deref().unwrap_or("> ");
             *active_modal = ActiveModal::IndicatorInput(InputModal::new(
-                "Configure Indicator",
-                "Enter indicator symbol (e.g. '> ', '▶ ', '{ascii:240}', '{nf:...}'):",
+                t!("themeedit.config_indicator_title"),
+                t!("themeedit.config_indicator_prompt"),
                 current_val,
             ));
         }
         TokenKind::DefaultIcon => {
             let current_val = state.current_theme.resolved_default_icon();
             *active_modal = ActiveModal::DefaultIconInput(InputModal::new(
-                "Configure Default Icon",
-                "Enter default menu item icon (e.g. '{nf:>:#f105}'):",
+                t!("themeedit.config_icon_title"),
+                t!("themeedit.config_icon_prompt"),
                 current_val,
             ));
         }
         TokenKind::DividerChar => {
             *active_modal = ActiveModal::AsciiPicker(
                 "divider_char".to_string(),
-                AsciiGridModal::new("Pick CP437 Divider Char", 196),
+                AsciiGridModal::new(t!("themeedit.divider_char_title"), 196),
             );
         }
         TokenKind::DividerLength => {
@@ -1970,7 +1992,7 @@ fn open_selected_token_picker(state: &mut ThemeEditorState, active_modal: &mut A
         TokenKind::MarqueeChar => {
             *active_modal = ActiveModal::AsciiPicker(
                 "marquee_char".to_string(),
-                AsciiGridModal::new("Pick CP437 Marquee Char", 7),
+                AsciiGridModal::new(t!("themeedit.marquee_char_title"), 7),
             );
         }
         TokenKind::MarqueeGap => {
@@ -1982,7 +2004,7 @@ fn open_selected_token_picker(state: &mut ThemeEditorState, active_modal: &mut A
         TokenKind::ToastChar => {
             *active_modal = ActiveModal::AsciiPicker(
                 "toast_char".to_string(),
-                AsciiGridModal::new("Pick Toast Left Bar Glyph", 221),
+                AsciiGridModal::new(t!("themeedit.toast_char_title"), 221),
             );
         }
     }

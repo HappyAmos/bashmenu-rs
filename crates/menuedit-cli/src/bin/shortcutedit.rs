@@ -23,12 +23,36 @@ struct Cli {
     /// Load and save shortcuts.yml in the current working directory
     #[arg(long)]
     local: bool,
+
+    /// Override interface display locale
+    #[arg(short = 'L', long = "locale")]
+    locale: Option<String>,
 }
 
 /// CLI entry point for the standalone keyboard shortcuts editor (`shortcutedit`).
 fn main() -> Result<()> {
     install_panic_hook();
     let cli = Cli::parse();
+
+    let cfg_path = if cli.local {
+        PathBuf::from("./bashmenu.yml")
+    } else {
+        bashmenu_core::resolve_app_path("bashmenu.yml")
+    };
+    let cfg = bashmenu_core::load_config(&cfg_path).ok();
+
+    let locale_target = cli
+        .locale
+        .clone()
+        .or_else(|| cfg.as_ref().and_then(|c| c.settings.locale.clone()))
+        .or_else(|| std::env::var("LC_ALL").ok())
+        .or_else(|| std::env::var("LC_MESSAGES").ok())
+        .or_else(|| std::env::var("LANG").ok());
+
+    if let Some(ref loc) = locale_target {
+        let clean_loc = loc.split('.').next().unwrap_or(loc);
+        let _ = bashmenu_core::set_locale(clean_loc);
+    }
 
     let shortcuts_path = if let Some(ref f) = cli.file {
         if cli.local && !f.is_absolute() {

@@ -2919,3 +2919,14 @@ fn test_themeedit_random_theme_resolution_and_reservation() {
     assert!(state.save_as_theme("[Random]").is_err());
     assert_eq!(state.current_name, "dracula");
 }
+
+#[test]
+fn test_themeedit_cli_locale_flag() {
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_themeedit"))
+        .arg("--help")
+        .output()
+        .expect("failed to execute themeedit --help");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("--locale"));
+}

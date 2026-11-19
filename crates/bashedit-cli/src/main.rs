@@ -242,7 +242,8 @@ fn make_save_as_modal(tab: &EditorBuffer) -> FilePickerModal {
         .and_then(|p| p.parent())
         .map(|p| p.to_path_buf())
         .unwrap_or(home_dir);
-    let mut picker = FilePickerModal::new("Save File As", &start_dir, false).with_save_as(true);
+    let mut picker = FilePickerModal::new(t!("common.dialogs.save_as_title"), &start_dir, false)
+        .with_save_as(true);
     if let Some(ref path) = tab.file_path {
         picker = picker.with_initial_selection(path);
         if let Some(fname) = path.file_name().and_then(|s| s.to_str()) {
@@ -861,14 +862,16 @@ fn main() -> Result<()> {
                         }
                         KeyCode::F(3) => {
                             active_modal = ActiveModal::AsciiTable(AsciiGridModal::new(
-                                "ASCII Character Table",
+                                t!("common.dialogs.ascii_table_title"),
                                 65,
                             ));
                             continue;
                         }
                         KeyCode::F(4) => {
-                            active_modal =
-                                ActiveModal::ViewColors(ColorGridModal::new("Terminal Colors", 7));
+                            active_modal = ActiveModal::ViewColors(ColorGridModal::new(
+                                t!("common.dialogs.color_grid_title"),
+                                7,
+                            ));
                             continue;
                         }
                         KeyCode::F(5) => {
@@ -1387,14 +1390,18 @@ fn main() -> Result<()> {
                                         );
                                     }
                                     FooterAction::AsciiTable => {
-                                        active_modal = ActiveModal::AsciiTable(
-                                            AsciiGridModal::new("ASCII Character Table", 65),
-                                        );
+                                        active_modal =
+                                            ActiveModal::AsciiTable(AsciiGridModal::new(
+                                                t!("common.dialogs.ascii_table_title"),
+                                                65,
+                                            ));
                                     }
                                     FooterAction::ViewColors => {
-                                        active_modal = ActiveModal::ViewColors(
-                                            ColorGridModal::new("Terminal Colors", 7),
-                                        );
+                                        active_modal =
+                                            ActiveModal::ViewColors(ColorGridModal::new(
+                                                t!("common.dialogs.color_grid_title"),
+                                                7,
+                                            ));
                                     }
                                     FooterAction::PlaceholdersHelp => {
                                         active_modal =
