@@ -24,65 +24,76 @@ echo "==================================================================="
 echo "              Installing BashMenu-RS System                        "
 echo "==================================================================="
 
-# Verify Cargo toolchain
-if ! command -v cargo >/dev/null 2>&1; then
-    echo "  [!] Cargo/Rust toolchain is not detected on your system."
-    OS_NAME="$(uname -s 2>/dev/null || echo "Unknown")"
+# Check for pre-built binaries (e.g. from GitHub release bundle or prior build)
+HAS_PREBUILT=true
+for bin in bashmenu ymlcheck menuedit shortcutedit themeedit bashedit bmpager cheat; do
+    if [ ! -f "$SCRIPT_DIR/bin/$bin" ] && [ ! -f "$SCRIPT_DIR/target/release/$bin" ]; then
+        HAS_PREBUILT=false
+        break
+    fi
+done
 
-    # Interactive prompt if connected to terminal
-    if [ -t 0 ]; then
-        printf "  [?] Would you like to install Rust now? [y/N]: "
-        read -r reply
-        case "$reply" in
-            [yY]|[yY][eE][sS])
-                echo "==> Installing Rust toolchain..."
-                case "$OS_NAME" in
-                    OpenBSD)
-                        if [ "$(id -u)" = "0" ]; then
-                            pkg_add rust
-                        elif command -v doas >/dev/null 2>&1; then
-                            doas pkg_add rust
-                        else
-                            echo "Error: Root or doas privileges required to run 'pkg_add rust'." >&2
-                            exit 1
-                        fi
-                        ;;
-                    *)
-                        if command -v curl >/dev/null 2>&1; then
-                            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-                        elif command -v wget >/dev/null 2>&1; then
-                            wget --https-only -qO- https://sh.rustup.rs | sh -s -- -y
-                        else
-                            echo "Error: Neither curl nor wget was found. Please install curl or wget first." >&2
-                            exit 1
-                        fi
-                        ;;
-                esac
+# If pre-built binaries are not present, verify Cargo toolchain
+if [ "$HAS_PREBUILT" = "false" ]; then
+    if ! command -v cargo >/dev/null 2>&1; then
+        echo "  [!] Cargo/Rust toolchain is not detected on your system."
+        OS_NAME="$(uname -s 2>/dev/null || echo "Unknown")"
 
-                # Source cargo environment immediately for this session
-                if [ -f "$HOME/.cargo/env" ]; then
-                    # shellcheck disable=SC1091
-                    . "$HOME/.cargo/env"
-                fi
-                export PATH="$HOME/.cargo/bin:$PATH"
-                ;;
-            *)
-                echo "Aborting installation. Rust is required to build BashMenu." >&2
-                exit 1
-                ;;
-        esac
-    else
-        echo "Error: Cargo is required to compile BashMenu, but is not installed." >&2
-        echo "Install Rust via https://rustup.rs (or 'pkg_add rust' on OpenBSD)." >&2
+        # Interactive prompt if connected to terminal
+        if [ -t 0 ]; then
+            printf "  [?] Would you like to install Rust now? [y/N]: "
+            read -r reply
+            case "$reply" in
+                [yY]|[yY][eE][sS])
+                    echo "==> Installing Rust toolchain..."
+                    case "$OS_NAME" in
+                        OpenBSD)
+                            if [ "$(id -u)" = "0" ]; then
+                                pkg_add rust
+                            elif command -v doas >/dev/null 2>&1; then
+                                doas pkg_add rust
+                            else
+                                echo "Error: Root or doas privileges required to run 'pkg_add rust'." >&2
+                                exit 1
+                            fi
+                            ;;
+                        *)
+                            if command -v curl >/dev/null 2>&1; then
+                                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+                            elif command -v wget >/dev/null 2>&1; then
+                                wget --https-only -qO- https://sh.rustup.rs | sh -s -- -y
+                            else
+                                echo "Error: Neither curl nor wget was found. Please install curl or wget first." >&2
+                                exit 1
+                            fi
+                            ;;
+                    esac
+
+                    # Source cargo environment immediately for this session
+                    if [ -f "$HOME/.cargo/env" ]; then
+                        # shellcheck disable=SC1091
+                        . "$HOME/.cargo/env"
+                    fi
+                    export PATH="$HOME/.cargo/bin:$PATH"
+                    ;;
+                *)
+                    echo "Aborting installation. Rust is required to build BashMenu." >&2
+                    exit 1
+                    ;;
+            esac
+        else
+            echo "Error: Cargo is required to compile BashMenu, but is not installed." >&2
+            echo "Install Rust via https://rustup.rs (or 'pkg_add rust' on OpenBSD)." >&2
+            exit 1
+        fi
+    fi
+
+    # Final check for cargo
+    if ! command -v cargo >/dev/null 2>&1; then
+        echo "Error: Cargo is required to compile BashMenu, but was not found in PATH." >&2
+        echo "Please ensure '$HOME/.cargo/bin' is in your PATH and rerun ./install.sh" >&2
         exit 1
     fi
-fi
-
-# Final check for cargo
-if ! command -v cargo >/dev/null 2>&1; then
-    echo "Error: Cargo is required to compile BashMenu, but was not found in PATH." >&2
-    echo "Please ensure '$HOME/.cargo/bin' is in your PATH and rerun ./install.sh" >&2
-    exit 1
 fi
 
 # Determine target binary directory
@@ -94,19 +105,27 @@ elif [ "$(id -u)" = "0" ]; then
 fi
 mkdir -p "$BIN_DIR"
 
-echo "==> Building all release binaries (workspace)..."
-(cd "$SCRIPT_DIR" && cargo build --release --workspace)
+if [ "$HAS_PREBUILT" = "true" ]; then
+    echo "==> Using pre-built binaries (skipping compilation)..."
+else
+    echo "==> Building all release binaries (workspace)..."
+    (cd "$SCRIPT_DIR" && cargo build --release --workspace)
+fi
 
 echo "==> Installing binaries to $BIN_DIR..."
 for bin in bashmenu ymlcheck menuedit shortcutedit themeedit bashedit bmpager cheat; do
-    src="$SCRIPT_DIR/target/release/$bin"
+    if [ -f "$SCRIPT_DIR/bin/$bin" ]; then
+        src="$SCRIPT_DIR/bin/$bin"
+    else
+        src="$SCRIPT_DIR/target/release/$bin"
+    fi
     if [ -f "$src" ]; then
         rm -f "$BIN_DIR/$bin"
         cp -f "$src" "$BIN_DIR/$bin"
         chmod +x "$BIN_DIR/$bin"
         echo "  [+] Installed $bin -> $BIN_DIR/$bin"
     else
-        echo "  [!] Warning: Binary $bin not found in target/release" >&2
+        echo "  [!] Warning: Binary $bin not found in bin/ or target/release/" >&2
     fi
 done
 

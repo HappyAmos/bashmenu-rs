@@ -1,3 +1,31 @@
+## Strict --repo and --local Configuration & Notebook Path Isolation
+- [x] Enforced strict path isolation in `crates/bashmenu-core/src/macro_engine.rs` with `repo_mode` and `local_mode` flags on `MacroContext`.
+- [x] Fixed `resolve_notebook_path` in `crates/bashmenu-core/src/notebook.rs` to never query, probe, or return user configuration directory (`~/.config/bashmenu`) when running with `--repo` or `--local`.
+- [x] Updated `{notebooks_dir}` macro placeholder to dynamically resolve to `{bashmenu_dir}` when `notebooks/` is absent and `notes.yml` exists at the root.
+- [x] Fixed `resolve_shortcuts_path` in `crates/bashmenu-core/src/shortcuts.rs` to strictly stay in the current working directory when `local_override` is true.
+- [x] Handled 0-byte and whitespace notebook files in `load_notebook` without failing on serde EOF.
+- [x] Populated repository root `notes.yml` with a comprehensive sample notebook including Welcome, Shortcuts, and Roadmap notes.
+- [x] Added unit tests in `bashmenu-core` and integration test `test_repo_mode_notebook_isolation` in `bashmenu-cli`.
+
+## Automated GitHub Release Binaries Workflow
+- [x] Created `.github/workflows/release.yml` with multi-architecture compilation matrix (`x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-gnu`).
+- [x] Implemented tarball packaging (`bashmenu-<target>.tar.gz`) containing all workspace binaries (`bashmenu`, `ymlcheck`, `menuedit`, `shortcutedit`, `themeedit`, `bashedit`, `bmpager`, `cheat`), assets, wallpapers, docs, templates, locales, and installer scripts.
+- [x] Configured automated SHA256 checksum generation (`SHA256SUMS.txt`) and release asset publishing via `softprops/action-gh-release@v2`.
+- [x] Updated `install.sh` to seamlessly detect and install pre-compiled release binaries without requiring a Cargo toolchain on end-user machines.
+
+## Locale Auto-Discovery & Dynamic Menu Switcher
+- [x] Implemented `discover_locales() -> Vec<LocaleInfo>` in `crates/bashmenu-core/src/i18n.rs` scanning `$BASHMENU_DIR/locales/`, `~/.config/bashmenu/locales/`, `/usr/share/bashmenu/locales/`, and repository root `locales/`.
+- [x] Enhanced `set_locale("auto")` to detect system environment (`LC_ALL` > `LC_MESSAGES` > `LANG`) and fallback cleanly to built-in `en_US`.
+- [x] Added `build_locale_radio_options()` in `crates/bashmenu-cli/src/main.rs` dynamically assembling options from discovered locale files.
+- [x] Added `Language / Locale [{settings.locale}]` radio modal under `Options & Settings -> Bashmenu Settings` in `bashmenu.mnu` and default `locale: auto` in `bashmenu.yml`.
+- [x] Added `{locale}` macro placeholder and `{settings.locale}` fallback in `macro_engine.rs`.
+- [x] Synchronized documentation in `bashmenu.md`, `bashmenu.1`, and `PLACEHOLDER_HELP_TEXT`. Added unit and audit tests.
+
+## Translation Quick-Start Guide (TRANSLATIONS.md)
+- [x] Created `TRANSLATIONS.md` providing step-by-step guidance for community translators with zero programming knowledge.
+- [x] Detailed copying canonical template (`en_us.yml`), translating values, preserving dynamic placeholders and glyph macros, live testing with `--locale <file>`, and automated validation via `ymlcheck -l`.
+- [x] Cross-referenced guide in `README.md`, `CONTRIBUTING.md`, and `.github/ISSUE_TEMPLATE/translation_request.yml`.
+
 ## Dedicated "New Language Translation" GitHub Issue Template
 - [x] Created GitHub Issue Form `.github/ISSUE_TEMPLATE/translation_request.yml` targeting community translators.
 - [x] Added structured fields for contributor role/intent (volunteer, ready PR, request), ISO target language/code, translation checklist, and cultural notes.

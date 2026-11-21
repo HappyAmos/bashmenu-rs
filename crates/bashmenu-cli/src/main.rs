@@ -500,9 +500,20 @@ fn main() -> Result<()> {
     };
 
     // 4. Macro Context & Status Gutter
+    let active_bashmenu_dir = if let Some(ref rdir) = repo_dir {
+        rdir.clone()
+    } else if cli.local {
+        std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+    } else {
+        bashmenu_core::get_user_config_dir()
+    };
+
     macro_rules! make_macro_ctx {
         ($cfg:expr) => {
             MacroContext::new($cfg)
+                .with_bashmenu_dir(active_bashmenu_dir.clone())
+                .with_repo_mode(cli.repo)
+                .with_local_mode(cli.local)
                 .with_paths(
                     config_path.clone(),
                     menu_path.clone(),

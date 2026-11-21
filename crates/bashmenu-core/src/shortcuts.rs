@@ -562,7 +562,7 @@ pub fn validate_key_spec(raw: &str, is_leader_def: bool) -> std::result::Result<
 /// Resolves the active `shortcuts.yml` path following the Single Source of Truth hierarchy.
 pub fn resolve_shortcuts_path(local_override: bool) -> PathBuf {
     let filename = Path::new("shortcuts.yml");
-    if local_override && filename.exists() {
+    if local_override {
         return filename.to_path_buf();
     }
     let user_cfg = get_user_config_dir();

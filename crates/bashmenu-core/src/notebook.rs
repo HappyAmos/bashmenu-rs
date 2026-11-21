@@ -70,7 +70,10 @@ pub fn resolve_notebook_path(raw_path: Option<&str>, ctx: &MacroContext) -> Path
             if root_nb.exists() {
                 return root_nb;
             }
-            return default_nb;
+            if notebooks_dir.exists() {
+                return default_nb;
+            }
+            return root_nb;
         }
     };
 
@@ -85,6 +88,85 @@ pub fn resolve_notebook_path(raw_path: Option<&str>, ctx: &MacroContext) -> Path
         interpolated
     };
     let p = PathBuf::from(&expanded);
+
+    // In isolated mode (--repo or --local), never inspect or return user config ~/.config/bashmenu
+    if ctx.is_repo_mode() || ctx.is_local_mode() {
+        let user_cfg = ctx.home_dir.join(".config/bashmenu");
+
+        // If an absolute path is inside user config directory, re-root it to ctx.bashmenu_dir
+        if p.is_absolute() {
+            if let Ok(rel) = p.strip_prefix(&user_cfg) {
+                let re_rooted_nb = notebooks_dir.join(rel);
+                if re_rooted_nb.exists() {
+                    return re_rooted_nb;
+                }
+                let re_rooted_root = ctx.bashmenu_dir.join(rel);
+                if re_rooted_root.exists() {
+                    return re_rooted_root;
+                }
+                if let Some(file_name) = rel.file_name() {
+                    let cand_nb = notebooks_dir.join(file_name);
+                    if cand_nb.exists() {
+                        return cand_nb;
+                    }
+                    let cand_root = ctx.bashmenu_dir.join(file_name);
+                    if cand_root.exists() {
+                        return cand_root;
+                    }
+                }
+                return if notebooks_dir.exists() {
+                    notebooks_dir.join(rel)
+                } else {
+                    ctx.bashmenu_dir.join(rel)
+                };
+            }
+
+            if p.exists() {
+                return p;
+            }
+
+            // Path is absolute but does not exist (e.g. {notebooks_dir}/notes.yml when notebooks/ is absent)
+            if let Some(file_name) = p.file_name() {
+                let cand_nb = notebooks_dir.join(file_name);
+                if cand_nb.exists() {
+                    return cand_nb;
+                }
+                let cand_root = ctx.bashmenu_dir.join(file_name);
+                if cand_root.exists() {
+                    return cand_root;
+                }
+            }
+
+            return if notebooks_dir.exists() {
+                notebooks_dir.join(p.file_name().map(PathBuf::from).unwrap_or(p))
+            } else {
+                ctx.bashmenu_dir
+                    .join(p.file_name().map(PathBuf::from).unwrap_or(p))
+            };
+        }
+
+        // Relative path in isolated mode: strictly check notebooks_dir, then bashmenu_dir
+        let cand1 = notebooks_dir.join(&p);
+        if cand1.exists() {
+            return cand1;
+        }
+        let cand2 = ctx.bashmenu_dir.join(&p);
+        if cand2.exists() {
+            return cand2;
+        }
+        if let Some(file_name) = p.file_name() {
+            let cand_file_nb = notebooks_dir.join(file_name);
+            if cand_file_nb.exists() {
+                return cand_file_nb;
+            }
+            let cand_file_root = ctx.bashmenu_dir.join(file_name);
+            if cand_file_root.exists() {
+                return cand_file_root;
+            }
+        }
+
+        return if notebooks_dir.exists() { cand1 } else { cand2 };
+    }
 
     if p.is_absolute() && p.exists() {
         return p;
@@ -157,6 +239,18 @@ pub fn load_notebook(path: impl AsRef<Path>) -> Result<NotebookSchema> {
         path: p.to_path_buf(),
         source,
     })?;
+    if raw.trim().is_empty() {
+        let base_name = p.file_stem().and_then(|s| s.to_str()).unwrap_or("Notebook");
+        let formatted_title = title_case(&base_name.replace('_', " "));
+        let nb = NotebookSchema {
+            notebook: NotebookData {
+                title: formatted_title,
+                format: "markdown".to_string(),
+                notes: Vec::new(),
+            },
+        };
+        return Ok(nb);
+    }
     let schema: NotebookSchema = serde_yml::from_str(&raw)?;
     Ok(schema)
 }
@@ -696,6 +790,76 @@ mod tests {
 
         NoteSwapFile::remove(&nb_path, "My Note");
         assert!(NoteSwapFile::load(&nb_path, "My Note").is_none());
+        let _ = fs::remove_dir_all(&tmp_dir);
+    }
+
+    #[test]
+    fn test_resolve_notebook_path_repo_and_local_isolation() {
+        let tmp_root = std::env::temp_dir().join(format!("iso_test_{}", std::process::id()));
+        let user_home = tmp_root.join("home");
+        let user_cfg = user_home.join(".config/bashmenu/notebooks");
+        let repo_dir = tmp_root.join("repo");
+        let local_dir = tmp_root.join("local");
+
+        let _ = fs::create_dir_all(&user_cfg);
+        let _ = fs::create_dir_all(&repo_dir);
+        let _ = fs::create_dir_all(&local_dir);
+
+        let user_notes = user_cfg.join("notes.yml");
+        let repo_notes = repo_dir.join("notes.yml");
+        let local_notes = local_dir.join("notes.yml");
+
+        fs::write(&user_notes, "notebook:\n  title: User Config\n").unwrap();
+        fs::write(&repo_notes, "notebook:\n  title: Repo Sample\n").unwrap();
+        fs::write(&local_notes, "notebook:\n  title: Local Sample\n").unwrap();
+
+        let cfg = crate::config::BashMenuConfig::default();
+
+        // 1. Repo mode isolation test
+        let mut repo_ctx = MacroContext::new(&cfg)
+            .with_bashmenu_dir(repo_dir.clone())
+            .with_repo_mode(true);
+        repo_ctx.home_dir = user_home.clone();
+
+        // Resolving {notebooks_dir}/notes.yml in repo mode must pick repo notes.yml, never user config
+        let resolved_repo = resolve_notebook_path(Some("{notebooks_dir}/notes.yml"), &repo_ctx);
+        assert_eq!(resolved_repo, repo_notes);
+
+        // Resolving None in repo mode must pick repo notes.yml
+        let resolved_repo_default = resolve_notebook_path(None, &repo_ctx);
+        assert_eq!(resolved_repo_default, repo_notes);
+
+        // Even passing an explicit user config path while in repo mode must redirect into repo
+        let resolved_repo_tampered =
+            resolve_notebook_path(Some(user_notes.to_str().unwrap()), &repo_ctx);
+        assert_eq!(resolved_repo_tampered, repo_notes);
+
+        // 2. Local mode isolation test
+        let mut local_ctx = MacroContext::new(&cfg)
+            .with_bashmenu_dir(local_dir.clone())
+            .with_local_mode(true);
+        local_ctx.home_dir = user_home.clone();
+
+        let resolved_local = resolve_notebook_path(Some("notes.yml"), &local_ctx);
+        assert_eq!(resolved_local, local_notes);
+
+        let resolved_local_default = resolve_notebook_path(None, &local_ctx);
+        assert_eq!(resolved_local_default, local_notes);
+
+        let _ = fs::remove_dir_all(&tmp_root);
+    }
+
+    #[test]
+    fn test_load_notebook_empty_file_graceful() {
+        let tmp_dir = std::env::temp_dir().join(format!("empty_nb_test_{}", std::process::id()));
+        let _ = fs::create_dir_all(&tmp_dir);
+        let empty_path = tmp_dir.join("empty_notes.yml");
+        fs::write(&empty_path, "   \n\n  ").unwrap();
+
+        let nb = load_notebook(&empty_path).unwrap();
+        assert_eq!(nb.notebook.title, "Empty Notes");
+        assert!(nb.notebook.notes.is_empty());
+
         let _ = fs::remove_dir_all(&tmp_dir);
     }
 }

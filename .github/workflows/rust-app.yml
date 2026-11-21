@@ -38,4 +38,4 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Shellcheck Lint
-        run: shellcheck *.sh
+        run: shellcheck *.sh scripts/*.sh

@@ -1,0 +1,32 @@
+notebook:
+  title: Notes
+  format: markdown
+  notes:
+  - Welcome to BashMenu:
+      type: note
+      format: markdown
+      content: |-
+        # Welcome to BashMenu
+
+        This sample notebook is loaded directly from the repository.
+        You can use notebooks to organize notes, project tasks, and documentation.
+  - Keyboard Shortcuts:
+      type: note
+      format: markdown
+      content: |-
+        # Notebook Shortcuts
+        - `[N]`: Create a new note
+        - `[M]`: Rename the selected note
+        - `[D]`: Delete the selected note
+        - `[Enter]`: View note contents in the reader modal
+        - `[E]`: Edit note contents in the built-in editor
+        - `[Esc]` or `[Q]`: Return to the previous menu
+  - Project Roadmap:
+      type: note
+      format: markdown
+      content: |-
+        # Project Roadmap
+        - 1:1 Parity for all legacy bashmenu scripts and menus
+        - Cross-platform terminal support (Linux framebuffer, TTY, desktop terminals)
+        - Rich truecolor, 256-color, 16-color, and monochrome fallback palettes
+        - Built-in multi-language translation and locale auto-discovery

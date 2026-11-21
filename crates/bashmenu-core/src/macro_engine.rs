@@ -41,6 +41,10 @@ pub struct MacroContext<'a> {
     pub tty_mode: Option<String>,
     /// Application release version from Cargo.toml workspace.package.version
     pub version: String,
+    /// Whether running in repository isolation mode (`--repo`)
+    pub repo_mode: bool,
+    /// Whether running in local isolation mode (`--local`)
+    pub local_mode: bool,
     /// Terminal viewport width
     pub window_width: usize,
     /// Terminal viewport height
@@ -106,11 +110,41 @@ impl<'a> MacroContext<'a> {
             color_mode: None,
             tty_mode: None,
             version,
+            repo_mode: false,
+            local_mode: false,
             window_width: 80,
             window_height: 24,
             screen_width: 80,
             extra_vars: HashMap::new(),
         }
+    }
+
+    /// Sets an explicit root `bashmenu_dir` for the context.
+    pub fn with_bashmenu_dir(mut self, dir: PathBuf) -> Self {
+        self.bashmenu_dir = dir;
+        self
+    }
+
+    /// Sets whether the context is running in repository isolation mode (`--repo`).
+    pub fn with_repo_mode(mut self, repo_mode: bool) -> Self {
+        self.repo_mode = repo_mode;
+        self
+    }
+
+    /// Sets whether the context is running in local isolation mode (`--local`).
+    pub fn with_local_mode(mut self, local_mode: bool) -> Self {
+        self.local_mode = local_mode;
+        self
+    }
+
+    /// Returns true if running in repository isolation mode (`--repo`).
+    pub fn is_repo_mode(&self) -> bool {
+        self.repo_mode
+    }
+
+    /// Returns true if running in local isolation mode (`--local`).
+    pub fn is_local_mode(&self) -> bool {
+        self.local_mode
     }
 
     /// Sets an explicit application version for the context.
@@ -1620,7 +1654,14 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
         direct_map.insert("{cache}", cache_dir);
     }
     if res.contains("{notebooks_dir}") || res.contains("{notebooks}") {
-        let notebooks_dir = format!("{}/notebooks", ctx.bashmenu_dir.display());
+        let n_dir = ctx.bashmenu_dir.join("notebooks");
+        let notebooks_dir = if n_dir.exists() {
+            n_dir.to_string_lossy().to_string()
+        } else if ctx.bashmenu_dir.join("notes.yml").exists() {
+            ctx.bashmenu_dir.to_string_lossy().to_string()
+        } else {
+            n_dir.to_string_lossy().to_string()
+        };
         direct_map.insert("{notebooks_dir}", notebooks_dir.clone());
         direct_map.insert("{notebooks}", notebooks_dir);
     }

@@ -505,8 +505,12 @@ bashedit:
         assert_eq!(catalog.get("common.gutters.quit"), "Quit");
     }
 
+    static TEST_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn test_global_translate_macro() {
+        let _guard = TEST_MUTEX.lock().unwrap();
+        let _ = set_locale("en_US");
         let yes = translate("common.buttons.yes");
         assert_eq!(yes, "Yes");
 
@@ -530,6 +534,7 @@ bashedit:
 
     #[test]
     fn test_set_locale_auto_and_code() {
+        let _guard = TEST_MUTEX.lock().unwrap();
         let _ = set_locale("es_ES");
         assert_eq!(current_locale(), "es_ES");
 

@@ -22,6 +22,32 @@ fn test_bashmenu_binary_help_and_version() {
 }
 
 #[test]
+fn test_repo_mode_notebook_isolation() {
+    let repo_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
+    let notes_path = repo_root.join("notes.yml");
+    assert!(notes_path.is_file(), "notes.yml must exist at repo root");
+    let nb = bashmenu_core::load_notebook(&notes_path).expect("notes.yml must load");
+    assert_eq!(nb.notebook.title, "Notes");
+    let notes = bashmenu_core::get_notes(&nb);
+    assert!(
+        !notes.is_empty(),
+        "Sample notes in repository must not be empty"
+    );
+
+    // Verify resolve_notebook_path in repo mode
+    let cfg = bashmenu_core::load_config(repo_root.join("bashmenu.yml")).unwrap_or_default();
+    let ctx = bashmenu_core::MacroContext::new(&cfg)
+        .with_bashmenu_dir(repo_root.clone())
+        .with_repo_mode(true);
+    let resolved = bashmenu_core::resolve_notebook_path(Some("{notebooks_dir}/notes.yml"), &ctx);
+    assert_eq!(
+        resolved.canonicalize().unwrap_or(resolved.clone()),
+        notes_path.canonicalize().unwrap_or(notes_path.clone()),
+        "In repo mode, {{notebooks_dir}}/notes.yml must resolve to repo notes.yml"
+    );
+}
+
+#[test]
 fn test_bashmenu_modal_animation_config_options() {
     let repo_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
     let yml_path = repo_root.join("bashmenu.yml");
