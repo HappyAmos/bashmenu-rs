@@ -721,6 +721,23 @@ items:
                   value: slow
                 key: settings.marquee_speed
                 title: Marquee Speed [{settings.marquee_speed}]
+            - Language / Locale [{settings.locale}]:
+                type: radio
+                icon: '{nf::#f0ac}'
+                action: settings.locale
+                prompt: 'Select display language / locale:'
+                interactive: true
+                quiet: false
+                alt_buffer: true
+                options:
+                - label: Auto (System Default)
+                  value: auto
+                - label: English (US) [en_US]
+                  value: en_US
+                - label: Español (España) [es_ES]
+                  value: es_ES
+                key: settings.locale
+                title: Language / Locale [{settings.locale}]
             - Nerd Font Display Width [{settings.nerd_font_width}]:
                 type: config
                 icon: '{nf::#f07e}'

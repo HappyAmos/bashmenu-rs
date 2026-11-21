@@ -66,6 +66,23 @@ fn save_config_or_toast(path: &Path, config: &BashMenuConfig, toast_rack: &mut T
     }
 }
 
+/// Builds the list of radio modal options for language / locale selection,
+/// combining system auto-detection with dynamically discovered locale files.
+fn build_locale_radio_options() -> Vec<(String, String)> {
+    let mut options = Vec::new();
+    let current = bashmenu_core::current_locale();
+    options.push((
+        "auto".to_string(),
+        format!("Auto (System Default) [{}]", current),
+    ));
+
+    for loc in bashmenu_core::discover_locales() {
+        options.push((loc.code.clone(), format!("{} [{}]", loc.name, loc.code)));
+    }
+
+    options
+}
+
 /// Resolves `MainMenu`, `Modals`, and `Toasts` styles from an optional theme.
 fn resolve_bashmenu_styles(
     theme: Option<&bashmenu_core::Theme>,
@@ -1614,9 +1631,32 @@ fn main() -> Result<()> {
                     };
                     if let Some(opt_val) = submitted {
                         if let Some(selected) = opt_val {
-                            config.set_value(key_path.as_str(), serde_yml::Value::String(selected));
+                            config.set_value(
+                                key_path.as_str(),
+                                serde_yml::Value::String(selected.clone()),
+                            );
                             save_config_or_toast(&config_path, &config, &mut toast_rack);
                             menu_view.set_config(config.clone());
+                            if key_path == "settings.locale"
+                                || key_path == "app.settings.locale"
+                                || key_path == "locale"
+                            {
+                                let clean = if selected.eq_ignore_ascii_case("auto") {
+                                    "auto"
+                                } else {
+                                    &selected
+                                };
+                                let _ = bashmenu_core::set_locale(clean);
+                                if let Ok(new_menu) = load_menu(&menu_path) {
+                                    menu_view.reload_menu(new_menu);
+                                }
+                                toast_rack.add(ToastNotification {
+                                    title: Some(t!("common.status.saved")),
+                                    message: format!("Locale: {}", clean),
+                                    severity: ToastSeverity::Information,
+                                    timeout_secs: 2.0,
+                                });
+                            }
                             if key_path == "settings.framebuffer"
                                 || key_path == "app.settings.framebuffer"
                             {
@@ -2407,8 +2447,16 @@ fn main() -> Result<()> {
                                     let raw_msg = item.message().unwrap_or("Configure option:");
                                     let title = interpolate_placeholders(raw_title, &ctx);
                                     let msg = interpolate_placeholders(raw_msg, &ctx);
-                                    let options = item.options();
-                                    let curr_val = config.get_value(key_path).unwrap_or_default();
+                                    let mut options = item.options();
+                                    if key_path == "settings.locale"
+                                        || key_path == "app.settings.locale"
+                                        || key_path == "locale"
+                                    {
+                                        options = build_locale_radio_options();
+                                    }
+                                    let curr_val = config
+                                        .get_value(key_path)
+                                        .unwrap_or_else(|| "auto".to_string());
                                     active_modal = ActiveModal::Radio(
                                         key_path.to_string(),
                                         RadioModal::new(title, msg, options, curr_val),

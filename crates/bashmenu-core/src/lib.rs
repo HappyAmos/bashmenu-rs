@@ -23,8 +23,9 @@ pub use glyph::{
     resolve_script_path, run_glyphs_search, CP437_TABLE,
 };
 pub use i18n::{
-    current_locale, interpolate_string, parse_and_flatten_yaml, resolve_locale_path, set_locale,
-    translate, translate_with, LocaleCatalog, DEFAULT_EN_US_YAML,
+    current_locale, discover_locales, interpolate_string, parse_and_flatten_yaml,
+    resolve_locale_path, set_locale, translate, translate_with, LocaleCatalog, LocaleInfo,
+    DEFAULT_EN_US_YAML,
 };
 pub use macro_engine::{
     apply_dir_picker_macros, apply_file_picker_macros, clear_command_cache, detect_color_mode,

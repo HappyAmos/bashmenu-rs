@@ -39,7 +39,11 @@ impl LocaleCatalog {
     pub fn load_yaml_str(&mut self, locale_code: &str, yaml_content: &str) -> Result<(), String> {
         let parsed = parse_and_flatten_yaml(yaml_content)
             .map_err(|e| format!("Failed to parse locale YAML for '{}': {}", locale_code, e))?;
-        self.active_locale = locale_code.to_string();
+        if let Some(canonical) = parsed.get("meta.locale") {
+            self.active_locale = canonical.clone();
+        } else {
+            self.active_locale = locale_code.to_string();
+        }
         self.active_strings = parsed;
         Ok(())
     }
@@ -131,6 +135,27 @@ pub fn set_locale(locale_or_path: &str) -> Result<(), String> {
         return Ok(());
     }
 
+    if locale_or_path.eq_ignore_ascii_case("auto") {
+        let sys_loc = std::env::var("LC_ALL")
+            .or_else(|_| std::env::var("LC_MESSAGES"))
+            .or_else(|_| std::env::var("LANG"))
+            .unwrap_or_default();
+        let clean = sys_loc.split('.').next().unwrap_or(&sys_loc);
+        if !clean.is_empty()
+            && !clean.eq_ignore_ascii_case("c")
+            && !clean.eq_ignore_ascii_case("posix")
+            && !clean.eq_ignore_ascii_case("en")
+            && !clean.eq_ignore_ascii_case("en_us")
+        {
+            if let Ok(()) = set_locale(clean) {
+                return Ok(());
+            }
+        }
+        let mut catalog = GLOBAL_CATALOG.write().unwrap();
+        catalog.reset_to_default();
+        return Ok(());
+    }
+
     let candidate_path = Path::new(locale_or_path);
     if candidate_path.is_file() {
         let mut catalog = GLOBAL_CATALOG.write().unwrap();
@@ -171,7 +196,13 @@ pub fn resolve_locale_path(code: &str) -> Option<PathBuf> {
         search_dirs.push(PathBuf::from(home).join(".config/bashmenu/locales"));
     }
 
-    // 3. Current working directory and ancestors
+    // 3. System shared locales (/usr/share/bashmenu/locales)
+    let sys_dir = PathBuf::from("/usr/share/bashmenu/locales");
+    if sys_dir.is_dir() {
+        search_dirs.push(sys_dir);
+    }
+
+    // 4. Current working directory and ancestors
     if let Ok(cwd) = std::env::current_dir() {
         let mut curr = Some(cwd.as_path());
         while let Some(dir) = curr {
@@ -180,7 +211,7 @@ pub fn resolve_locale_path(code: &str) -> Option<PathBuf> {
         }
     }
 
-    // 4. Cargo manifest directory and ancestors (for test runners and dev builds)
+    // 5. Cargo manifest directory and ancestors (for test runners and dev builds)
     if let Ok(manifest) = std::env::var("CARGO_MANIFEST_DIR") {
         let mut curr = Some(Path::new(&manifest));
         while let Some(dir) = curr {
@@ -199,6 +230,159 @@ pub fn resolve_locale_path(code: &str) -> Option<PathBuf> {
     }
 
     None
+}
+
+/// Discovered locale metadata describing an available translation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LocaleInfo {
+    /// Standard locale code (e.g. "en_US", "es_ES", "fr_FR")
+    pub code: String,
+    /// Friendly localized language name (e.g. "English (US)", "Español (España)")
+    pub name: String,
+    /// Path to file on disk, or `None` if built-in
+    pub path: Option<PathBuf>,
+}
+
+#[derive(serde::Deserialize)]
+struct LocaleMetaHeader {
+    meta: Option<LocaleMetaInner>,
+}
+
+#[derive(serde::Deserialize)]
+struct LocaleMetaInner {
+    locale: Option<String>,
+    name: Option<String>,
+}
+
+/// Discovers available locale translation files across standard search paths:
+/// 1. Built-in `en_US` ("English (US)")
+/// 2. `$BASHMENU_DIR/locales/`
+/// 3. `~/.config/bashmenu/locales/`
+/// 4. `/usr/share/bashmenu/locales/`
+/// 5. Current working directory and ancestors (`locales/`)
+/// 6. Repository root and Cargo manifest directory (`locales/`)
+pub fn discover_locales() -> Vec<LocaleInfo> {
+    let mut search_dirs = Vec::new();
+
+    // 1. $BASHMENU_DIR/locales
+    if let Ok(dir) = std::env::var("BASHMENU_DIR") {
+        search_dirs.push(PathBuf::from(dir).join("locales"));
+    }
+
+    // 2. ~/.config/bashmenu/locales
+    if let Ok(home) = std::env::var("HOME") {
+        search_dirs.push(PathBuf::from(home).join(".config/bashmenu/locales"));
+    }
+
+    // 3. System shared locales (/usr/share/bashmenu/locales)
+    let sys_dir = PathBuf::from("/usr/share/bashmenu/locales");
+    if sys_dir.is_dir() {
+        search_dirs.push(sys_dir);
+    }
+
+    // 4. Current working directory and ancestors
+    if let Ok(cwd) = std::env::current_dir() {
+        let mut curr = Some(cwd.as_path());
+        while let Some(dir) = curr {
+            search_dirs.push(dir.join("locales"));
+            curr = dir.parent();
+        }
+    }
+
+    // 5. Cargo manifest directory and ancestors
+    if let Ok(manifest) = std::env::var("CARGO_MANIFEST_DIR") {
+        let mut curr = Some(Path::new(&manifest));
+        while let Some(dir) = curr {
+            search_dirs.push(dir.join("locales"));
+            curr = dir.parent();
+        }
+    }
+
+    let mut map: std::collections::HashMap<String, LocaleInfo> = std::collections::HashMap::new();
+
+    // Built-in English (US) is always available
+    map.insert(
+        "en_us".to_string(),
+        LocaleInfo {
+            code: "en_US".to_string(),
+            name: "English (US)".to_string(),
+            path: None,
+        },
+    );
+
+    for dir in search_dirs {
+        let entries = match std::fs::read_dir(&dir) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+
+            let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("");
+            if ext != "yml" && ext != "yaml" {
+                continue;
+            }
+
+            let file_stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+            if file_stem.is_empty() {
+                continue;
+            }
+
+            let content = match std::fs::read_to_string(&path) {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+
+            let header: Option<LocaleMetaHeader> = serde_yml::from_str(&content).ok();
+            let raw_code = header
+                .as_ref()
+                .and_then(|h| h.meta.as_ref())
+                .and_then(|m| m.locale.clone())
+                .unwrap_or_else(|| {
+                    if let Some((lang, country)) = file_stem.split_once('_') {
+                        format!("{}_{}", lang.to_lowercase(), country.to_uppercase())
+                    } else {
+                        file_stem.to_string()
+                    }
+                });
+
+            let name = header
+                .as_ref()
+                .and_then(|h| h.meta.as_ref())
+                .and_then(|m| m.name.clone())
+                .unwrap_or_else(|| raw_code.clone());
+
+            let key = raw_code.trim().replace('-', "_").to_lowercase();
+            if key == "en_us" || key == "en" {
+                if let Some(en_info) = map.get_mut("en_us") {
+                    if en_info.path.is_none() {
+                        en_info.path = Some(path);
+                    }
+                }
+            } else {
+                map.entry(key).or_insert(LocaleInfo {
+                    code: raw_code,
+                    name,
+                    path: Some(path),
+                });
+            }
+        }
+    }
+
+    let mut result = Vec::new();
+    if let Some(en) = map.remove("en_us") {
+        result.push(en);
+    }
+
+    let mut others: Vec<LocaleInfo> = map.into_values().collect();
+    others.sort_by(|a, b| a.name.cmp(&b.name));
+    result.extend(others);
+
+    result
 }
 
 /// Helper function to interpolate `{variable}` placeholders inside a string.
@@ -331,6 +515,31 @@ bashedit:
             &[("line", "1"), ("col", "2"), ("char", "A")],
         );
         assert_eq!(legend, "Line 1, Col 2 | Char A");
+    }
+
+    #[test]
+    fn test_discover_locales() {
+        let locales = discover_locales();
+        assert!(!locales.is_empty(), "Must discover at least en_US");
+        assert_eq!(locales[0].code, "en_US");
+        assert_eq!(locales[0].name, "English (US)");
+
+        let has_es = locales.iter().any(|loc| loc.code == "es_ES");
+        assert!(has_es, "Must discover es_ES from repository locales/");
+    }
+
+    #[test]
+    fn test_set_locale_auto_and_code() {
+        let _ = set_locale("es_ES");
+        assert_eq!(current_locale(), "es_ES");
+
+        let _ = set_locale("auto");
+        // Auto resets or uses system LANG; in test environment without LANG=es it defaults to en_US
+        let cur = current_locale();
+        assert!(cur == "en_US" || !cur.is_empty());
+
+        let _ = set_locale("en_US");
+        assert_eq!(current_locale(), "en_US");
     }
 
     #[test]

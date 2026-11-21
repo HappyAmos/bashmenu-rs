@@ -554,6 +554,19 @@ settings:
 | `normal` (Default) | ~250 ms | Standard recommended marquee cadence (~4 steps/sec). |
 | `slow` | ~500 ms | Deliberate, relaxed scrolling (~2 steps/sec). |
 
+#### Display Language & Locale Auto-Discovery (`settings.locale`):
+The active interface language can be set explicitly or set to `auto` to match the user's system locale (`LC_ALL` > `LC_MESSAGES` > `LANG`). Translations are automatically discovered from `locales/`, `~/.config/bashmenu/locales/`, and `/usr/share/bashmenu/locales/`. You can switch languages interactively via **Options & Settings -> Bashmenu Settings -> Language / Locale**:
+
+```yaml
+settings:
+  locale: auto                 # Options: auto, en_US, es_ES, or any discovered locale code
+```
+
+| Locale Setting | Description |
+| :--- | :--- |
+| `auto` (Default) | Automatically detects system locale from environment (`LC_ALL`, `LC_MESSAGES`, `LANG`), falling back to English (`en_US`). |
+| `<locale_code>` | Explicitly loads a locale file (e.g. `es_ES`, `fr_FR`, `de_DE`, `ja_JP`) from discovered locale directories. |
+
 *Disabling Transitions for Specific Commands:* Any command or script menu item
 can disable transitions by specifying `transition: false` in `bashmenu.mnu`:
 ```yaml
