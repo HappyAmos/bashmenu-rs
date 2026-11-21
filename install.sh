@@ -9,10 +9,23 @@
 set -e
 
 UPDATE_MENU=false
+MERGE_MENU=false
 for arg in "$@"; do
     case "$arg" in
+        --merge|--merge-menu)
+            MERGE_MENU=true
+            ;;
         --update-menu|--reset-menu)
             UPDATE_MENU=true
+            ;;
+        -h|--help)
+            echo "Usage: ./install.sh [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  --merge, --merge-menu   Interactively merge new vanilla menu features with existing user menu"
+            echo "  --update-menu           Replace existing user menu with vanilla template (creates .bak backup)"
+            echo "  -h, --help              Display this help message and exit"
+            exit 0
             ;;
     esac
 done
@@ -139,7 +152,54 @@ mkdir -p "$CONFIG_DIR"
 for cfg in bashmenu.yml bashmenu.mnu bashmenu.themes shortcuts.yml cheat.yml; do
     src="$SCRIPT_DIR/$cfg"
     dest="$CONFIG_DIR/$cfg"
-    if [ "$cfg" = "bashmenu.mnu" ] && [ "$UPDATE_MENU" = "true" ] && [ -f "$src" ]; then
+    if [ "$cfg" = "bashmenu.mnu" ] && [ "$MERGE_MENU" = "true" ] && [ -f "$src" ]; then
+        if [ -f "$dest" ]; then
+            MENUEDIT_BIN=""
+            if [ -x "$BIN_DIR/menuedit" ]; then
+                MENUEDIT_BIN="$BIN_DIR/menuedit"
+            elif [ -x "$SCRIPT_DIR/target/release/menuedit" ]; then
+                MENUEDIT_BIN="$SCRIPT_DIR/target/release/menuedit"
+            elif [ -x "$SCRIPT_DIR/bin/menuedit" ]; then
+                MENUEDIT_BIN="$SCRIPT_DIR/bin/menuedit"
+            elif command -v menuedit >/dev/null 2>&1; then
+                MENUEDIT_BIN="$(command -v menuedit)"
+            fi
+
+            YMLCHECK_BIN=""
+            if [ -x "$BIN_DIR/ymlcheck" ]; then
+                YMLCHECK_BIN="$BIN_DIR/ymlcheck"
+            elif [ -x "$SCRIPT_DIR/target/release/ymlcheck" ]; then
+                YMLCHECK_BIN="$SCRIPT_DIR/target/release/ymlcheck"
+            elif [ -x "$SCRIPT_DIR/bin/ymlcheck" ]; then
+                YMLCHECK_BIN="$SCRIPT_DIR/bin/ymlcheck"
+            elif command -v ymlcheck >/dev/null 2>&1; then
+                YMLCHECK_BIN="$(command -v ymlcheck)"
+            fi
+
+            if [ -n "$MENUEDIT_BIN" ]; then
+                echo "  [*] Launching interactive menu merge..."
+                "$MENUEDIT_BIN" --merge --user-menu "$dest" --vanilla-menu "$src" --backup "$dest.bak"
+                if [ -n "$YMLCHECK_BIN" ]; then
+                    echo "  [*] Validating merged menu schema..."
+                    if ! "$YMLCHECK_BIN" -m "$dest"; then
+                        echo "  [!] Schema validation failed for merged menu!" >&2
+                        if [ -f "$dest.bak" ]; then
+                            echo "  [!] Restoring backup from $dest.bak" >&2
+                            cp -f "$dest.bak" "$dest"
+                        fi
+                        exit 1
+                    fi
+                    echo "  [+] Merged menu successfully verified: $dest"
+                fi
+            else
+                echo "  [!] Error: 'menuedit' binary not found to perform menu merge." >&2
+                exit 1
+            fi
+        else
+            cp "$src" "$dest"
+            echo "  [+] Initialized user config: $dest"
+        fi
+    elif [ "$cfg" = "bashmenu.mnu" ] && [ "$UPDATE_MENU" = "true" ] && [ -f "$src" ]; then
         if [ -f "$dest" ]; then
             cp -f "$dest" "$dest.bak"
             echo "  [+] Backed up existing menu -> $dest.bak"
@@ -151,6 +211,7 @@ for cfg in bashmenu.yml bashmenu.mnu bashmenu.themes shortcuts.yml cheat.yml; do
         echo "  [+] Initialized user config: $dest"
     elif [ "$cfg" = "bashmenu.mnu" ] && [ -f "$dest" ]; then
         echo "  [*] Preserving existing user menu: $dest"
+        echo "      (Run './install.sh --merge' to interactively merge latest upstream features)"
         echo "      (Run './install.sh --update-menu' to update to latest vanilla layout with .bak backup)"
     fi
 done

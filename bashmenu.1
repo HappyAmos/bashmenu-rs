@@ -268,6 +268,9 @@ CTRL+S / F2 (Save changes), CTRL+T (Change item type), CTRL+A / F3 (ASCII table)
 .PP
 .B Menu Focus Synchronization & Property Inspector Previews:
 When launching menuedit from bashmenu (via F4 or menu item action), the editor tree automatically synchronizes active keyboard focus and selection directly on the item that was selected in bashmenu, so pressing e or ENTER immediately opens the ItemEditModal dialog for that exact item. The Property Inspector side panel features a real-time visual Preview section for all item types (commands, submenus, scripts, dividers, etc.) showing exactly how the item will appear in the main menu (including resolved Nerd Font/emoji icons, placeholders, and right-aligned shortcut brackets). Additionally, the ItemEditModal dialog dynamically updates its preview box in real-time as title or icon fields are edited.
+.PP
+.B Interactive Menu Merge Mode:
+When upgrading BashMenu or adopting upstream additions, menuedit provides an interactive semantic merge engine: \fBmenuedit --merge\fR [--user-menu FILE] [--vanilla-menu FILE] [--output-menu FILE] [--backup FILE] [-y|--yes]. The installer also exposes \fB./install.sh --merge\fR to automatically reconcile existing user menus with new upstream templates, saving a .bak backup and running schema validation via \fBymlcheck -m\fR.
 .SS Built-in Text Editor (bashedit)
 The application features a built-in text editor supporting tabs, colocated swap files, and desktop shortcuts. Command-line options: bashedit [-r|--read-only] [--tabstop N] [--show-whitespace] [--wrap] [--tab-to-spaces BOOL] [-l|--line N] [-t|--theme NAME] [--local] [FILE].
 .TP

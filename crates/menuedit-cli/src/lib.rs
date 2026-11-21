@@ -1,6 +1,7 @@
 //! Library module for MenuEdit core tree navigation and menu manipulation.
 
 pub mod item_edit;
+pub mod merge_wizard;
 pub mod shortcut_editor;
 pub mod tree;
 pub mod type_picker;
@@ -18,6 +19,7 @@ pub use item_edit::{
     render_item_preview_line, BrowseTarget, FocusControl, ItemEditModal, ItemEditResult,
     MultiLineInput, TextInput,
 };
+pub use merge_wizard::run_merge_wizard;
 pub use shortcut_editor::{
     format_shortcut_inspector, render_shortcut_editor_screen, run_shortcut_editor, KeyCaptureModal,
     LeaderSettingsModal, ShortcutEditModal, ShortcutEditorState,

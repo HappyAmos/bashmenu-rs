@@ -1,3 +1,13 @@
+## Interactive Menu Merge (install.sh --merge and menuedit --merge)
+- [x] Implemented recursive semantic menu diffing and merge engine in `crates/bashmenu-core/src/menu_merge.rs` with `compute_menu_diff` and `apply_merge`.
+- [x] Supported structural normalization (stripping dynamic parameter brackets), recursive submenu traversal, and divider deduplication.
+- [x] Created interactive CLI wizard in `crates/menuedit-cli/src/merge_wizard.rs` handling Stage 1 (New Upstream Items), Stage 2 (Property Conflicts), and Stage 3 (Summary & Confirmation).
+- [x] Added `--merge`, `--user-menu`, `--vanilla-menu`, `--output-menu`, `--backup`, and `-y`/`--yes` CLI flags to `menuedit`.
+- [x] Integrated `--merge` / `--merge-menu` into `install.sh` with automatic backup (`.bak`), execution of `menuedit --merge`, and schema validation via `ymlcheck -m` with automatic rollback on error.
+- [x] Updated `install.sh` usage help and menu preservation messages.
+- [x] Added unit and integration tests across `bashmenu-core`, `menuedit-cli`, and `bashmenu-cli`.
+- [x] Updated documentation across all reference manuals (`bashmenu.md`, `bashmenu.1`).
+
 ## Strict --repo and --local Configuration & Notebook Path Isolation
 - [x] Enforced strict path isolation in `crates/bashmenu-core/src/macro_engine.rs` with `repo_mode` and `local_mode` flags on `MacroContext`.
 - [x] Fixed `resolve_notebook_path` in `crates/bashmenu-core/src/notebook.rs` to never query, probe, or return user configuration directory (`~/.config/bashmenu`) when running with `--repo` or `--local`.

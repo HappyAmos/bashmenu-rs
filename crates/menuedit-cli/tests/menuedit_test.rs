@@ -2014,3 +2014,129 @@ fn test_shortcutedit_cli_locale_flag() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("--locale"));
 }
+
+#[test]
+fn test_menuedit_merge_cli_help() {
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_menuedit"))
+        .arg("--help")
+        .output()
+        .expect("failed to execute menuedit --help");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("--merge"));
+    assert!(stdout.contains("--user-menu"));
+    assert!(stdout.contains("--vanilla-menu"));
+    assert!(stdout.contains("--output-menu"));
+    assert!(stdout.contains("--backup"));
+    assert!(stdout.contains("--yes"));
+}
+
+#[test]
+fn test_menuedit_merge_cli_execution() {
+    let temp_dir = std::env::temp_dir().join(format!("bm_merge_test_{}", std::process::id()));
+    let _ = fs::create_dir_all(&temp_dir);
+
+    let user_menu_path = temp_dir.join("user_menu.mnu");
+    let vanilla_menu_path = temp_dir.join("vanilla_menu.mnu");
+    let output_menu_path = temp_dir.join("merged_menu.mnu");
+    let backup_menu_path = temp_dir.join("user_menu.mnu.bak");
+
+    let user_yaml = r#"
+items:
+  - Custom User Item:
+      icon: "⚙"
+      type: command
+      command: "echo custom"
+  - Applications:
+      icon: "󰖟"
+      type: submenu
+      submenu:
+        title: Applications
+        items:
+          - My Tool:
+              action: "mytool"
+"#;
+
+    let vanilla_yaml = r#"
+items:
+  - Custom User Item:
+      icon: "⚙"
+      type: command
+      command: "echo upstream_default"
+  - Applications:
+      icon: "󰖟"
+      type: submenu
+      submenu:
+        title: Applications
+        items:
+          - Web Browser:
+              action: "{scripts_dir}/webopen.sh"
+  - System Information:
+      icon: "ℹ"
+      type: command
+      command: "fastfetch"
+"#;
+
+    fs::write(&user_menu_path, user_yaml).unwrap();
+    fs::write(&vanilla_menu_path, vanilla_yaml).unwrap();
+
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_menuedit"))
+        .arg("--merge")
+        .arg("--user-menu")
+        .arg(&user_menu_path)
+        .arg("--vanilla-menu")
+        .arg(&vanilla_menu_path)
+        .arg("--output-menu")
+        .arg(&output_menu_path)
+        .arg("--backup")
+        .arg(&backup_menu_path)
+        .arg("--yes")
+        .output()
+        .expect("menuedit --merge failed to execute");
+
+    assert!(
+        output.status.success(),
+        "menuedit --merge must exit 0: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    // Backup was created
+    assert!(backup_menu_path.exists());
+    let backup_content = fs::read_to_string(&backup_menu_path).unwrap();
+    assert!(backup_content.contains("Custom User Item"));
+
+    // Merged file exists and loads cleanly
+    assert!(output_menu_path.exists());
+    let merged_menu = load_menu(&output_menu_path).expect("merged menu must be valid YAML");
+
+    // Must have preserved user custom item (with user command in non-interactive mode default)
+    let user_it = merged_menu
+        .items
+        .iter()
+        .find(|i| i.label.contains("Custom User Item"))
+        .unwrap();
+    assert_eq!(user_it.command.as_deref(), Some("echo custom"));
+
+    // Must have added new upstream item "System Information"
+    assert!(merged_menu
+        .items
+        .iter()
+        .any(|i| i.label.contains("System Information")));
+
+    // Submenu must contain both user tool and new vanilla web browser
+    let app_sub = merged_menu
+        .items
+        .iter()
+        .find(|i| i.label.contains("Applications"))
+        .unwrap()
+        .submenu
+        .as_ref()
+        .unwrap();
+    assert!(app_sub.items.iter().any(|i| i.label.contains("My Tool")));
+    assert!(app_sub
+        .items
+        .iter()
+        .any(|i| i.label.contains("Web Browser")));
+
+    let _ = fs::remove_dir_all(&temp_dir);
+}
