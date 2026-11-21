@@ -7,6 +7,8 @@ body:
       value: |
         Thank you for helping translate BashMenu-RS! Community translations make terminal menus and companion tools accessible to everyone worldwide.
 
+        Please review our [Translation Quick-Start Guide](https://github.com/HappyAmos/bashmenu-rs/blob/main/TRANSLATIONS.md) for full instructions on copying templates, testing in your terminal, and automated validation.
+
         Before opening a new issue, please check existing issues and PRs to see if a translation for your language is already in progress.
 
   - type: dropdown

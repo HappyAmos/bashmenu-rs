@@ -120,8 +120,9 @@ Shell scripts in the root directory or `scripts/` must:
 
 ## Translating BashMenu (Localization)
 
-We welcome community translations! Contributing a new language requires zero Rust coding experience:
+We welcome community translations! Contributing a new language requires zero Rust coding experience. For complete step-by-step instructions and FAQ, see the dedicated [Translation Quick-Start Guide](TRANSLATIONS.md).
 
+Quick summary:
 1. **Copy the Canonical Template:** Copy [`locales/en_us.yml`](locales/en_us.yml) to `locales/<lang_code>.yml` (e.g. `locales/fr_fr.yml`, `locales/de_de.yml`, `locales/ja_jp.yml`).
 2. **Translate the Strings:** Translate the right-hand text values. Do **not** alter keys or dynamic placeholder variables (such as `{theme}`, `{line}`, `{file}`, `{title}`).
 3. **Validate Your Translation:** Use `ymlcheck` with the `-l` / `--locale` flag to automatically verify syntax, 100% key completeness, and placeholder variable parity:

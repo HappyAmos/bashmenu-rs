@@ -140,5 +140,6 @@ make test
 ## Community & Security
 
 - **Contributing Guide:** See [CONTRIBUTING.md](CONTRIBUTING.md) for developer setup and PR guidelines.
+- **Translations & Localization:** Want to translate BashMenu into your native language? See the [Translation Quick-Start Guide](TRANSLATIONS.md) (no coding required!).
 - **Code of Conduct:** Please review our [Community Guidelines](CODE_OF_CONDUCT.md) for participation standards.
 - **Security Policy:** To report security concerns privately, please consult our [Security Policy](SECURITY.md).
