@@ -1,3 +1,17 @@
+## Dedicated "New Language Translation" GitHub Issue Template
+- [x] Created GitHub Issue Form `.github/ISSUE_TEMPLATE/translation_request.yml` targeting community translators.
+- [x] Added structured fields for contributor role/intent (volunteer, ready PR, request), ISO target language/code, translation checklist, and cultural notes.
+- [x] Updated `.github/ISSUE_TEMPLATE/feature_request.yml` to direct translation proposals to the dedicated form.
+- [x] Validated YAML syntax with `ymlcheck -y` and passed pre-commit verification and CI gatekeeping.
+
+## Marquee Speed Configuration Setting
+- [x] Added `pub marquee_speed: Option<String>` to `Settings` in `crates/bashmenu-core/src/config.rs`.
+- [x] Added `Settings::marquee_speed_duration(&self) -> Duration` supporting `fast` (125ms), `normal` (250ms), `slow` (500ms), and custom numeric ms (clamped 50–2000ms).
+- [x] Implemented `"settings.marquee_speed"` key handling in `BashMenuConfig::set_value`.
+- [x] Updated marquee animation loop in `crates/bashmenu-cli/src/main.rs` to dynamically query configured speed duration.
+- [x] Added `marquee_speed: normal` in `bashmenu.yml` and interactive radio modal under `Options & Settings -> Bashmenu Settings -> Marquee Speed` in `bashmenu.mnu`.
+- [x] Synchronized documentation across 6 tiers (`bashmenu.md`, `bashmenu.1`, `HelpModal`) and added unit/integration tests in `bashmenu-core` and `bashmenu-cli`.
+
 ## Universal Marquee Overflow Invariant & Multi-Panel Enforcement
 - [x] Formalized Universal Marquee Overflow Invariant in `.agents/rules/invariants.md` (kept within 24KB limit at 23,877 bytes) and `.agents/skills/bashmenu-rs-developer/SKILL.md`: text in panels, windows, viewports, lists, and titles exceeding width margins must always marquee using the theme's `marquee.char` and `marquee.gap`, with explicit exemption for input text boxes (`TextInput`).
 - [x] Enforced marquee in `bashmenu` (`MenuView`):
