@@ -1,5 +1,11 @@
 # BashMenu-RS Development Roadmap & Tasks (TODO)
 
+## 0. High-Priority Bugs
+- [x] **[BUG] Strict `--repo` and `--local` Configuration & Notebook Path Isolation:**
+  - Fix `MacroContext` and `resolve_notebook_path` so that `--repo` loads configurations and notebooks strictly from the repository directory (`{dev_dir}`) and `--local` strictly from the current working directory (`.`).
+  - Ensure `~/.config/bashmenu` is never probed, read, or returned when `--repo` or `--local` is passed.
+  - Populate root `notes.yml` as a sample notebook loaded when running `bm --repo`.
+
 ## 1. UI & Configuration Enhancements
 - [x] **Marquee Speed Configuration Setting (`Options & Settings -> Bashmenu Settings -> Marquee Speed`):**
   - Add `marquee_speed` configuration setting in `bashmenu-core` (`BashMenuConfig` / `Settings` schema).
@@ -15,10 +21,10 @@
 - [x] **Translation Quick-Start Guide (`TRANSLATIONS.md`):**
   - Create a dedicated guide detailing how non-programmers can copy `locales/en_us.yml`, translate keys, and test live using `bashmenu --locale <file>`.
   - Document `ymlcheck -l locales/<file>.yml` for self-validation.
-- [ ] PENDING: **Locale Auto-Discovery:**
+- [x] **Locale Auto-Discovery:**
   - Enhance `bashmenu-core` and `bashmenu-cli` to automatically discover and list available `.yml` locale files in `~/.config/bashmenu/locales/` and `/usr/share/bashmenu/locales/`.
   - Expose a dynamic locale switcher in `Options & Settings -> Language / Locale`.
 
 ## 3. CI/CD & Distribution
-- [ ] **Automated GitHub Release Binaries Workflow:**
+- [x] **Automated GitHub Release Binaries Workflow:**
   - Create GitHub Actions workflow (`.github/workflows/release.yml`) to automatically compile, package, and upload release artifacts (x86_64 and aarch64 Linux binaries + man pages + assets) whenever a version tag (`v*.*.*`) is published.
