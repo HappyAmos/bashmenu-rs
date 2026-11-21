@@ -10,8 +10,8 @@
   - Maintain universal 6-tier documentation parity (`bashmenu.md`, `bashmenu.1`, `HelpModal`, etc.).
 
 ## 2. Community & Contributor Infrastructure (Localization Direction)
-- [ ] **Dedicated "New Language Translation" GitHub Issue Template:**
-  - Create `.github/ISSUE_TEMPLATE/translation_request.md` for community members to volunteer for or track progress on a specific language (e.g. French, German, Italian, Portuguese, Japanese).
+- [ ] PENDING: **Dedicated "New Language Translation" GitHub Issue Template:**
+  - Create `.github/ISSUE_TEMPLATE/translation_request.yml` for community members to volunteer for or track progress on a specific language (e.g. French, German, Italian, Portuguese, Japanese).
 - [ ] **Translation Quick-Start Guide (`TRANSLATIONS.md`):**
   - Create a dedicated guide detailing how non-programmers can copy `locales/en_us.yml`, translate keys, and test live using `bashmenu --locale <file>`.
   - Document `ymlcheck -l locales/<file>.yml` for self-validation.

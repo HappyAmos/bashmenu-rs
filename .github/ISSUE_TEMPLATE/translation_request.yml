@@ -1,0 +1,55 @@
+name: Translation / Localization
+description: Volunteer for, track progress on, or request a new language translation for BashMenu-RS
+labels: ["enhancement", "help wanted"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping translate BashMenu-RS! Community translations make terminal menus and companion tools accessible to everyone worldwide.
+
+        Before opening a new issue, please check existing issues and PRs to see if a translation for your language is already in progress.
+
+  - type: dropdown
+    id: role
+    attributes:
+      label: Translation Type / Intent
+      description: How are you contributing to this translation?
+      options:
+        - "I am volunteering to translate this language myself"
+        - "I have already translated this language and will submit a Pull Request"
+        - "I am requesting that this language be translated by a contributor"
+    validations:
+      required: true
+
+  - type: input
+    id: language
+    attributes:
+      label: Target Language & Locale Code
+      description: What language and standard ISO locale code are you translating?
+      placeholder: "e.g. French (fr_fr), German (de_de), Japanese (ja_jp), Italian (it_it)"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: progress
+    attributes:
+      label: Translation Checklist
+      description: Tasks required to complete and validate a translation for BashMenu-RS.
+      options:
+        - label: Copied `locales/en_us.yml` to `locales/<lang>_<country>.yml` (e.g. `locales/fr_fr.yml`)
+          required: false
+        - label: Translated string values without modifying `{...}` interpolation placeholders or `{nf:...}` glyph tokens
+          required: false
+        - label: Tested interactively in terminal via `bashmenu --locale locales/<lang>_<country>.yml`
+          required: false
+        - label: Verified 100% key parity with schema using `cargo run -p ymlcheck-cli -- -l locales/<lang>_<country>.yml` (or `ymlcheck -l ...`)
+          required: false
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional Context, Questions, or Cultural Notes
+      description: Mention any specific dialect details, questions about string context, or special characters.
+      placeholder: Share any context, questions, or notes here...
+    validations:
+      required: false

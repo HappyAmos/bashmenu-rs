@@ -1,5 +1,5 @@
 name: Feature Request
-description: Suggest a new idea, enhancement, theme, or translation for BashMenu-RS
+description: Suggest a new idea, enhancement, or custom theme for BashMenu-RS
 labels: ["enhancement"]
 body:
   - type: markdown
