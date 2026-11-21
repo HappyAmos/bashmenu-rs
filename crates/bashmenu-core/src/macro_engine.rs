@@ -1020,6 +1020,11 @@ pub fn resolve_config_dot_path(config_val: &serde_json::Value, path: &str) -> Op
         }
     }
 
+    // Default fallbacks for standard configuration keys
+    if path == "settings.locale" || path == "app.settings.locale" || path == "locale" {
+        return Some("auto".to_string());
+    }
+
     None
 }
 
@@ -1795,6 +1800,9 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
     if res.contains("{theme}") || res.contains("{app.theme}") {
         direct_map.insert("{theme}", ctx.config.theme.clone());
         direct_map.insert("{app.theme}", ctx.config.theme.clone());
+    }
+    if res.contains("{locale}") {
+        direct_map.insert("{locale}", crate::current_locale());
     }
 
     if res.contains("{window_width}") {

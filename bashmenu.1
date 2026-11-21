@@ -536,6 +536,12 @@ Modal animation playback speed is configured via
 Horizontal scrolling marquee ticker speed is configured via
 .I settings.marquee_speed
 (fast, normal, slow, or milliseconds; default: normal).
+Interface language and locale are configured via
+.I settings.locale
+(auto, en_US, es_ES, or any discovered locale code; default: auto). Translations are automatically discovered from
+.IR ~/.config/bashmenu/locales/ ,
+.IR /usr/share/bashmenu/locales/ ,
+and the repository or working directory.
 Direct Linux framebuffer hardware graphics on /dev/fb0 are configured via
 .I settings.framebuffer
 (auto, image, true, false) or at launch via the

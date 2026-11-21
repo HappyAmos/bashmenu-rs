@@ -12,10 +12,10 @@
 ## 2. Community & Contributor Infrastructure (Localization Direction)
 - [x] **Dedicated "New Language Translation" GitHub Issue Template:**
   - Create `.github/ISSUE_TEMPLATE/translation_request.yml` for community members to volunteer for or track progress on a specific language (e.g. French, German, Italian, Portuguese, Japanese).
-- [ ] PENDING: **Translation Quick-Start Guide (`TRANSLATIONS.md`):**
+- [x] **Translation Quick-Start Guide (`TRANSLATIONS.md`):**
   - Create a dedicated guide detailing how non-programmers can copy `locales/en_us.yml`, translate keys, and test live using `bashmenu --locale <file>`.
   - Document `ymlcheck -l locales/<file>.yml` for self-validation.
-- [ ] **Locale Auto-Discovery:**
+- [ ] PENDING: **Locale Auto-Discovery:**
   - Enhance `bashmenu-core` and `bashmenu-cli` to automatically discover and list available `.yml` locale files in `~/.config/bashmenu/locales/` and `/usr/share/bashmenu/locales/`.
   - Expose a dynamic locale switcher in `Options & Settings -> Language / Locale`.
 

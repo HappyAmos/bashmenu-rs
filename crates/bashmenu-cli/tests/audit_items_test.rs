@@ -46,6 +46,21 @@ fn test_bashmenu_marquee_speed_config_options() {
 }
 
 #[test]
+fn test_bashmenu_locale_config_options() {
+    let repo_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
+    let yml_path = repo_root.join("bashmenu.yml");
+    let config = bashmenu_core::load_config(&yml_path).expect("bashmenu.yml must load");
+    assert_eq!(config.settings.locale, Some("auto".to_string()));
+
+    let mnu_path = repo_root.join("bashmenu.mnu");
+    let content = std::fs::read_to_string(&mnu_path).expect("bashmenu.mnu must exist");
+    assert!(
+        content.contains("Language / Locale [{settings.locale}]"),
+        "bashmenu.mnu must contain Language / Locale radio setting"
+    );
+}
+
+#[test]
 fn test_user_config_isolation_and_vanilla_separation() {
     let bin = env!("CARGO_BIN_EXE_bashmenu");
     let output = Command::new(bin)

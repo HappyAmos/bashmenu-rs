@@ -69,6 +69,7 @@ pub const PLACEHOLDER_HELP_TEXT: &str = "\
 {user-mode}                  │ Privilege level (User or Root)
 {version}                    │ Application release version (from Cargo.toml)
 {theme}                      │ Active color theme name (or {app.theme})
+{locale}                     │ Active interface locale (e.g. en_US, es_ES)
 {color_mode}                 │ Current terminal color mode (e.g. truecolor, 256 color)
 {tty_mode}                   │ Current TTY mode (e.g. virtual console (tty), pty)
 
