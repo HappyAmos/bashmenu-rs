@@ -7,6 +7,7 @@ pub mod glyph;
 pub mod i18n;
 pub mod macro_engine;
 pub mod menu;
+pub mod menu_merge;
 pub mod notebook;
 pub mod plugin;
 pub mod shortcuts;
@@ -38,6 +39,10 @@ pub use macro_engine::{
 pub use menu::{
     load_menu, save_menu, ConfirmAction, ConfirmActionDetails, ExecutionMode, MenuItem,
     MenuItemType, MenuSchema, Submenu,
+};
+pub use menu_merge::{
+    apply_merge, compute_menu_diff, compute_property_diffs, items_match, ConflictChoice,
+    ItemConflict, ItemPath, MenuMergePlan, MergeDecisions, NewUpstreamItem, PropertyDiff,
 };
 pub use notebook::{
     add_or_update_note, build_notebook_submenu, delete_note, get_note_by_title, get_notes,

@@ -110,6 +110,30 @@ struct Cli {
     #[arg(long)]
     shortcuts: bool,
 
+    /// Interactively merge a user menu with an upstream vanilla template
+    #[arg(long)]
+    merge: bool,
+
+    /// User menu file for merge mode (defaults to user's bashmenu.mnu)
+    #[arg(long)]
+    user_menu: Option<PathBuf>,
+
+    /// Vanilla / upstream template menu file for merge mode (defaults to repo or installed vanilla bashmenu.mnu)
+    #[arg(long)]
+    vanilla_menu: Option<PathBuf>,
+
+    /// Destination file for merged menu (defaults to user_menu)
+    #[arg(long)]
+    output_menu: Option<PathBuf>,
+
+    /// Create a backup file at this path before writing merged menu
+    #[arg(long)]
+    backup: Option<PathBuf>,
+
+    /// Automatically accept defaults in non-interactive mode
+    #[arg(short = 'y', long = "yes")]
+    yes: bool,
+
     /// Override interface display locale
     #[arg(short = 'L', long = "locale")]
     locale: Option<String>,
@@ -252,6 +276,40 @@ fn main() -> Result<()> {
     if let Some(ref loc) = locale_target {
         let clean_loc = loc.split('.').next().unwrap_or(loc);
         let _ = bashmenu_core::set_locale(clean_loc);
+    }
+
+    if cli.merge {
+        let user_menu = if let Some(ref u) = cli.user_menu {
+            resolve_menu_path(u, cli.local)
+        } else if let Some(ref f) = cli.file {
+            resolve_menu_path(f, cli.local)
+        } else if cli.local {
+            PathBuf::from("./bashmenu.mnu")
+        } else {
+            bashmenu_core::get_user_config_dir().join("bashmenu.mnu")
+        };
+
+        let vanilla_menu = if let Some(ref v) = cli.vanilla_menu {
+            resolve_menu_path(v, cli.local)
+        } else {
+            bashmenu_core::resolve_app_path("bashmenu.mnu")
+        };
+
+        let output_menu = cli
+            .output_menu
+            .as_ref()
+            .map(|o| resolve_menu_path(o, cli.local))
+            .unwrap_or_else(|| user_menu.clone());
+
+        let backup_menu = cli.backup.as_ref().map(|b| resolve_menu_path(b, cli.local));
+
+        return menuedit_cli::run_merge_wizard(
+            &user_menu,
+            &vanilla_menu,
+            &output_menu,
+            backup_menu.as_deref(),
+            cli.yes,
+        );
     }
 
     if cli.shortcuts {

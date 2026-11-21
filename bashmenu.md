@@ -185,6 +185,11 @@ Used as dynamic templates for code generation, settings, or block injections:
 
 *Note on Menu Focus Synchronization & Property Inspector Previews:* When launching `menuedit` from `bashmenu` (via `F4` or menu item action), the editor tree automatically synchronizes active keyboard focus and selection directly on the item that was selected in `bashmenu`, so pressing `e` or `ENTER` immediately opens the `ItemEditModal` dialog for that exact item. The Property Inspector side panel features a real-time visual `Preview:` section for all item types (commands, submenus, scripts, dividers, etc.) showing exactly how the item will appear in the main menu (including resolved Nerd Font/emoji icons, placeholders, and right-aligned shortcut brackets). Additionally, the `ItemEditModal` dialog dynamically updates its preview box in real-time as title or icon fields are edited.
 
+#### Interactive Menu Merge Mode (`menuedit --merge` & `install.sh --merge`)
+When upgrading BashMenu or adopting upstream additions, `menuedit` includes an interactive semantic merge engine:
+- `menuedit --merge [--user-menu <FILE>] [--vanilla-menu <FILE>] [--output-menu <FILE>] [--backup <FILE>] [-y|--yes]`: Recursively diffs user configurations against upstream vanilla templates, prompting the user on additions and property conflicts while preserving personal additions and customizations.
+- `./install.sh --merge`: Automatically triggers `menuedit --merge` during installation to safely update `~/.config/bashmenu/bashmenu.mnu`, saving a `.bak` backup and running schema validation via `ymlcheck -m`.
+
 ### 3.3 Built-in Text Editor (`bashedit`)
 
 | Option | Description |

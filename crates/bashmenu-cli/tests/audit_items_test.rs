@@ -417,3 +417,21 @@ fn test_random_theme_resolution_in_bashmenu() {
     assert!(themes.contains_key(&active_name));
     assert!(active_theme.is_some());
 }
+
+#[test]
+fn test_installer_help_flags() {
+    let repo_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
+    let install_sh = repo_root.join("install.sh");
+    assert!(install_sh.is_file(), "install.sh must exist at repo root");
+
+    let output = Command::new("sh")
+        .arg(&install_sh)
+        .arg("--help")
+        .output()
+        .expect("install.sh --help must run");
+
+    assert!(output.status.success(), "install.sh --help must exit 0");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("--merge"));
+    assert!(stdout.contains("--update-menu"));
+}
