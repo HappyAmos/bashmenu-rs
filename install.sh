@@ -37,10 +37,10 @@ echo "==================================================================="
 echo "              Installing BashMenu-RS System                        "
 echo "==================================================================="
 
-# Check for pre-built binaries (e.g. from GitHub release bundle or prior build)
+# Check for pre-built binaries (e.g. from GitHub release bundle in bin/)
 HAS_PREBUILT=true
 for bin in bashmenu ymlcheck menuedit shortcutedit themeedit bashedit bmpager cheat; do
-    if [ ! -f "$SCRIPT_DIR/bin/$bin" ] && [ ! -f "$SCRIPT_DIR/target/release/$bin" ]; then
+    if [ ! -f "$SCRIPT_DIR/bin/$bin" ]; then
         HAS_PREBUILT=false
         break
     fi

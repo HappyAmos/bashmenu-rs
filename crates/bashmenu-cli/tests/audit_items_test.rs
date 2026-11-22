@@ -434,4 +434,12 @@ fn test_installer_help_flags() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("--merge"));
     assert!(stdout.contains("--update-menu"));
+
+    let script = std::fs::read_to_string(&install_sh).expect("install.sh must be readable");
+    assert!(
+        !script.contains(
+            "if [ ! -f \"$SCRIPT_DIR/bin/$bin\" ] && [ ! -f \"$SCRIPT_DIR/target/release/$bin\" ]; then"
+        ),
+        "install.sh must not skip cargo build when only stale target/release binaries exist"
+    );
 }
