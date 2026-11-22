@@ -38,7 +38,13 @@ fi
 
 if [ -z "$CACHE_DIR" ]; then
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    CONF_FILE="$SCRIPT_DIR/../bashmenu.yml"
+    CONF_FILE="${BASHMENU_DIR:-$HOME/.config/bashmenu}/bashmenu.yml"
+    if [ ! -f "$CONF_FILE" ]; then
+        CONF_FILE="$SCRIPT_DIR/../bashmenu.yml"
+    fi
+    if [ ! -f "$CONF_FILE" ]; then
+        CONF_FILE="$SCRIPT_DIR/../defaults/bashmenu.yml"
+    fi
     if [ -f "$CONF_FILE" ]; then
         if command -v python3 &>/dev/null; then
             RAW_CACHE=$(python3 -c "import yaml; data=yaml.safe_load(open('$CONF_FILE')); print(data.get('settings', {}).get('cache_dir', ''))" 2>/dev/null)

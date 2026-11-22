@@ -110,14 +110,49 @@ impl Default for ShortcutsConfig {
     }
 }
 
+/// Canonical built-in BashMenu action macros and their i18n locale keys.
+pub const BUILTIN_ACTIONS: &[(&str, &str)] = &[
+    ("{help}", "common.gutters.help"),
+    ("{theme_picker}", "common.gutters.themes"),
+    ("{text_editor}", "common.gutters.editor"),
+    ("{menu_editor}", "common.gutters.edit"),
+    ("{refresh}", "common.gutters.refresh"),
+    ("{keys_toggle}", "common.gutters.keys"),
+    ("{user_gutter}", "common.gutters.gutter"),
+    ("{theme_editor}", "common.gutters.themeedit"),
+    ("{shortcut_editor}", "common.gutters.shortcutedit"),
+    ("{back}", "common.gutters.back"),
+    ("{select}", "common.gutters.select"),
+    ("{toggle_gutter}", "common.gutters.expand"),
+];
+
+/// Returns the canonical locale key for a built-in action macro, if recognized.
+pub fn builtin_action_locale_key(macro_str: &str) -> Option<&'static str> {
+    let trimmed = macro_str.trim();
+    BUILTIN_ACTIONS
+        .iter()
+        .find(|(m, _)| m.eq_ignore_ascii_case(trimmed))
+        .map(|(_, key)| *key)
+}
+
+/// Resolves the localized display label for a built-in action macro.
+pub fn resolve_builtin_description(macro_str: &str) -> Option<String> {
+    builtin_action_locale_key(macro_str).map(crate::i18n::translate)
+}
+
 /// A single keyboard shortcut definition in `shortcuts.yml`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ShortcutEntry {
-    /// Key combo (`"F10"`, `"ctrl+g"`, `"alt+t"`) or leader chord (`"<leader> t"`).
+    /// Key combo (`"F1"`, `"F10"`, `"ctrl+g"`, `"alt+t"`, `"esc"`, `"enter"`) or
+    /// leader chord (`"<leader> t"`).
     pub key: String,
-    /// Human-readable description displayed in the Shortcut Manager and leader popup.
+    /// Human-readable description displayed in the Shortcut Manager, help gutter,
+    /// and leader popup. When empty on a `builtin` shortcut, auto-derives from
+    /// the active locale.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub description: String,
-    /// Item type (`command`, `script`, `editor`, `toast`, `confirm`, `notebook`, `theme_selector`).
+    /// Item type (`builtin`, `command`, `script`, `editor`, `toast`, `confirm`,
+    /// `notebook`, `theme_selector`).
     #[serde(default)]
     pub r#type: MenuItemType,
     /// Primary target command, script, or file path.
@@ -165,6 +200,9 @@ pub struct ShortcutEntry {
     /// Whether this shortcut is currently active.
     #[serde(default = "default_true", skip_serializing_if = "is_true")]
     pub enabled: bool,
+    /// Whether this shortcut is displayed in the main menu help gutter.
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
+    pub show_in_gutter: bool,
     /// Additional custom properties forwarded to `MenuItem`.
     #[serde(flatten)]
     pub extra: HashMap<String, serde_yml::Value>,
@@ -192,12 +230,45 @@ impl Default for ShortcutEntry {
             tabstop: None,
             timeout: None,
             enabled: true,
+            show_in_gutter: true,
             extra: HashMap::new(),
         }
     }
 }
 
 impl ShortcutEntry {
+    /// Returns the recognized built-in action macro (e.g. `"{help}"`,
+    /// `"{refresh}"`) if this shortcut invokes a built-in BashMenu action.
+    pub fn builtin_macro(&self) -> Option<&'static str> {
+        if self.r#type == MenuItemType::ThemeSelector {
+            return Some("{theme_picker}");
+        }
+        let raw = self
+            .action
+            .as_deref()
+            .or(self.command.as_deref())
+            .or(self.script.as_deref())?
+            .trim();
+        BUILTIN_ACTIONS
+            .iter()
+            .find(|(m, _)| m.eq_ignore_ascii_case(raw))
+            .map(|(m, _)| *m)
+    }
+
+    /// Returns the display description for this shortcut, automatically
+    /// deriving the localized label from `locales/*.yml` when `description`
+    /// is empty on a built-in action.
+    pub fn resolved_description(&self) -> String {
+        if !self.description.trim().is_empty() {
+            return self.description.clone();
+        }
+        if let Some(m) = self.builtin_macro() {
+            if let Some(loc) = resolve_builtin_description(m) {
+                return loc;
+            }
+        }
+        self.description.clone()
+    }
     /// Converts this `ShortcutEntry` into a [`MenuItem`] for execution via `MenuAction::Execute`.
     pub fn to_menu_item(&self) -> MenuItem {
         let mut extra = self.extra.clone();
@@ -458,32 +529,13 @@ pub fn normalize_key_spec(raw: &str) -> String {
     normalize_single_key_token(trimmed)
 }
 
-/// Reserved navigation and system keys that cannot be bound as direct single-stroke shortcuts.
+/// Reserved navigation and OS keys that cannot be bound as direct shortcuts.
 const RESERVED_DIRECT_KEYS: &[&str] = &[
-    "up",
-    "down",
-    "left",
-    "right",
-    "enter",
-    "esc",
-    "backspace",
-    "tab",
-    "home",
-    "end",
-    "pageup",
-    "pagedown",
-    "space",
-    "F1",
-    "F2",
-    "F3",
-    "F4",
-    "F5",
-    "F6",
-    "F7",
-    "F8",
-    "F9",
-    "F11",
+    "up", "down", "left", "right", "tab", "home", "end", "pageup", "pagedown", "space", "F11",
 ];
+
+/// Non-modifier special keys explicitly allowed as direct shortcuts.
+const ALLOWED_SPECIAL_DIRECT_KEYS: &[&str] = &["enter", "esc", "backspace"];
 
 /// Validates a shortcut key specification or leader key definition.
 /// Returns `Ok(normalized_key)` if valid, or `Err(reason)` if invalid or reserved.
@@ -541,17 +593,20 @@ pub fn validate_key_spec(raw: &str, is_leader_def: bool) -> std::result::Result<
         .any(|k| k.eq_ignore_ascii_case(&norm))
     {
         return Err(format!(
-            "'{}' is reserved for core BashMenu navigation or built-in functions (use F10, F12, ctrl+<key>, alt+<key>, or '<leader> <key>').",
+            "'{}' is reserved for core navigation or OS fullscreen (use F1-F10, F12, enter, esc, backspace, ctrl+<key>, alt+<key>, or '<leader> <key>').",
             norm
         ));
     }
 
-    // Must be a function key (F10, F12) or modified key (ctrl+..., alt+...)
+    // Must be a function key (F1..F10, F12), allowed special key, or modified key
     let is_fn = norm.starts_with('F') && norm[1..].parse::<u8>().is_ok();
     let is_mod = norm.starts_with("ctrl+") || norm.starts_with("alt+");
-    if !is_fn && !is_mod {
+    let is_special = ALLOWED_SPECIAL_DIRECT_KEYS
+        .iter()
+        .any(|k| k.eq_ignore_ascii_case(&norm));
+    if !is_fn && !is_mod && !is_special {
         return Err(format!(
-            "Direct shortcut '{}' must use 'ctrl+<key>', 'alt+<key>', 'F10'/'F12', or '<leader> <key>'.",
+            "Direct shortcut '{}' must use 'ctrl+<key>', 'alt+<key>', 'F1'-'F10'/'F12', 'enter'/'esc'/'backspace', or '<leader> <key>'.",
             norm
         ));
     }
@@ -583,6 +638,10 @@ pub fn resolve_shortcuts_path(local_override: bool) -> PathBuf {
         .map(PathBuf::from)
         .unwrap_or_else(|_| PathBuf::from("/"));
     let dev_dir = resolve_dev_dir(&home_dir, &user_cfg);
+    let defaults_path = dev_dir.join("defaults").join(filename);
+    if defaults_path.exists() {
+        return defaults_path;
+    }
     let dev_path = dev_dir.join(filename);
     if dev_path.exists() {
         return dev_path;
@@ -648,11 +707,16 @@ mod tests {
         assert!(validate_key_spec("ctrl+g", false).is_ok());
         assert!(validate_key_spec("alt+1", false).is_ok());
 
-        // Single unmodified char or F1..F9 / F11 must be rejected as direct shortcuts
+        // F1..F10, F12, enter, esc, backspace are allowed as direct shortcuts
+        assert!(validate_key_spec("F1", false).is_ok());
+        assert!(validate_key_spec("F9", false).is_ok());
+        assert!(validate_key_spec("enter", false).is_ok());
+        assert!(validate_key_spec("esc", false).is_ok());
+        assert!(validate_key_spec("backspace", false).is_ok());
+
+        // Single unmodified char and F11 (OS fullscreen) must be rejected
         assert!(validate_key_spec("t", false).is_err());
         assert!(validate_key_spec("1", false).is_err());
-        assert!(validate_key_spec("F1", false).is_err());
-        assert!(validate_key_spec("F9", false).is_err());
         assert!(validate_key_spec("F11", false).is_err());
     }
 

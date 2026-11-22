@@ -466,19 +466,19 @@ items:
                 quiet: false
                 alt_buffer: true
                 tabstop: 4
-            - Edit Configuration File [{bashmenu_dir}/bashmenu.yml]:
+            - Edit Configuration File [{bashmenu_yml}]:
                 type: editor
                 icon: '{nf::#f1de}'
-                action: '{bashmenu_dir}/bashmenu.yml'
+                action: '{bashmenu_yml}'
                 interactive: true
                 quiet: false
                 alt_buffer: true
                 tabstop: 4
                 show_whitespace: true
-            - Edit Menu Layout [{bashmenu_dir}/bashmenu.mnu]:
+            - Edit Menu Layout [{bashmenu_mnu}]:
                 type: editor
                 icon: '{nf::#f0279}'
-                action: '{bashmenu_dir}/bashmenu.mnu'
+                action: '{bashmenu_mnu}'
                 interactive: true
                 quiet: false
                 alt_buffer: true
@@ -554,11 +554,11 @@ items:
                 alt_buffer: true
                 tabstop: 4
                 show_whitespace: true
-            - Edit Themes File [{bashmenu_dir}/bashmenu.themes]:
+            - Edit Themes File [{bashmenu_themes}]:
                 type: editor
                 icon: '{nf::#e22b}'
-                action: '{bashmenu_dir}/bashmenu.themes'
-                file: '{bashmenu_dir}/bashmenu.themes'
+                action: '{bashmenu_themes}'
+                file: '{bashmenu_themes}'
                 interactive: true
                 quiet: false
                 alt_buffer: true
@@ -949,11 +949,11 @@ items:
           icon: '{nf::#f048:}'
       - '{divider}': null
 - '{divider}': null
-- Help [bmpager -m bashmenu.md]:
+- Help [bmpager -m assets/bashmenu.md]:
     type: command
     icon: '{nf::#f02d6:}'
-    command: bmpager -m {bashmenu_dir}/bashmenu.md
-    action: bmpager -m {bashmenu_dir}/bashmenu.md
+    command: bmpager -m {bashmenu_dir}/assets/bashmenu.md
+    action: bmpager -m {bashmenu_dir}/assets/bashmenu.md
     interactive: true
     quiet: true
     alt_buffer: true

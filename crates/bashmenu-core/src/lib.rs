@@ -53,8 +53,9 @@ pub use plugin::{
     PluginCacheEntry, PluginConfig, PluginDef, PluginDisplayRow, PluginEngine, PluginLayout,
 };
 pub use shortcuts::{
-    load_shortcuts, normalize_key_spec, normalize_single_key_token, resolve_shortcuts_path,
-    save_shortcuts, validate_key_spec, ShortcutEntry, ShortcutsConfig, SHORTCUTS_HEADER,
+    builtin_action_locale_key, load_shortcuts, normalize_key_spec, normalize_single_key_token,
+    resolve_builtin_description, resolve_shortcuts_path, save_shortcuts, validate_key_spec,
+    ShortcutEntry, ShortcutsConfig, BUILTIN_ACTIONS, SHORTCUTS_HEADER,
 };
 pub use theme::{
     activity_override_tokens, default_activity_overrides_map, is_random_theme_spec,

@@ -18,7 +18,7 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
 - **Authoritative Rules:** All permanent operational invariants, constraints, safety checks, and task execution rules are centralized in `.agents/rules/invariants.md`. Consult that file for:
   - Mandatory git commit and push workflow (`git commit -m "..." && git push origin main`) and remote CI tracking (`gh run list`).
   - Sequential TODO execution lifecycle (`PENDING:` marking, updating `DONE.md`, pruning `- [x]`, and task precedence: `CRITICAL` > `BUG` > `RESPONSIVENESS` > `UI` > `FEATURE` > `REQUEST` > `RESEARCH`).
-  - Single source config paths and project root default configurations (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `cheat.yml`).
+  - Single source config paths and repository `defaults/` default configurations (`defaults/bashmenu.yml`, `defaults/bashmenu.mnu`, `defaults/bashmenu.themes`, `defaults/shortcuts.yml`, `defaults/cheat.yml`, `defaults/notes.yml`).
   - Linux Framebuffer TrueColor & `--image` mode (`/dev/fb0`).
   - Application version `{version}` and environment table `{env}` / `assets/about.md`.
   - Config header preservation (`save_config`) and YAML structural integrity (no flat dotted keys).
@@ -52,9 +52,9 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
 | `crates/cheat-cli` | Binary (`cheat`) | Interactive cheatsheet search and terminal viewer. |
 | `crates/ymlcheck-cli` | Binary (`ymlcheck`) | Schema validation CLI for YAML configurations. |
 | `bashmenu.sh` | Shell | POSIX wrapper checking capabilities, paths, and binary execution. |
-| `bashmenu.yml` | Config | Active theme, plugin layout, timeouts, transitions, and settings. |
-| `bashmenu.mnu` | Config | Menu hierarchy using label-as-key `items:` schema. |
-| `bashmenu.themes` | Config | Theme palettes (256/16/8 tiers), activity overrides, window borders, dividers, marquees. |
+| `defaults/bashmenu.yml` | Config | Active theme, plugin layout, timeouts, transitions, and settings. |
+| `defaults/bashmenu.mnu` | Config | Menu hierarchy using label-as-key `items:` schema. |
+| `defaults/bashmenu.themes` | Config | Theme palettes (256/16/8 tiers), activity overrides, window borders, dividers, marquees. |
 | `scripts/` | Shell | Extension tools and plugins (`glyphs.sh`, `webopen.sh`, `unicode.sh`, games). |
 | `templates/` | Templates | Shell configs (`autoexec.sh.tmpl`, `bash_aliases.tmpl`) free of personal hostnames or paths. |
 
@@ -76,7 +76,7 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
 - **Status & Help Gutters:**
   - Neither status gutter (right) nor help gutter (left) may exceed 50% of available width (`max_gutter_w = std::cmp::max(5, avail_w / 2)`).
   - Status gutter takes layout precedence over help gutter in narrow terminals.
-  - Function keys `<F1>` through `<F12>` listed in help gutters must ALWAYS be in strictly ascending numerical order. Omit `[UP/DN]: Nav` across all views.
+  - Default function keys `<F1>` through `<F12>` ship in ascending order (`defaults/shortcuts.yml`), while `MenuView` preserves the user's configured `shortcuts.yml` order. Omit `[UP/DN]: Nav` across all views.
   - Sizing formula: `gutter_rows = std::cmp::min(2, std::cmp::max(1, std::cmp::max(help_lines.len(), status_lines.len())))`. Total rendered lines strictly equals terminal height `h`.
 - **Universal Marquee Overflow Invariant & 50/50 Partition Contract:**
   - Text in panels, windows, viewports, lists, and titles (e.g. menu items, plugin rows, tree nodes, inspector lines, sidebar tokens, preview panes) exceeding panel or window width margins must marquee using the active theme's `marquee.char` and `marquee.gap`.
@@ -182,5 +182,5 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
   2. `crates/menuedit-cli`: Inspector guide help modal.
   3. `crates/bashedit-cli`: Editor manual modal.
   4. `crates/bmpager-cli`: Standalone pager help modal.
-  5. `bashmenu.md`: Reference documentation.
-  6. `bashmenu.1`: Linux system man page.
+  5. `assets/bashmenu.md`: Reference documentation.
+  6. `assets/bashmenu.1`: Linux system man page.

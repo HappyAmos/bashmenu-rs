@@ -98,6 +98,9 @@ pub enum MenuItemType {
     /// Opens the interactive theme selector modal
     #[serde(rename = "theme_selector")]
     ThemeSelector,
+    /// Executes a built-in BashMenu action macro (e.g. `{help}`, `{refresh}`)
+    #[serde(rename = "builtin")]
+    Builtin,
     /// Exits BashMenu
     #[serde(rename = "exit")]
     Exit,
@@ -967,7 +970,7 @@ mod tests {
 
     #[test]
     fn test_load_menu_fixture() {
-        let fixture_path = Path::new("../../bashmenu.mnu");
+        let fixture_path = Path::new("../../defaults/bashmenu.mnu");
         if fixture_path.exists() {
             let menu = load_menu(fixture_path).expect("Failed to load bashmenu.mnu");
             assert_eq!(menu.title, "Bash Menu");

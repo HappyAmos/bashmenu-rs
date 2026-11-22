@@ -87,7 +87,11 @@ impl<'a> MacroContext<'a> {
                     user_cfg
                 } else {
                     let cur = std::env::current_dir().unwrap_or_else(|_| home_dir.clone());
-                    if cur.join("bashmenu.mnu").exists() || cur.join("bashmenu.yml").exists() {
+                    if cur.join("bashmenu.mnu").exists()
+                        || cur.join("bashmenu.yml").exists()
+                        || cur.join("defaults/bashmenu.mnu").exists()
+                        || cur.join("defaults/bashmenu.yml").exists()
+                    {
                         cur
                     } else {
                         user_cfg
@@ -194,11 +198,16 @@ impl<'a> MacroContext<'a> {
             if p.exists() {
                 p
             } else {
-                let dev = self.dev_dir.join("bashmenu.yml");
-                if dev.exists() {
-                    dev
+                let def = self.dev_dir.join("defaults/bashmenu.yml");
+                if def.exists() {
+                    def
                 } else {
-                    p
+                    let dev = self.dev_dir.join("bashmenu.yml");
+                    if dev.exists() {
+                        dev
+                    } else {
+                        p
+                    }
                 }
             }
         })
@@ -211,11 +220,16 @@ impl<'a> MacroContext<'a> {
             if p.exists() {
                 p
             } else {
-                let dev = self.dev_dir.join("bashmenu.mnu");
-                if dev.exists() {
-                    dev
+                let def = self.dev_dir.join("defaults/bashmenu.mnu");
+                if def.exists() {
+                    def
                 } else {
-                    p
+                    let dev = self.dev_dir.join("bashmenu.mnu");
+                    if dev.exists() {
+                        dev
+                    } else {
+                        p
+                    }
                 }
             }
         })
@@ -228,11 +242,16 @@ impl<'a> MacroContext<'a> {
             if p.exists() {
                 p
             } else {
-                let dev = self.dev_dir.join("bashmenu.themes");
-                if dev.exists() {
-                    dev
+                let def = self.dev_dir.join("defaults/bashmenu.themes");
+                if def.exists() {
+                    def
                 } else {
-                    p
+                    let dev = self.dev_dir.join("bashmenu.themes");
+                    if dev.exists() {
+                        dev
+                    } else {
+                        p
+                    }
                 }
             }
         })
@@ -245,11 +264,16 @@ impl<'a> MacroContext<'a> {
             if p.exists() {
                 p
             } else {
-                let dev = self.dev_dir.join("shortcuts.yml");
-                if dev.exists() {
-                    dev
+                let def = self.dev_dir.join("defaults/shortcuts.yml");
+                if def.exists() {
+                    def
                 } else {
-                    p
+                    let dev = self.dev_dir.join("shortcuts.yml");
+                    if dev.exists() {
+                        dev
+                    } else {
+                        p
+                    }
                 }
             }
         })
@@ -262,11 +286,16 @@ impl<'a> MacroContext<'a> {
             if p.exists() {
                 p
             } else {
-                let dev = self.dev_dir.join("cheat.yml");
-                if dev.exists() {
-                    dev
+                let def = self.dev_dir.join("defaults/cheat.yml");
+                if def.exists() {
+                    def
                 } else {
-                    p
+                    let dev = self.dev_dir.join("cheat.yml");
+                    if dev.exists() {
+                        dev
+                    } else {
+                        p
+                    }
                 }
             }
         })
@@ -723,7 +752,8 @@ pub fn resolve_dev_dir(home_dir: &Path, bashmenu_dir: &Path) -> PathBuf {
             if (ancestor.join(".git").exists() || ancestor.join(".git").is_file())
                 && (ancestor.join("crates/bashmenu-core").exists()
                     || (ancestor.join("Cargo.toml").exists()
-                        && ancestor.join("bashmenu.mnu").exists()))
+                        && (ancestor.join("defaults/bashmenu.mnu").exists()
+                            || ancestor.join("bashmenu.mnu").exists())))
             {
                 return ancestor.to_path_buf();
             }
@@ -744,6 +774,13 @@ pub fn resolve_dev_dir(home_dir: &Path, bashmenu_dir: &Path) -> PathBuf {
                     if parent.join(".git").exists() || parent.join("Cargo.toml").exists() {
                         return parent.to_path_buf();
                     }
+                    if let Some(grandparent) = parent.parent() {
+                        if grandparent.join(".git").exists()
+                            || grandparent.join("Cargo.toml").exists()
+                        {
+                            return grandparent.to_path_buf();
+                        }
+                    }
                 }
             }
         }
@@ -756,7 +793,8 @@ pub fn resolve_dev_dir(home_dir: &Path, bashmenu_dir: &Path) -> PathBuf {
             if (ancestor.join(".git").exists() || ancestor.join(".git").is_file())
                 && (ancestor.join("crates/bashmenu-core").exists()
                     || (ancestor.join("Cargo.toml").exists()
-                        && ancestor.join("bashmenu.mnu").exists()))
+                        && (ancestor.join("defaults/bashmenu.mnu").exists()
+                            || ancestor.join("bashmenu.mnu").exists())))
             {
                 return ancestor.to_path_buf();
             }
@@ -770,7 +808,8 @@ pub fn resolve_dev_dir(home_dir: &Path, bashmenu_dir: &Path) -> PathBuf {
                 if (ancestor.join(".git").exists() || ancestor.join(".git").is_file())
                     && (ancestor.join("crates/bashmenu-core").exists()
                         || (ancestor.join("Cargo.toml").exists()
-                            && ancestor.join("bashmenu.mnu").exists()))
+                            && (ancestor.join("defaults/bashmenu.mnu").exists()
+                                || ancestor.join("bashmenu.mnu").exists())))
                 {
                     return ancestor.to_path_buf();
                 }
@@ -1618,6 +1657,11 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
         direct_map.insert("{dev_dir}", dev_str.clone());
         direct_map.insert("{dev}", dev_str);
     }
+    if res.contains("{defaults_dir}") || res.contains("{defaults}") {
+        let defaults_str = ctx.dev_dir.join("defaults").to_string_lossy().to_string();
+        direct_map.insert("{defaults_dir}", defaults_str.clone());
+        direct_map.insert("{defaults}", defaults_str);
+    }
     if res.contains("{bashmenu_dir}") || res.contains("{config_dir}") {
         let bm_dir = ctx.bashmenu_dir.to_string_lossy().to_string();
         direct_map.insert("{bashmenu_dir}", bm_dir.clone());
@@ -1657,6 +1701,11 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
         let n_dir = ctx.bashmenu_dir.join("notebooks");
         let notebooks_dir = if n_dir.exists() {
             n_dir.to_string_lossy().to_string()
+        } else if ctx.bashmenu_dir.join("defaults/notes.yml").exists() {
+            ctx.bashmenu_dir
+                .join("defaults")
+                .to_string_lossy()
+                .to_string()
         } else if ctx.bashmenu_dir.join("notes.yml").exists() {
             ctx.bashmenu_dir.to_string_lossy().to_string()
         } else {

@@ -618,7 +618,7 @@ mod tests {
 
     #[test]
     fn test_load_themes_fixture() {
-        let fixture_path = Path::new("../../bashmenu.themes");
+        let fixture_path = Path::new("../../defaults/bashmenu.themes");
         if fixture_path.exists() {
             let themes = load_themes(fixture_path).expect("Failed to load bashmenu.themes");
             assert!(themes.contains_key("dracula"), "dracula theme must exist");

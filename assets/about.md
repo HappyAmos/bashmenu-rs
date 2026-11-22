@@ -6,10 +6,11 @@ title: Current Bashmenu Environment
 | Version | {version} |
 | Color Mode | {color_mode} |
 | TTY Mode | {tty_mode} |
+| Repo Dir | {dev_dir} |
+| Config Dir | {bashmenu_dir} |
 | bashmenu.yml | {bashmenu_yml} |
 | bashmenu.mnu | {bashmenu_mnu} |
 | bashmenu.themes | {bashmenu_themes} |
 | shortcuts.yml | {shortcuts_yml} |
 | cheat.yml | {cheat_yml} |
-| Config Dir | {bashmenu_dir} |
-| Notebook Dir | {notebooks_dir} |
+| Notebooks Dir | {notebooks_dir} |

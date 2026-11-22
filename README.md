@@ -12,7 +12,7 @@
 
 This started as a Bash menu script to create reproducible installs for my homelab, then a Python version, then a Rust version. While I throw as much as I can at it, it should be considered to be in an alpha state. In addition to being a script launcher, over time I've incorporated a built-in text editor (because why not), a visual theme editor, a keyboard shortcuts editor (default is a <ctrl> + <space> leader key then a shortcut key), visual menu editor, custom pager that does a decent job of rendering basic Markdown in a terminal, cheatsheet management tool (list, search, etc.) which uses the built-in pager tool to display Markdown, and a plethora of small utility scripts.
 
-BM uses ```{}``` brackets to include environment variables, custom scripts, dynamic data, etc. All {} placeholders/macros may be used in scripts, commands, status gutter, plug-ins, etc. View [bashmenu.md](https://github.com/HappyAmos/bashmenu-rs/bashmenu.md) for more details on the included placeholders/macros.
+BM uses ```{}``` brackets to include environment variables, custom scripts, dynamic data, etc. All {} placeholders/macros may be used in scripts, commands, status gutter, plug-ins, etc. View [bashmenu.md](assets/bashmenu.md) for more details on the included placeholders/macros.
 
 Installation is fairly simple if you already have Rust installed. Just clone this Github repository, then run the install.sh script. The script copies binaries and symlinks to ~/.local/bin/. Configuration files are stored in ~/.config/bashmenu, while cache is installed in ~/.cache/bashmenu. A utility script is included in the repository root, uninstall.sh, that removes binaries, symlinks, and cache from ~/.local/bin, ~/.config/bashmenu, and ~/.cache/bashmenu, respectively. The repository is not removed when uninstalling.
 
@@ -115,7 +115,7 @@ crates/
 ```
 
 For full architectural details, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).  
-For the complete user manual and specification, see [bashmenu.md](bashmenu.md).
+For the complete user manual and specification, see [assets/bashmenu.md](assets/bashmenu.md).
 
 ---
 

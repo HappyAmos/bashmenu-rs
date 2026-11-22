@@ -72,7 +72,7 @@ Color theme definitions (supporting 256, 16, and 8 color modes).
 .SH MAN PAGES (MANUALS)
 The application provides a local man page for terminal-based help:
 .TP
-.I bashmenu.1
+.I assets/bashmenu.1
 Terminal manual page for HA Bash Menu.
 .SH DYNAMIC SCRIPTS & TEMPLATES
 .SS Provided Utility Scripts (scripts/)
@@ -176,7 +176,7 @@ Expand or collapse the left help gutter to reveal all hidden shortcuts.
 Execute active selected menu option action.
 .TP
 .B F1
-View Markdown user manual (bashmenu.md) via bmpager --markdown.
+View Markdown user manual (assets/bashmenu.md) via bmpager --markdown.
 .TP
 .B F2
 Open Theme selector dialog.
@@ -715,6 +715,9 @@ User configuration root directory (~/.config/bashmenu).
 .B {dev_dir}, {dev}
 Local git repository and development workspace root directory.
 .TP
+.B {defaults_dir}, {defaults}
+Repository defaults configuration directory ({dev_dir}/defaults).
+.TP
 .B {templates_dir}, {templates}, {scripts_dir}, {scripts}
 Templates and scripts folders paths.
 .TP
@@ -803,6 +806,9 @@ User-defined Markdown popup directive (e.g., {info:{bashmenu_dir}/info.md} or {i
 .TP
 .B {bashmenu_yml}, {bashmenu_mnu}, {bashmenu_themes}, {shortcuts_yml}, {cheat_yml}
 Full canonical paths to the currently loaded configuration, menu, theme, shortcuts, and cheatsheet YAML files.
+.TP
+.B {help}, {theme_picker}, {text_editor}, {menu_editor}, {refresh}, {keys_toggle}, {user_gutter}, {theme_editor}, {shortcut_editor}, {back}, {select}, {toggle_gutter}
+Built-in action macros usable in shortcuts.yml (type: builtin, with optional show_in_gutter: true|false) and bashmenu.mnu to invoke core BashMenu actions, modals, and companion editors. When description is omitted on a built-in shortcut, its label is automatically localized from locales/*.yml.
 .TP
 .B {color_mode}
 Current terminal color depth mode (e.g., 3-bit (8 color), 16 color, 256 color, truecolor).

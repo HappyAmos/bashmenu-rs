@@ -54,6 +54,8 @@ common:
     read_note: "Leer"
     rename_note: "Renombrar"
     delete_note: "Eliminar"
+    expand: "Expandir"
+    leader: "Líder"
   dialogs:
     confirm_title: "Confirmación"
     error_title: "Error"

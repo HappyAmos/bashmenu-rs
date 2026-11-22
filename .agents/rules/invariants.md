@@ -1,5 +1,8 @@
 # BashMenu-RS Development Invariants & Guidelines
 
+## 0. User Request Sanity & Clarification Gate
+- **Halt on Confusion or Misguided Requests:** If the user requests something counterproductive, based on a misconception, or showing obvious confusion about repository state, architecture, or consequences, **halt execution immediately** before making changes. Clearly explain the discrepancy or risk and wait until the user confirms they understand and still want to proceed.
+
 ## 1. Mandatory Git Commit & Push Workflow
 - **Commit & Push Requirement:** Every completed task, bug fix, feature, or refactor must conclude with a descriptive commit (`git commit -m "..."`) pushed directly to GitHub (`git push origin main`). Never leave changes uncommitted or unpushed.
 - **Remote CI Verification:** After pushing to GitHub, verify remote CI passes using the GitHub CLI:
@@ -7,9 +10,9 @@
   - Watch run: `gh run watch <ID>` (always pass an explicit ID to avoid interactive hangs).
 
 ## 2. Configuration & State Persistence
-- **Single Source of Truth Config Path & Project Root Defaults:** User configs reside in `~/.config/bashmenu/` (`{bashmenu_dir}`), while `{dev_dir}` dynamically resolves git repository root. Original default config files (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `cheat.yml`) reside strictly in project root. The `/tests/fixtures` directory has been removed and must never be reintroduced; all test harnesses, fallbacks, and loaders reference root files directly.
+- **Single Source of Truth Config Path & Repository Defaults:** User configs reside in `~/.config/bashmenu/` (`{bashmenu_dir}`), while `{dev_dir}` dynamically resolves git repository root and `{defaults}` / `{defaults_dir}` resolves `{dev_dir}/defaults`. Original default config files (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `cheat.yml`, `notes.yml`) reside strictly in `defaults/`. The `/tests/fixtures` directory has been removed and must never be reintroduced; all test harnesses, fallbacks, and loaders reference `defaults/` directly.
 - **Strict `--repo` and `--local` Path Isolation:**
-  - Passing `--repo` / `-r` forces loading all configuration and data files (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `notes.yml`, notebooks) strictly from repository root (`{dev_dir}`).
+  - Passing `--repo` / `-r` forces loading all configuration and data files (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `cheat.yml`, `notes.yml`, notebooks) strictly from repository `defaults/` (`{defaults}`).
   - Passing `--local` forces loading configuration files strictly from the current working directory (`.`).
   - Under no circumstances may `~/.config/bashmenu` be queried, probed, or fallen back to when either `--repo` or `--local` is active.
 - **Direct Linux Framebuffer TrueColor & Full-Resolution Image Mode (`--image` / `-i`):** On Linux console with accessible `/dev/fb0` (`settings.framebuffer: auto | true | image`), `FramebufferDevice` renders Ratatui's buffer in 24-bit TrueColor directly into `/dev/fb0` while `TerminalOutput` suppresses stdout ANSI writes. Default uses character-block wallpaper (`▀`/`▛`); passing `--image` or `-i` renders full-resolution pixel wallpaper onto `/dev/fb0` composited beneath TrueColor TUI.
@@ -46,7 +49,7 @@
 - **Menu Priority Over Plugins:** When terminal height is constrained, plugin rows must automatically truncate or drop first so menu items and status gutter remain visible.
 - **Modal View Selection & Background Invariant:** Text inside modal frames inherits `styles.background`. Active/highlighted items in note viewers use inverted text (`Modifier::REVERSED`) rather than glyph markers (`►`) or clashing highlight fills.
 - **Unicode-Safe Text Editing & Universal Clipboard:** Editors (`TextInput`, `bashedit`, `NoteEditorModal`, `menuedit`) must operate on Unicode `char` counts (never byte slices), soft-wrap at word boundaries (`wrap_chars_by_word`), and support `Shift+Directional` selection plus `Ctrl+C`/`Ctrl+V`/`Ctrl+X` clipboard operations (`bashmenu_tui::clipboard`).
-- **Spread Help Gutters & Ascending Function Keys:** Help gutters spread items across up to 2 lines (`wrap_spread_help_gutter`) using `|` as delimiter. Omit `[UP/DN]: Nav`. Function keys `<F1>`..`<F12>` must ALWAYS be in strictly ascending order. Panel titles connect directly to borders (`┌─[ Title ]───`). Scrollbars render 1 column inside right border.
+- **Spread Help Gutters & Shortcuts Ordering:** Help gutters spread items across up to 2 lines (`wrap_spread_help_gutter`) using `|` as delimiter. Omit `[UP/DN]: Nav`. Built-in main-menu shortcuts (`F1`..`F9`, `esc`, `enter`, `ctrl+g`) live in `shortcuts.yml` (`type: builtin`, optional `show_in_gutter`) and render strictly in `shortcuts.yml` order (default `defaults/shortcuts.yml` ships in ascending `F1`..`F9` order), omitting individual `<leader>` chords and appending the configured leader key last. Panel titles connect directly to borders (`┌─[ Title ]───`). Scrollbars render 1 column inside right border.
 - **Status Gutter Precedence:** Status gutter takes layout precedence over help gutter. In narrow terminals, help gutter yields columns to ensure no trailing status tokens or date/time stamps are dropped.
 - **Toast Notification Dispatch:** Non-blocking toasts (`{toast:SECONDS:"MESSAGE"}`) dock in bottom-right corner above status gutter with accent block `▌` (`\u{258c}`), theme panel background, bold title, and wrapped body. Dismiss on timeout or mouse click. Empty commands must never execute a shell.
 - **Universal Marquee Overflow Invariant:** Text in panels, windows, lists, and titles exceeding width margins must marquee via `get_marquee_slice` using active theme's `marquee.char` and `marquee.gap` after a 4-tick (1.0s) pause delay; pauses during modals. `TextInput` is strictly exempted and scrolls horizontally without marqueeing.
@@ -83,8 +86,8 @@
   2. Inspector guide help modal in `menuedit-cli`
   3. Editor manual modal in `bashedit-cli`
   4. Pager manual modal in `bmpager-cli`
-  5. Markdown guide (`bashmenu.md`)
-  6. Linux man page (`bashmenu.1`)
+  5. Markdown guide (`assets/bashmenu.md`)
+  6. Linux man page (`assets/bashmenu.1`)
 
 ## 5. TODO Task Execution & Lifecycle Invariants (CRITICAL)
 - **Sequential TODO Execution:** Unless specifically labeled (`CRITICAL`) or explicitly instructed otherwise by the user, always tackle items from TODO lists (`~/.config/bashmenu/notebooks/notes.yml` under `'TODO (Agent: Allowed)'` or `.agents/skills/bashmenu-rs-developer/TODO.md`) strictly in sequential order, top to bottom. Complete each item fully (including verification, commit, push, and remote CI check) before moving to the next.

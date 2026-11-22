@@ -7,8 +7,8 @@
 version: '0.0.1'
 theme: alaska-train
 user:
-  example_boolean: true
   example_filepath: '{bashmenu_dir}'
+  example_boolean: true
   example_string: A string of text
 settings:
   cache_dir: '{home}/.cache/bashmenu'
@@ -20,11 +20,10 @@ settings:
   help_gutter_delay: 2.0
   tab_to_spaces: true
   tabstop: 4
-  locale: auto
   show_menu_shortcuts: true
   use_nerd_fonts: true
   nerd_font_width: auto
-  status_gutter: '| Theme: {theme} | {user} | Battery: {battery} ({battery_stat}) | {user.localip} | [b]{date_time_24_short}[/b]'
+  status_gutter: '| Theme: {theme} | {user} | Battery: {battery} ({battery_stat}) | Version: {version} | {localip} | [b]{date_time_24_short}[/b]'
   inactivity_timeout:
     milliseconds: 300000
     command: kcchase --keyboard
@@ -60,3 +59,4 @@ settings:
   modal_animation_speed: fast
   marquee_speed: normal
   framebuffer: auto
+  locale: auto

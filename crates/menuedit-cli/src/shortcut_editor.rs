@@ -175,8 +175,15 @@ pub fn format_shortcut_inspector(
 
     lines.push("Selected Shortcut Properties".to_string());
     lines.push(rule.clone());
-    lines.push(format!("  Description     : {}", entry.description));
+    lines.push(format!(
+        "  Description     : {}",
+        entry.resolved_description()
+    ));
     lines.push(format!("  Key / Chord     : {}", entry.normalized_key()));
+    lines.push(format!(
+        "  Show in Gutter  : {}",
+        if entry.show_in_gutter { "Yes" } else { "No" }
+    ));
     lines.push(format!(
         "  Trigger Kind    : {}",
         if entry.leader_chord_key().is_some() {
@@ -747,7 +754,7 @@ pub enum ShortcutEditAction {
 
 /// Property editor modal for a single [`ShortcutEntry`].
 pub struct ShortcutEditModal {
-    /// Human-readable description label
+    /// Human-readable description label (optional for `builtin` shortcuts)
     pub description: TextInput,
     /// Direct key binding or leader chord follow-up key
     pub key_input: TextInput,
@@ -755,6 +762,8 @@ pub struct ShortcutEditModal {
     pub use_leader: bool,
     /// Selected index in `SHORTCUT_TYPES`
     pub item_type_idx: usize,
+    /// Selected index in `bashmenu_core::BUILTIN_ACTIONS` (when `type == builtin`)
+    pub builtin_action_idx: usize,
     /// Target command, script path, or editor file
     pub target_input: TextInput,
     /// Subprocess execution mode (`Console`, `Streaming`, `Interactive`)
@@ -767,7 +776,9 @@ pub struct ShortcutEditModal {
     pub alt_buffer: bool,
     /// Whether this shortcut binding is currently active
     pub enabled: bool,
-    /// Current input focus index (0..=13)
+    /// Whether this shortcut is displayed in the main menu help gutter
+    pub show_in_gutter: bool,
+    /// Current input focus index (0..=14)
     pub focus_idx: usize,
     /// Validation error message, if any
     pub error_msg: Option<String>,
@@ -775,6 +786,7 @@ pub struct ShortcutEditModal {
 
 /// Supported item types selectable for keyboard shortcut actions in the editor.
 const SHORTCUT_TYPES: &[(&str, MenuItemType)] = &[
+    ("builtin", MenuItemType::Builtin),
     ("command", MenuItemType::Command),
     ("script", MenuItemType::Script),
     ("editor", MenuItemType::Editor),
@@ -794,13 +806,14 @@ impl ShortcutEditModal {
         };
 
         let item_type_idx = match &entry.r#type {
-            MenuItemType::Command => 0,
-            MenuItemType::Script => 1,
-            MenuItemType::Editor => 2,
-            MenuItemType::Other(s) if s == "toast" => 3,
-            MenuItemType::Notebook => 4,
-            MenuItemType::ThemeSelector => 5,
-            _ => 0,
+            MenuItemType::Builtin => 0,
+            MenuItemType::Command => 1,
+            MenuItemType::Script => 2,
+            MenuItemType::Editor => 3,
+            MenuItemType::Other(s) if s == "toast" => 4,
+            MenuItemType::Notebook => 5,
+            MenuItemType::ThemeSelector => 6,
+            _ => 1,
         };
 
         let target_str = entry
@@ -812,17 +825,24 @@ impl ShortcutEditModal {
             .or(entry.message.as_deref())
             .unwrap_or_default();
 
+        let builtin_action_idx = bashmenu_core::BUILTIN_ACTIONS
+            .iter()
+            .position(|(m, _)| m.eq_ignore_ascii_case(target_str.trim()))
+            .unwrap_or(0);
+
         Self {
             description: TextInput::new(&entry.description),
             key_input: TextInput::new(&key_body),
             use_leader,
             item_type_idx,
+            builtin_action_idx,
             target_input: TextInput::new(target_str),
             execution_mode: entry.effective_execution_mode(),
             window_percent: TextInput::new(&entry.window_percent.unwrap_or(65).to_string()),
             quiet: entry.quiet.unwrap_or(false),
             alt_buffer: entry.alt_buffer.unwrap_or(true),
             enabled: entry.enabled,
+            show_in_gutter: entry.show_in_gutter,
             focus_idx: 0,
             error_msg: None,
         }
@@ -831,13 +851,57 @@ impl ShortcutEditModal {
     /// Returns the currently selected [`MenuItemType`] corresponding to `item_type_idx`.
     pub fn current_type(&self) -> MenuItemType {
         match self.item_type_idx {
-            0 => MenuItemType::Command,
-            1 => MenuItemType::Script,
-            2 => MenuItemType::Editor,
-            3 => MenuItemType::Other("toast".to_string()),
-            4 => MenuItemType::Notebook,
-            5 => MenuItemType::ThemeSelector,
+            0 => MenuItemType::Builtin,
+            1 => MenuItemType::Command,
+            2 => MenuItemType::Script,
+            3 => MenuItemType::Editor,
+            4 => MenuItemType::Other("toast".to_string()),
+            5 => MenuItemType::Notebook,
+            6 => MenuItemType::ThemeSelector,
             _ => MenuItemType::Command,
+        }
+    }
+
+    /// Returns `true` when editing a built-in action shortcut (no file path input).
+    pub fn is_builtin(&self) -> bool {
+        self.current_type() == MenuItemType::Builtin
+    }
+
+    /// Returns `true` when the selected shortcut type takes no file path or subprocess options.
+    pub fn is_parameterless(&self) -> bool {
+        matches!(
+            self.current_type(),
+            MenuItemType::Builtin | MenuItemType::ThemeSelector
+        )
+    }
+
+    /// Returns the ordered list of currently visible focusable field indices.
+    pub fn visible_focus_indices(&self) -> Vec<usize> {
+        match self.current_type() {
+            MenuItemType::Builtin => vec![0, 1, 2, 3, 4, 5, 11, 12, 13, 14],
+            MenuItemType::ThemeSelector => vec![0, 1, 2, 3, 4, 11, 12, 13, 14],
+            MenuItemType::Other(ref s) if s == "toast" => vec![0, 1, 2, 3, 4, 5, 11, 12, 13, 14],
+            _ => vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
+        }
+    }
+
+    /// Advances focus to the next visible field in visual traversal order.
+    pub fn focus_next(&mut self) {
+        let vis = self.visible_focus_indices();
+        if let Some(pos) = vis.iter().position(|&i| i == self.focus_idx) {
+            self.focus_idx = vis[(pos + 1) % vis.len()];
+        } else {
+            self.focus_idx = vis[0];
+        }
+    }
+
+    /// Moves focus to the previous visible field in reverse traversal order.
+    pub fn focus_prev(&mut self) {
+        let vis = self.visible_focus_indices();
+        if let Some(pos) = vis.iter().position(|&i| i == self.focus_idx) {
+            self.focus_idx = vis[(pos + vis.len() - 1) % vis.len()];
+        } else {
+            self.focus_idx = vis[0];
         }
     }
 
@@ -872,16 +936,16 @@ impl ShortcutEditModal {
         &mut self,
         orig: &ShortcutEntry,
     ) -> std::result::Result<ShortcutEntry, String> {
+        let r#type = self.current_type();
         let desc = self.description.as_string().trim().to_string();
-        if desc.is_empty() {
+        if desc.is_empty() && !self.is_parameterless() {
             return Err("Description cannot be empty.".to_string());
         }
         let full_key = self.composed_key();
         let valid_key = validate_key_spec(&full_key, false)?;
 
-        let r#type = self.current_type();
         let target = self.target_input.as_string().trim().to_string();
-        if target.is_empty() && r#type != MenuItemType::ThemeSelector {
+        if target.is_empty() && !self.is_parameterless() {
             return Err("Target action / file / command cannot be empty.".to_string());
         }
 
@@ -898,6 +962,7 @@ impl ShortcutEditModal {
         entry.description = desc;
         entry.r#type = r#type.clone();
         entry.enabled = self.enabled;
+        entry.show_in_gutter = self.show_in_gutter;
 
         // Assign canonical target fields
         entry.action = None;
@@ -907,6 +972,16 @@ impl ShortcutEditModal {
         entry.message = None;
 
         match r#type {
+            MenuItemType::Builtin => {
+                let (macro_str, _) = bashmenu_core::BUILTIN_ACTIONS[self
+                    .builtin_action_idx
+                    .min(bashmenu_core::BUILTIN_ACTIONS.len().saturating_sub(1))];
+                entry.action = Some(macro_str.to_string());
+                entry.execution_mode = None;
+                entry.window_percent = None;
+                entry.quiet = None;
+                entry.alt_buffer = None;
+            }
             MenuItemType::Editor | MenuItemType::Notebook => {
                 entry.file = Some(target.clone());
                 entry.action = Some(target);
@@ -926,7 +1001,11 @@ impl ShortcutEditModal {
                 }
             }
             MenuItemType::ThemeSelector => {
-                entry.action = Some("theme_selector".to_string());
+                entry.action = Some("{theme_picker}".to_string());
+                entry.execution_mode = None;
+                entry.window_percent = None;
+                entry.quiet = None;
+                entry.alt_buffer = None;
             }
             _ => {
                 entry.action = Some(target.clone());
@@ -1026,91 +1105,123 @@ impl ShortcutEditModal {
             }
             y += 2;
 
-            // 5: Target Input + 6: Browse button
-            if row == y {
-                if col > field_x + tgt_w {
-                    self.focus_idx = 6;
-                    return ShortcutEditAction::BrowseScript;
-                } else if col >= field_x {
+            // 5: Built-in Action selector OR Target Input (+ 6: Browse button)
+            let is_builtin = self.is_builtin();
+            let is_paramless = self.is_parameterless();
+            let is_toast =
+                matches!(self.current_type(), MenuItemType::Other(ref s) if s == "toast");
+
+            if is_builtin {
+                if row == y {
                     self.focus_idx = 5;
-                    let rel_col = (col - field_x) as usize;
-                    let is_shift = mouse
-                        .modifiers
-                        .contains(crossterm::event::KeyModifiers::SHIFT);
-                    let scroll = self.target_input.scroll_for_width(tgt_w as usize);
-                    self.target_input
-                        .handle_mouse_click(scroll + rel_col.min(tgt_w as usize), is_shift);
-                    self.target_input.ensure_cursor_visible(tgt_w as usize);
+                    self.builtin_action_idx =
+                        (self.builtin_action_idx + 1) % bashmenu_core::BUILTIN_ACTIONS.len();
                     return ShortcutEditAction::None;
                 }
+                y += 2;
+            } else if !is_paramless {
+                if row == y {
+                    if !is_toast && col > field_x + tgt_w {
+                        self.focus_idx = 6;
+                        return ShortcutEditAction::BrowseScript;
+                    } else if col >= field_x {
+                        self.focus_idx = 5;
+                        let eff_w = if is_toast { field_w } else { tgt_w };
+                        let rel_col = (col - field_x) as usize;
+                        let is_shift = mouse
+                            .modifiers
+                            .contains(crossterm::event::KeyModifiers::SHIFT);
+                        let scroll = self.target_input.scroll_for_width(eff_w as usize);
+                        self.target_input
+                            .handle_mouse_click(scroll + rel_col.min(eff_w as usize), is_shift);
+                        self.target_input.ensure_cursor_visible(eff_w as usize);
+                        return ShortcutEditAction::None;
+                    }
+                }
+                y += 2;
             }
-            y += 2;
 
-            // 7: Execution Mode
-            if row == y {
-                self.focus_idx = 7;
-                self.execution_mode = match self.execution_mode {
-                    ExecutionMode::Console => ExecutionMode::Streaming,
-                    ExecutionMode::Streaming => ExecutionMode::Interactive,
-                    ExecutionMode::Interactive => ExecutionMode::Console,
-                };
-                return ShortcutEditAction::None;
+            if !is_paramless && !is_toast {
+                // 7: Execution Mode
+                if row == y {
+                    self.focus_idx = 7;
+                    self.execution_mode = match self.execution_mode {
+                        ExecutionMode::Console => ExecutionMode::Streaming,
+                        ExecutionMode::Streaming => ExecutionMode::Interactive,
+                        ExecutionMode::Interactive => ExecutionMode::Console,
+                    };
+                    return ShortcutEditAction::None;
+                }
+                y += 2;
+
+                // 8: Window Size %
+                if row == y {
+                    self.focus_idx = 8;
+                    let pct_w = 6;
+                    if col >= field_x && col < field_x + pct_w as u16 {
+                        let rel_col = (col - field_x) as usize;
+                        let is_shift = mouse
+                            .modifiers
+                            .contains(crossterm::event::KeyModifiers::SHIFT);
+                        let scroll = self.window_percent.scroll_for_width(pct_w);
+                        self.window_percent
+                            .handle_mouse_click(scroll + rel_col.min(pct_w), is_shift);
+                        self.window_percent.ensure_cursor_visible(pct_w);
+                    }
+                    return ShortcutEditAction::None;
+                }
+                y += 2;
             }
-            y += 2;
 
-            // 8: Window Size %
+            // Checkboxes row: (Quiet, Alt Buffer when applicable) + Enabled + Show in Gutter
             if row == y {
-                self.focus_idx = 8;
-                let pct_w = 6;
-                if col >= field_x && col < field_x + pct_w as u16 {
-                    let rel_col = (col - field_x) as usize;
-                    let is_shift = mouse
-                        .modifiers
-                        .contains(crossterm::event::KeyModifiers::SHIFT);
-                    let scroll = self.window_percent.scroll_for_width(pct_w);
-                    self.window_percent
-                        .handle_mouse_click(scroll + rel_col.min(pct_w), is_shift);
-                    self.window_percent.ensure_cursor_visible(pct_w);
+                if !is_paramless && !is_toast {
+                    let q_lbl = "[x] Quiet";
+                    let alt_lbl = "[x] AltBuf";
+                    let en_lbl = "[x] Enabled";
+                    let q_x = inner.x + 1;
+                    let alt_x = q_x + q_lbl.len() as u16 + 2;
+                    let en_x = alt_x + alt_lbl.len() as u16 + 2;
+                    let gut_x = en_x + en_lbl.len() as u16 + 2;
+                    if col < alt_x {
+                        self.focus_idx = 9;
+                        self.quiet = !self.quiet;
+                    } else if col < en_x {
+                        self.focus_idx = 10;
+                        self.alt_buffer = !self.alt_buffer;
+                    } else if col < gut_x {
+                        self.focus_idx = 11;
+                        self.enabled = !self.enabled;
+                    } else {
+                        self.focus_idx = 12;
+                        self.show_in_gutter = !self.show_in_gutter;
+                    }
+                } else {
+                    let en_lbl = "[x] Enabled";
+                    let en_x = inner.x + 1;
+                    let gut_x = en_x + en_lbl.len() as u16 + 3;
+                    if col < gut_x {
+                        self.focus_idx = 11;
+                        self.enabled = !self.enabled;
+                    } else {
+                        self.focus_idx = 12;
+                        self.show_in_gutter = !self.show_in_gutter;
+                    }
                 }
                 return ShortcutEditAction::None;
             }
-            y += 2;
 
-            // 9: Quiet, 10: Alt Buffer, 11: Enabled checkboxes
-            if row == y {
-                let q_lbl = if inner.width.saturating_sub(2) >= 54 {
-                    "[x] Quiet Mode"
-                } else {
-                    "[x] Quiet"
-                };
-                let alt_lbl = "[x] Alt Buffer";
-                let q_x = inner.x + 1;
-                let alt_x = q_x + q_lbl.len() as u16 + 2;
-                let en_x = alt_x + alt_lbl.len() as u16 + 2;
-                if col < alt_x {
-                    self.focus_idx = 9;
-                    self.quiet = !self.quiet;
-                } else if col < en_x {
-                    self.focus_idx = 10;
-                    self.alt_buffer = !self.alt_buffer;
-                } else {
-                    self.focus_idx = 11;
-                    self.enabled = !self.enabled;
-                }
-                return ShortcutEditAction::None;
-            }
-
-            // 12: Save, 13: Cancel
+            // 13: Save, 14: Cancel
             let btn_y = inner.y + inner.height.saturating_sub(3);
             if row == btn_y {
                 let center_x = inner.x + inner.width / 2;
                 let save_x = center_x.saturating_sub(24).max(inner.x + 1);
                 let cancel_x = (center_x + 2).max(save_x + 24);
                 if col >= save_x && col < cancel_x {
-                    self.focus_idx = 12;
+                    self.focus_idx = 13;
                     return ShortcutEditAction::Save;
                 } else if col >= cancel_x {
-                    self.focus_idx = 13;
+                    self.focus_idx = 14;
                     return ShortcutEditAction::Cancel;
                 }
             }
@@ -1243,147 +1354,183 @@ impl ShortcutEditModal {
         buf.set_string(field_x, y, &type_clipped, type_style);
         y += 2;
 
-        // 5: Target Action / File + 6: Browse button
-        let target_lbl = match self.current_type() {
-            MenuItemType::Editor | MenuItemType::Notebook => "File Path       :",
-            MenuItemType::Script => "Script Path     :",
-            MenuItemType::Other(ref s) if s == "toast" => "Toast Message   :",
-            _ => "Command / Action:",
-        };
-        buf.set_string(inner.x + 1, y, target_lbl, label_style);
-        let tgt_w = field_w.saturating_sub(12).max(10);
-        draw_input(
-            buf,
-            Rect::new(field_x, y, tgt_w, 1),
-            &self.target_input,
-            styles,
-            self.focus_idx == 5,
-        );
-        let brw_lbl = "[ Browse ]";
-        let brw_style = if self.focus_idx == 6 {
-            active_style
-        } else {
-            styles.accent.bg(base_bg)
-        };
-        buf.set_string(field_x + tgt_w + 1, y, brw_lbl, brw_style);
-        y += 2;
+        // 5: Built-in Action selector OR Target Action / File (+ 6: Browse button)
+        let is_builtin = self.is_builtin();
+        let is_paramless = self.is_parameterless();
+        let is_toast = matches!(self.current_type(), MenuItemType::Other(ref s) if s == "toast");
 
-        // 7: Execution Mode
-        buf.set_string(inner.x + 1, y, "Execution Mode  :", label_style);
-        let c_mark = if self.execution_mode == ExecutionMode::Console {
-            "(•)"
-        } else {
-            "( )"
-        };
-        let s_mark = if self.execution_mode == ExecutionMode::Streaming {
-            "(•)"
-        } else {
-            "( )"
-        };
-        let i_mark = if self.execution_mode == ExecutionMode::Interactive {
-            "(•)"
-        } else {
-            "( )"
-        };
-        let mode_line = if field_w >= 44 {
-            format!(
-                "{} Console   {} Streaming   {} Interactive",
-                c_mark, s_mark, i_mark
-            )
-        } else if field_w >= 34 {
-            format!("{} Console  {} Stream  {} Inter", c_mark, s_mark, i_mark)
-        } else {
-            format!("{} Con  {} Str  {} Int", c_mark, s_mark, i_mark)
-        };
-        let mode_clipped: String = mode_line.chars().take(field_w as usize).collect();
-        let mode_style = if self.focus_idx == 7 {
-            active_style
-        } else {
-            label_style
-        };
-        buf.set_string(field_x, y, &mode_clipped, mode_style);
-        y += 2;
+        if is_builtin {
+            let (macro_str, loc_key) = bashmenu_core::BUILTIN_ACTIONS[self
+                .builtin_action_idx
+                .min(bashmenu_core::BUILTIN_ACTIONS.len().saturating_sub(1))];
+            let loc_label = bashmenu_core::translate(loc_key);
+            let builtin_str = format!("◄  {} ({})  ►", macro_str, loc_label);
+            let builtin_clipped: String = builtin_str.chars().take(field_w as usize).collect();
+            buf.set_string(inner.x + 1, y, "Built-in Action :", label_style);
+            let b_style = if self.focus_idx == 5 {
+                active_style
+            } else {
+                styles.shortcut_key.bg(base_bg).add_modifier(Modifier::BOLD)
+            };
+            buf.set_string(field_x, y, &builtin_clipped, b_style);
+            y += 2;
+        } else if !is_paramless {
+            let target_lbl = match self.current_type() {
+                MenuItemType::Editor | MenuItemType::Notebook => "File Path       :",
+                MenuItemType::Script => "Script Path     :",
+                MenuItemType::Other(ref s) if s == "toast" => "Toast Message   :",
+                _ => "Command / Action:",
+            };
+            buf.set_string(inner.x + 1, y, target_lbl, label_style);
+            if is_toast {
+                draw_input(
+                    buf,
+                    Rect::new(field_x, y, field_w, 1),
+                    &self.target_input,
+                    styles,
+                    self.focus_idx == 5,
+                );
+            } else {
+                let tgt_w = field_w.saturating_sub(12).max(10);
+                draw_input(
+                    buf,
+                    Rect::new(field_x, y, tgt_w, 1),
+                    &self.target_input,
+                    styles,
+                    self.focus_idx == 5,
+                );
+                let brw_lbl = "[ Browse ]";
+                let brw_style = if self.focus_idx == 6 {
+                    active_style
+                } else {
+                    styles.accent.bg(base_bg)
+                };
+                buf.set_string(field_x + tgt_w + 1, y, brw_lbl, brw_style);
+            }
+            y += 2;
+        }
 
-        // 8: Window Size % (or Quiet Mode) & 9: Alt Buffer & 10: Enabled
-        buf.set_string(inner.x + 1, y, "Window Size %   :", label_style);
-        draw_input(
-            buf,
-            Rect::new(field_x, y, 6, 1),
-            &self.window_percent,
-            styles,
-            self.focus_idx == 8,
-        );
-        let pct_hint_avail = field_w.saturating_sub(8) as usize;
-        let pct_hint = if pct_hint_avail >= 35 {
-            "(20-100%, Streaming/Interactive)"
-        } else if pct_hint_avail >= 12 {
-            "(20-100%)"
-        } else {
-            ""
-        };
-        let pct_clipped: String = pct_hint.chars().take(pct_hint_avail).collect();
-        buf.set_string(field_x + 8, y, &pct_clipped, hint_style);
-        y += 2;
+        if !is_paramless && !is_toast {
+            // 7: Execution Mode
+            buf.set_string(inner.x + 1, y, "Execution Mode  :", label_style);
+            let c_mark = if self.execution_mode == ExecutionMode::Console {
+                "(•)"
+            } else {
+                "( )"
+            };
+            let s_mark = if self.execution_mode == ExecutionMode::Streaming {
+                "(•)"
+            } else {
+                "( )"
+            };
+            let i_mark = if self.execution_mode == ExecutionMode::Interactive {
+                "(•)"
+            } else {
+                "( )"
+            };
+            let mode_line = if field_w >= 44 {
+                format!(
+                    "{} Console   {} Streaming   {} Interactive",
+                    c_mark, s_mark, i_mark
+                )
+            } else if field_w >= 34 {
+                format!("{} Console  {} Stream  {} Inter", c_mark, s_mark, i_mark)
+            } else {
+                format!("{} Con  {} Str  {} Int", c_mark, s_mark, i_mark)
+            };
+            let mode_clipped: String = mode_line.chars().take(field_w as usize).collect();
+            let mode_style = if self.focus_idx == 7 {
+                active_style
+            } else {
+                label_style
+            };
+            buf.set_string(field_x, y, &mode_clipped, mode_style);
+            y += 2;
 
-        // 9: Quiet, 10: Alt Buffer, 11: Enabled checkboxes
-        let q_chk = if self.quiet { "[x]" } else { "[ ]" };
-        let alt_chk = if self.alt_buffer { "[x]" } else { "[ ]" };
+            // 8: Window Size %
+            buf.set_string(inner.x + 1, y, "Window Size %   :", label_style);
+            draw_input(
+                buf,
+                Rect::new(field_x, y, 6, 1),
+                &self.window_percent,
+                styles,
+                self.focus_idx == 8,
+            );
+            let pct_hint_avail = field_w.saturating_sub(8) as usize;
+            let pct_hint = if pct_hint_avail >= 35 {
+                "(20-100%, Streaming/Interactive)"
+            } else if pct_hint_avail >= 12 {
+                "(20-100%)"
+            } else {
+                ""
+            };
+            let pct_clipped: String = pct_hint.chars().take(pct_hint_avail).collect();
+            buf.set_string(field_x + 8, y, &pct_clipped, hint_style);
+            y += 2;
+        }
+
+        // Checkboxes: (9: Quiet, 10: AltBuf when applicable) + 11: Enabled + 12: Show in Gutter
         let en_chk = if self.enabled { "[x]" } else { "[ ]" };
-
-        let q_lbl = if avail_w >= 54 {
-            format!("{} Quiet Mode", q_chk)
-        } else {
-            format!("{} Quiet", q_chk)
-        };
-        let alt_lbl = format!("{} Alt Buffer", alt_chk);
+        let gut_chk = if self.show_in_gutter { "[x]" } else { "[ ]" };
         let en_lbl = format!("{} Enabled", en_chk);
-
-        let q_x = inner.x + 1;
-        let alt_x = q_x + q_lbl.len() as u16 + 2;
-        let en_x = alt_x + alt_lbl.len() as u16 + 2;
-
+        let gut_lbl = if avail_w >= 54 {
+            format!("{} Show in Gutter", gut_chk)
+        } else {
+            format!("{} Gutter", gut_chk)
+        };
         let right_bound = inner.x + inner.width;
-        if q_x < right_bound {
-            let max_w = (right_bound - q_x) as usize;
-            let clipped: String = q_lbl.chars().take(max_w).collect();
-            buf.set_string(
-                q_x,
-                y,
-                &clipped,
-                if self.focus_idx == 9 {
-                    active_style
-                } else {
-                    label_style
-                },
-            );
-        }
-        if alt_x < right_bound {
-            let max_w = (right_bound - alt_x) as usize;
-            let clipped: String = alt_lbl.chars().take(max_w).collect();
-            buf.set_string(
-                alt_x,
-                y,
-                &clipped,
-                if self.focus_idx == 10 {
-                    active_style
-                } else {
-                    label_style
-                },
-            );
-        }
-        if en_x < right_bound {
-            let max_w = (right_bound - en_x) as usize;
-            let clipped: String = en_lbl.chars().take(max_w).collect();
-            buf.set_string(
-                en_x,
-                y,
-                &clipped,
-                if self.focus_idx == 11 {
-                    active_style
-                } else {
-                    label_style
-                },
-            );
+
+        if !is_paramless && !is_toast {
+            let q_chk = if self.quiet { "[x]" } else { "[ ]" };
+            let alt_chk = if self.alt_buffer { "[x]" } else { "[ ]" };
+            let q_lbl = format!("{} Quiet", q_chk);
+            let alt_lbl = format!("{} AltBuf", alt_chk);
+
+            let q_x = inner.x + 1;
+            let alt_x = q_x + q_lbl.len() as u16 + 2;
+            let en_x = alt_x + alt_lbl.len() as u16 + 2;
+            let gut_x = en_x + en_lbl.len() as u16 + 2;
+
+            for (cx, lbl, fidx) in [
+                (q_x, &q_lbl, 9usize),
+                (alt_x, &alt_lbl, 10usize),
+                (en_x, &en_lbl, 11usize),
+                (gut_x, &gut_lbl, 12usize),
+            ] {
+                if cx < right_bound {
+                    let max_w = (right_bound - cx) as usize;
+                    let clipped: String = lbl.chars().take(max_w).collect();
+                    buf.set_string(
+                        cx,
+                        y,
+                        &clipped,
+                        if self.focus_idx == fidx {
+                            active_style
+                        } else {
+                            label_style
+                        },
+                    );
+                }
+            }
+        } else {
+            let en_x = inner.x + 1;
+            let gut_x = en_x + en_lbl.len() as u16 + 3;
+            for (cx, lbl, fidx) in [(en_x, &en_lbl, 11usize), (gut_x, &gut_lbl, 12usize)] {
+                if cx < right_bound {
+                    let max_w = (right_bound - cx) as usize;
+                    let clipped: String = lbl.chars().take(max_w).collect();
+                    buf.set_string(
+                        cx,
+                        y,
+                        &clipped,
+                        if self.focus_idx == fidx {
+                            active_style
+                        } else {
+                            label_style
+                        },
+                    );
+                }
+            }
         }
         y += 2;
 
@@ -1395,16 +1542,16 @@ impl ShortcutEditModal {
             }
         }
 
-        // 12: Save, 13: Cancel
+        // 13: Save, 14: Cancel
         let btn_y = inner.y + inner.height.saturating_sub(3);
         let save_lbl = "   [ Save (Ctrl+S) ]   ";
         let cancel_lbl = "   [ Cancel (Esc) ]   ";
-        let save_style = if self.focus_idx == 12 {
+        let save_style = if self.focus_idx == 13 {
             active_style
         } else {
             styles.shortcut_key.bg(base_bg)
         };
-        let cancel_style = if self.focus_idx == 13 {
+        let cancel_style = if self.focus_idx == 14 {
             active_style
         } else {
             styles.help_text.bg(base_bg)
@@ -1988,9 +2135,9 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
 
                     // Field focus index map:
                     // 0 = description, 1 = key_input, 2 = capture_btn, 3 = use_leader,
-                    // 4 = item_type, 5 = target_input, 6 = browse_btn, 7 = execution_mode,
-                    // 8 = window_percent, 9 = quiet, 10 = alt_buffer, 11 = enabled,
-                    // 12 = Save, 13 = Cancel
+                    // 4 = item_type, 5 = builtin_action / target_input, 6 = browse_btn,
+                    // 7 = execution_mode, 8 = window_percent, 9 = quiet, 10 = alt_buffer,
+                    // 11 = enabled, 12 = show_in_gutter, 13 = Save, 14 = Cancel
                     match k.code {
                         KeyCode::Esc => {
                             // Cancel edits: if this was a freshly added item, discard it from state
@@ -2000,24 +2147,29 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                             active_modal = ActiveShortcutModal::None;
                         }
                         KeyCode::Tab | KeyCode::Down => {
-                            // Forward field navigation (cycles 0..13)
-                            modal.focus_idx = (modal.focus_idx + 1) % 14;
+                            modal.focus_next();
                         }
                         KeyCode::BackTab | KeyCode::Up => {
-                            // Backward field navigation
-                            modal.focus_idx = (modal.focus_idx + 13) % 14;
+                            modal.focus_prev();
                         }
                         KeyCode::Left if modal.focus_idx == 4 => {
-                            // Cycle item type backwards (command, script, editor, toast, notebook, theme_selector)
                             modal.item_type_idx = (modal.item_type_idx + SHORTCUT_TYPES.len() - 1)
                                 % SHORTCUT_TYPES.len();
                         }
                         KeyCode::Right | KeyCode::Char(' ') if modal.focus_idx == 4 => {
-                            // Cycle item type forwards
                             modal.item_type_idx = (modal.item_type_idx + 1) % SHORTCUT_TYPES.len();
                         }
+                        KeyCode::Left if modal.focus_idx == 5 && modal.is_builtin() => {
+                            let len = bashmenu_core::BUILTIN_ACTIONS.len();
+                            modal.builtin_action_idx = (modal.builtin_action_idx + len - 1) % len;
+                        }
+                        KeyCode::Right | KeyCode::Char(' ')
+                            if modal.focus_idx == 5 && modal.is_builtin() =>
+                        {
+                            let len = bashmenu_core::BUILTIN_ACTIONS.len();
+                            modal.builtin_action_idx = (modal.builtin_action_idx + 1) % len;
+                        }
                         KeyCode::Left if modal.focus_idx == 7 => {
-                            // Cycle execution mode backwards (Console, Streaming, Interactive)
                             modal.execution_mode = match modal.execution_mode {
                                 ExecutionMode::Console => ExecutionMode::Interactive,
                                 ExecutionMode::Streaming => ExecutionMode::Console,
@@ -2025,7 +2177,6 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                             };
                         }
                         KeyCode::Right | KeyCode::Char(' ') if modal.focus_idx == 7 => {
-                            // Cycle execution mode forwards
                             modal.execution_mode = match modal.execution_mode {
                                 ExecutionMode::Console => ExecutionMode::Streaming,
                                 ExecutionMode::Streaming => ExecutionMode::Interactive,
@@ -2033,24 +2184,22 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                             };
                         }
                         KeyCode::Char(' ') if modal.focus_idx == 3 => {
-                            // Toggle `<leader>` prefix on/off
                             modal.use_leader = !modal.use_leader;
                         }
                         KeyCode::Char(' ') if modal.focus_idx == 9 => {
-                            // Toggle Quiet mode (suppresses "Press [ENTER] to return...")
                             modal.quiet = !modal.quiet;
                         }
                         KeyCode::Char(' ') if modal.focus_idx == 10 => {
-                            // Toggle Alt Buffer (preserves or clears terminal alternate screen)
                             modal.alt_buffer = !modal.alt_buffer;
                         }
                         KeyCode::Char(' ') if modal.focus_idx == 11 => {
-                            // Toggle Enabled status
                             modal.enabled = !modal.enabled;
+                        }
+                        KeyCode::Char(' ') if modal.focus_idx == 12 => {
+                            modal.show_in_gutter = !modal.show_in_gutter;
                         }
                         KeyCode::Enter => match modal.focus_idx {
                             2 => {
-                                // Activate interactive key capture modal
                                 *child_capture = Some(KeyCaptureModal::new(
                                     &modal.composed_key(),
                                     &state.config.leader_key,
@@ -2063,6 +2212,10 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                             4 => {
                                 modal.item_type_idx =
                                     (modal.item_type_idx + 1) % SHORTCUT_TYPES.len();
+                            }
+                            5 if modal.is_builtin() => {
+                                let len = bashmenu_core::BUILTIN_ACTIONS.len();
+                                modal.builtin_action_idx = (modal.builtin_action_idx + 1) % len;
                             }
                             6 => {
                                 let start =
@@ -2083,13 +2236,14 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                             9 => modal.quiet = !modal.quiet,
                             10 => modal.alt_buffer = !modal.alt_buffer,
                             11 => modal.enabled = !modal.enabled,
-                            13 => {
+                            12 => modal.show_in_gutter = !modal.show_in_gutter,
+                            14 => {
                                 if *is_new {
                                     state.delete_selected();
                                 }
                                 active_modal = ActiveShortcutModal::None;
                             }
-                            0 | 1 | 5 | 8 | 12 => {
+                            0 | 1 | 5 | 8 | 13 => {
                                 let orig = state.selected_entry().cloned().unwrap_or_default();
                                 match modal.build_entry(&orig) {
                                     Ok(built) => {
@@ -2117,7 +2271,7 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                                     .key_input
                                     .handle_key_with_modifiers(k.code, k.modifiers);
                             }
-                            5 => {
+                            5 if !modal.is_builtin() => {
                                 let _ = modal
                                     .target_input
                                     .handle_key_with_modifiers(k.code, k.modifiers);
@@ -2239,7 +2393,7 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                                         t!("menuedit.delete_shortcut_title"),
                                         t!(
                                             "menuedit.delete_shortcut_confirm",
-                                            desc => &entry.description,
+                                            desc => &entry.resolved_description(),
                                             key => &entry.key
                                         ),
                                     ));
@@ -2435,7 +2589,13 @@ pub fn render_shortcut_editor_screen(
             let chk = if entry.enabled { "[x]" } else { "[ ]" };
             let key_disp = format!("[{}]", entry.normalized_key());
             let badge = entry.mode_badge();
-            let row_text = format!("{} {:<13} {} {}", chk, key_disp, badge, entry.description);
+            let row_text = format!(
+                "{} {:<13} {} {}",
+                chk,
+                key_disp,
+                badge,
+                entry.resolved_description()
+            );
             let mut clipped: String = row_text.chars().take(item_max_w).collect();
             let cur_w = visible_text_len(&clipped);
             if cur_w < item_max_w {

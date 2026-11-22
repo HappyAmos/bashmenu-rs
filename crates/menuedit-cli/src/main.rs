@@ -386,12 +386,18 @@ fn main() -> Result<()> {
             .max(0.0),
     );
     let mut footer_hover = bashmenu_tui::HelpGutterHover::with_duration(hover_duration);
+    let marquee_interval = cfg
+        .as_ref()
+        .map(|c| c.settings.marquee_speed_duration())
+        .unwrap_or_else(|| Duration::from_millis(250));
+    let mut last_marquee_tick = std::time::Instant::now();
     let mut marquee_tracker = MarqueeTracker::default();
     let mut last_selected_idx = selected_node_idx;
 
     loop {
         if selected_node_idx != last_selected_idx {
             marquee_tracker.reset();
+            last_marquee_tick = std::time::Instant::now();
             last_selected_idx = selected_node_idx;
         }
         let size = guard.terminal_mut().size()?;
@@ -1691,8 +1697,14 @@ fn main() -> Result<()> {
                 }
             }
         } else if matches!(active_modal, ActiveModal::None) {
-            marquee_tracker.tick();
             let _ = footer_hover.check_hover_timeout(has_hidden && area.height >= 12);
+        }
+
+        if last_marquee_tick.elapsed() >= marquee_interval {
+            if matches!(active_modal, ActiveModal::None) {
+                marquee_tracker.tick();
+            }
+            last_marquee_tick = std::time::Instant::now();
         }
     }
 

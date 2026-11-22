@@ -37,7 +37,8 @@ echo "==================================================================="
 echo "              Installing BashMenu-RS System                        "
 echo "==================================================================="
 
-# Check for pre-built binaries (e.g. from GitHub release bundle in bin/)
+# Check for pre-built release bundle binaries in bin/
+# (Never skip cargo build just because target/release/ exists from a prior build)
 HAS_PREBUILT=true
 for bin in bashmenu ymlcheck menuedit shortcutedit themeedit bashedit bmpager cheat; do
     if [ ! -f "$SCRIPT_DIR/bin/$bin" ]; then
@@ -150,7 +151,10 @@ echo "  [+] Created shortcut 'bm' -> $BIN_DIR/bm"
 CONFIG_DIR="$HOME/.config/bashmenu"
 mkdir -p "$CONFIG_DIR"
 for cfg in bashmenu.yml bashmenu.mnu bashmenu.themes shortcuts.yml cheat.yml; do
-    src="$SCRIPT_DIR/$cfg"
+    src="$SCRIPT_DIR/defaults/$cfg"
+    if [ ! -f "$src" ]; then
+        src="$SCRIPT_DIR/$cfg"
+    fi
     dest="$CONFIG_DIR/$cfg"
     if [ "$cfg" = "bashmenu.mnu" ] && [ "$MERGE_MENU" = "true" ] && [ -f "$src" ]; then
         if [ -f "$dest" ]; then
@@ -225,9 +229,9 @@ if [ -d "$SCRIPT_DIR/scripts" ]; then
     ln -sfn "$SCRIPT_DIR/scripts" "$CONFIG_DIR/scripts"
     echo "  [+] Symlinked scripts -> $CONFIG_DIR/scripts"
 fi
-if [ -f "$SCRIPT_DIR/bashmenu.md" ]; then
-    ln -sfn "$SCRIPT_DIR/bashmenu.md" "$CONFIG_DIR/bashmenu.md"
-    echo "  [+] Symlinked bashmenu.md -> $CONFIG_DIR/bashmenu.md"
+if [ -f "$SCRIPT_DIR/assets/bashmenu.md" ]; then
+    ln -sfn "$SCRIPT_DIR/assets/bashmenu.md" "$CONFIG_DIR/bashmenu.md"
+    echo "  [+] Symlinked assets/bashmenu.md -> $CONFIG_DIR/bashmenu.md"
 fi
 if [ -d "$SCRIPT_DIR/locales" ]; then
     ln -sfn "$SCRIPT_DIR/locales" "$CONFIG_DIR/locales"
@@ -247,6 +251,11 @@ if [ -d "$SCRIPT_DIR/notebooks" ]; then
         fi
     done
 fi
+if [ -f "$SCRIPT_DIR/defaults/notes.yml" ] && [ ! -f "$CONFIG_DIR/notebooks/notes.yml" ] && [ ! -f "$CONFIG_DIR/notes.yml" ]; then
+    mkdir -p "$CONFIG_DIR/notebooks"
+    cp "$SCRIPT_DIR/defaults/notes.yml" "$CONFIG_DIR/notebooks/notes.yml"
+    echo "  [+] Initialized user notebook: $CONFIG_DIR/notebooks/notes.yml"
+fi
 
 # Install manual page into man1 directory
 MAN_DIR="$HOME/.local/share/man/man1"
@@ -256,9 +265,9 @@ elif [ "$(id -u)" = "0" ]; then
     MAN_DIR="/usr/local/share/man/man1"
 fi
 mkdir -p "$MAN_DIR"
-if [ -f "$SCRIPT_DIR/bashmenu.1" ]; then
+if [ -f "$SCRIPT_DIR/assets/bashmenu.1" ]; then
     rm -f "$MAN_DIR/bashmenu.1"
-    cp -f "$SCRIPT_DIR/bashmenu.1" "$MAN_DIR/bashmenu.1"
+    cp -f "$SCRIPT_DIR/assets/bashmenu.1" "$MAN_DIR/bashmenu.1"
     rm -f "$MAN_DIR/bm.1"
     ln -sf "$MAN_DIR/bashmenu.1" "$MAN_DIR/bm.1"
     echo "  [+] Installed manual page -> $MAN_DIR/bashmenu.1 (and alias $MAN_DIR/bm.1)"

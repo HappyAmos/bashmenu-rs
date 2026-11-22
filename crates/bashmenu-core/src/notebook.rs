@@ -92,6 +92,7 @@ pub fn resolve_notebook_path(raw_path: Option<&str>, ctx: &MacroContext) -> Path
     // In isolated mode (--repo or --local), never inspect or return user config ~/.config/bashmenu
     if ctx.is_repo_mode() || ctx.is_local_mode() {
         let user_cfg = ctx.home_dir.join(".config/bashmenu");
+        let defaults_dir = ctx.bashmenu_dir.join("defaults");
 
         // If an absolute path is inside user config directory, re-root it to ctx.bashmenu_dir
         if p.is_absolute() {
@@ -99,6 +100,10 @@ pub fn resolve_notebook_path(raw_path: Option<&str>, ctx: &MacroContext) -> Path
                 let re_rooted_nb = notebooks_dir.join(rel);
                 if re_rooted_nb.exists() {
                     return re_rooted_nb;
+                }
+                let re_rooted_def = defaults_dir.join(rel);
+                if re_rooted_def.exists() {
+                    return re_rooted_def;
                 }
                 let re_rooted_root = ctx.bashmenu_dir.join(rel);
                 if re_rooted_root.exists() {
@@ -109,6 +114,10 @@ pub fn resolve_notebook_path(raw_path: Option<&str>, ctx: &MacroContext) -> Path
                     if cand_nb.exists() {
                         return cand_nb;
                     }
+                    let cand_def = defaults_dir.join(file_name);
+                    if cand_def.exists() {
+                        return cand_def;
+                    }
                     let cand_root = ctx.bashmenu_dir.join(file_name);
                     if cand_root.exists() {
                         return cand_root;
@@ -116,6 +125,8 @@ pub fn resolve_notebook_path(raw_path: Option<&str>, ctx: &MacroContext) -> Path
                 }
                 return if notebooks_dir.exists() {
                     notebooks_dir.join(rel)
+                } else if defaults_dir.exists() {
+                    defaults_dir.join(rel)
                 } else {
                     ctx.bashmenu_dir.join(rel)
                 };
@@ -131,6 +142,10 @@ pub fn resolve_notebook_path(raw_path: Option<&str>, ctx: &MacroContext) -> Path
                 if cand_nb.exists() {
                     return cand_nb;
                 }
+                let cand_def = defaults_dir.join(file_name);
+                if cand_def.exists() {
+                    return cand_def;
+                }
                 let cand_root = ctx.bashmenu_dir.join(file_name);
                 if cand_root.exists() {
                     return cand_root;
@@ -139,16 +154,22 @@ pub fn resolve_notebook_path(raw_path: Option<&str>, ctx: &MacroContext) -> Path
 
             return if notebooks_dir.exists() {
                 notebooks_dir.join(p.file_name().map(PathBuf::from).unwrap_or(p))
+            } else if defaults_dir.exists() {
+                defaults_dir.join(p.file_name().map(PathBuf::from).unwrap_or(p))
             } else {
                 ctx.bashmenu_dir
                     .join(p.file_name().map(PathBuf::from).unwrap_or(p))
             };
         }
 
-        // Relative path in isolated mode: strictly check notebooks_dir, then bashmenu_dir
+        // Relative path in isolated mode: strictly check notebooks_dir, defaults_dir, then bashmenu_dir
         let cand1 = notebooks_dir.join(&p);
         if cand1.exists() {
             return cand1;
+        }
+        let cand_def = defaults_dir.join(&p);
+        if cand_def.exists() {
+            return cand_def;
         }
         let cand2 = ctx.bashmenu_dir.join(&p);
         if cand2.exists() {
@@ -159,13 +180,23 @@ pub fn resolve_notebook_path(raw_path: Option<&str>, ctx: &MacroContext) -> Path
             if cand_file_nb.exists() {
                 return cand_file_nb;
             }
+            let cand_file_def = defaults_dir.join(file_name);
+            if cand_file_def.exists() {
+                return cand_file_def;
+            }
             let cand_file_root = ctx.bashmenu_dir.join(file_name);
             if cand_file_root.exists() {
                 return cand_file_root;
             }
         }
 
-        return if notebooks_dir.exists() { cand1 } else { cand2 };
+        return if notebooks_dir.exists() {
+            cand1
+        } else if defaults_dir.exists() {
+            cand_def
+        } else {
+            cand2
+        };
     }
 
     if p.is_absolute() && p.exists() {
