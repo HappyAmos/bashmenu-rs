@@ -199,7 +199,7 @@ fn test_framebuffer_default_character_and_image_mode_rendering() {
 
     let repo_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
     std::env::set_var("BASHMENU_DIR", &repo_root);
-    let menu_path = repo_root.join("bashmenu.mnu");
+    let menu_path = repo_root.join("defaults/bashmenu.mnu");
     let schema = load_menu(&menu_path).expect("bashmenu.mnu must load");
 
     let styles = ResolvedThemeStyles {

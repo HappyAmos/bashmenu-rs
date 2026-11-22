@@ -18,7 +18,7 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
 - **Authoritative Rules:** All permanent operational invariants, constraints, safety checks, and task execution rules are centralized in `.agents/rules/invariants.md`. Consult that file for:
   - Mandatory git commit and push workflow (`git commit -m "..." && git push origin main`) and remote CI tracking (`gh run list`).
   - Sequential TODO execution lifecycle (`PENDING:` marking, updating `DONE.md`, pruning `- [x]`, and task precedence: `CRITICAL` > `BUG` > `RESPONSIVENESS` > `UI` > `FEATURE` > `REQUEST` > `RESEARCH`).
-  - Single source config paths and project root default configurations (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `cheat.yml`).
+  - Single source config paths and repository `defaults/` default configurations (`defaults/bashmenu.yml`, `defaults/bashmenu.mnu`, `defaults/bashmenu.themes`, `defaults/shortcuts.yml`, `defaults/cheat.yml`, `defaults/notes.yml`).
   - Linux Framebuffer TrueColor & `--image` mode (`/dev/fb0`).
   - Application version `{version}` and environment table `{env}` / `assets/about.md`.
   - Config header preservation (`save_config`) and YAML structural integrity (no flat dotted keys).
@@ -52,9 +52,9 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
 | `crates/cheat-cli` | Binary (`cheat`) | Interactive cheatsheet search and terminal viewer. |
 | `crates/ymlcheck-cli` | Binary (`ymlcheck`) | Schema validation CLI for YAML configurations. |
 | `bashmenu.sh` | Shell | POSIX wrapper checking capabilities, paths, and binary execution. |
-| `bashmenu.yml` | Config | Active theme, plugin layout, timeouts, transitions, and settings. |
-| `bashmenu.mnu` | Config | Menu hierarchy using label-as-key `items:` schema. |
-| `bashmenu.themes` | Config | Theme palettes (256/16/8 tiers), activity overrides, window borders, dividers, marquees. |
+| `defaults/bashmenu.yml` | Config | Active theme, plugin layout, timeouts, transitions, and settings. |
+| `defaults/bashmenu.mnu` | Config | Menu hierarchy using label-as-key `items:` schema. |
+| `defaults/bashmenu.themes` | Config | Theme palettes (256/16/8 tiers), activity overrides, window borders, dividers, marquees. |
 | `scripts/` | Shell | Extension tools and plugins (`glyphs.sh`, `webopen.sh`, `unicode.sh`, games). |
 | `templates/` | Templates | Shell configs (`autoexec.sh.tmpl`, `bash_aliases.tmpl`) free of personal hostnames or paths. |
 
@@ -182,5 +182,5 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
   2. `crates/menuedit-cli`: Inspector guide help modal.
   3. `crates/bashedit-cli`: Editor manual modal.
   4. `crates/bmpager-cli`: Standalone pager help modal.
-  5. `bashmenu.md`: Reference documentation.
-  6. `bashmenu.1`: Linux system man page.
+  5. `assets/bashmenu.md`: Reference documentation.
+  6. `assets/bashmenu.1`: Linux system man page.

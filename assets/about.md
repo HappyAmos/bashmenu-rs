@@ -6,6 +6,7 @@ title: Current Bashmenu Environment
 | Version | {version} |
 | Color Mode | {color_mode} |
 | TTY Mode | {tty_mode} |
+| Repo Dir | {dev_dir} |
 | Config Dir | {bashmenu_dir} |
 | bashmenu.yml | {bashmenu_yml} |
 | bashmenu.mnu | {bashmenu_mnu} |

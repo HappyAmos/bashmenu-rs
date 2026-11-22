@@ -967,7 +967,7 @@ mod tests {
 
     #[test]
     fn test_load_menu_fixture() {
-        let fixture_path = Path::new("../../bashmenu.mnu");
+        let fixture_path = Path::new("../../defaults/bashmenu.mnu");
         if fixture_path.exists() {
             let menu = load_menu(fixture_path).expect("Failed to load bashmenu.mnu");
             assert_eq!(menu.title, "Bash Menu");

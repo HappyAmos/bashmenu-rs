@@ -140,7 +140,7 @@ struct Cli {
     #[arg(long)]
     local: bool,
 
-    /// Load configuration files from the repository root directory
+    /// Load configuration files from the repository defaults directory
     #[arg(short, long)]
     repo: bool,
 
@@ -311,7 +311,7 @@ fn main() -> Result<()> {
     let config_path = if let Some(ref cp) = cli.config {
         resolve_file_path(cp, cli.local)
     } else if let Some(ref rdir) = repo_dir {
-        rdir.join("bashmenu.yml")
+        rdir.join("defaults/bashmenu.yml")
     } else if cli.local {
         PathBuf::from("./bashmenu.yml")
     } else {
@@ -330,7 +330,7 @@ fn main() -> Result<()> {
                     .unwrap_or_else(|| {
                         bashmenu_core::resolve_dev_dir(&home, &bashmenu_core::get_user_config_dir())
                     })
-                    .join("bashmenu.yml");
+                    .join("defaults/bashmenu.yml");
                 if dev_cfg.exists() && dev_cfg != config_path {
                     load_config(&dev_cfg).unwrap_or_default()
                 } else {
@@ -372,7 +372,7 @@ fn main() -> Result<()> {
     let menu_path = if let Some(ref mp) = cli.menu {
         resolve_file_path(mp, cli.local)
     } else if let Some(ref rdir) = repo_dir {
-        rdir.join("bashmenu.mnu")
+        rdir.join("defaults/bashmenu.mnu")
     } else if cli.local {
         PathBuf::from("./bashmenu.mnu")
     } else {
@@ -397,7 +397,7 @@ fn main() -> Result<()> {
     let shortcuts_path = if let Some(ref sp) = cli.shortcuts {
         resolve_file_path(sp, cli.local)
     } else if let Some(ref rdir) = repo_dir {
-        rdir.join("shortcuts.yml")
+        rdir.join("defaults/shortcuts.yml")
     } else {
         resolve_shortcuts_path(cli.local)
     };
@@ -410,7 +410,7 @@ fn main() -> Result<()> {
 
     // 3. Load Themes
     let themes_path = if let Some(ref rdir) = repo_dir {
-        rdir.join("bashmenu.themes")
+        rdir.join("defaults/bashmenu.themes")
     } else if cli.local {
         PathBuf::from("./bashmenu.themes")
     } else {
@@ -428,7 +428,7 @@ fn main() -> Result<()> {
     };
 
     let cheat_path = if let Some(ref rdir) = repo_dir {
-        rdir.join("cheat.yml")
+        rdir.join("defaults/cheat.yml")
     } else if cli.local {
         PathBuf::from("./cheat.yml")
     } else {
@@ -2006,15 +2006,18 @@ fn main() -> Result<()> {
                     match action {
                         MenuAction::Help => {
                             let ctx = make_macro_ctx!(&config);
+                            let asset_cand = ctx.bashmenu_dir.join("assets/bashmenu.md");
                             let cand = ctx.bashmenu_dir.join("bashmenu.md");
-                            let doc_path = if cand.exists() {
+                            let doc_path = if asset_cand.exists() {
+                                asset_cand
+                            } else if cand.exists() {
                                 cand
                             } else {
-                                let dev_cand = ctx.dev_dir.join("bashmenu.md");
+                                let dev_cand = ctx.dev_dir.join("assets/bashmenu.md");
                                 if dev_cand.exists() {
                                     dev_cand
                                 } else {
-                                    resolve_file_path(Path::new("bashmenu.md"), cli.local)
+                                    resolve_file_path(Path::new("assets/bashmenu.md"), cli.local)
                                 }
                             };
                             if doc_path.exists() {

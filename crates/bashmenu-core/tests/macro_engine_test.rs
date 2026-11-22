@@ -7,7 +7,7 @@ use unicode_width::UnicodeWidthStr;
 
 #[test]
 fn test_status_gutter_interpolation() {
-    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../bashmenu.yml");
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../defaults/bashmenu.yml");
     let config = load_config(fixture).expect("load config");
 
     let mut ctx = MacroContext::new(&config);
@@ -91,7 +91,7 @@ fn test_icon_slot_4_columns_strict_invariant() {
 
 #[test]
 fn test_right_aligned_bracket_placeholders_expansion() {
-    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../bashmenu.yml");
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../defaults/bashmenu.yml");
     let mut config = load_config(fixture).expect("load config");
     config.settings.ping_target = Some("1.1.1.1".to_string());
     config.settings.check_for_updates = Some(false);
@@ -155,7 +155,7 @@ fn test_right_aligned_bracket_placeholders_expansion() {
 
 #[test]
 fn test_profile_and_editor_placeholders_expansion() {
-    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../bashmenu.yml");
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../defaults/bashmenu.yml");
     let config = load_config(fixture).expect("load config");
 
     let mut ctx = MacroContext::new(&config);
@@ -216,7 +216,7 @@ fn test_profile_and_editor_placeholders_expansion() {
 
 #[test]
 fn test_dev_dir_placeholder_resolution() {
-    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../bashmenu.yml");
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../defaults/bashmenu.yml");
     let config = load_config(fixture).expect("load config");
     let ctx = MacroContext::new(&config);
 
@@ -245,11 +245,24 @@ fn test_dev_dir_placeholder_resolution() {
     let dev_alias_expanded = interpolate_placeholders("{dev}/Cargo.toml", &ctx);
     let expected_alias = format!("{}/Cargo.toml", ctx.dev_dir.display());
     assert_eq!(dev_alias_expanded, expected_alias);
+
+    // Verify {defaults} and {defaults_dir} placeholders expand to ctx.dev_dir/defaults
+    let defaults_expanded = interpolate_placeholders("{defaults}/bashmenu.yml", &ctx);
+    let expected_defaults = format!("{}/defaults/bashmenu.yml", ctx.dev_dir.display());
+    assert_eq!(defaults_expanded, expected_defaults);
+
+    let defaults_dir_expanded = interpolate_placeholders("{defaults_dir}/bashmenu.mnu", &ctx);
+    let expected_defaults_dir = format!("{}/defaults/bashmenu.mnu", ctx.dev_dir.display());
+    assert_eq!(defaults_dir_expanded, expected_defaults_dir);
+    assert!(
+        ctx.dev_dir.join("defaults/bashmenu.yml").is_file(),
+        "ctx.dev_dir/defaults/bashmenu.yml must exist"
+    );
 }
 
 #[test]
 fn test_utc_seconds_and_command_placeholders() {
-    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../bashmenu.yml");
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../defaults/bashmenu.yml");
     let config = load_config(fixture).expect("load config");
     let mut ctx = MacroContext::new(&config);
     ctx.home_dir = std::path::PathBuf::from("/home/testuser");
@@ -272,7 +285,7 @@ fn test_utc_seconds_and_command_placeholders() {
 
 #[test]
 fn test_cmd_alias_matches_command_placeholder() {
-    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../bashmenu.yml");
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../defaults/bashmenu.yml");
     let mut config = load_config(fixture).expect("load config");
     config.user.insert(
         "name".to_string(),
@@ -299,7 +312,7 @@ fn test_file_and_dir_picker_macros_and_modifiers() {
     };
     use std::path::PathBuf;
 
-    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../bashmenu.yml");
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../defaults/bashmenu.yml");
     let config = load_config(fixture).expect("load config");
     let mut ctx = MacroContext::new(&config);
     ctx.home_dir = PathBuf::from("/home/testuser");

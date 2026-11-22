@@ -7,9 +7,9 @@
   - Watch run: `gh run watch <ID>` (always pass an explicit ID to avoid interactive hangs).
 
 ## 2. Configuration & State Persistence
-- **Single Source of Truth Config Path & Project Root Defaults:** User configs reside in `~/.config/bashmenu/` (`{bashmenu_dir}`), while `{dev_dir}` dynamically resolves git repository root. Original default config files (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `cheat.yml`) reside strictly in project root. The `/tests/fixtures` directory has been removed and must never be reintroduced; all test harnesses, fallbacks, and loaders reference root files directly.
+- **Single Source of Truth Config Path & Repository Defaults:** User configs reside in `~/.config/bashmenu/` (`{bashmenu_dir}`), while `{dev_dir}` dynamically resolves git repository root and `{defaults}` / `{defaults_dir}` resolves `{dev_dir}/defaults`. Original default config files (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `cheat.yml`, `notes.yml`) reside strictly in `defaults/`. The `/tests/fixtures` directory has been removed and must never be reintroduced; all test harnesses, fallbacks, and loaders reference `defaults/` directly.
 - **Strict `--repo` and `--local` Path Isolation:**
-  - Passing `--repo` / `-r` forces loading all configuration and data files (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `notes.yml`, notebooks) strictly from repository root (`{dev_dir}`).
+  - Passing `--repo` / `-r` forces loading all configuration and data files (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `cheat.yml`, `notes.yml`, notebooks) strictly from repository `defaults/` (`{defaults}`).
   - Passing `--local` forces loading configuration files strictly from the current working directory (`.`).
   - Under no circumstances may `~/.config/bashmenu` be queried, probed, or fallen back to when either `--repo` or `--local` is active.
 - **Direct Linux Framebuffer TrueColor & Full-Resolution Image Mode (`--image` / `-i`):** On Linux console with accessible `/dev/fb0` (`settings.framebuffer: auto | true | image`), `FramebufferDevice` renders Ratatui's buffer in 24-bit TrueColor directly into `/dev/fb0` while `TerminalOutput` suppresses stdout ANSI writes. Default uses character-block wallpaper (`▀`/`▛`); passing `--image` or `-i` renders full-resolution pixel wallpaper onto `/dev/fb0` composited beneath TrueColor TUI.
@@ -83,8 +83,8 @@
   2. Inspector guide help modal in `menuedit-cli`
   3. Editor manual modal in `bashedit-cli`
   4. Pager manual modal in `bmpager-cli`
-  5. Markdown guide (`bashmenu.md`)
-  6. Linux man page (`bashmenu.1`)
+  5. Markdown guide (`assets/bashmenu.md`)
+  6. Linux man page (`assets/bashmenu.1`)
 
 ## 5. TODO Task Execution & Lifecycle Invariants (CRITICAL)
 - **Sequential TODO Execution:** Unless specifically labeled (`CRITICAL`) or explicitly instructed otherwise by the user, always tackle items from TODO lists (`~/.config/bashmenu/notebooks/notes.yml` under `'TODO (Agent: Allowed)'` or `.agents/skills/bashmenu-rs-developer/TODO.md`) strictly in sequential order, top to bottom. Complete each item fully (including verification, commit, push, and remote CI check) before moving to the next.

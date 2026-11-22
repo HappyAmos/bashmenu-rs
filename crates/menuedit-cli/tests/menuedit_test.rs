@@ -7,11 +7,16 @@ use std::path::PathBuf;
 
 fn get_fixture_path(filename: &str) -> PathBuf {
     let manifest_dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
-    let path = manifest_dir.join("../..").join(filename);
-    if path.exists() {
-        path
+    let defaults_path = manifest_dir.join("../../defaults").join(filename);
+    if defaults_path.exists() {
+        defaults_path
     } else {
-        PathBuf::from(filename)
+        let path = manifest_dir.join("../..").join(filename);
+        if path.exists() {
+            path
+        } else {
+            PathBuf::from(filename)
+        }
     }
 }
 

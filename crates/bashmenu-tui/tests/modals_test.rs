@@ -268,8 +268,8 @@ fn test_grid_pickers_navigation() {
 
 #[test]
 fn test_file_picker_navigation() {
-    let root_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let mut picker = FilePickerModal::new("Pick Configuration", &root_dir, false);
+    let defaults_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../defaults");
+    let mut picker = FilePickerModal::new("Pick Configuration", &defaults_dir, false);
     let styles = ResolvedThemeStyles::default();
     let area = Rect::new(0, 0, 80, 24);
 

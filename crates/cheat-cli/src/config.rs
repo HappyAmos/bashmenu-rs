@@ -48,12 +48,20 @@ pub fn get_config_path() -> Result<PathBuf> {
         .map(PathBuf::from)
         .unwrap_or_else(|_| PathBuf::from("/"));
     let dev_dir = bashmenu_core::resolve_dev_dir(&home, &user_cfg);
+    let dev_defaults_cheat = dev_dir.join("defaults/cheat.yml");
+    if dev_defaults_cheat.is_file() {
+        return Ok(dev_defaults_cheat);
+    }
     let dev_cheat = dev_dir.join("cheat.yml");
     if dev_cheat.is_file() {
         return Ok(dev_cheat);
     }
 
-    let root_paths = [PathBuf::from("cheat.yml"), PathBuf::from("../../cheat.yml")];
+    let root_paths = [
+        PathBuf::from("cheat.yml"),
+        PathBuf::from("defaults/cheat.yml"),
+        PathBuf::from("../../defaults/cheat.yml"),
+    ];
     for p in &root_paths {
         if p.is_file() {
             return Ok(p.clone());

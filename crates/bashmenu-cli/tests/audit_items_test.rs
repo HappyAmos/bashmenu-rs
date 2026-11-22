@@ -24,8 +24,11 @@ fn test_bashmenu_binary_help_and_version() {
 #[test]
 fn test_repo_mode_notebook_isolation() {
     let repo_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
-    let notes_path = repo_root.join("notes.yml");
-    assert!(notes_path.is_file(), "notes.yml must exist at repo root");
+    let notes_path = repo_root.join("defaults/notes.yml");
+    assert!(
+        notes_path.is_file(),
+        "notes.yml must exist in repo defaults/"
+    );
     let nb = bashmenu_core::load_notebook(&notes_path).expect("notes.yml must load");
     assert_eq!(nb.notebook.title, "Notes");
     let notes = bashmenu_core::get_notes(&nb);
@@ -35,7 +38,8 @@ fn test_repo_mode_notebook_isolation() {
     );
 
     // Verify resolve_notebook_path in repo mode
-    let cfg = bashmenu_core::load_config(repo_root.join("bashmenu.yml")).unwrap_or_default();
+    let cfg =
+        bashmenu_core::load_config(repo_root.join("defaults/bashmenu.yml")).unwrap_or_default();
     let ctx = bashmenu_core::MacroContext::new(&cfg)
         .with_bashmenu_dir(repo_root.clone())
         .with_repo_mode(true);
@@ -43,14 +47,14 @@ fn test_repo_mode_notebook_isolation() {
     assert_eq!(
         resolved.canonicalize().unwrap_or(resolved.clone()),
         notes_path.canonicalize().unwrap_or(notes_path.clone()),
-        "In repo mode, {{notebooks_dir}}/notes.yml must resolve to repo notes.yml"
+        "In repo mode, {{notebooks_dir}}/notes.yml must resolve to repo defaults/notes.yml"
     );
 }
 
 #[test]
 fn test_bashmenu_modal_animation_config_options() {
     let repo_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
-    let yml_path = repo_root.join("bashmenu.yml");
+    let yml_path = repo_root.join("defaults/bashmenu.yml");
     let config = bashmenu_core::load_config(&yml_path).expect("bashmenu.yml must load");
     assert_eq!(config.settings.modal_animation, Some("zoom".to_string()));
     assert_eq!(
@@ -62,7 +66,7 @@ fn test_bashmenu_modal_animation_config_options() {
 #[test]
 fn test_bashmenu_marquee_speed_config_options() {
     let repo_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
-    let yml_path = repo_root.join("bashmenu.yml");
+    let yml_path = repo_root.join("defaults/bashmenu.yml");
     let config = bashmenu_core::load_config(&yml_path).expect("bashmenu.yml must load");
     assert_eq!(config.settings.marquee_speed, Some("normal".to_string()));
     assert_eq!(
@@ -74,11 +78,11 @@ fn test_bashmenu_marquee_speed_config_options() {
 #[test]
 fn test_bashmenu_locale_config_options() {
     let repo_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
-    let yml_path = repo_root.join("bashmenu.yml");
+    let yml_path = repo_root.join("defaults/bashmenu.yml");
     let config = bashmenu_core::load_config(&yml_path).expect("bashmenu.yml must load");
     assert_eq!(config.settings.locale, Some("auto".to_string()));
 
-    let mnu_path = repo_root.join("bashmenu.mnu");
+    let mnu_path = repo_root.join("defaults/bashmenu.mnu");
     let content = std::fs::read_to_string(&mnu_path).expect("bashmenu.mnu must exist");
     assert!(
         content.contains("Language / Locale [{settings.locale}]"),
@@ -164,7 +168,7 @@ fn test_makefile_targets_and_dry_run() {
 #[test]
 fn test_search_nerd_font_and_emoji_menu_item_streaming() {
     let repo_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
-    let menu_path = repo_root.join("bashmenu.mnu");
+    let menu_path = repo_root.join("defaults/bashmenu.mnu");
     let schema = bashmenu_core::load_menu(&menu_path).expect("bashmenu.mnu must load");
 
     // Search for the glyphs menu item across all submenus
@@ -209,7 +213,7 @@ fn test_inactivity_timeout_timer_reset_contract() {
     use std::time::{Duration, Instant};
 
     let repo_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
-    let yml_path = repo_root.join("bashmenu.yml");
+    let yml_path = repo_root.join("defaults/bashmenu.yml");
     let config = bashmenu_core::load_config(&yml_path).expect("bashmenu.yml must load");
 
     // Inactivity timeout should be defined in settings
@@ -262,11 +266,11 @@ fn test_bashmenu_repo_flag_in_help_and_parsing() {
 #[test]
 fn test_env_environment_info_modal_formatting() {
     let repo_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
-    let yml_path = repo_root.join("bashmenu.yml");
-    let mnu_path = repo_root.join("bashmenu.mnu");
-    let thm_path = repo_root.join("bashmenu.themes");
-    let shc_path = repo_root.join("shortcuts.yml");
-    let cht_path = repo_root.join("cheat.yml");
+    let yml_path = repo_root.join("defaults/bashmenu.yml");
+    let mnu_path = repo_root.join("defaults/bashmenu.mnu");
+    let thm_path = repo_root.join("defaults/bashmenu.themes");
+    let shc_path = repo_root.join("defaults/shortcuts.yml");
+    let cht_path = repo_root.join("defaults/cheat.yml");
 
     let config = bashmenu_core::load_config(&yml_path).expect("bashmenu.yml must load");
     let ctx = bashmenu_core::MacroContext::new(&config)
@@ -355,7 +359,7 @@ fn test_theme_picker_includes_random_option() {
 #[test]
 fn test_all_themes_define_default_icon_and_menu_items_have_icons() {
     let repo_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
-    let themes_path = repo_root.join("bashmenu.themes");
+    let themes_path = repo_root.join("defaults/bashmenu.themes");
     let themes = bashmenu_core::load_themes(&themes_path).expect("bashmenu.themes must load");
 
     assert!(!themes.is_empty(), "Themes collection must not be empty");
@@ -374,7 +378,7 @@ fn test_all_themes_define_default_icon_and_menu_items_have_icons() {
         );
     }
 
-    let menu_path = repo_root.join("bashmenu.mnu");
+    let menu_path = repo_root.join("defaults/bashmenu.mnu");
     let menu = bashmenu_core::load_menu(&menu_path).expect("bashmenu.mnu must load");
     fn assert_items_have_icons(items: &[bashmenu_core::MenuItem]) {
         for it in items {
@@ -396,7 +400,7 @@ fn test_all_themes_define_default_icon_and_menu_items_have_icons() {
 #[test]
 fn test_random_theme_resolution_in_bashmenu() {
     let repo_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
-    let themes_path = repo_root.join("bashmenu.themes");
+    let themes_path = repo_root.join("defaults/bashmenu.themes");
     let themes = bashmenu_core::load_themes(&themes_path).expect("bashmenu.themes must load");
 
     let cfg_theme = "[ Random ]";

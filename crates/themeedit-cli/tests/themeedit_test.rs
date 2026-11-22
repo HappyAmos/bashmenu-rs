@@ -6,11 +6,16 @@ use themeedit_cli::ThemeEditorState;
 
 fn get_fixture_path(filename: &str) -> PathBuf {
     let manifest_dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
-    let path = manifest_dir.join("../..").join(filename);
-    if path.exists() {
-        path
+    let defaults_path = manifest_dir.join("../../defaults").join(filename);
+    if defaults_path.exists() {
+        defaults_path
     } else {
-        PathBuf::from(filename)
+        let path = manifest_dir.join("../..").join(filename);
+        if path.exists() {
+            path
+        } else {
+            PathBuf::from(filename)
+        }
     }
 }
 
@@ -2881,7 +2886,7 @@ fn test_themeedit_marquee_overflow_on_tokens_sidebar() {
 
 #[test]
 fn test_themeedit_random_theme_resolution_and_reservation() {
-    let themes_path = PathBuf::from("../../bashmenu.themes");
+    let themes_path = PathBuf::from("../../defaults/bashmenu.themes");
     assert!(themes_path.exists(), "bashmenu.themes fixture must exist");
 
     // 1. Initializing with "[ Random ]" should resolve to an actual loaded theme, never literal "[ Random ]"

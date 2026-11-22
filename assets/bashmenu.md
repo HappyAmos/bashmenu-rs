@@ -68,7 +68,7 @@ HA Bash Menu is comprised of modular scripts and configuration files:
 
 | File | Description |
 | :--- | :--- |
-| `bashmenu.1` | Terminal manual page for HA Bash Menu. |
+| `assets/bashmenu.1` | Terminal manual page for HA Bash Menu. |
 
 ### 1.2 Command-Line Options (`bashmenu`)
 
@@ -78,7 +78,7 @@ HA Bash Menu is comprised of modular scripts and configuration files:
 | `--menu <FILE>` | `-m` | Explicit path to menu definition file (default: `~/.config/bashmenu/bashmenu.mnu`). |
 | `--theme <NAME>` | `-t` | Override active theme name. |
 | `--shortcuts <FILE>` | `-s` | Explicit path to keyboard shortcuts file (default: `~/.config/bashmenu/shortcuts.yml`). |
-| `--repo` | `-r` | Load configuration files (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`) from repository root directory. |
+| `--repo` | `-r` | Load configuration files (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `cheat.yml`, `notes.yml`) from repository `defaults/` directory. |
 | `--image` | `-i` | Render full-resolution TrueColor background images directly via the Linux framebuffer (`/dev/fb0`) instead of character-block translation. |
 | `--local` | | Load and save configuration files in current working directory. |
 
@@ -136,7 +136,7 @@ Used as dynamic templates for code generation, settings, or block injections:
 | `Ctrl+Space` | Leader key chord prefix (opens which-key shortcut palette overlay). |
 | `Ctrl+G` | Expand or collapse the left help gutter to reveal all hidden shortcuts. |
 | `ENTER` | Execute selected item action. |
-| `F1` | View Markdown user manual (`bashmenu.md`) via `bmpager --markdown`. |
+| `F1` | View Markdown user manual (`assets/bashmenu.md`) via `bmpager --markdown`. |
 | `F2` | Open Theme selector dialog. |
 | `F3` | Launch built-in text editor (`bashedit`). |
 | `F4` | Launch visual menu editor (`menuedit`). |
@@ -1050,6 +1050,7 @@ These variables are dynamically resolved using active configuration and environm
 | `{home}` | User's absolute home directory path. |
 | `{bashmenu_dir}` | User configuration root directory path (`~/.config/bashmenu`). |
 | `{dev_dir}` / `{dev}` | Local git repository / development workspace root directory path. |
+| `{defaults_dir}` / `{defaults}` | Repository defaults configuration directory path (`{dev_dir}/defaults`). |
 | `{templates_dir}` / `{templates}` | Templates folder path (`settings.templates_dir`). |
 | `{scripts_dir}` / `{scripts}` | Scripts folder path (`settings.scripts_dir`). |
 | `{cache_dir}` / `{cache}` | Cache folder path (`settings.cache_dir`, default `~/.cache/bashmenu`). Sets `$CACHE_DIR`. |

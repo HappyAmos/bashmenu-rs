@@ -26,6 +26,8 @@ pub const PLACEHOLDER_HELP_TEXT: &str = "\
 {home}                       │ User home directory path (~ / /home/username)
 {dev_dir}                    │ Repository root directory where project resides
 {dev}                        │ Alias for {dev_dir}
+{defaults_dir}               │ Repository defaults directory ({dev_dir}/defaults)
+{defaults}                   │ Alias for {defaults_dir}
 {bashmenu_dir}               │ Application root directory
 {config_dir}                 │ Alias for {bashmenu_dir}
 {scripts_dir}                │ Scripts directory path

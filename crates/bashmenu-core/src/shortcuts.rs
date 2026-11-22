@@ -583,6 +583,10 @@ pub fn resolve_shortcuts_path(local_override: bool) -> PathBuf {
         .map(PathBuf::from)
         .unwrap_or_else(|_| PathBuf::from("/"));
     let dev_dir = resolve_dev_dir(&home_dir, &user_cfg);
+    let defaults_path = dev_dir.join("defaults").join(filename);
+    if defaults_path.exists() {
+        return defaults_path;
+    }
     let dev_path = dev_dir.join(filename);
     if dev_path.exists() {
         return dev_path;

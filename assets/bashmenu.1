@@ -72,7 +72,7 @@ Color theme definitions (supporting 256, 16, and 8 color modes).
 .SH MAN PAGES (MANUALS)
 The application provides a local man page for terminal-based help:
 .TP
-.I bashmenu.1
+.I assets/bashmenu.1
 Terminal manual page for HA Bash Menu.
 .SH DYNAMIC SCRIPTS & TEMPLATES
 .SS Provided Utility Scripts (scripts/)
@@ -176,7 +176,7 @@ Expand or collapse the left help gutter to reveal all hidden shortcuts.
 Execute active selected menu option action.
 .TP
 .B F1
-View Markdown user manual (bashmenu.md) via bmpager --markdown.
+View Markdown user manual (assets/bashmenu.md) via bmpager --markdown.
 .TP
 .B F2
 Open Theme selector dialog.
@@ -714,6 +714,9 @@ User configuration root directory (~/.config/bashmenu).
 .TP
 .B {dev_dir}, {dev}
 Local git repository and development workspace root directory.
+.TP
+.B {defaults_dir}, {defaults}
+Repository defaults configuration directory ({dev_dir}/defaults).
 .TP
 .B {templates_dir}, {templates}, {scripts_dir}, {scripts}
 Templates and scripts folders paths.

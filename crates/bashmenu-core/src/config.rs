@@ -668,8 +668,9 @@ pub fn get_user_config_dir() -> PathBuf {
 ///    Look in `get_user_config_dir().join(target)`. If it exists, return it.
 /// 4. Environment override (`$BASHMENU_DIR`):
 ///    If set and `$BASHMENU_DIR/<target>` exists, return it.
-/// 5. Repository root fallback:
-///    If the file exists in the repository root directory (`resolve_dev_dir`), return it.
+/// 5. Repository defaults/assets/root fallback:
+///    If the file exists in `<dev_dir>/defaults/`, `<dev_dir>/assets/`, or
+///    `<dev_dir>/` (`resolve_dev_dir`), return it.
 /// 6. Default fallback:
 ///    Return `get_user_config_dir().join(target)`. This ensures saved files
 ///    always persist to `~/.config/bashmenu/` regardless of working directory.
@@ -703,6 +704,14 @@ pub fn resolve_app_path<P: AsRef<Path>>(target: P) -> PathBuf {
         .map(PathBuf::from)
         .unwrap_or_else(|_| PathBuf::from("/"));
     let dev_dir = resolve_dev_dir(&home, &user_cfg_dir);
+    let defaults_path = dev_dir.join("defaults").join(target);
+    if defaults_path.exists() {
+        return defaults_path;
+    }
+    let assets_path = dev_dir.join("assets").join(target);
+    if assets_path.exists() {
+        return assets_path;
+    }
     let dev_path = dev_dir.join(target);
     if dev_path.exists() {
         return dev_path;
@@ -763,7 +772,7 @@ mod tests {
 
     #[test]
     fn test_load_and_save_config_roundtrip() {
-        let fixture_path = Path::new("../../bashmenu.yml");
+        let fixture_path = Path::new("../../defaults/bashmenu.yml");
         if fixture_path.exists() {
             let config = load_config(fixture_path).expect("Failed to load bashmenu.yml");
             assert!(!config.version.is_empty());

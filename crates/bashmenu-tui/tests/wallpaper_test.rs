@@ -144,7 +144,7 @@ fn test_menu_view_renders_with_wallpaper() {
     let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
     std::env::set_var("BASHMENU_DIR", &repo_root);
 
-    let themes_path = repo_root.join("bashmenu.themes");
+    let themes_path = repo_root.join("defaults/bashmenu.themes");
     let themes = load_themes(&themes_path).expect("load themes");
     let theme = themes
         .get("alaska-mountain")
@@ -254,7 +254,7 @@ fn test_resolve_wallpaper_user_overrides() {
     let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
     std::env::set_var("BASHMENU_DIR", &repo_root);
 
-    let themes = load_themes(repo_root.join("bashmenu.themes")).expect("load themes");
+    let themes = load_themes(repo_root.join("defaults/bashmenu.themes")).expect("load themes");
     let theme = themes
         .get("alaska-mountain")
         .expect("alaska-mountain theme");
