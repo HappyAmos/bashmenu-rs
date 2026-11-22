@@ -528,9 +528,9 @@ pub fn is_linux_console() -> bool {
 }
 
 #[cfg(target_os = "linux")]
-const FBIOGET_VSCREENINFO: libc::c_ulong = 0x4600;
+const FBIOGET_VSCREENINFO: libc::Ioctl = 0x4600;
 #[cfg(target_os = "linux")]
-const FBIOGET_FSCREENINFO: libc::c_ulong = 0x4602;
+const FBIOGET_FSCREENINFO: libc::Ioctl = 0x4602;
 
 #[cfg(target_os = "linux")]
 #[repr(C)]
