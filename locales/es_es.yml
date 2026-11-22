@@ -191,6 +191,7 @@ menuedit:
   gutter_glyphs: "Glifos"
   gutter_placeholders: "Marcadores"
   gutter_add: "Añadir"
+  gutter_duplicate: "Duplicar"
   gutter_type: "Tipo"
   gutter_toggle: "Alternar"
   gutter_move_down: "Mover abajo"

@@ -42,6 +42,8 @@ enum MenuEditFooterAction {
     Placeholders,
     /// Add a new menu item
     Add,
+    /// Duplicate selected menu item in-place below it
+    Duplicate,
     /// Edit the selected menu item properties
     Edit,
     /// Change selected menu item type
@@ -188,7 +190,7 @@ enum ActiveModal {
     GlyphSearch(InputModal),
 }
 
-fn get_footer_items() -> [(String, MenuEditFooterAction); 16] {
+fn get_footer_items() -> [(String, MenuEditFooterAction); 17] {
     [
         (
             format!("[F1] {}", t!("common.gutters.help")),
@@ -215,6 +217,10 @@ fn get_footer_items() -> [(String, MenuEditFooterAction); 16] {
             MenuEditFooterAction::Add,
         ),
         (
+            format!("[d] {}", t!("menuedit.gutter_duplicate")),
+            MenuEditFooterAction::Duplicate,
+        ),
+        (
             format!("[e/ENTER] {}", t!("common.gutters.edit")),
             MenuEditFooterAction::Edit,
         ),
@@ -227,7 +233,7 @@ fn get_footer_items() -> [(String, MenuEditFooterAction); 16] {
             MenuEditFooterAction::Toggle,
         ),
         (
-            format!("[d] {}", t!("common.buttons.delete")),
+            format!("[DEL] {}", t!("common.buttons.delete")),
             MenuEditFooterAction::Delete,
         ),
         (
@@ -1238,6 +1244,31 @@ fn main() -> Result<()> {
                                                 }
                                             }
                                         }
+                                        MenuEditFooterAction::Duplicate => {
+                                            if let Some(node) = visible_nodes.get(selected_node_idx)
+                                            {
+                                                if let Some(new_p) = menuedit_cli::duplicate_item(
+                                                    &mut menu,
+                                                    &node.path,
+                                                    &mut expanded_paths,
+                                                ) {
+                                                    is_modified = true;
+                                                    toast_rack.add(ToastNotification {
+                                                        title: Some("Menu Editor".to_string()),
+                                                        message: "Duplicated item".to_string(),
+                                                        severity: ToastSeverity::Information,
+                                                        timeout_secs: 1.5,
+                                                    });
+                                                    let new_vis =
+                                                        flatten_tree(&menu, &expanded_paths);
+                                                    if let Some(pos) =
+                                                        new_vis.iter().position(|n| n.path == new_p)
+                                                    {
+                                                        selected_node_idx = pos;
+                                                    }
+                                                }
+                                            }
+                                        }
                                         MenuEditFooterAction::Delete => {
                                             if let Some(node) = visible_nodes.get(selected_node_idx)
                                             {
@@ -1565,7 +1596,30 @@ fn main() -> Result<()> {
                                         );
                                     }
                                 }
-                                KeyCode::Char('d') | KeyCode::Char('D') | KeyCode::Delete => {
+                                KeyCode::Char('d') | KeyCode::Char('D') => {
+                                    if let Some(node) = visible_nodes.get(selected_node_idx) {
+                                        if let Some(new_p) = menuedit_cli::duplicate_item(
+                                            &mut menu,
+                                            &node.path,
+                                            &mut expanded_paths,
+                                        ) {
+                                            is_modified = true;
+                                            toast_rack.add(ToastNotification {
+                                                title: Some("Menu Editor".to_string()),
+                                                message: "Duplicated item".to_string(),
+                                                severity: ToastSeverity::Information,
+                                                timeout_secs: 1.5,
+                                            });
+                                            let new_vis = flatten_tree(&menu, &expanded_paths);
+                                            if let Some(pos) =
+                                                new_vis.iter().position(|n| n.path == new_p)
+                                            {
+                                                selected_node_idx = pos;
+                                            }
+                                        }
+                                    }
+                                }
+                                KeyCode::Delete => {
                                     if let Some(node) = visible_nodes.get(selected_node_idx) {
                                         active_modal = ActiveModal::ConfirmDelete(
                                             ConfirmModal::new(

@@ -1,21 +1,25 @@
 #!/usr/bin/env bash
-# terminal_radar.sh - Pure Bash interactive animated NWS weather radar viewer
-# Zero Python or external image-library dependencies (uses bash, curl, chafa).
+# ==============================================================================
+# SCRIPT: terminal_radar.sh
+# DESCRIPTION: Pure Bash interactive animated NWS weather radar viewer using
+#              curl and chafa (zero Python or external image-library deps).
+# ==============================================================================
 
 set -euo pipefail
 
 # --- Configuration ---
 DEFAULT_LOCATION="KDTX"
 SYMBOL_MODE="block"      # "block" (ANSI half-blocks) or "braille" (Unicode Braille)
-COLOR_MODE="full"        # "full" (truecolor) or "256"
+COLOR_MODE="full"        # "full" (truecolor), "256", "16", "8", or "none"
 SIZE=""                  # Optional WxH (e.g. 80x40), auto-detected if empty
 DELAY_MS=250             # Initial frame delay in milliseconds
 MIN_DELAY_MS=50
 MAX_DELAY_MS=2000
 STEP_DELAY_MS=50
-USER_AGENT="terminal-radar-bash/3.0"
+USER_AGENT="terminal-radar-bash/3.1"
 
 TMP_DIR=""
+SAVED_STTY=""
 FRAME_COUNT=0
 LAST_MOD_EPOCH=0
 STATION=""
@@ -37,24 +41,31 @@ LOCATION can be:
   - An NWS regional mosaic name (e.g., CENTGRLAKES, CONUS)
 
 Options:
-  -b, --braille       Use Unicode Braille characters instead of ANSI half-blocks
-  -s, --size WxH      Set output dimensions in columns x rows (e.g., 80x40)
-  -d, --delay MS      Initial delay between frames in milliseconds (default: 250)
-  -h, --help          Show this help message
+  -b, --braille         Use Unicode Braille characters instead of ANSI half-blocks
+  -c, --colors MODE     Color mode: full, 256, 16, 8, none (default: full)
+  -s, --size WxH        Set output dimensions in columns x rows (e.g., 80x40)
+  -d, --delay MS        Initial delay between frames in milliseconds (default: 250)
+  -h, --help            Show this help message
 
 Interactive Controls:
-  + / =               Speed up animation
-  - / _               Slow down animation
-  r                   Refresh radar frames from NWS
-  Space               Pause / resume playback
-  q                   Quit
+  + / =                 Speed up animation
+  - / _                 Slow down animation
+  Left / ,              Pause & step backward one frame
+  Right / .             Pause & step forward one frame
+  r                     Refresh radar frames from NWS
+  Space                 Pause / resume playback
+  q / Esc               Quit
 EOF
     exit 0
 }
 
 cleanup() {
     printf "\033[?25h\033[0m"
-    stty echo icanon 2>/dev/null || true
+    if [[ -n "$SAVED_STTY" ]]; then
+        stty "$SAVED_STTY" 2>/dev/null || true
+    else
+        stty echo icanon 2>/dev/null || true
+    fi
     if [[ -n "$TMP_DIR" && -d "$TMP_DIR" ]]; then
         rm -rf "$TMP_DIR"
     fi
@@ -69,11 +80,27 @@ while [[ $# -gt 0 ]]; do
             SYMBOL_MODE="braille"
             shift
             ;;
+        -c|--colors)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: '$1' requires a value (full, 256, 16, 8, none)." >&2
+                exit 1
+            fi
+            COLOR_MODE="$2"
+            shift 2
+            ;;
         -s|--size)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: '$1' requires a WxH value (e.g., 80x40)." >&2
+                exit 1
+            fi
             SIZE="$2"
             shift 2
             ;;
         -d|--delay)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: '$1' requires a millisecond value." >&2
+                exit 1
+            fi
             DELAY_MS="$2"
             shift 2
             ;;
@@ -91,6 +118,16 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+if ! [[ "$DELAY_MS" =~ ^[0-9]+$ ]]; then
+    echo "Error: --delay must be a positive integer in milliseconds." >&2
+    exit 1
+fi
+if (( DELAY_MS < MIN_DELAY_MS )); then
+    DELAY_MS=$MIN_DELAY_MS
+elif (( DELAY_MS > MAX_DELAY_MS )); then
+    DELAY_MS=$MAX_DELAY_MS
+fi
+
 TARGET="${TARGET:-$DEFAULT_LOCATION}"
 TARGET="${TARGET^^}"
 
@@ -105,9 +142,11 @@ done
 # --- Lightweight JSON Extractor (Pure Bash + grep/sed, no jq needed) ---
 json_val() {
     local key="$1"
-    grep -oE "\"${key}\"[[:space:]]*:[[:space:]]*\"?[^\",}]+\"?" \
-        | head -n 1 \
-        | sed -E "s/^\"${key}\"[[:space:]]*:[[:space:]]*\"?//; s/\"?$//"
+    (
+        grep -oE "\"${key}\"[[:space:]]*:[[:space:]]*\"?[^\",}]+\"?" \
+            | head -n 1 \
+            | sed -E "s/^\"${key}\"[[:space:]]*:[[:space:]]*\"?//; s/\"?$//"
+    ) || true
 }
 
 # --- Location Resolution ---
@@ -115,7 +154,7 @@ resolve_station() {
     local input="$1"
 
     case "$input" in
-        ALASKA|CARIB|CENTGRLAKES|CONUS|GUAM|HAWAII|NORTHEAST|NORTHROCKIES|PACNORTHWEST|PACSOUTHWEST|SOUTHMissVLY|SOUTHPLAINS|SOUTHEAST|UPPERMISSVLY)
+        ALASKA|CARIB|CENTGRLAKES|CONUS|GUAM|HAWAII|NORTHEAST|NORTHROCKIES|PACNORTHWEST|PACSOUTHWEST|SOUTHMISSVLY|SOUTHPLAINS|SOUTHEAST|UPPERMISSVLY)
             STATION="$input"
             RESOLVED_LABEL="Mosaic: $input"
             return
@@ -137,13 +176,19 @@ resolve_station() {
         echo "Finding nearest NWS radar tower for ($lat, $lon)..."
         points_json=$(curl -sf -H "User-Agent: $USER_AGENT" "https://api.weather.gov/points/${lat},${lon}" || true)
         STATION=$(printf "%s" "$points_json" | json_val "radarStation")
+        if [[ -z "$STATION" || "$STATION" == "null" ]]; then
+            echo "Error: Could not find an NWS radar station for ZIP '$input' ($lat, $lon)." >&2
+            exit 1
+        fi
         RESOLVED_LABEL="ZIP $input -> $STATION"
         return
     fi
 
     if [[ "$input" =~ ^[A-Z]{3,4}$ ]]; then
         local icao="$input"
-        [[ ${#icao} -eq 3 ]] && icao="K${icao}"
+        if [[ ${#icao} -eq 3 ]]; then
+            icao="K${icao}"
+        fi
 
         local station_json
         station_json=$(curl -sf -H "User-Agent: $USER_AGENT" "https://api.weather.gov/stations/${icao}" 2>/dev/null || true)
@@ -164,6 +209,23 @@ resolve_station() {
 
     STATION="$input"
     RESOLVED_LABEL="$STATION"
+}
+
+# --- Fast byte-slice helper (GNU dd skip_bytes/count_bytes with POSIX fallback) ---
+extract_bytes() {
+    local src="$1"
+    local offset="$2"
+    local length="$3"
+    local dest="$4"
+    local append="${5:-0}"
+
+    if [[ "$append" == "1" ]]; then
+        dd if="$src" bs=4096 iflag=skip_bytes,count_bytes skip="$offset" count="$length" >> "$dest" 2>/dev/null \
+            || dd if="$src" bs=1 skip="$offset" count="$length" >> "$dest" 2>/dev/null
+    else
+        dd if="$src" of="$dest" bs=4096 iflag=skip_bytes,count_bytes skip="$offset" count="$length" 2>/dev/null \
+            || dd if="$src" of="$dest" bs=1 skip="$offset" count="$length" 2>/dev/null
+    fi
 }
 
 # --- Pure Bash Binary GIF Frame Splitter ---
@@ -200,7 +262,7 @@ split_gif_pure_bash() {
     fi
 
     # Extract shared header + Global Color Table once
-    dd if="$gif_file" of="$out_dir/header.bin" bs=1 count="$header_end" 2>/dev/null
+    extract_bytes "$gif_file" 0 "$header_end" "$out_dir/header.bin" 0
 
     local pos=$header_end
     local idx=0
@@ -210,11 +272,11 @@ split_gif_pure_bash() {
     skip_subblocks() {
         while (( pos < total )); do
             local sz=$(( 16#${bytes[pos]} ))
-            (( pos++ ))
+            pos=$(( pos + 1 ))
             if (( sz == 0 )); then
                 break
             fi
-            (( pos += sz ))
+            pos=$(( pos + sz ))
         done
     }
 
@@ -226,21 +288,29 @@ split_gif_pure_bash() {
             break
         elif [[ "$b" == "21" ]]; then
             # Extension Introducer (0x21)
-            local label="${bytes[pos+1]:-00}"
+            local label="00"
+            if (( pos + 1 < total )); then
+                label="${bytes[pos+1]}"
+            fi
             if [[ "$label" == "f9" ]]; then
                 # Graphic Control Extension marks start of next frame
                 gce_start=$pos
-                (( pos += 2 ))
+                pos=$(( pos + 2 ))
                 skip_subblocks
             else
                 # Application, Comment, or Plain Text Extension
-                (( pos += 2 ))
+                pos=$(( pos + 2 ))
                 skip_subblocks
             fi
         elif [[ "$b" == "2c" ]]; then
-            # Image Descriptor (0x2C)
+            # Image Descriptor (0x2C) requires at least 10 bytes
+            if (( pos + 9 >= total )); then
+                break
+            fi
             local frame_start=$pos
-            (( gce_start >= 0 )) && frame_start=$gce_start
+            if (( gce_start >= 0 )); then
+                frame_start=$gce_start
+            fi
 
             local img_packed=$(( 16#${bytes[pos+9]} ))
             local lct_flag=$(( (img_packed >> 7) & 1 ))
@@ -251,7 +321,7 @@ split_gif_pure_bash() {
             fi
 
             # Advance past Image Descriptor (10 bytes) + LCT + LZW Min Code Size (1 byte)
-            (( pos += 10 + lct_size + 1 ))
+            pos=$(( pos + 10 + lct_size + 1 ))
             skip_subblocks
 
             local frame_len=$(( pos - frame_start ))
@@ -259,13 +329,13 @@ split_gif_pure_bash() {
             printf -v out_gif "%s/frame_%03d.gif" "$out_dir" "$idx"
 
             cp "$out_dir/header.bin" "$out_gif"
-            dd if="$gif_file" bs=1 skip="$frame_start" count="$frame_len" >> "$out_gif" 2>/dev/null
+            extract_bytes "$gif_file" "$frame_start" "$frame_len" "$out_gif" 1
             printf '\x3b' >> "$out_gif"
 
-            (( idx++ ))
+            idx=$(( idx + 1 ))
             gce_start=-1
         else
-            (( pos++ ))
+            pos=$(( pos + 1 ))
         fi
     done
 
@@ -285,8 +355,12 @@ fetch_and_render() {
     fi
 
     # Parse HTTP Last-Modified header into epoch seconds for frame timestamps
-    local last_mod_str
-    last_mod_str=$(grep -i '^last-modified:' "$hdr_file" | head -n 1 | sed -E 's/^[Ll]ast-[Mm]odified:[[:space:]]*//; s/\r$//')
+    local last_mod_str=""
+    last_mod_str=$(
+        grep -i '^last-modified:' "$hdr_file" \
+            | head -n 1 \
+            | sed -E 's/^[Ll]ast-[Mm]odified:[[:space:]]*//; s/\r$//'
+    ) || true
     if [[ -n "$last_mod_str" ]]; then
         LAST_MOD_EPOCH=$(date -d "$last_mod_str" +%s 2>/dev/null || date +%s)
     else
@@ -301,9 +375,13 @@ fetch_and_render() {
         cols=$(tput cols 2>/dev/null || echo 80)
         rows=$(tput lines 2>/dev/null || echo 36)
         local max_h=$(( rows - 4 ))
-        (( max_h < 12 )) && max_h=12
+        if (( max_h < 12 )); then
+            max_h=12
+        fi
         local max_w=$(( max_h * 2 ))
-        (( max_w > cols )) && max_w=$cols
+        if (( max_w > cols )); then
+            max_w=$cols
+        fi
         target_size="${max_w}x${max_h}"
     fi
 
@@ -355,9 +433,10 @@ if ! fetch_and_render; then
     exit 1
 fi
 
-# Hide cursor and enable non-canonical single-key reading
+# Save terminal state, hide cursor, and disable echo
+SAVED_STTY=$(stty -g 2>/dev/null || true)
 printf "\033[?25l"
-stty -echo -icanon time 0 min 0 2>/dev/null || true
+stty -echo 2>/dev/null || true
 
 idx=0
 paused=0
@@ -368,14 +447,16 @@ clear
 while true; do
     # Build current frame output in a single buffer for tear-free terminal updates
     local_state="PLAYING"
-    (( paused == 1 )) && local_state="PAUSED "
+    if (( paused == 1 )); then
+        local_state="PAUSED "
+    fi
 
     fps_x10=$(( 10000 / DELAY_MS ))
     fps_str="$(( fps_x10 / 10 )).$(( fps_x10 % 10 ))"
 
     header_line=$(printf "\033[1;36mNWS Radar:\033[0m %-22s \033[1;33mFrame:\033[0m %02d/%02d  \033[1;32mTime:\033[0m %s" \
-        "$RESOLVED_LABEL" "$((idx + 1))" "$FRAME_COUNT" "${TIMESTAMPS[$idx]}")
-    footer_line=$(printf "\033[7m %s \033[0m Speed: %dms (%s FPS) | [+] Faster  [-] Slower  [r] Refresh  [Space] Pause  [q] Quit %s" \
+        "$RESOLVED_LABEL" "$(( idx + 1 ))" "$FRAME_COUNT" "${TIMESTAMPS[$idx]}")
+    footer_line=$(printf "\033[7m %s \033[0m Speed: %dms (%s FPS) | [+/-] Speed  [</>] Step  [r] Refresh  [Space] Pause  [q/Esc] Quit %s" \
         "$local_state" "$DELAY_MS" "$fps_str" "$status_note")
 
     # Move cursor to home (1,1), print header + pre-rendered frame + footer, clear trailing lines
@@ -389,12 +470,49 @@ while true; do
     if IFS= read -rsn1 -t "$sleep_sec" key; then
         case "$key" in
             "+"|"=")
-                (( DELAY_MS -= STEP_DELAY_MS ))
-                (( DELAY_MS < MIN_DELAY_MS )) && DELAY_MS=$MIN_DELAY_MS
+                DELAY_MS=$(( DELAY_MS - STEP_DELAY_MS ))
+                if (( DELAY_MS < MIN_DELAY_MS )); then
+                    DELAY_MS=$MIN_DELAY_MS
+                fi
                 ;;
             "-"|"_")
-                (( DELAY_MS += STEP_DELAY_MS ))
-                (( DELAY_MS > MAX_DELAY_MS )) && DELAY_MS=$MAX_DELAY_MS
+                DELAY_MS=$(( DELAY_MS + STEP_DELAY_MS ))
+                if (( DELAY_MS > MAX_DELAY_MS )); then
+                    DELAY_MS=$MAX_DELAY_MS
+                fi
+                ;;
+            ",")
+                if (( FRAME_COUNT > 0 )); then
+                    paused=1
+                    idx=$(( (idx - 1 + FRAME_COUNT) % FRAME_COUNT ))
+                fi
+                ;;
+            ".")
+                if (( FRAME_COUNT > 0 )); then
+                    paused=1
+                    idx=$(( (idx + 1) % FRAME_COUNT ))
+                fi
+                ;;
+            $'\x1b')
+                seq=""
+                if IFS= read -rsn2 -t 0.02 seq; then
+                    case "$seq" in
+                        "[C")
+                            if (( FRAME_COUNT > 0 )); then
+                                paused=1
+                                idx=$(( (idx + 1) % FRAME_COUNT ))
+                            fi
+                            ;;
+                        "[D")
+                            if (( FRAME_COUNT > 0 )); then
+                                paused=1
+                                idx=$(( (idx - 1 + FRAME_COUNT) % FRAME_COUNT ))
+                            fi
+                            ;;
+                    esac
+                else
+                    break
+                fi
                 ;;
             "r"|"R")
                 printf "\033[H\033[1;33mRefreshing radar loop for %s...\033[K\033[0m" "$RESOLVED_LABEL"
@@ -413,9 +531,10 @@ while true; do
                 break
                 ;;
         esac
-    fi
-
-    if (( paused == 0 && FRAME_COUNT > 0 )); then
-        idx=$(( (idx + 1) % FRAME_COUNT ))
+    else
+        # Advance frame only on normal frame timeout (not when adjusting speed)
+        if (( paused == 0 && FRAME_COUNT > 0 )); then
+            idx=$(( (idx + 1) % FRAME_COUNT ))
+        fi
     fi
 done

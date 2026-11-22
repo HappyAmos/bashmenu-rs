@@ -124,7 +124,7 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
   - Serialization: Use `bashmenu_core::menu::dump_menu_yaml()` with 2-space indented sequences and lean defaults (prune default boolean flags).
 - **Visual Menu Editor (`menuedit`):**
   - Type-filtered inspector (`ItemEditModal`): filters visible controls based on item type (`command`, `script`, `submenu`, `toggle`, `radio`, `confirm`).
-  - Adding/Deleting key parity: <kbd>a</kbd> / <kbd>Insert</kbd> adds node; <kbd>d</kbd> / <kbd>Delete</kbd> prompts confirmation to delete node.
+  - Adding/Duplicating/Deleting keys: <kbd>a</kbd> / <kbd>Insert</kbd> adds node; <kbd>d</kbd> / <kbd>D</kbd> duplicates node in-place below it; <kbd>Delete</kbd> prompts confirmation to delete node.
   - Type mutation (<kbd>Ctrl+T</kbd> / <kbd>t</kbd>): converts node types, migrating canonical payloads (`action`, `file`, `key`) and pruning obsolete fields.
   - Synchronization: `<F4>` passes `--select-path`, `--select-title`, and `--title-chain` to autofocus active item.
 
