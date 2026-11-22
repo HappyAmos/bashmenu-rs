@@ -21,7 +21,7 @@ shortcuts:
   execution_mode: console
   quiet: true
   alt_buffer: false
-- key: <leader> w
+- key: <leader> a
   description: Environment Info
   type: script
   action: '{env}'
