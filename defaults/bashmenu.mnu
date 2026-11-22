@@ -943,6 +943,23 @@ items:
           interactive: true
           quiet: true
           alt_buffer: true
+      - Weather Radar [weather.gov]:
+          type: command
+          icon: '{nf:>:#f067f}'
+          command: '{scripts_dir}/terminal_radar.sh {param}'
+          action: '{scripts_dir}/terminal_radar.sh {param}'
+          prompt: 'Enter a 5 digit US ZIP Code, 3 or 4 letter US airport code, 4 letter NEXRAD radar station ID, A NWS regional mosaic name:'
+          interactive: true
+          quiet: true
+          alt_buffer: true
+          tabstop: 4
+          exec_mode: console
+          show_whitespace: false
+          refresh: true
+          no_formatting: false
+          stream: false
+          masked: false
+          external: false
       - '{divider}': null
       - Back to Main Menu:
           type: back
