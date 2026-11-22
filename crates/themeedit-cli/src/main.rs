@@ -996,27 +996,43 @@ fn main() -> Result<()> {
                     }
                     _ => {}
                 },
-                ActiveModal::ConfirmExit(modal) => match ev {
-                    Event::Key(k) => {
-                        if let Some(choice) = modal.handle_key(k.code) {
-                            if choice.is_yes() {
-                                break;
-                            } else {
+                ActiveModal::ConfirmExit(modal) => {
+                    let choice = match ev {
+                        Event::Key(k) => modal.handle_key(k.code),
+                        Event::Mouse(m) => modal.handle_mouse(m, area),
+                        _ => None,
+                    };
+                    if let Some(c) = choice {
+                        match c {
+                            bashmenu_tui::ConfirmChoice::Yes => {
+                                if state.current_name.trim().is_empty() {
+                                    active_modal = ActiveModal::SaveAs(InputModal::new(
+                                        t!("themeedit.save_as_title"),
+                                        t!("themeedit.save_as_prompt"),
+                                        &state.name_input.as_string(),
+                                    ));
+                                } else {
+                                    match state.save_to_disk() {
+                                        Ok(_) => break,
+                                        Err(e) => {
+                                            toast_rack.add(ToastNotification {
+                                                title: Some("Save Failed".to_string()),
+                                                message: format!("Error saving theme: {}", e),
+                                                severity: ToastSeverity::Error,
+                                                timeout_secs: 4.0,
+                                            });
+                                            active_modal = ActiveModal::None;
+                                        }
+                                    }
+                                }
+                            }
+                            bashmenu_tui::ConfirmChoice::No => break,
+                            bashmenu_tui::ConfirmChoice::Cancel => {
                                 active_modal = ActiveModal::None;
                             }
                         }
                     }
-                    Event::Mouse(m) => {
-                        if let Some(choice) = modal.handle_mouse(m, area) {
-                            if choice.is_yes() {
-                                break;
-                            } else {
-                                active_modal = ActiveModal::None;
-                            }
-                        }
-                    }
-                    _ => {}
-                },
+                }
                 ActiveModal::BackgroundConfig(ref mut modal) => {
                     let action = match ev {
                         Event::Key(k) => modal.handle_key_with_modifiers(k.code, k.modifiers),
@@ -1176,10 +1192,13 @@ fn main() -> Result<()> {
                                 // Universal close button [X]
                                 if m.row == area.y && m.column >= area.x + area.width - 5 {
                                     if state.is_modified {
-                                        active_modal = ActiveModal::ConfirmExit(ConfirmModal::new(
-                                            t!("common.dialogs.unsaved_changes_title"),
-                                            t!("common.dialogs.discard_exit_msg"),
-                                        ));
+                                        active_modal = ActiveModal::ConfirmExit(
+                                            ConfirmModal::new(
+                                                t!("common.dialogs.unsaved_changes_title"),
+                                                t!("common.dialogs.unsaved_changes_msg"),
+                                            )
+                                            .with_default_cancel(),
+                                        );
                                     } else {
                                         break;
                                     }
@@ -1870,10 +1889,13 @@ fn main() -> Result<()> {
                                 }
                                 KeyCode::Esc | KeyCode::Char('q') => {
                                     if state.is_modified {
-                                        active_modal = ActiveModal::ConfirmExit(ConfirmModal::new(
-                                            t!("common.dialogs.unsaved_changes_title"),
-                                            t!("common.dialogs.discard_exit_msg"),
-                                        ));
+                                        active_modal = ActiveModal::ConfirmExit(
+                                            ConfirmModal::new(
+                                                t!("common.dialogs.unsaved_changes_title"),
+                                                t!("common.dialogs.unsaved_changes_msg"),
+                                            )
+                                            .with_default_cancel(),
+                                        );
                                     } else {
                                         break;
                                     }

@@ -60,6 +60,23 @@ impl ConfirmModal {
         }
     }
 
+    /// Sets the initially focused button choice (`Yes`, `No`, or `Cancel`).
+    pub fn with_default_choice(mut self, choice: ConfirmChoice) -> Self {
+        self.selected_index = match choice {
+            ConfirmChoice::Yes => 0,
+            ConfirmChoice::No => 1,
+            ConfirmChoice::Cancel => 2,
+        };
+        self.sync_yes();
+        self
+    }
+
+    /// Sets `[ Cancel ]` as the initially focused button so pressing `Enter`
+    /// dismisses the dialog without performing a destructive or saving action.
+    pub fn with_default_cancel(self) -> Self {
+        self.with_default_choice(ConfirmChoice::Cancel)
+    }
+
     /// Synchronizes the `selected_yes` helper boolean with `selected_index == 0`.
     fn sync_yes(&mut self) {
         self.selected_yes = self.selected_index == 0;

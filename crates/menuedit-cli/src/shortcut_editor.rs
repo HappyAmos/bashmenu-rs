@@ -1821,8 +1821,21 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                 };
                 if let Some(c) = choice {
                     match c {
-                        ConfirmChoice::Yes => break,
-                        ConfirmChoice::No | ConfirmChoice::Cancel => {
+                        ConfirmChoice::Yes => {
+                            match save_shortcuts(&shortcuts_path, &state.config) {
+                                Ok(()) => break,
+                                Err(e) => {
+                                    toast_rack.add(ToastNotification::new(
+                                        format!("Save failed: {}", e),
+                                        Some("Error".to_string()),
+                                        4.0,
+                                    ));
+                                    active_modal = ActiveShortcutModal::None;
+                                }
+                            }
+                        }
+                        ConfirmChoice::No => break,
+                        ConfirmChoice::Cancel => {
                             active_modal = ActiveShortcutModal::None;
                         }
                     }
@@ -2437,10 +2450,13 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                         // [Esc] / [q] Quit application (prompts confirmation if unsaved changes exist)
                         KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q') => {
                             if state.dirty {
-                                active_modal = ActiveShortcutModal::ConfirmExit(ConfirmModal::new(
-                                    t!("common.dialogs.unsaved_changes_title"),
-                                    t!("common.dialogs.discard_exit_msg"),
-                                ));
+                                active_modal = ActiveShortcutModal::ConfirmExit(
+                                    ConfirmModal::new(
+                                        t!("common.dialogs.unsaved_changes_title"),
+                                        t!("common.dialogs.unsaved_changes_msg"),
+                                    )
+                                    .with_default_cancel(),
+                                );
                             } else {
                                 break;
                             }

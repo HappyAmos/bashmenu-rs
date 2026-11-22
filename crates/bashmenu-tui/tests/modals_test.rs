@@ -2511,3 +2511,29 @@ fn test_text_input_horizontal_scrolling_does_not_marquee() {
     assert!(input.cursor >= scroll_15);
     assert!(input.cursor < scroll_15 + inner_w);
 }
+
+#[test]
+fn test_confirm_modal_with_default_cancel() {
+    let mut modal = ConfirmModal::new(
+        "Unsaved Changes",
+        "You have unsaved changes. Save before exiting?",
+    )
+    .with_default_cancel();
+
+    assert_eq!(modal.selected_index, 2);
+    assert!(!modal.selected_yes);
+    assert_eq!(
+        modal.handle_key(KeyCode::Enter),
+        Some(ConfirmChoice::Cancel)
+    );
+
+    // Navigating left from Cancel selects No, then Yes
+    let mut modal2 = ConfirmModal::new(
+        "Unsaved Changes",
+        "You have unsaved changes. Save before exiting?",
+    )
+    .with_default_cancel();
+    assert_eq!(modal2.handle_key(KeyCode::Left), None);
+    assert_eq!(modal2.selected_index, 1);
+    assert_eq!(modal2.handle_key(KeyCode::Enter), Some(ConfirmChoice::No));
+}

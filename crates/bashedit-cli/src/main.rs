@@ -987,10 +987,13 @@ fn main() -> Result<()> {
                             KeyCode::Char('q') => {
                                 let has_modified = tabs.iter().any(|t| t.is_modified);
                                 if has_modified {
-                                    active_modal = ActiveModal::ConfirmExit(ConfirmModal::new(
-                                        "Unsaved Changes",
-                                        "One or more tabs have unsaved changes. Exit anyway?",
-                                    ));
+                                    active_modal = ActiveModal::ConfirmExit(
+                                        ConfirmModal::new(
+                                            t!("common.dialogs.unsaved_changes_title"),
+                                            t!("common.dialogs.unsaved_changes_msg"),
+                                        )
+                                        .with_default_cancel(),
+                                    );
                                 } else {
                                     for t in &tabs {
                                         t.cleanup_swap();
@@ -1160,10 +1163,13 @@ fn main() -> Result<()> {
                         KeyCode::Esc => {
                             let has_modified = tabs.iter().any(|t| t.is_modified);
                             if has_modified {
-                                active_modal = ActiveModal::ConfirmExit(ConfirmModal::new(
-                                    "Unsaved Changes",
-                                    "One or more tabs have unsaved changes. Exit anyway?",
-                                ));
+                                active_modal = ActiveModal::ConfirmExit(
+                                    ConfirmModal::new(
+                                        t!("common.dialogs.unsaved_changes_title"),
+                                        t!("common.dialogs.unsaved_changes_msg"),
+                                    )
+                                    .with_default_cancel(),
+                                );
                             } else {
                                 for t in &tabs {
                                     t.cleanup_swap();
@@ -1272,10 +1278,13 @@ fn main() -> Result<()> {
                         if m.column >= close_btn_x {
                             let has_modified = tabs.iter().any(|t| t.is_modified);
                             if has_modified {
-                                active_modal = ActiveModal::ConfirmExit(ConfirmModal::new(
-                                    "Unsaved Changes",
-                                    "One or more tabs have unsaved changes. Exit anyway?",
-                                ));
+                                active_modal = ActiveModal::ConfirmExit(
+                                    ConfirmModal::new(
+                                        t!("common.dialogs.unsaved_changes_title"),
+                                        t!("common.dialogs.unsaved_changes_msg"),
+                                    )
+                                    .with_default_cancel(),
+                                );
                             } else {
                                 for t in &tabs {
                                     t.cleanup_swap();
@@ -1495,10 +1504,13 @@ fn main() -> Result<()> {
                                     FooterAction::Exit => {
                                         let has_modified = tabs.iter().any(|t| t.is_modified);
                                         if has_modified {
-                                            active_modal = ActiveModal::ConfirmExit(ConfirmModal::new(
-                                                "Unsaved Changes",
-                                                "One or more tabs have unsaved changes. Exit anyway?",
-                                            ));
+                                            active_modal = ActiveModal::ConfirmExit(
+                                                ConfirmModal::new(
+                                                    t!("common.dialogs.unsaved_changes_title"),
+                                                    t!("common.dialogs.unsaved_changes_msg"),
+                                                )
+                                                .with_default_cancel(),
+                                            );
                                         } else {
                                             for t in &tabs {
                                                 t.cleanup_swap();
@@ -1942,14 +1954,57 @@ fn handle_active_modal(
                 _ => None,
             };
             if let Some(c) = choice {
-                if c.is_yes() {
-                    for t in tabs.iter() {
-                        t.cleanup_swap();
+                match c {
+                    bashmenu_tui::ConfirmChoice::Yes => {
+                        let mut untitled_idx: Option<usize> = None;
+                        let mut save_failed = false;
+                        for (i, tab) in tabs.iter_mut().enumerate() {
+                            if !tab.is_modified {
+                                continue;
+                            }
+                            if tab.file_path.is_none() {
+                                untitled_idx = Some(i);
+                                break;
+                            }
+                            if let Err(e) = tab.save_to_disk() {
+                                toast_rack.add(ToastNotification {
+                                    title: Some("Save Failed".to_string()),
+                                    message: format!("Error saving file: {}", e),
+                                    severity: ToastSeverity::Error,
+                                    timeout_secs: 4.0,
+                                });
+                                save_failed = true;
+                                break;
+                            }
+                        }
+                        if let Some(idx) = untitled_idx {
+                            *active_tab_idx = idx;
+                            let cwd =
+                                std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+                            *active_modal = ActiveModal::SaveAs(
+                                FilePickerModal::new("Save File As", &cwd, false)
+                                    .with_save_as(true),
+                            );
+                        } else if save_failed {
+                            *active_modal = ActiveModal::None;
+                        } else {
+                            for t in tabs.iter() {
+                                t.cleanup_swap();
+                            }
+                            tabs.clear();
+                            *active_modal = ActiveModal::None;
+                        }
                     }
-                    tabs.clear();
-                    *active_modal = ActiveModal::None;
-                } else {
-                    *active_modal = ActiveModal::None;
+                    bashmenu_tui::ConfirmChoice::No => {
+                        for t in tabs.iter() {
+                            t.cleanup_swap();
+                        }
+                        tabs.clear();
+                        *active_modal = ActiveModal::None;
+                    }
+                    bashmenu_tui::ConfirmChoice::Cancel => {
+                        *active_modal = ActiveModal::None;
+                    }
                 }
             }
             true
