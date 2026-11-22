@@ -12,3 +12,4 @@ title: Current Bashmenu Environment
 | shortcuts.yml | {shortcuts_yml} |
 | cheat.yml | {cheat_yml} |
 | Config Dir | {bashmenu_dir} |
+| Notebook Dir | {notebooks_dir} |
