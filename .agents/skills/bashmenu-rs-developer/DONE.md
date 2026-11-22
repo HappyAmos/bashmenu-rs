@@ -1254,3 +1254,8 @@
 - [x] Hardened `themeedit-cli` so `ThemeEditorState::new` resolves random theme specs (`[ Random ]`, `[Random]`, `Random`) to an active loaded theme rather than reporting literal "Random" or creating a blank default theme.
 - [x] Prevented renaming or saving themes as reserved random keywords (`Random`, `[ Random ]`, `[Random]`) in `themeedit-cli`.
 - [x] Added unit and integration tests across `bashmenu-core`, `bashmenu-cli`, and `themeedit-cli` for random theme resolution and reservation.
+
+## Fix `install.sh` Skipping Compilation on Stale `target/release` Binaries
+- [x] Updated `install.sh` pre-built binary detection (`HAS_PREBUILT`) to only skip `cargo build --release --workspace` when release-bundle binaries exist in `$SCRIPT_DIR/bin/`, preventing stale `target/release/*` binaries from being installed instead of rebuilding (which broke `./install.sh --merge` when `menuedit` lacked `--merge`).
+- [x] Added regression assertion in `crates/bashmenu-cli/tests/audit_items_test.rs` (`test_installer_help_flags`).
+- [x] Verified `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, and `shellcheck *.sh scripts/*.sh` all pass with exit code 0.
