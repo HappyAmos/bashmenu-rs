@@ -397,18 +397,42 @@ impl EditorBuffer {
         true
     }
 
+    /// Pastes a raw text payload (such as a terminal Bracketed Paste event),
+    /// normalizing `\r\n` and bare `\r` line endings into `\n` before inserting.
+    pub fn paste_text(&mut self, text: &str) -> bool {
+        let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
+        let paste_lines: Vec<String> = normalized.split('\n').map(String::from).collect();
+        self.paste(&paste_lines)
+    }
+
     /// Pastes lines from cutbuffer or fallback clipboard at cursor
     pub fn paste(&mut self, cutbuffer: &[String]) -> bool {
         if self.is_read_only {
             return false;
         }
-        let fallback = if cutbuffer.is_empty() {
+        let raw_lines = if cutbuffer.is_empty() {
             get_clipboard_text()
-                .map(|s| s.lines().map(|l| l.to_string()).collect::<Vec<_>>())
+                .map(|s| {
+                    s.replace("\r\n", "\n")
+                        .replace('\r', "\n")
+                        .split('\n')
+                        .map(String::from)
+                        .collect::<Vec<_>>()
+                })
                 .unwrap_or_default()
         } else {
             cutbuffer.to_vec()
         };
+        let fallback: Vec<String> = raw_lines
+            .into_iter()
+            .flat_map(|l| {
+                l.replace("\r\n", "\n")
+                    .replace('\r', "\n")
+                    .split('\n')
+                    .map(String::from)
+                    .collect::<Vec<_>>()
+            })
+            .collect();
         if fallback.is_empty() {
             self.status_message = "Buffer empty".to_string();
             return false;
