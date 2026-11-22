@@ -298,6 +298,56 @@ pub fn move_down_sibling(menu: &mut MenuSchema, path: &[usize]) -> Option<Vec<us
     Some(new_path)
 }
 
+/// Duplicates the menu item at `path`, inserting the cloned copy directly below
+/// it (`last_idx + 1`) in the same parent container.
+///
+/// Non-divider items receive a `" (Copy)"` suffix on their label (and submenu
+/// title if present), while dividers are cloned verbatim. Any `expanded` tree
+/// paths referencing siblings after `last_idx` in the same parent container are
+/// shifted by `+1` so expanded submenus remain attached to their original nodes.
+pub fn duplicate_item(
+    menu: &mut MenuSchema,
+    path: &[usize],
+    expanded: &mut HashSet<Vec<usize>>,
+) -> Option<Vec<usize>> {
+    let last_idx = *path.last()?;
+    let parent_path = &path[..path.len() - 1];
+    let items = get_container_items_mut(menu, parent_path)?;
+    let original = items.get(last_idx)?;
+
+    let mut cloned = original.clone();
+    if !cloned.is_divider() {
+        cloned.label = format!("{} (Copy)", cloned.label);
+        if let Some(ref mut sub) = cloned.submenu {
+            if !sub.title.is_empty() {
+                sub.title = format!("{} (Copy)", sub.title);
+            }
+        }
+    }
+
+    let insert_idx = last_idx + 1;
+    items.insert(insert_idx, cloned);
+
+    let parent_len = parent_path.len();
+    let shifted: HashSet<Vec<usize>> = expanded
+        .drain()
+        .map(|mut p| {
+            if p.len() > parent_len
+                && p[..parent_len] == *parent_path
+                && p[parent_len] >= insert_idx
+            {
+                p[parent_len] += 1;
+            }
+            p
+        })
+        .collect();
+    *expanded = shifted;
+
+    let mut new_path = parent_path.to_vec();
+    new_path.push(insert_idx);
+    Some(new_path)
+}
+
 /// Indents an item into the preceding sibling submenu
 pub fn indent_item(
     menu: &mut MenuSchema,

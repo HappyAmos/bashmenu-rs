@@ -193,6 +193,7 @@ menuedit:
   gutter_glyphs: "Glyphs"
   gutter_placeholders: "Placeholders"
   gutter_add: "Add"
+  gutter_duplicate: "Duplicate"
   gutter_type: "Type"
   gutter_toggle: "Toggle"
   gutter_move_down: "Move Dn"

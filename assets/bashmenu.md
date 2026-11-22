@@ -158,7 +158,8 @@ Used as dynamic templates for code generation, settings, or block injections:
 | `e` / `ENTER` | Edit selected node properties (opens `ItemEditModal`). |
 | `t` / `CTRL+T` | Change selected item type. |
 | `SPACE` / `LEFT` / `RIGHT` | Expand or collapse submenu tree node. |
-| `d` / `D` / `Delete` | Delete selected node (prompts confirmation). |
+| `d` / `D` | Duplicate selected node in-place directly below it (appends ` (Copy)` to non-dividers). |
+| `Delete` | Delete selected node (prompts confirmation). |
 | `m` | Move selected node down. |
 | `M` | Move selected node up. |
 | `>` | Indent item into preceding Submenu folder. |

@@ -698,7 +698,7 @@ fn test_menuedit_footer_spread_and_position() {
     ];
     let items_r2 = [
         "[SPACE] Toggle",
-        "[d] Delete",
+        "[DEL] Delete",
         "[m] Move Dn",
         "[M] Move Up",
         "[>] Indent",
@@ -1805,7 +1805,7 @@ fn test_menuedit_footer_border_overflow_repro() {
         "[e/ENTER] Edit",
         "[t] Type",
         "[SPACE] Toggle",
-        "[d] Delete",
+        "[DEL] Delete",
         "[m] Move Dn",
         "[M] Move Up",
         "[>] Indent",
@@ -1908,17 +1908,88 @@ fn test_menuedit_insert_and_delete_keys() {
     assert!(is_add_key(KeyCode::Insert));
     assert!(!is_add_key(KeyCode::Char('x')));
 
-    // Verify key matching for delete action (both 'd' and Delete)
-    let is_delete_key = |key: KeyCode| {
-        matches!(
-            key,
-            KeyCode::Char('d') | KeyCode::Char('D') | KeyCode::Delete
-        )
-    };
-    assert!(is_delete_key(KeyCode::Char('d')));
-    assert!(is_delete_key(KeyCode::Char('D')));
+    // Verify key matching for duplicate action ('d' / 'D') and delete action (Delete only)
+    let is_duplicate_key = |key: KeyCode| matches!(key, KeyCode::Char('d') | KeyCode::Char('D'));
+    let is_delete_key = |key: KeyCode| matches!(key, KeyCode::Delete);
+    assert!(is_duplicate_key(KeyCode::Char('d')));
+    assert!(is_duplicate_key(KeyCode::Char('D')));
+    assert!(!is_duplicate_key(KeyCode::Delete));
     assert!(is_delete_key(KeyCode::Delete));
+    assert!(!is_delete_key(KeyCode::Char('d')));
+    assert!(!is_delete_key(KeyCode::Char('D')));
     assert!(!is_delete_key(KeyCode::Char('x')));
+}
+
+#[test]
+fn test_menuedit_duplicate_item_leaf_divider_and_submenu() {
+    use menuedit_cli::duplicate_item;
+    use std::collections::HashSet;
+
+    let mut menu = bashmenu_core::MenuSchema {
+        version: "0.0.1".to_string(),
+        title: "Root".to_string(),
+        items: vec![
+            MenuItem {
+                label: "Web Browser".to_string(),
+                r#type: MenuItemType::Command,
+                command: Some("firefox".to_string()),
+                icon: Some("🚀".to_string()),
+                ..Default::default()
+            },
+            MenuItem::divider(),
+            MenuItem {
+                label: "Tools".to_string(),
+                r#type: MenuItemType::Submenu,
+                submenu: Some(Submenu {
+                    title: "Tools".to_string(),
+                    items: vec![MenuItem {
+                        label: "Htop".to_string(),
+                        r#type: MenuItemType::Command,
+                        command: Some("htop".to_string()),
+                        ..Default::default()
+                    }],
+                }),
+                ..Default::default()
+            },
+        ],
+        extra: Default::default(),
+    };
+
+    let mut expanded: HashSet<Vec<usize>> = HashSet::new();
+    expanded.insert(vec![2]); // "Tools" submenu is expanded
+
+    // 1. Duplicate leaf item at [0] -> inserted at [1], "Tools" shifts from [2] to [3]
+    let dup_leaf = duplicate_item(&mut menu, &[0], &mut expanded).expect("duplicate leaf");
+    assert_eq!(dup_leaf, vec![1]);
+    assert_eq!(menu.items.len(), 4);
+    assert_eq!(menu.items[0].label, "Web Browser");
+    assert_eq!(menu.items[1].label, "Web Browser (Copy)");
+    assert_eq!(menu.items[1].command.as_deref(), Some("firefox"));
+    assert_eq!(menu.items[1].icon.as_deref(), Some("🚀"));
+    assert!(
+        expanded.contains(&vec![3]),
+        "expanded submenu path must shift to [3]"
+    );
+    assert!(!expanded.contains(&vec![2]));
+
+    // 2. Duplicate divider at [2] -> inserted at [3] verbatim (no " (Copy)" suffix)
+    let dup_div = duplicate_item(&mut menu, &[2], &mut expanded).expect("duplicate divider");
+    assert_eq!(dup_div, vec![3]);
+    assert!(menu.items[3].is_divider());
+    assert_eq!(menu.items[3].label, menu.items[2].label);
+    assert!(
+        expanded.contains(&vec![4]),
+        "expanded submenu path must shift to [4]"
+    );
+
+    // 3. Duplicate submenu at [4] -> deep copies children and appends " (Copy)"
+    let dup_sub = duplicate_item(&mut menu, &[4], &mut expanded).expect("duplicate submenu");
+    assert_eq!(dup_sub, vec![5]);
+    assert_eq!(menu.items[5].label, "Tools (Copy)");
+    let sub = menu.items[5].submenu.as_ref().expect("cloned submenu");
+    assert_eq!(sub.title, "Tools (Copy)");
+    assert_eq!(sub.items.len(), 1);
+    assert_eq!(sub.items[0].label, "Htop");
 }
 
 #[test]
