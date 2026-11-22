@@ -163,6 +163,8 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
 - **Installer (`install.sh`) & Uninstaller (`uninstall.sh`):**
   - Installs/uninstalls all 8 binaries: `bashmenu`, `ymlcheck`, `menuedit`, `shortcutedit`, `themeedit`, `bashedit`, `bmpager`, `cheat`.
   - Links `bm` -> `bashmenu`. Installs manual page `bashmenu.1`.
+  - Installer `--merge` / `--merge-menu`: runs interactive semantic merge (`menuedit --merge`) with `.bak` backup and `ymlcheck -m` schema verification.
+  - Installer `--update-menu`: overwrites user menu with vanilla template after saving `.bak` backup.
   - Uninstaller preserves user settings by default (`[Y/n]`), supporting `-k`/`--keep-settings`.
 - **YAML Validation (`ymlcheck`):**
   - `--yaml` / `-y`: syntax validation.

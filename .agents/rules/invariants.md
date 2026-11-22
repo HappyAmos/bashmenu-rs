@@ -8,7 +8,10 @@
 
 ## 2. Configuration & State Persistence
 - **Single Source of Truth Config Path & Project Root Defaults:** User configs reside in `~/.config/bashmenu/` (`{bashmenu_dir}`), while `{dev_dir}` dynamically resolves git repository root. Original default config files (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `cheat.yml`) reside strictly in project root. The `/tests/fixtures` directory has been removed and must never be reintroduced; all test harnesses, fallbacks, and loaders reference root files directly.
-- **Repository Root Mode (`--repo` / `-r`):** Passing `--repo` or `-r` to `bashmenu` forces loading `bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, and `shortcuts.yml` directly from repository root (`resolve_dev_dir`) rather than user config or working directory.
+- **Strict `--repo` and `--local` Path Isolation:**
+  - Passing `--repo` / `-r` forces loading all configuration and data files (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `notes.yml`, notebooks) strictly from repository root (`{dev_dir}`).
+  - Passing `--local` forces loading configuration files strictly from the current working directory (`.`).
+  - Under no circumstances may `~/.config/bashmenu` be queried, probed, or fallen back to when either `--repo` or `--local` is active.
 - **Direct Linux Framebuffer TrueColor & Full-Resolution Image Mode (`--image` / `-i`):** On Linux console with accessible `/dev/fb0` (`settings.framebuffer: auto | true | image`), `FramebufferDevice` renders Ratatui's buffer in 24-bit TrueColor directly into `/dev/fb0` while `TerminalOutput` suppresses stdout ANSI writes. Default uses character-block wallpaper (`▀`/`▛`); passing `--image` or `-i` renders full-resolution pixel wallpaper onto `/dev/fb0` composited beneath TrueColor TUI.
 - **Environment Overview Macro (`{env}` / `{environment}`) & Application Version (`{version}`):**
   - `{version}` resolves strictly to root `Cargo.toml` (`workspace.package.version`), with `env!("CARGO_PKG_VERSION")` fallback. `{app.version}` is disabled in dot-path resolution.
@@ -99,7 +102,10 @@
   `bashmenu`, `ymlcheck`, `menuedit`, `shortcutedit`, `themeedit`, `bashedit`, `bmpager`, `cheat`.
 - **Convenience Symlinks:** Must link `bm` -> `bashmenu`.
 - **Manual Page Installation:** Must install `bashmenu.1` to `$MAN_DIR` (`$HOME/.local/share/man/man1` or system equivalent).
-- **Configuration Seeding:** Must copy initial default config files (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `cheat.yml`) from project root into `~/.config/bashmenu/` without overwriting existing user files.
+- **Configuration Seeding & Menu Merge:**
+  - Without flags, default config files (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `cheat.yml`) are initialized into `~/.config/bashmenu/` without overwriting existing files, displaying guidance for `--merge`.
+  - Passing `--merge` or `--merge-menu` triggers interactive semantic menu merge via `menuedit --merge`, saving a `.bak` backup and validating schema integrity via `ymlcheck -m` with automatic rollback on failure.
+  - Passing `--update-menu` or `--reset-menu` replaces existing `bashmenu.mnu` with the vanilla template, saving a `.bak` backup.
 - **Output Banner:** The summary of installed commands displayed to user must explicitly list `cheat` along with all other tools.
 
 ### Uninstaller (`uninstall.sh`)
