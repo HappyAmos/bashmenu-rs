@@ -1,11 +1,17 @@
 use bashmenu_core::{
-    BashMenuConfig, MenuItem, MenuItemType, MenuSchema, PluginDisplayRow, Submenu,
+    BashMenuConfig, MenuItem, MenuItemType, MenuSchema, PluginDisplayRow, ShortcutsConfig, Submenu,
 };
 use bashmenu_tui::{MenuAction, MenuView, ResolvedThemeStyles};
 use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Color;
+
+fn default_shortcuts_cfg() -> ShortcutsConfig {
+    let path =
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../defaults/shortcuts.yml");
+    bashmenu_core::load_shortcuts(&path).expect("defaults/shortcuts.yml must load")
+}
 
 fn create_sample_menu() -> MenuSchema {
     MenuSchema {
@@ -265,28 +271,69 @@ fn test_menu_priority_over_plugins_rendering() {
 
 #[test]
 fn test_function_key_actions() {
+    use bashmenu_tui::{ShortcutDispatchResult, ShortcutDispatcher};
+    use crossterm::event::KeyEvent;
+
     let schema = create_sample_menu();
+    let cfg = default_shortcuts_cfg();
+    let mut dispatcher = ShortcutDispatcher::new(cfg.clone());
     let mut view = MenuView::new(
         schema,
         ResolvedThemeStyles::default(),
         true,
         "Status".to_string(),
     );
+    view.set_shortcuts_config(&cfg);
 
-    assert_eq!(view.handle_key(KeyCode::F(1)), MenuAction::Help);
-    assert_eq!(view.handle_key(KeyCode::F(2)), MenuAction::ThemeSelector);
-    assert_eq!(view.handle_key(KeyCode::F(3)), MenuAction::LaunchEditor);
-    assert_eq!(view.handle_key(KeyCode::F(4)), MenuAction::EditMenu);
-    assert_eq!(view.handle_key(KeyCode::F(5)), MenuAction::Reload);
-    assert_eq!(view.handle_key(KeyCode::F(6)), MenuAction::ToggleShortcuts);
-    assert_eq!(view.handle_key(KeyCode::F(7)), MenuAction::ConfigureGutter);
+    let mut dispatch = |code: KeyCode, mods: KeyModifiers| -> MenuAction {
+        match dispatcher.handle_key(KeyEvent::new(code, mods)) {
+            ShortcutDispatchResult::Matched(entry) => entry
+                .builtin_macro()
+                .and_then(|m| view.action_for_builtin_macro(m))
+                .unwrap_or(MenuAction::None),
+            _ => MenuAction::None,
+        }
+    };
+
     assert_eq!(
-        view.handle_key(KeyCode::F(8)),
+        dispatch(KeyCode::F(1), KeyModifiers::NONE),
+        MenuAction::Help
+    );
+    assert_eq!(
+        dispatch(KeyCode::F(2), KeyModifiers::NONE),
+        MenuAction::ThemeSelector
+    );
+    assert_eq!(
+        dispatch(KeyCode::F(3), KeyModifiers::NONE),
+        MenuAction::LaunchEditor
+    );
+    assert_eq!(
+        dispatch(KeyCode::F(4), KeyModifiers::NONE),
+        MenuAction::EditMenu
+    );
+    assert_eq!(
+        dispatch(KeyCode::F(5), KeyModifiers::NONE),
+        MenuAction::Reload
+    );
+    assert_eq!(
+        dispatch(KeyCode::F(6), KeyModifiers::NONE),
+        MenuAction::ToggleShortcuts
+    );
+    assert_eq!(
+        dispatch(KeyCode::F(7), KeyModifiers::NONE),
+        MenuAction::ConfigureGutter
+    );
+    assert_eq!(
+        dispatch(KeyCode::F(8), KeyModifiers::NONE),
         MenuAction::LaunchThemeEditor
     );
     assert_eq!(
-        view.handle_key(KeyCode::F(9)),
+        dispatch(KeyCode::F(9), KeyModifiers::NONE),
         MenuAction::LaunchShortcutEditor
+    );
+    assert_eq!(
+        dispatch(KeyCode::Char('g'), KeyModifiers::CONTROL),
+        MenuAction::ToggleHelpGutter
     );
 }
 
@@ -478,7 +525,7 @@ fn test_bbcode_placeholder_and_right_aligned_brackets() {
 
     // Verify BBCode in plugin row: raw tags [b], [/b], [green], [/green] stripped, content rendered
     let mut found_plugin_line = false;
-    for y in 2..20 {
+    for y in 2..22 {
         let mut line_str = String::new();
         for x in 0..80 {
             line_str.push(buf[(x, y)].symbol().chars().next().unwrap_or(' '));
@@ -694,6 +741,7 @@ fn test_gutter_mouse_click_actions() {
     let schema = create_sample_menu();
     let styles = ResolvedThemeStyles::default();
     let mut view = MenuView::new(schema, styles, false, "Status".to_string());
+    view.set_shortcuts_config(&default_shortcuts_cfg());
 
     let area = Rect::new(0, 0, 100, 24);
 
@@ -786,6 +834,7 @@ fn test_help_gutter_text_contains_f9_and_omits_direct() {
         true,
         "Status".to_string(),
     );
+    view.set_shortcuts_config(&default_shortcuts_cfg());
 
     let area = Rect::new(0, 0, 200, 24);
     let mut buf = Buffer::empty(area);
@@ -940,6 +989,7 @@ fn test_menu_plugin_rows_and_title_marquee_when_exceeding_width() {
 
     let styles = ResolvedThemeStyles::default();
     let mut view = MenuView::new(schema, styles, false, String::new());
+    view.set_shortcuts_config(&default_shortcuts_cfg());
     view.set_plugin_rows(vec![PluginDisplayRow {
         text: "Long plugin output row that exceeds the available menu viewport width".to_string(),
         is_divider: false,
@@ -1127,6 +1177,7 @@ fn test_gutter_hover_expansion_and_collapse() {
     let schema = create_sample_menu();
     let styles = ResolvedThemeStyles::default();
     let mut view = MenuView::new(schema, styles, false, "Status".to_string());
+    view.set_shortcuts_config(&default_shortcuts_cfg());
     // Use short duration for test speed
     view.gutter_hover =
         bashmenu_tui::HelpGutterHover::with_duration(std::time::Duration::from_millis(50));
@@ -1217,6 +1268,7 @@ fn test_gutter_hover_zero_delay_instant_expansion() {
     let schema = create_sample_menu();
     let styles = ResolvedThemeStyles::default();
     let mut view = MenuView::new(schema, styles, false, "Status".to_string());
+    view.set_shortcuts_config(&default_shortcuts_cfg());
     view.gutter_hover
         .set_duration(std::time::Duration::from_millis(0));
 
@@ -1244,20 +1296,14 @@ fn test_help_gutter_expansion_decouples_status_border_and_covers_plugins() {
         is_divider: false,
     }]);
 
-    // Add multiple shortcuts so help gutter needs >= 3 rows
-    let custom_shortcuts = vec![
+    // Add multiple shortcuts on top of defaults so help gutter needs >= 3 rows
+    let mut custom_shortcuts = default_shortcuts_cfg().shortcuts;
+    custom_shortcuts.extend(vec![
         ShortcutEntry {
             key: "F10".to_string(),
             description: "Backup Files".to_string(),
             r#type: MenuItemType::Command,
             action: Some("echo backup".to_string()),
-            ..Default::default()
-        },
-        ShortcutEntry {
-            key: "F11".to_string(),
-            description: "Toggle Dev".to_string(),
-            r#type: MenuItemType::Command,
-            action: Some("echo dev".to_string()),
             ..Default::default()
         },
         ShortcutEntry {
@@ -1267,7 +1313,7 @@ fn test_help_gutter_expansion_decouples_status_border_and_covers_plugins() {
             action: Some("echo sys".to_string()),
             ..Default::default()
         },
-    ];
+    ]);
     view.set_shortcuts(custom_shortcuts);
 
     let area = Rect::new(0, 0, 80, 24);
@@ -1361,20 +1407,14 @@ fn test_ctrl_g_toggles_help_gutter_expansion() {
     let styles = ResolvedThemeStyles::default();
     let mut view = MenuView::new(schema, styles, false, "StatusInfo".to_string());
 
-    // Add extra shortcuts so help gutter has hidden lines at width 80 even with no plugins
-    view.set_shortcuts(vec![
+    // Add extra shortcuts on top of defaults so help gutter has hidden lines at width 80
+    let mut all_sc = default_shortcuts_cfg().shortcuts;
+    all_sc.extend(vec![
         ShortcutEntry {
             key: "F10".to_string(),
             description: "Backup Files".to_string(),
             r#type: MenuItemType::Command,
             action: Some("echo backup".to_string()),
-            ..Default::default()
-        },
-        ShortcutEntry {
-            key: "F11".to_string(),
-            description: "Toggle Dev".to_string(),
-            r#type: MenuItemType::Command,
-            action: Some("echo dev".to_string()),
             ..Default::default()
         },
         ShortcutEntry {
@@ -1385,6 +1425,7 @@ fn test_ctrl_g_toggles_help_gutter_expansion() {
             ..Default::default()
         },
     ]);
+    view.set_shortcuts(all_sc);
 
     let area = Rect::new(0, 0, 80, 24);
     assert!(view.has_hidden_help_text(area));
@@ -1562,7 +1603,8 @@ fn test_menu_view_help_gutter_localization() {
     let _ = bashmenu_core::set_locale("en_US");
     let schema = MenuSchema::default();
     let styles = ResolvedThemeStyles::default();
-    let view = MenuView::new(schema, styles, false, String::new());
+    let mut view = MenuView::new(schema, styles, false, String::new());
+    view.set_shortcuts_config(&default_shortcuts_cfg());
 
     let en_tokens = view.get_help_tokens();
     assert!(
@@ -1573,6 +1615,29 @@ fn test_menu_view_help_gutter_localization() {
     assert!(
         en_tokens.iter().any(|t| t.contains("[ESC]: Back")),
         "Default tokens must contain English Back: {:?}",
+        en_tokens
+    );
+    // Individual <leader> chords must NOT appear in the help gutter
+    assert!(
+        !en_tokens.iter().any(|t| t.contains("<LEADER>")),
+        "Individual leader chords must be omitted from help gutter: {:?}",
+        en_tokens
+    );
+    // [CTRL+G]: Expand must appear before [CTRL+SPACE]: Leader (which is last)
+    let ctrl_g_pos = en_tokens
+        .iter()
+        .position(|t| t == "[CTRL+G]: Expand")
+        .expect("Help gutter must contain '[CTRL+G]: Expand'");
+    let leader_pos = en_tokens
+        .iter()
+        .position(|t| t == "[CTRL+SPACE]: Leader")
+        .expect("Help gutter must contain '[CTRL+SPACE]: Leader'");
+    assert!(ctrl_g_pos < leader_pos);
+    assert_eq!(leader_pos, en_tokens.len() - 1);
+    // enter has show_in_gutter: false in defaults/shortcuts.yml
+    assert!(
+        !en_tokens.iter().any(|t| t.contains("[ENTER]:")),
+        "Entries with show_in_gutter: false must be hidden: {:?}",
         en_tokens
     );
 
@@ -1587,6 +1652,16 @@ fn test_menu_view_help_gutter_localization() {
     assert!(
         es_tokens.iter().any(|t| t.contains("[ESC]: Atrás")),
         "Spanish tokens must contain Atrás: {:?}",
+        es_tokens
+    );
+    assert!(
+        es_tokens.iter().any(|t| t.contains("[CTRL+G]: Expandir")),
+        "Spanish tokens must contain Expandir: {:?}",
+        es_tokens
+    );
+    assert!(
+        es_tokens.iter().any(|t| t.contains("[CTRL+SPACE]: Líder")),
+        "Spanish tokens must contain Líder: {:?}",
         es_tokens
     );
 

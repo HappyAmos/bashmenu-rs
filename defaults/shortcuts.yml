@@ -1,19 +1,59 @@
 # ==============================================================================
 # BashMenu Custom Keyboard Shortcuts (shortcuts.yml)
 # ==============================================================================
-# Configure custom direct key combos (e.g. "F10", "alt+t", "ctrl+g") and
-# leader-key chords (e.g. "<leader> t", "<leader> g") to launch commands,
-# scripts, editors, toast notifications, or interactive prompts.
+# Configure built-in actions, direct key combos (e.g. "F1", "F10", "alt+t",
+# "ctrl+g", "esc", "enter"), and leader-key chords (e.g. "<leader> t") to
+# launch built-in tools, commands, scripts, editors, or toast notifications.
 #
-# All target fields (action, command, script, file, message) support the full
-# 6-tier BashMenu macro placeholder engine:
-#   {bashmenu_dir}, {dev_dir}, {scripts_dir}, {home}, {env:VAR},
-#   {param:prompt=...}, {file_picker:path=...}, {dir_picker}, {toast:3:"..."}
+# Built-in action macros (type: builtin):
+#   {help}, {theme_picker}, {text_editor}, {menu_editor}, {refresh},
+#   {keys_toggle}, {user_gutter}, {theme_editor}, {shortcut_editor},
+#   {back}, {select}, {toggle_gutter}
+#
+# Set `show_in_gutter: false` to keep a shortcut active without showing it in
+# the main menu help gutter. Entries render in the exact order listed below.
 # ==============================================================================
 leader_key: ctrl+space
 leader_timeout_ms: 1500
 show_leader_hint: true
 shortcuts:
+- key: F1
+  type: builtin
+  action: '{help}'
+- key: F2
+  type: builtin
+  action: '{theme_picker}'
+- key: F3
+  type: builtin
+  action: '{text_editor}'
+- key: F4
+  type: builtin
+  action: '{menu_editor}'
+- key: F5
+  type: builtin
+  action: '{refresh}'
+- key: F6
+  type: builtin
+  action: '{keys_toggle}'
+- key: F7
+  type: builtin
+  action: '{user_gutter}'
+- key: F8
+  type: builtin
+  action: '{theme_editor}'
+- key: F9
+  type: builtin
+  action: '{shortcut_editor}'
+- key: esc
+  type: builtin
+  action: '{back}'
+- key: enter
+  type: builtin
+  action: '{select}'
+  show_in_gutter: false
+- key: ctrl+g
+  type: builtin
+  action: '{toggle_gutter}'
 - key: <leader> t
   description: Interactive Shell
   type: command

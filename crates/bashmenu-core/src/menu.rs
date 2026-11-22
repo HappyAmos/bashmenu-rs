@@ -98,6 +98,9 @@ pub enum MenuItemType {
     /// Opens the interactive theme selector modal
     #[serde(rename = "theme_selector")]
     ThemeSelector,
+    /// Executes a built-in BashMenu action macro (e.g. `{help}`, `{refresh}`)
+    #[serde(rename = "builtin")]
+    Builtin,
     /// Exits BashMenu
     #[serde(rename = "exit")]
     Exit,

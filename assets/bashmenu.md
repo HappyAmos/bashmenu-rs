@@ -1095,6 +1095,18 @@ These variables are dynamically resolved using active configuration and environm
 | `{toast:SECONDS:"Message"}` / `{toast:"Message"}` | Configurable non-blocking toast notification directive. Displays a brief floating toast notification on the bottom-right corner for specified seconds (defaults to 1-2 seconds if omitted) and resolves to an empty string. Supports double quotes, single quotes, or unquoted strings (e.g. `{toast: 2: "Saved"}` or `{toast: "Done"}`). |
 | `{env}` / `{environment}` | Displays an environment overview table modal showing active file locations for `bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `cheat.yml`, and application version. Can also be interpolated inline as a Markdown table. |
 | `{info:<path>}` | Loads a user-defined Markdown file (supporting nested placeholders such as `{info:{bashmenu_dir}/info.md}` or tilde paths `{info:~/.config/bashmenu/info.md}`), parses optional YAML frontmatter (`title`, `width` %, `height` %), expands all placeholders in the body, and displays it in a popup modal. Automatically renders a vertical scrollbar when content exceeds the modal height, supporting keyboard (`Up`/`Down`/`PgUp`/`PgDn`/`Home`/`End`) and mouse (scroll wheel and scrollbar clicks/drags) scrolling. |
+| `{help}` | Built-in action macro: opens BashMenu documentation (`assets/bashmenu.md`) via `bmpager --markdown` (with built-in Help modal fallback). |
+| `{theme_picker}` | Built-in action macro: opens the interactive theme selector modal. |
+| `{text_editor}` | Built-in action macro: launches `bashedit` text editor. |
+| `{menu_editor}` | Built-in action macro: launches `menuedit` focused on the active menu item and reloads on exit. |
+| `{refresh}` | Built-in action macro: reloads `bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, plugins, and gutters. |
+| `{keys_toggle}` | Built-in action macro: toggles menu item shortcut key labels (`settings.show_menu_shortcuts`). |
+| `{user_gutter}` | Built-in action macro: opens the interactive 1-line status gutter editor modal. |
+| `{theme_editor}` | Built-in action macro: launches `themeedit` on the active theme and reloads on exit. |
+| `{shortcut_editor}` | Built-in action macro: launches `shortcutedit` on the active `shortcuts.yml` and reloads on exit. |
+| `{back}` | Built-in action macro: navigates back to parent menu or exits from root. |
+| `{select}` | Built-in action macro: activates the currently highlighted menu item. |
+| `{toggle_gutter}` | Built-in action macro: toggles help gutter expansion (`Ctrl+G` by default). |
 | `{bashmenu_yml}` | Full canonical path to the currently loaded `bashmenu.yml` configuration file. |
 | `{bashmenu_mnu}` | Full canonical path to the currently loaded `bashmenu.mnu` menu definition file. |
 | `{bashmenu_themes}` | Full canonical path to the currently loaded `bashmenu.themes` theme palette file. |

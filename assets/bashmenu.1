@@ -807,6 +807,9 @@ User-defined Markdown popup directive (e.g., {info:{bashmenu_dir}/info.md} or {i
 .B {bashmenu_yml}, {bashmenu_mnu}, {bashmenu_themes}, {shortcuts_yml}, {cheat_yml}
 Full canonical paths to the currently loaded configuration, menu, theme, shortcuts, and cheatsheet YAML files.
 .TP
+.B {help}, {theme_picker}, {text_editor}, {menu_editor}, {refresh}, {keys_toggle}, {user_gutter}, {theme_editor}, {shortcut_editor}, {back}, {select}, {toggle_gutter}
+Built-in action macros usable in shortcuts.yml (type: builtin, with optional show_in_gutter: true|false) and bashmenu.mnu to invoke core BashMenu actions, modals, and companion editors. When description is omitted on a built-in shortcut, its label is automatically localized from locales/*.yml.
+.TP
 .B {color_mode}
 Current terminal color depth mode (e.g., 3-bit (8 color), 16 color, 256 color, truecolor).
 .TP

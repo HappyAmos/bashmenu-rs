@@ -76,7 +76,7 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
 - **Status & Help Gutters:**
   - Neither status gutter (right) nor help gutter (left) may exceed 50% of available width (`max_gutter_w = std::cmp::max(5, avail_w / 2)`).
   - Status gutter takes layout precedence over help gutter in narrow terminals.
-  - Function keys `<F1>` through `<F12>` listed in help gutters must ALWAYS be in strictly ascending numerical order. Omit `[UP/DN]: Nav` across all views.
+  - Default function keys `<F1>` through `<F12>` ship in ascending order (`defaults/shortcuts.yml`), while `MenuView` preserves the user's configured `shortcuts.yml` order. Omit `[UP/DN]: Nav` across all views.
   - Sizing formula: `gutter_rows = std::cmp::min(2, std::cmp::max(1, std::cmp::max(help_lines.len(), status_lines.len())))`. Total rendered lines strictly equals terminal height `h`.
 - **Universal Marquee Overflow Invariant & 50/50 Partition Contract:**
   - Text in panels, windows, viewports, lists, and titles (e.g. menu items, plugin rows, tree nodes, inspector lines, sidebar tokens, preview panes) exceeding panel or window width margins must marquee using the active theme's `marquee.char` and `marquee.gap`.

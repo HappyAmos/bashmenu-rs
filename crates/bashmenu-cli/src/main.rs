@@ -547,7 +547,8 @@ fn main() -> Result<()> {
     let mut guard = TerminalGuard::init_with_framebuffer(fb_device)?;
     let mut menu_view = MenuView::new(menu, styles.clone(), use_nerd, status_gutter)
         .with_config(config.clone())
-        .with_shortcuts(shortcuts_cfg.shortcuts.clone());
+        .with_shortcuts(shortcuts_cfg.shortcuts.clone())
+        .with_leader_key(shortcuts_cfg.leader_key.clone());
     let initial_wallpaper = config.resolve_wallpaper(active_theme);
     menu_view.set_wallpaper(initial_wallpaper.clone());
     if let Some(show) = config.settings.show_menu_shortcuts {
@@ -1929,14 +1930,15 @@ fn main() -> Result<()> {
                                             .contains(crossterm::event::KeyModifiers::CONTROL)
                                     {
                                         MenuAction::Exit
-                                    } else if matches!(
-                                        key.code,
-                                        KeyCode::Char('g') | KeyCode::Char('G')
-                                    ) && key
-                                        .modifiers
-                                        .contains(crossterm::event::KeyModifiers::CONTROL)
+                                    } else if !menu_view.is_current_notebook()
+                                        && ((key.code == KeyCode::Enter
+                                            && shortcut_dispatcher.has_active_builtin("{select}"))
+                                            || (matches!(
+                                                key.code,
+                                                KeyCode::Esc | KeyCode::Backspace
+                                            ) && shortcut_dispatcher
+                                                .has_active_builtin("{back}")))
                                     {
-                                        menu_view.toggle_help_gutter(area);
                                         MenuAction::None
                                     } else {
                                         menu_view.handle_key(key.code)
@@ -1954,11 +1956,46 @@ fn main() -> Result<()> {
                                     MenuAction::None
                                 }
                                 ShortcutDispatchResult::Matched(entry) => {
-                                    let item = entry.to_menu_item();
-                                    if item.r#type == MenuItemType::Notebook {
-                                        MenuAction::OpenNotebook(Box::new(item))
+                                    if let Some(m) = entry.builtin_macro() {
+                                        let will_transition = match m {
+                                            "{select}" => {
+                                                if let Some(item) = menu_view.selected_item() {
+                                                    item.r#type == MenuItemType::Submenu
+                                                        || item.submenu.is_some()
+                                                        || item.r#type == MenuItemType::Notebook
+                                                } else {
+                                                    false
+                                                }
+                                            }
+                                            "{back}" => menu_view.stack_depth() > 1,
+                                            _ => false,
+                                        };
+                                        if will_transition {
+                                            let eff = TransitionEffect::parse(
+                                                config.settings.transition.as_deref(),
+                                            );
+                                            if eff != TransitionEffect::None
+                                                && eff != TransitionEffect::Instant
+                                            {
+                                                let _ = guard.draw_with_transition_out(
+                                                    eff,
+                                                    trans_speed,
+                                                    |f| {
+                                                        menu_view.render(f.area(), f.buffer_mut());
+                                                    },
+                                                );
+                                            }
+                                        }
+                                        menu_view
+                                            .action_for_builtin_macro(m)
+                                            .unwrap_or(MenuAction::None)
                                     } else {
-                                        MenuAction::Execute(Box::new(item))
+                                        let item = entry.to_menu_item();
+                                        if item.r#type == MenuItemType::Notebook {
+                                            MenuAction::OpenNotebook(Box::new(item))
+                                        } else {
+                                            MenuAction::Execute(Box::new(item))
+                                        }
                                     }
                                 }
                             },
@@ -1966,11 +2003,17 @@ fn main() -> Result<()> {
                                 if shortcut_dispatcher.is_leader_pending() {
                                     match shortcut_dispatcher.handle_mouse(mouse, area) {
                                         ShortcutDispatchResult::Matched(entry) => {
-                                            let item = entry.to_menu_item();
-                                            if item.r#type == MenuItemType::Notebook {
-                                                MenuAction::OpenNotebook(Box::new(item))
+                                            if let Some(m) = entry.builtin_macro() {
+                                                menu_view
+                                                    .action_for_builtin_macro(m)
+                                                    .unwrap_or(MenuAction::None)
                                             } else {
-                                                MenuAction::Execute(Box::new(item))
+                                                let item = entry.to_menu_item();
+                                                if item.r#type == MenuItemType::Notebook {
+                                                    MenuAction::OpenNotebook(Box::new(item))
+                                                } else {
+                                                    MenuAction::Execute(Box::new(item))
+                                                }
                                             }
                                         }
                                         _ => MenuAction::None,
@@ -2138,7 +2181,7 @@ fn main() -> Result<()> {
 
                             if shortcuts_path.exists() {
                                 if let Ok(new_shortcuts) = load_shortcuts(&shortcuts_path) {
-                                    menu_view.set_shortcuts(new_shortcuts.shortcuts.clone());
+                                    menu_view.set_shortcuts_config(&new_shortcuts);
                                     shortcut_dispatcher.set_config(new_shortcuts);
                                 }
                             }
@@ -2359,7 +2402,25 @@ fn main() -> Result<()> {
                                 );
                             }
                         }
+                        MenuAction::ToggleHelpGutter => {
+                            menu_view.toggle_help_gutter(area);
+                        }
+                        MenuAction::ActivateLeader => {
+                            shortcut_dispatcher.activate_leader();
+                        }
                         MenuAction::Execute(item) => {
+                            let builtin_target = item
+                                .action
+                                .as_deref()
+                                .or(item.command.as_deref())
+                                .or(item.script.as_deref())
+                                .map(str::trim)
+                                .filter(|s| bashmenu_core::builtin_action_locale_key(s).is_some());
+                            if let Some(m) = builtin_target {
+                                pending_action = menu_view.action_for_builtin_macro(m);
+                                continue;
+                            }
+
                             let mut ctx = make_macro_ctx!(&config);
                             ctx.window_width = size.width as usize;
                             ctx.window_height = size.height as usize;

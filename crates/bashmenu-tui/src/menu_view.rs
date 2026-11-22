@@ -47,6 +47,10 @@ pub enum MenuAction {
     LaunchThemeEditor,
     /// Launch keyboard shortcut editor (F9)
     LaunchShortcutEditor,
+    /// Toggle help gutter expansion (Ctrl+G / `{toggle_gutter}`)
+    ToggleHelpGutter,
+    /// Activate leader-key chord popup overlay
+    ActivateLeader,
     /// Open a notebook menu
     OpenNotebook(Box<MenuItem>),
     /// View/read a notebook note
@@ -108,6 +112,8 @@ pub struct MenuView {
     marquee_tracker: MarqueeTracker,
     /// Configured shortcuts from the shortcut manager
     shortcuts: Vec<ShortcutEntry>,
+    /// Configured leader key display string (e.g. `"ctrl+space"`)
+    leader_key: String,
     /// Stationary mouse hover tracker for help gutter expansion
     pub gutter_hover: HelpGutterHover,
 }
@@ -146,6 +152,7 @@ impl MenuView {
             framebuffer_image_mode: false,
             marquee_tracker: MarqueeTracker::new(4),
             shortcuts: Vec::new(),
+            leader_key: "ctrl+space".to_string(),
             gutter_hover: HelpGutterHover::with_duration(hover_duration),
         };
         view.ensure_selectable();
@@ -161,6 +168,23 @@ impl MenuView {
     /// Sets configured shortcuts from the shortcut manager
     pub fn set_shortcuts(&mut self, shortcuts: Vec<ShortcutEntry>) {
         self.shortcuts = shortcuts;
+    }
+
+    /// Sets the configured leader key string displayed last in the help gutter.
+    pub fn with_leader_key(mut self, leader_key: impl Into<String>) -> Self {
+        self.leader_key = leader_key.into();
+        self
+    }
+
+    /// Updates the configured leader key string displayed last in the help gutter.
+    pub fn set_leader_key(&mut self, leader_key: impl Into<String>) {
+        self.leader_key = leader_key.into();
+    }
+
+    /// Updates both shortcuts and leader key from a [`bashmenu_core::ShortcutsConfig`].
+    pub fn set_shortcuts_config(&mut self, cfg: &bashmenu_core::ShortcutsConfig) {
+        self.shortcuts = cfg.shortcuts.clone();
+        self.leader_key = cfg.leader_key.clone();
     }
 
     /// Sets the application configuration
@@ -718,152 +742,148 @@ impl MenuView {
                 let target_num = 36 + (c as u8 - b'A') as usize;
                 self.activate_shortcut_index(target_num)
             }
-            KeyCode::F(1) => MenuAction::Help,
-            KeyCode::F(2) => MenuAction::ThemeSelector,
-            KeyCode::F(3) => MenuAction::LaunchEditor,
-            KeyCode::F(4) => MenuAction::EditMenu,
-            KeyCode::F(5) => MenuAction::Reload,
-            KeyCode::F(6) => MenuAction::ToggleShortcuts,
-            KeyCode::F(7) => MenuAction::ConfigureGutter,
-            KeyCode::F(8) => MenuAction::LaunchThemeEditor,
-            KeyCode::F(9) => MenuAction::LaunchShortcutEditor,
             _ => MenuAction::None,
         }
     }
 
-    /// Returns the raw contextual help string for the current menu level or mode.
-    fn get_help_raw(&self) -> String {
-        let help = t!("common.gutters.help");
-        let themes = t!("common.gutters.themes");
-        let editor = t!("common.gutters.editor");
-        let edit = t!("common.gutters.edit");
-        let refresh = t!("common.gutters.refresh");
-        let keys = t!("common.gutters.keys");
-        let gutter = t!("common.gutters.gutter");
-        let themeedit = t!("common.gutters.themeedit");
-        let shortcutedit = t!("common.gutters.shortcutedit");
-        let back = t!("common.gutters.back");
+    /// Resolves a built-in action macro (e.g. `"{help}"`, `"{refresh}"`,
+    /// `"{back}"`, `"{select}"`, `"{toggle_gutter}"`) into its [`MenuAction`].
+    pub fn action_for_builtin_macro(&mut self, macro_str: &str) -> Option<MenuAction> {
+        match macro_str.trim().to_ascii_lowercase().as_str() {
+            "{help}" => Some(MenuAction::Help),
+            "{theme_picker}" => Some(MenuAction::ThemeSelector),
+            "{text_editor}" => Some(MenuAction::LaunchEditor),
+            "{menu_editor}" => Some(MenuAction::EditMenu),
+            "{refresh}" => Some(MenuAction::Reload),
+            "{keys_toggle}" => Some(MenuAction::ToggleShortcuts),
+            "{user_gutter}" => Some(MenuAction::ConfigureGutter),
+            "{theme_editor}" => Some(MenuAction::LaunchThemeEditor),
+            "{shortcut_editor}" => Some(MenuAction::LaunchShortcutEditor),
+            "{back}" => Some(self.go_back()),
+            "{select}" => Some(self.activate_selected()),
+            "{toggle_gutter}" => Some(MenuAction::ToggleHelpGutter),
+            _ => None,
+        }
+    }
 
+    /// Formats a shortcut key string into a bracketed gutter badge (e.g. `[F1]`, `[CTRL+G]`).
+    fn format_gutter_key(key: &str) -> String {
+        let trimmed = key.trim();
+        if (trimmed.starts_with('<') && trimmed.ends_with('>'))
+            || (trimmed.starts_with('[') && trimmed.ends_with(']'))
+        {
+            trimmed.to_uppercase()
+        } else {
+            format!("[{}]", trimmed.to_uppercase())
+        }
+    }
+
+    /// Returns the contextual help tokens displayed in the help gutter.
+    ///
+    /// - In notebook view: displays only notebook-related actions.
+    /// - In main menu view: renders enabled, non-leader-chord entries from
+    ///   `shortcuts.yml` with `show_in_gutter: true` in their exact configured
+    ///   order, followed by the configured `leader_key` hint last.
+    pub fn get_help_tokens(&self) -> Vec<String> {
         if self.is_current_notebook() {
             let new_note = t!("common.gutters.new_note");
             let read = t!("common.gutters.read_note");
             let rename = t!("common.gutters.rename_note");
             let delete = t!("common.gutters.delete_note");
-            format!(
-                "[N]: {new_note} | [ENTER]: {read} | [M]: {rename} | [D]: {delete} | [F1]: {help} | [F2]: {themes} | [F7]: {gutter} | [F8]: {themeedit} | [F9]: {shortcutedit} | [ESC]: {back}"
-            )
-        } else if self.show_shortcuts {
-            format!(
-                "[F1]: {help} | [F2]: {themes} | [F3]: {editor} | [F4]: {edit} | [F5]: {refresh} | [F6]: {keys} | [F7]: {gutter} | [F8]: {themeedit} | [F9]: {shortcutedit} | [ESC]: {back}"
-            )
-        } else {
-            let select = t!("common.gutters.select");
-            format!(
-                "[ENTER]: {select} | [F1]: {help} | [F2]: {themes} | [F3]: {editor} | [F4]: {edit} | [F5]: {refresh} | [F6]: {keys} | [F7]: {gutter} | [F8]: {themeedit} | [F9]: {shortcutedit} | [ESC]: {back}"
-            )
+            let back = t!("common.gutters.back");
+            return vec![
+                format!("[N]: {new_note}"),
+                format!("[ENTER]: {read}"),
+                format!("[M]: {rename}"),
+                format!("[D]: {delete}"),
+                format!("[ESC]: {back}"),
+            ];
         }
-    }
 
-    /// Returns the combined contextual help tokens and configured shortcut tokens.
-    pub fn get_help_tokens(&self) -> Vec<String> {
-        let help_raw = self.get_help_raw();
-        let mut tokens: Vec<String> = help_raw
-            .split('|')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect();
-
-        // Append configured shortcuts from shortcut manager
+        let mut tokens: Vec<String> = Vec::new();
         for sc in &self.shortcuts {
+            if !sc.enabled || !sc.show_in_gutter || sc.leader_chord_key().is_some() {
+                continue;
+            }
             let key = sc.key.trim();
             if key.is_empty() {
                 continue;
             }
-            let key_display = if (key.starts_with('<') && key.ends_with('>'))
-                || (key.starts_with('[') && key.ends_with(']'))
-            {
-                key.to_string()
-            } else {
-                format!("[{}]", key.to_uppercase())
-            };
-            let desc = sc.description.trim();
-            let token = if desc.is_empty() {
+            let key_display = Self::format_gutter_key(key);
+            let desc = sc.resolved_description();
+            let desc_trimmed = desc.trim();
+            let token = if desc_trimmed.is_empty() {
                 key_display
             } else {
-                format!("{}: {}", key_display, desc)
+                format!("{}: {}", key_display, desc_trimmed)
             };
             if !tokens.contains(&token) {
                 tokens.push(token);
             }
         }
-        tokens
-    }
 
-    /// Maps a clicked status gutter button token (e.g., `[F1]` or `[F2]`) to its corresponding MenuAction.
-    fn action_for_gutter_token(&mut self, tok: &str) -> MenuAction {
-        // 1. Check configured shortcuts first
-        for sc in &self.shortcuts {
-            let key_norm = sc.key.trim().to_uppercase();
-            let key_bracket = format!("[{}]", key_norm);
-            if !key_norm.is_empty()
-                && (tok.to_uppercase().starts_with(&key_bracket)
-                    || tok.to_uppercase().starts_with(&format!("<{}>", key_norm))
-                    || tok.to_uppercase().starts_with(&key_norm))
-            {
-                let item = sc.to_menu_item();
-                if item.r#type == MenuItemType::Notebook {
-                    return MenuAction::OpenNotebook(Box::new(item));
-                } else {
-                    return MenuAction::Execute(Box::new(item));
-                }
+        // Append configured leader key reference last
+        let leader = self.leader_key.trim();
+        if !leader.is_empty() {
+            let leader_tok = format!(
+                "{}: {}",
+                Self::format_gutter_key(leader),
+                t!("common.gutters.leader")
+            );
+            if !tokens.contains(&leader_tok) {
+                tokens.push(leader_tok);
             }
         }
 
-        // 2. Contextual menu actions
-        if tok.contains("[F1]") || tok.contains("Help") || tok.contains(&t!("common.gutters.help"))
-        {
-            MenuAction::Help
-        } else if tok.contains("[F2]")
-            || tok.contains("Themes")
-            || tok.contains(&t!("common.gutters.themes"))
-        {
-            MenuAction::ThemeSelector
-        } else if tok.contains("[F3]")
-            || tok.contains("Editor")
-            || tok.contains(&t!("common.gutters.editor"))
-        {
-            MenuAction::LaunchEditor
-        } else if tok.contains("[F8]")
-            || tok.contains("ThemeEdit")
-            || tok.contains(&t!("common.gutters.themeedit"))
-        {
-            MenuAction::LaunchThemeEditor
-        } else if tok.contains("[F9]")
-            || tok.contains("Shortcut")
-            || tok.contains(&t!("common.gutters.shortcutedit"))
-        {
-            MenuAction::LaunchShortcutEditor
-        } else if tok.contains("[F4]")
-            || tok.contains("Edit")
-            || tok.contains(&t!("common.gutters.edit"))
-        {
-            MenuAction::EditMenu
-        } else if tok.contains("[F5]")
-            || tok.contains("Refresh")
-            || tok.contains(&t!("common.gutters.refresh"))
-        {
-            MenuAction::Reload
-        } else if tok.contains("[F6]")
-            || tok.contains("Keys")
-            || tok.contains(&t!("common.gutters.keys"))
-        {
-            MenuAction::ToggleShortcuts
-        } else if tok.contains("[F7]")
-            || tok.contains("Gutter")
-            || tok.contains(&t!("common.gutters.gutter"))
-        {
-            MenuAction::ConfigureGutter
-        } else if tok.contains("[ESC]")
+        tokens
+    }
+
+    /// Maps a clicked help gutter token (e.g., `[F1]: Help`) to its corresponding [`MenuAction`].
+    fn action_for_gutter_token(&mut self, tok: &str) -> MenuAction {
+        let tok_upper = tok.trim().to_uppercase();
+
+        // 0. Check leader key reference token
+        let leader = self.leader_key.trim();
+        if !leader.is_empty() {
+            let leader_badge = Self::format_gutter_key(leader);
+            if tok_upper.starts_with(&leader_badge) {
+                return MenuAction::ActivateLeader;
+            }
+        }
+
+        // 1. Check configured shortcuts in order (non-notebook view)
+        if !self.is_current_notebook() {
+            let matched_sc = self.shortcuts.iter().find(|sc| {
+                if !sc.enabled || sc.leader_chord_key().is_some() {
+                    return false;
+                }
+                let key_norm = sc.key.trim().to_uppercase();
+                if key_norm.is_empty() {
+                    return false;
+                }
+                let key_bracket = Self::format_gutter_key(&key_norm);
+                tok_upper.starts_with(&key_bracket)
+                    || tok_upper.starts_with(&format!("<{}>", key_norm))
+                    || tok_upper.starts_with(&key_norm)
+            });
+
+            if let Some(sc) = matched_sc.cloned() {
+                if let Some(m) = sc.builtin_macro() {
+                    if let Some(act) = self.action_for_builtin_macro(m) {
+                        return act;
+                    }
+                }
+                let item = sc.to_menu_item();
+                return if item.r#type == MenuItemType::Notebook {
+                    MenuAction::OpenNotebook(Box::new(item))
+                } else {
+                    MenuAction::Execute(Box::new(item))
+                };
+            }
+        }
+
+        // 2. Notebook contextual gutter actions
+        if tok.contains("[ESC]")
             || tok.contains(": Back")
             || tok.ends_with(" Back")
             || tok.contains(&t!("common.gutters.back"))

@@ -102,6 +102,18 @@ pub const PLACEHOLDER_HELP_TEXT: &str = "\
 {env:<var_name>}             │ Environment variable value (e.g. {env:USER})
 {env} / {environment}        │ Environment inspection modal / overview table
 {info:<path>}                │ Renders Markdown file with YAML frontmatter (title, width, height)
+{help}                       │ Built-in action: opens BashMenu documentation manual
+{theme_picker}               │ Built-in action: opens interactive theme selector modal
+{text_editor}                │ Built-in action: launches bashedit text editor
+{menu_editor}                │ Built-in action: launches menuedit focused on active menu item
+{refresh}                    │ Built-in action: reloads config, menu, themes, plugins, and gutters
+{keys_toggle}                │ Built-in action: toggles menu item shortcut keys visibility
+{user_gutter}                │ Built-in action: opens 1-line status gutter editor modal
+{theme_editor}               │ Built-in action: launches themeedit on active theme
+{shortcut_editor}            │ Built-in action: launches shortcutedit on active shortcuts.yml
+{back}                       │ Built-in action: returns to parent menu or exits
+{select}                     │ Built-in action: activates the currently selected menu item
+{toggle_gutter}              │ Built-in action: toggles help gutter expansion
 {<key.path>}                 │ Refers to nested key in bashmenu.yml (e.g. {user.postal_code})
 ";
 

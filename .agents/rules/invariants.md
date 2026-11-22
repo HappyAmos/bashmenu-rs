@@ -1,5 +1,8 @@
 # BashMenu-RS Development Invariants & Guidelines
 
+## 0. User Request Sanity & Clarification Gate
+- **Halt on Confusion or Misguided Requests:** If the user requests something counterproductive, based on a misconception, or showing obvious confusion about repository state, architecture, or consequences, **halt execution immediately** before making changes. Clearly explain the discrepancy or risk and wait until the user confirms they understand and still want to proceed.
+
 ## 1. Mandatory Git Commit & Push Workflow
 - **Commit & Push Requirement:** Every completed task, bug fix, feature, or refactor must conclude with a descriptive commit (`git commit -m "..."`) pushed directly to GitHub (`git push origin main`). Never leave changes uncommitted or unpushed.
 - **Remote CI Verification:** After pushing to GitHub, verify remote CI passes using the GitHub CLI:
@@ -46,7 +49,7 @@
 - **Menu Priority Over Plugins:** When terminal height is constrained, plugin rows must automatically truncate or drop first so menu items and status gutter remain visible.
 - **Modal View Selection & Background Invariant:** Text inside modal frames inherits `styles.background`. Active/highlighted items in note viewers use inverted text (`Modifier::REVERSED`) rather than glyph markers (`►`) or clashing highlight fills.
 - **Unicode-Safe Text Editing & Universal Clipboard:** Editors (`TextInput`, `bashedit`, `NoteEditorModal`, `menuedit`) must operate on Unicode `char` counts (never byte slices), soft-wrap at word boundaries (`wrap_chars_by_word`), and support `Shift+Directional` selection plus `Ctrl+C`/`Ctrl+V`/`Ctrl+X` clipboard operations (`bashmenu_tui::clipboard`).
-- **Spread Help Gutters & Ascending Function Keys:** Help gutters spread items across up to 2 lines (`wrap_spread_help_gutter`) using `|` as delimiter. Omit `[UP/DN]: Nav`. Function keys `<F1>`..`<F12>` must ALWAYS be in strictly ascending order. Panel titles connect directly to borders (`┌─[ Title ]───`). Scrollbars render 1 column inside right border.
+- **Spread Help Gutters & Shortcuts Ordering:** Help gutters spread items across up to 2 lines (`wrap_spread_help_gutter`) using `|` as delimiter. Omit `[UP/DN]: Nav`. Built-in main-menu shortcuts (`F1`..`F9`, `esc`, `enter`, `ctrl+g`) live in `shortcuts.yml` (`type: builtin`, optional `show_in_gutter`) and render strictly in `shortcuts.yml` order (default `defaults/shortcuts.yml` ships in ascending `F1`..`F9` order), omitting individual `<leader>` chords and appending the configured leader key last. Panel titles connect directly to borders (`┌─[ Title ]───`). Scrollbars render 1 column inside right border.
 - **Status Gutter Precedence:** Status gutter takes layout precedence over help gutter. In narrow terminals, help gutter yields columns to ensure no trailing status tokens or date/time stamps are dropped.
 - **Toast Notification Dispatch:** Non-blocking toasts (`{toast:SECONDS:"MESSAGE"}`) dock in bottom-right corner above status gutter with accent block `▌` (`\u{258c}`), theme panel background, bold title, and wrapped body. Dismiss on timeout or mouse click. Empty commands must never execute a shell.
 - **Universal Marquee Overflow Invariant:** Text in panels, windows, lists, and titles exceeding width margins must marquee via `get_marquee_slice` using active theme's `marquee.char` and `marquee.gap` after a 4-tick (1.0s) pause delay; pauses during modals. `TextInput` is strictly exempted and scrolls horizontally without marqueeing.

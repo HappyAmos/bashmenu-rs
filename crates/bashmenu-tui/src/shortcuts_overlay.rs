@@ -124,9 +124,25 @@ impl ShortcutDispatcher {
         self.leader_pending_since.is_some()
     }
 
+    /// Explicitly activates Leader Pending mode (e.g. when clicking the leader
+    /// hint in the help gutter).
+    pub fn activate_leader(&mut self) {
+        self.leader_pending_since = Some(Instant::now());
+    }
+
     /// Explicitly cancels Leader Pending mode.
     pub fn cancel_leader(&mut self) {
         self.leader_pending_since = None;
+    }
+
+    /// Returns `true` if any enabled shortcut in the active configuration
+    /// invokes the specified built-in action macro (e.g. `"{back}"`, `"{select}"`).
+    pub fn has_active_builtin(&self, macro_name: &str) -> bool {
+        self.config.shortcuts.iter().any(|s| {
+            s.enabled
+                && s.builtin_macro()
+                    .is_some_and(|m| m.eq_ignore_ascii_case(macro_name))
+        })
     }
 
     /// Checks whether the leader key timeout has elapsed.
@@ -287,7 +303,7 @@ impl ShortcutDispatcher {
 
                 let desc_x = inner.x + 1 + key_col_w;
                 let desc_max_w = inner.width.saturating_sub(key_col_w + mode_w + 4) as usize;
-                let mut desc = entry.description.clone();
+                let mut desc = entry.resolved_description();
                 if UnicodeWidthStr::width(desc.as_str()) > desc_max_w && desc_max_w > 1 {
                     let mut clipped = String::new();
                     let mut w = 0;

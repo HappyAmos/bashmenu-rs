@@ -602,8 +602,8 @@ fn validate_shortcuts_file(path: &Path) -> bool {
 
     let mut seen_keys = HashSet::new();
     for (idx, entry) in cfg.shortcuts.iter().enumerate() {
-        let loc = format!("shortcuts[{}] ('{}')", idx, entry.description);
-        if entry.description.trim().is_empty() {
+        let loc = format!("shortcuts[{}] ('{}')", idx, entry.resolved_description());
+        if entry.description.trim().is_empty() && entry.builtin_macro().is_none() {
             errors.push(format!("{}: 'description' must not be empty.", loc));
         }
         match validate_key_spec(&entry.key, false) {
