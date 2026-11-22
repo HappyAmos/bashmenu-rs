@@ -180,7 +180,8 @@ impl NoteEditorModal {
     /// Pastes text at cursor, replacing selection if active
     pub fn paste_text(&mut self, text: &str) {
         self.delete_selection();
-        let paste_lines: Vec<&str> = text.split('\n').collect();
+        let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
+        let paste_lines: Vec<&str> = normalized.split('\n').collect();
         if paste_lines.is_empty() {
             return;
         }

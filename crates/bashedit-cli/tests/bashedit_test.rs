@@ -677,3 +677,49 @@ fn test_visual_page_navigation() {
     page_visual_up(&v_lines, &mut row, &mut col, 20);
     assert_eq!(row, 0);
 }
+
+#[test]
+fn test_bracketed_paste_cr_normalization_and_single_undo() {
+    let mut buf = EditorBuffer::new_empty();
+    buf.lines = vec!["hello world".to_string()];
+    buf.cursor_row = 0;
+    buf.cursor_col = 6;
+    // Select "world"
+    buf.mark_active = true;
+    buf.mark_row = 0;
+    buf.mark_col = 6;
+    buf.cursor_col = 11;
+
+    // Simulate Linux terminal Bracketed Paste (<Ctrl+Shift+V>) sending bare '\r'
+    assert!(buf.paste_text("line1\r  indented\rline3"));
+    assert_eq!(
+        buf.lines,
+        vec![
+            "hello line1".to_string(),
+            "  indented".to_string(),
+            "line3".to_string(),
+        ]
+    );
+    assert!(buf.lines.iter().all(|l| !l.contains('\r')));
+    assert_eq!(buf.cursor_row, 2);
+    assert_eq!(buf.cursor_col, 5);
+
+    // Single undo must restore original buffer and replaced selection in one step
+    assert!(buf.undo());
+    assert_eq!(buf.lines, vec!["hello world".to_string()]);
+
+    // Also verify CRLF (\r\n) normalization
+    buf.mark_active = false;
+    buf.cursor_row = 0;
+    buf.cursor_col = 11;
+    assert!(buf.paste_text("\r\nsecond\r\nthird"));
+    assert_eq!(
+        buf.lines,
+        vec![
+            "hello world".to_string(),
+            "second".to_string(),
+            "third".to_string(),
+        ]
+    );
+    assert!(buf.lines.iter().all(|l| !l.contains('\r')));
+}

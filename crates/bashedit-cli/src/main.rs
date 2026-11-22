@@ -826,12 +826,7 @@ fn main() -> Result<()> {
             if let Event::Paste(text) = &ev {
                 if matches!(active_modal, ActiveModal::None) {
                     let active_tab = &mut tabs[active_tab_idx];
-                    active_tab.delete_selection();
-                    let paste_lines: Vec<String> = text
-                        .split('\n')
-                        .map(|s| s.trim_end_matches('\r').to_string())
-                        .collect();
-                    active_tab.paste(&paste_lines);
+                    active_tab.paste_text(text);
                     continue;
                 }
             }
