@@ -1156,10 +1156,13 @@ fn main() -> Result<()> {
                                 // Close button [X] at top right
                                 if m.row == area.y && m.column >= area.x + area.width - 5 {
                                     if is_modified {
-                                        active_modal = ActiveModal::ConfirmExit(ConfirmModal::new(
-                                            t!("common.dialogs.unsaved_changes_title"),
-                                            t!("common.dialogs.unsaved_changes_msg"),
-                                        ));
+                                        active_modal = ActiveModal::ConfirmExit(
+                                            ConfirmModal::new(
+                                                t!("common.dialogs.unsaved_changes_title"),
+                                                t!("common.dialogs.unsaved_changes_msg"),
+                                            )
+                                            .with_default_cancel(),
+                                        );
                                     } else {
                                         break;
                                     }
@@ -1400,11 +1403,13 @@ fn main() -> Result<()> {
                                         }
                                         MenuEditFooterAction::Exit => {
                                             if is_modified {
-                                                active_modal =
-                                                    ActiveModal::ConfirmExit(ConfirmModal::new(
+                                                active_modal = ActiveModal::ConfirmExit(
+                                                    ConfirmModal::new(
                                                         t!("common.dialogs.unsaved_changes_title"),
                                                         t!("common.dialogs.unsaved_changes_msg"),
-                                                    ));
+                                                    )
+                                                    .with_default_cancel(),
+                                                );
                                             } else {
                                                 break;
                                             }
@@ -1735,10 +1740,13 @@ fn main() -> Result<()> {
                                 }
                                 KeyCode::Esc | KeyCode::Char('q') => {
                                     if is_modified {
-                                        active_modal = ActiveModal::ConfirmExit(ConfirmModal::new(
-                                            t!("common.dialogs.unsaved_changes_title"),
-                                            t!("common.dialogs.unsaved_changes_msg"),
-                                        ));
+                                        active_modal = ActiveModal::ConfirmExit(
+                                            ConfirmModal::new(
+                                                t!("common.dialogs.unsaved_changes_title"),
+                                                t!("common.dialogs.unsaved_changes_msg"),
+                                            )
+                                            .with_default_cancel(),
+                                        );
                                     } else {
                                         break;
                                     }
