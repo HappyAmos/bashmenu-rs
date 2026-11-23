@@ -1,16 +1,14 @@
 # BashMenu-RS
 
-> Modern, lightning-fast terminal menu system and companion developer tools in **Rust + Bash scripting** using **Ratatui** and **Crossterm**.
-
----
-![Bashmenu Preview](assets/bashmenu.gif)
----
-
-
+[![Release](https://img.shields.io/github/v/release/HappyAmos/bashmenu-rs?label=Release)](https://github.com/HappyAmos/bashmenu-rs/releases/latest)
 [![Rust Application](https://github.com/HappyAmos/bashmenu-rs/actions/workflows/rust-app.yml/badge.svg)](https://github.com/HappyAmos/bashmenu-rs/actions/workflows/rust-app.yml)
 [![ShellCheck](https://github.com/HappyAmos/bashmenu-rs/actions/workflows/shellcheck-app.yml/badge.svg)](https://github.com/HappyAmos/bashmenu-rs/actions/workflows/shellcheck-app.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+> Modern, lightning-fast terminal menu system and companion developer tools in **Rust + Bash scripting** using **Ratatui** and **Crossterm**.
+
+---
+![Bashmenu Preview](assets/bashmenu.gif)
 ---
 
 ## What On Earth Is This?
