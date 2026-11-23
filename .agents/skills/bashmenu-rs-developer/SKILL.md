@@ -16,7 +16,8 @@ description: Core developer guidelines for the multi-platform BashMenu Rust
 
 ## 2. Development Workflow & Invariants Reference
 - **Authoritative Rules:** All permanent operational invariants, constraints, safety checks, and task execution rules are centralized in `.agents/rules/invariants.md`. Consult that file for:
-  - Mandatory git commit and push workflow (`git commit -m "..." && git push origin main`) and remote CI tracking (`gh run list`).
+  - Mandatory PR-based git workflow (`branch` -> `gh pr create` -> `gh pr checks <PR> --watch` -> `gh pr merge --squash` -> sync `main`) and large-binary push hygiene (`.agents/rules/git-workflow.md`).
+  - README badge/workflow parity: badges sit directly under `# BashMenu-RS` starting with the Release badge, and every GitHub Actions badge URL must match an existing `.github/workflows/*.yml` file (`rust-app.yml`, `shellcheck-app.yml`).
   - Sequential TODO execution lifecycle (`PENDING:` marking, updating `DONE.md`, pruning `- [x]`, and task precedence: `CRITICAL` > `BUG` > `RESPONSIVENESS` > `UI` > `FEATURE` > `REQUEST` > `RESEARCH`).
   - Single source config paths and repository `defaults/` default configurations (`defaults/bashmenu.yml`, `defaults/bashmenu.mnu`, `defaults/bashmenu.themes`, `defaults/shortcuts.yml`, `defaults/cheat.yml`, `defaults/notes.yml`).
   - Linux Framebuffer TrueColor & `--image` mode (`/dev/fb0`).
