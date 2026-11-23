@@ -3,11 +3,8 @@
 ## 0. User Request Sanity & Clarification Gate
 - **Halt on Confusion or Misguided Requests:** If the user requests something counterproductive, based on a misconception, or showing obvious confusion about repository state, architecture, or consequences, **halt execution immediately** before making changes. Clearly explain the discrepancy or risk and wait until the user confirms they understand and still want to proceed.
 
-## 1. Mandatory Git Commit & Push Workflow
-- **Commit & Push Requirement:** Every completed task, bug fix, feature, or refactor must conclude with a descriptive commit (`git commit -m "..."`) pushed directly to GitHub (`git push origin main`). Never leave changes uncommitted or unpushed.
-- **Remote CI Verification:** After pushing to GitHub, verify remote CI passes using the GitHub CLI:
-  - Query run ID: `gh run list --workflow=rust-app.yml --limit 1 --json databaseId -q '.[0].databaseId'`
-  - Watch run: `gh run watch <ID>` (always pass an explicit ID to avoid interactive hangs).
+## 1. Mandatory Git PR & CI Workflow
+- **Authoritative Workflow:** Direct pushes to `main` are blocked (`GH013`). Follow `.agents/rules/git-workflow.md` for the PR-based branch, CI check (`gh pr checks`), squash-merge, and large-binary push hygiene rules.
 
 ## 2. Configuration & State Persistence
 - **Single Source of Truth Config Path & Repository Defaults:** User configs reside in `~/.config/bashmenu/` (`{bashmenu_dir}`), while `{dev_dir}` dynamically resolves git repository root and `{defaults}` / `{defaults_dir}` resolves `{dev_dir}/defaults`. Original default config files (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `cheat.yml`, `notes.yml`) reside strictly in `defaults/`. The `/tests/fixtures` directory has been removed and must never be reintroduced; all test harnesses, fallbacks, and loaders reference `defaults/` directly.
