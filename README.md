@@ -3,7 +3,7 @@
 > Modern, lightning-fast terminal menu system and companion developer tools in **Rust + Bash scripting** using **Ratatui** and **Crossterm**.
 
 ---
-![Bashmenu Preview](https://github.com/HappyAmos/bashmenu-rs/assets/bashmenu.gif)
+![Bashmenu Preview](assets/bashmenu.gif)
 ---
 
 
