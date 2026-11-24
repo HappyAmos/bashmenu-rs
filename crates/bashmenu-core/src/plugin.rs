@@ -58,7 +58,7 @@ pub struct PluginDef {
 
     /// Column span specification (e.g. "full", 1, 2)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub span: Option<serde_yml::Value>,
+    pub span: Option<serde_json::Value>,
 }
 
 impl Default for PluginDef {
@@ -207,32 +207,32 @@ impl PluginEngine {
             None => return result,
         };
 
-        let map = match plugins_val.as_mapping() {
+        let map = match plugins_val.as_object() {
             Some(m) => m,
             None => return result,
         };
 
         // Extract layout fields if present
-        if let Some(t) = map.get(serde_yml::Value::String("type".to_string())) {
+        if let Some(t) = map.get("type") {
             if let Some(s) = t.as_str() {
                 result.layout.layout_type = s.to_string();
             }
         }
-        if let Some(w) = map.get(serde_yml::Value::String("width".to_string())) {
+        if let Some(w) = map.get("width") {
             if let Some(s) = w.as_str() {
                 result.layout.width = s.to_string();
             }
         }
-        if let Some(e) = map.get(serde_yml::Value::String("entries".to_string())) {
+        if let Some(e) = map.get("entries") {
             if let Some(n) = e.as_u64() {
                 result.layout.entries = n.max(1) as usize;
             }
-        } else if let Some(e) = map.get(serde_yml::Value::String("columns".to_string())) {
+        } else if let Some(e) = map.get("columns") {
             if let Some(n) = e.as_u64() {
                 result.layout.entries = n.max(1) as usize;
             }
         }
-        if let Some(d) = map.get(serde_yml::Value::String("divider".to_string())) {
+        if let Some(d) = map.get("divider") {
             if let Some(b) = d.as_bool() {
                 if b {
                     result.layout.divider = Some("true".to_string());
@@ -241,8 +241,8 @@ impl PluginEngine {
                 result.layout.divider = Some(s.to_string());
             }
         }
-        if let Some(h) = map.get(serde_yml::Value::String("headers".to_string())) {
-            if let Some(seq) = h.as_sequence() {
+        if let Some(h) = map.get("headers") {
+            if let Some(seq) = h.as_array() {
                 result.layout.headers = seq
                     .iter()
                     .filter_map(|v| v.as_str().map(|s| s.to_string()))
@@ -251,24 +251,24 @@ impl PluginEngine {
         }
 
         // Check if layout was defined as nested dictionary `layout: { ... }`
-        if let Some(nested_layout) = map.get(serde_yml::Value::String("layout".to_string())) {
-            if let Some(nl_map) = nested_layout.as_mapping() {
-                if let Some(t) = nl_map.get(serde_yml::Value::String("type".to_string())) {
+        if let Some(nested_layout) = map.get("layout") {
+            if let Some(nl_map) = nested_layout.as_object() {
+                if let Some(t) = nl_map.get("type") {
                     if let Some(s) = t.as_str() {
                         result.layout.layout_type = s.to_string();
                     }
                 }
-                if let Some(w) = nl_map.get(serde_yml::Value::String("width".to_string())) {
+                if let Some(w) = nl_map.get("width") {
                     if let Some(s) = w.as_str() {
                         result.layout.width = s.to_string();
                     }
                 }
-                if let Some(e) = nl_map.get(serde_yml::Value::String("entries".to_string())) {
+                if let Some(e) = nl_map.get("entries") {
                     if let Some(n) = e.as_u64() {
                         result.layout.entries = n.max(1) as usize;
                     }
                 }
-                if let Some(d) = nl_map.get(serde_yml::Value::String("divider".to_string())) {
+                if let Some(d) = nl_map.get("divider") {
                     if let Some(b) = d.as_bool() {
                         if b {
                             result.layout.divider = Some("true".to_string());
@@ -277,8 +277,8 @@ impl PluginEngine {
                         result.layout.divider = Some(s.to_string());
                     }
                 }
-                if let Some(h) = nl_map.get(serde_yml::Value::String("headers".to_string())) {
-                    if let Some(seq) = h.as_sequence() {
+                if let Some(h) = nl_map.get("headers") {
+                    if let Some(seq) = h.as_array() {
                         result.layout.headers = seq
                             .iter()
                             .filter_map(|v| v.as_str().map(|s| s.to_string()))
@@ -305,14 +305,13 @@ impl PluginEngine {
         ];
 
         for (k, v) in map {
-            if let Some(key_str) = k.as_str() {
-                if reserved_keys.contains(&key_str) {
-                    continue;
-                }
-                if let Ok(plugin_def) = serde_yml::from_value::<PluginDef>(v.clone()) {
-                    result.order.push(key_str.to_string());
-                    result.plugins.insert(key_str.to_string(), plugin_def);
-                }
+            let key_str = k.as_str();
+            if reserved_keys.contains(&key_str) {
+                continue;
+            }
+            if let Ok(plugin_def) = serde_json::from_value::<PluginDef>(v.clone()) {
+                result.order.push(key_str.to_string());
+                result.plugins.insert(key_str.to_string(), plugin_def);
             }
         }
 
@@ -530,8 +529,8 @@ impl PluginEngine {
 
                 let is_standalone = plugin.standalone.unwrap_or(false)
                     || match &plugin.span {
-                        Some(serde_yml::Value::String(s)) => s == "full",
-                        Some(serde_yml::Value::Number(n)) => n.as_u64() == Some(1),
+                        Some(serde_json::Value::String(s)) => s == "full",
+                        Some(serde_json::Value::Number(n)) => n.as_u64() == Some(1),
                         _ => false,
                     };
 

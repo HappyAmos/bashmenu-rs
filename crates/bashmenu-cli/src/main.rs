@@ -1525,7 +1525,7 @@ fn main() -> Result<()> {
                     if let Some(c) = choice {
                         if c == ToggleChoice::True || c == ToggleChoice::False {
                             let val = c == ToggleChoice::True;
-                            config.set_value(key_path.as_str(), serde_yml::Value::Bool(val));
+                            config.set_value(key_path.as_str(), serde_json::Value::Bool(val));
                             save_config_or_toast(&config_path, &config, &mut toast_rack);
                             menu_view.set_config(config.clone());
                             if key_path == "settings.use_nerd_fonts" {
@@ -1570,18 +1570,19 @@ fn main() -> Result<()> {
                     if let Some(opt_val) = submitted {
                         if let Some(new_val) = opt_val {
                             let trimmed = new_val.trim();
-                            let parsed: serde_yml::Value = if trimmed.eq_ignore_ascii_case("true") {
-                                serde_yml::Value::Bool(true)
+                            let parsed: serde_json::Value = if trimmed.eq_ignore_ascii_case("true")
+                            {
+                                serde_json::Value::Bool(true)
                             } else if trimmed.eq_ignore_ascii_case("false") {
-                                serde_yml::Value::Bool(false)
+                                serde_json::Value::Bool(false)
                             } else if let Ok(num) = trimmed.parse::<i64>() {
-                                serde_yml::Value::Number(serde_yml::Number::from(num))
+                                serde_json::Value::Number(serde_json::Number::from(num))
                             } else if let Ok(f) = trimmed.parse::<f64>() {
-                                serde_yml::to_value(f).unwrap_or_else(|_| {
-                                    serde_yml::Value::String(trimmed.to_string())
+                                serde_json::to_value(f).unwrap_or_else(|_| {
+                                    serde_json::Value::String(trimmed.to_string())
                                 })
                             } else {
-                                serde_yml::Value::String(trimmed.to_string())
+                                serde_json::Value::String(trimmed.to_string())
                             };
                             config.set_value(key_path.as_str(), parsed);
                             save_config_or_toast(&config_path, &config, &mut toast_rack);
@@ -1645,7 +1646,7 @@ fn main() -> Result<()> {
                         if let Some(selected) = opt_val {
                             config.set_value(
                                 key_path.as_str(),
-                                serde_yml::Value::String(selected.clone()),
+                                serde_json::Value::String(selected.clone()),
                             );
                             save_config_or_toast(&config_path, &config, &mut toast_rack);
                             menu_view.set_config(config.clone());

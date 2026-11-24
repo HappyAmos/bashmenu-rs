@@ -190,7 +190,7 @@ pub struct ConfirmActionDetails {
     pub stream: Option<bool>,
     /// Extra arbitrary properties
     #[serde(flatten)]
-    pub extra: HashMap<String, serde_yml::Value>,
+    pub extra: HashMap<String, serde_json::Value>,
 }
 
 /// A normalized menu item definition.
@@ -229,7 +229,7 @@ pub struct MenuItem {
     /// Nested submenu container
     pub submenu: Option<Submenu>,
     /// Additional custom keys
-    pub extra: HashMap<String, serde_yml::Value>,
+    pub extra: HashMap<String, serde_json::Value>,
 }
 
 impl MenuItem {
@@ -305,11 +305,11 @@ impl MenuItem {
     /// Whether input prompts for this item should mask characters with `*`
     pub fn masked(&self) -> bool {
         match self.extra.get("masked") {
-            Some(serde_yml::Value::Bool(b)) => return *b,
-            Some(serde_yml::Value::String(s)) => {
+            Some(serde_json::Value::Bool(b)) => return *b,
+            Some(serde_json::Value::String(s)) => {
                 return matches!(s.trim().to_ascii_lowercase().as_str(), "true" | "1" | "yes");
             }
-            Some(serde_yml::Value::Number(n)) => return n.as_i64().unwrap_or(0) != 0,
+            Some(serde_json::Value::Number(n)) => return n.as_i64().unwrap_or(0) != 0,
             _ => {}
         }
         self.inline_param_spec().map(|s| s.masked).unwrap_or(false)
@@ -453,10 +453,10 @@ impl MenuItem {
     /// Radio selection options as (value, label) pairs
     pub fn options(&self) -> Vec<(String, String)> {
         let mut list = Vec::new();
-        if let Some(serde_yml::Value::Sequence(seq)) = self.extra.get("options") {
+        if let Some(serde_json::Value::Array(seq)) = self.extra.get("options") {
             for item in seq {
                 match item {
-                    serde_yml::Value::Mapping(map) => {
+                    serde_json::Value::Object(map) => {
                         let val = map
                             .get("value")
                             .and_then(|v| v.as_str())
@@ -470,12 +470,12 @@ impl MenuItem {
                             .to_string();
                         list.push((val, lbl));
                     }
-                    serde_yml::Value::Sequence(pair) if pair.len() >= 2 => {
+                    serde_json::Value::Array(pair) if pair.len() >= 2 => {
                         let val = pair[0].as_str().unwrap_or_default().to_string();
                         let lbl = pair[1].as_str().unwrap_or(&val).to_string();
                         list.push((val, lbl));
                     }
-                    serde_yml::Value::String(s) => {
+                    serde_json::Value::String(s) => {
                         list.push((s.clone(), s.clone()));
                     }
                     other => {
@@ -535,12 +535,12 @@ impl MenuItem {
     /// this item. Defaults to `true` unless `transition: false` is configured.
     pub fn transition_enabled(&self) -> bool {
         match self.extra.get("transition") {
-            Some(serde_yml::Value::Bool(b)) => *b,
-            Some(serde_yml::Value::String(s)) => !matches!(
+            Some(serde_json::Value::Bool(b)) => *b,
+            Some(serde_json::Value::String(s)) => !matches!(
                 s.trim().to_ascii_lowercase().as_str(),
                 "false" | "0" | "no" | "off" | "none"
             ),
-            Some(serde_yml::Value::Number(n)) => n.as_i64().unwrap_or(1) != 0,
+            Some(serde_json::Value::Number(n)) => n.as_i64().unwrap_or(1) != 0,
             _ => true,
         }
     }
@@ -601,7 +601,7 @@ pub struct MenuSchema {
     pub items: Vec<MenuItem>,
     /// Extra root fields
     #[serde(flatten)]
-    pub extra: HashMap<String, serde_yml::Value>,
+    pub extra: HashMap<String, serde_json::Value>,
 }
 
 /// Default schema version string (`"0.0.1"`).
@@ -680,7 +680,7 @@ struct RawItemProperties {
     pub submenu: Option<Submenu>,
     /// Additional unstructured fields preserved across roundtrips
     #[serde(flatten)]
-    pub extra: HashMap<String, serde_yml::Value>,
+    pub extra: HashMap<String, serde_json::Value>,
 }
 
 impl<'de> Deserialize<'de> for MenuItem {
@@ -689,7 +689,7 @@ impl<'de> Deserialize<'de> for MenuItem {
     where
         D: Deserializer<'de>,
     {
-        let val = serde_yml::Value::deserialize(deserializer)?;
+        let val = serde_json::Value::deserialize(deserializer)?;
 
         // -------------------------------------------------------------------
         // Case 1: Plain string literal (e.g. "{divider}" or shorthand command)
@@ -697,7 +697,7 @@ impl<'de> Deserialize<'de> for MenuItem {
         // In YAML, an item can be written simply as a scalar string:
         //   - '{divider}'
         //   - 'echo hello world'
-        if let serde_yml::Value::String(s) = &val {
+        if let serde_json::Value::String(s) = &val {
             if s == "{divider}" {
                 return Ok(MenuItem::divider());
             }
@@ -713,18 +713,14 @@ impl<'de> Deserialize<'de> for MenuItem {
         // -------------------------------------------------------------------
         // Case 2: Mapping / Dictionary structure
         // -------------------------------------------------------------------
-        if let serde_yml::Value::Mapping(map) = &val {
+        if let serde_json::Value::Object(map) = &val {
             if map.is_empty() {
                 return Ok(MenuItem::default());
             }
 
             // Step 2a: Check if explicit divider mapping: `{"{divider}": null}`
-            for k in map.keys() {
-                if let serde_yml::Value::String(ks) = k {
-                    if ks == "{divider}" {
-                        return Ok(MenuItem::divider());
-                    }
-                }
+            if map.contains_key("{divider}") {
+                return Ok(MenuItem::divider());
             }
 
             // Step 2b: Check if pre-normalized structure containing an explicit "label" key:
@@ -733,11 +729,11 @@ impl<'de> Deserialize<'de> for MenuItem {
             let has_label = map.contains_key("label");
             if has_label {
                 let label = match map.get("label") {
-                    Some(serde_yml::Value::String(s)) => s.clone(),
+                    Some(serde_json::Value::String(s)) => s.clone(),
                     _ => "Unnamed".to_string(),
                 };
                 let raw_props: RawItemProperties =
-                    serde_yml::from_value(serde_yml::Value::Mapping(map.clone()))
+                    serde_json::from_value(serde_json::Value::Object(map.clone()))
                         .map_err(serde::de::Error::custom)?;
                 let item_type =
                     if raw_props.submenu.is_some() && raw_props.r#type == MenuItemType::Command {
@@ -774,10 +770,7 @@ impl<'de> Deserialize<'de> for MenuItem {
             //   - "Section Header": null
             if map.len() == 1 {
                 let (k, v) = map.iter().next().unwrap();
-                let label = match k {
-                    serde_yml::Value::String(s) => s.clone(),
-                    other => format!("{:?}", other),
-                };
+                let label = k.clone();
 
                 // Null body indicates a non-interactive label / header
                 if v.is_null() {
@@ -788,9 +781,9 @@ impl<'de> Deserialize<'de> for MenuItem {
                 }
 
                 // Nested property mapping under the label key
-                if let serde_yml::Value::Mapping(_) = v {
+                if let serde_json::Value::Object(_) = v {
                     let raw_props: RawItemProperties =
-                        serde_yml::from_value(v.clone()).map_err(serde::de::Error::custom)?;
+                        serde_json::from_value(v.clone()).map_err(serde::de::Error::custom)?;
                     let item_type = if raw_props.submenu.is_some()
                         && raw_props.r#type == MenuItemType::Command
                     {
@@ -949,14 +942,14 @@ pub fn load_menu<P: AsRef<Path>>(path: P) -> Result<MenuSchema> {
         path: p.to_path_buf(),
         source: e,
     })?;
-    let menu: MenuSchema = serde_yml::from_str(&content)?;
+    let menu: MenuSchema = serde_saphyr::from_str(&content)?;
     Ok(menu)
 }
 
 /// Serializes and saves menu schema to disk using clean label-as-key formatting.
 pub fn save_menu<P: AsRef<Path>>(path: P, menu: &MenuSchema) -> Result<()> {
     let p = path.as_ref();
-    let yaml_body = serde_yml::to_string(menu)?;
+    let yaml_body = serde_saphyr::to_string(menu)?;
     fs::write(p, yaml_body).map_err(|e| BashMenuError::Io {
         path: p.to_path_buf(),
         source: e,
@@ -1003,20 +996,20 @@ mod tests {
         let mut item_disabled = MenuItem::default();
         item_disabled
             .extra
-            .insert("transition".to_string(), serde_yml::Value::Bool(false));
+            .insert("transition".to_string(), serde_json::Value::Bool(false));
         assert!(!item_disabled.transition_enabled());
 
         let mut item_str_off = MenuItem::default();
         item_str_off.extra.insert(
             "transition".to_string(),
-            serde_yml::Value::String("off".to_string()),
+            serde_json::Value::String("off".to_string()),
         );
         assert!(!item_str_off.transition_enabled());
 
         let mut item_enabled = MenuItem::default();
         item_enabled
             .extra
-            .insert("transition".to_string(), serde_yml::Value::Bool(true));
+            .insert("transition".to_string(), serde_json::Value::Bool(true));
         assert!(item_enabled.transition_enabled());
     }
 }

@@ -24,7 +24,7 @@ pub struct NotebookData {
     pub format: String,
     /// Sequence of raw YAML note mappings
     #[serde(default)]
-    pub notes: Vec<serde_yml::Value>,
+    pub notes: Vec<serde_json::Value>,
 }
 
 /// Default note format string (`"markdown"`).
@@ -282,7 +282,7 @@ pub fn load_notebook(path: impl AsRef<Path>) -> Result<NotebookSchema> {
         };
         return Ok(nb);
     }
-    let schema: NotebookSchema = serde_yml::from_str(&raw)?;
+    let schema: NotebookSchema = serde_saphyr::from_str(&raw)?;
     Ok(schema)
 }
 
@@ -292,7 +292,7 @@ pub fn save_notebook(path: impl AsRef<Path>, nb: &NotebookSchema) -> Result<()> 
     if let Some(parent) = p.parent() {
         let _ = fs::create_dir_all(parent);
     }
-    let yaml_str = serde_yml::to_string(nb)?;
+    let yaml_str = serde_saphyr::to_string(nb)?;
     fs::write(p, yaml_str).map_err(|source| BashMenuError::Io {
         path: p.to_path_buf(),
         source,
@@ -300,15 +300,12 @@ pub fn save_notebook(path: impl AsRef<Path>, nb: &NotebookSchema) -> Result<()> 
     Ok(())
 }
 
-/// Helper to retrieve a string field from a serde_yml::Mapping
-fn get_str_field<'a>(map: &'a serde_yml::Mapping, key: &str) -> Option<&'a str> {
-    map.iter().find_map(|(k, v)| {
-        if k.as_str() == Some(key) {
-            v.as_str()
-        } else {
-            None
-        }
-    })
+/// Helper to retrieve a string field from a `serde_json::Map`
+fn get_str_field<'a>(
+    map: &'a serde_json::Map<String, serde_json::Value>,
+    key: &str,
+) -> Option<&'a str> {
+    map.get(key).and_then(|v| v.as_str())
 }
 
 /// Extracts a flat list of `NoteItem` structs from the notebook schema.
@@ -316,13 +313,13 @@ pub fn get_notes(nb: &NotebookSchema) -> Vec<NoteItem> {
     let mut results = Vec::new();
 
     for item in &nb.notebook.notes {
-        if let serde_yml::Value::Mapping(map) = item {
+        if let serde_json::Value::Object(map) = item {
             // Check for single-key mapping (Title: properties)
             if map.len() == 1 {
                 if let Some((k, v)) = map.iter().next() {
-                    let title = k.as_str().unwrap_or("Untitled").to_string();
+                    let title = k.clone();
                     let (note_type, format, content, icon) = match v {
-                        serde_yml::Value::Mapping(props) => {
+                        serde_json::Value::Object(props) => {
                             let note_type =
                                 get_str_field(props, "type").unwrap_or("note").to_string();
                             let format = get_str_field(props, "format")
@@ -332,7 +329,7 @@ pub fn get_notes(nb: &NotebookSchema) -> Vec<NoteItem> {
                             let icon = get_str_field(props, "icon").map(|s| s.to_string());
                             (note_type, format, content, icon)
                         }
-                        serde_yml::Value::String(s) => {
+                        serde_json::Value::String(s) => {
                             ("note".to_string(), "markdown".to_string(), s.clone(), None)
                         }
                         _ => (
@@ -388,33 +385,31 @@ pub fn add_or_update_note(nb: &mut NotebookSchema, note: NoteItem) {
     let mut updated = false;
 
     for item in &mut nb.notebook.notes {
-        if let serde_yml::Value::Mapping(map) = item {
+        if let serde_json::Value::Object(map) = item {
             // Check for label-as-key
             if map.len() == 1 {
                 if let Some(first_key) = map.keys().next().cloned() {
-                    if first_key.as_str() == Some(&note.title) {
-                        let mut new_props = serde_yml::Mapping::new();
+                    if first_key == note.title {
+                        let mut new_props = serde_json::Map::new();
                         new_props.insert(
-                            serde_yml::Value::String("type".to_string()),
-                            serde_yml::Value::String(note.r#type.clone()),
+                            "type".to_string(),
+                            serde_json::Value::String(note.r#type.clone()),
                         );
                         new_props.insert(
-                            serde_yml::Value::String("format".to_string()),
-                            serde_yml::Value::String(note.format.clone()),
+                            "format".to_string(),
+                            serde_json::Value::String(note.format.clone()),
                         );
                         new_props.insert(
-                            serde_yml::Value::String("content".to_string()),
-                            serde_yml::Value::String(note.content.clone()),
+                            "content".to_string(),
+                            serde_json::Value::String(note.content.clone()),
                         );
                         if let Some(ref ic) = note.icon {
-                            new_props.insert(
-                                serde_yml::Value::String("icon".to_string()),
-                                serde_yml::Value::String(ic.clone()),
-                            );
+                            new_props
+                                .insert("icon".to_string(), serde_json::Value::String(ic.clone()));
                         }
-                        *item = serde_yml::Value::Mapping({
-                            let mut m = serde_yml::Mapping::new();
-                            m.insert(first_key, serde_yml::Value::Mapping(new_props));
+                        *item = serde_json::Value::Object({
+                            let mut m = serde_json::Map::new();
+                            m.insert(first_key, serde_json::Value::Object(new_props));
                             m
                         });
                         updated = true;
@@ -423,22 +418,19 @@ pub fn add_or_update_note(nb: &mut NotebookSchema, note: NoteItem) {
                 }
             } else if get_str_field(map, "title") == Some(&note.title) {
                 map.insert(
-                    serde_yml::Value::String("content".to_string()),
-                    serde_yml::Value::String(note.content.clone()),
+                    "content".to_string(),
+                    serde_json::Value::String(note.content.clone()),
                 );
                 map.insert(
-                    serde_yml::Value::String("format".to_string()),
-                    serde_yml::Value::String(note.format.clone()),
+                    "format".to_string(),
+                    serde_json::Value::String(note.format.clone()),
                 );
                 map.insert(
-                    serde_yml::Value::String("type".to_string()),
-                    serde_yml::Value::String(note.r#type.clone()),
+                    "type".to_string(),
+                    serde_json::Value::String(note.r#type.clone()),
                 );
                 if let Some(ref ic) = note.icon {
-                    map.insert(
-                        serde_yml::Value::String("icon".to_string()),
-                        serde_yml::Value::String(ic.clone()),
-                    );
+                    map.insert("icon".to_string(), serde_json::Value::String(ic.clone()));
                 }
                 updated = true;
                 break;
@@ -447,53 +439,41 @@ pub fn add_or_update_note(nb: &mut NotebookSchema, note: NoteItem) {
     }
 
     if !updated {
-        let mut props = serde_yml::Mapping::new();
+        let mut props = serde_json::Map::new();
+        props.insert("type".to_string(), serde_json::Value::String(note.r#type));
+        props.insert("format".to_string(), serde_json::Value::String(note.format));
         props.insert(
-            serde_yml::Value::String("type".to_string()),
-            serde_yml::Value::String(note.r#type),
-        );
-        props.insert(
-            serde_yml::Value::String("format".to_string()),
-            serde_yml::Value::String(note.format),
-        );
-        props.insert(
-            serde_yml::Value::String("content".to_string()),
-            serde_yml::Value::String(note.content),
+            "content".to_string(),
+            serde_json::Value::String(note.content),
         );
         if let Some(ic) = note.icon {
-            props.insert(
-                serde_yml::Value::String("icon".to_string()),
-                serde_yml::Value::String(ic),
-            );
+            props.insert("icon".to_string(), serde_json::Value::String(ic));
         }
 
-        let mut entry = serde_yml::Mapping::new();
-        entry.insert(
-            serde_yml::Value::String(note.title),
-            serde_yml::Value::Mapping(props),
-        );
-        nb.notebook.notes.push(serde_yml::Value::Mapping(entry));
+        let mut entry = serde_json::Map::new();
+        entry.insert(note.title, serde_json::Value::Object(props));
+        nb.notebook.notes.push(serde_json::Value::Object(entry));
     }
 }
 
 /// Renames a note in the notebook data structure.
 pub fn rename_note(nb: &mut NotebookSchema, old_title: &str, new_title: &str) -> bool {
     for item in &mut nb.notebook.notes {
-        if let serde_yml::Value::Mapping(map) = item {
+        if let serde_json::Value::Object(map) = item {
             if map.len() == 1 {
                 if let Some(first_key) = map.keys().next().cloned() {
-                    if first_key.as_str() == Some(old_title) {
+                    if first_key == old_title {
                         let val = map.values().next().cloned().unwrap();
-                        let mut new_map = serde_yml::Mapping::new();
-                        new_map.insert(serde_yml::Value::String(new_title.to_string()), val);
-                        *item = serde_yml::Value::Mapping(new_map);
+                        let mut new_map = serde_json::Map::new();
+                        new_map.insert(new_title.to_string(), val);
+                        *item = serde_json::Value::Object(new_map);
                         return true;
                     }
                 }
             } else if get_str_field(map, "title") == Some(old_title) {
                 map.insert(
-                    serde_yml::Value::String("title".to_string()),
-                    serde_yml::Value::String(new_title.to_string()),
+                    "title".to_string(),
+                    serde_json::Value::String(new_title.to_string()),
                 );
                 return true;
             }
@@ -506,10 +486,10 @@ pub fn rename_note(nb: &mut NotebookSchema, old_title: &str, new_title: &str) ->
 pub fn delete_note(nb: &mut NotebookSchema, title: &str) -> bool {
     let before_len = nb.notebook.notes.len();
     nb.notebook.notes.retain(|item| {
-        if let serde_yml::Value::Mapping(map) = item {
+        if let serde_json::Value::Object(map) = item {
             if map.len() == 1 {
                 if let Some(k) = map.keys().next() {
-                    return k.as_str() != Some(title);
+                    return k != title;
                 }
             } else if get_str_field(map, "title") == Some(title) {
                 return false;
@@ -602,7 +582,7 @@ impl NoteSwapFile {
             note_title: note_title.to_string(),
             base_content: base_content.to_string(),
         };
-        let yaml = serde_yml::to_string(&swap).ok()?;
+        let yaml = serde_saphyr::to_string(&swap).ok()?;
         fs::write(&path, yaml).ok()?;
         Some(path)
     }
@@ -612,7 +592,7 @@ impl NoteSwapFile {
         let path = Self::swap_path(notebook_path, note_title);
         if path.exists() {
             let data = fs::read_to_string(&path).ok()?;
-            serde_yml::from_str(&data).ok()
+            serde_saphyr::from_str(&data).ok()
         } else {
             None
         }

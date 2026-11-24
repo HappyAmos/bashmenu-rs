@@ -21,5 +21,6 @@ ratatui = { workspace = true }
 crossterm = { workspace = true }
 clap = { workspace = true }
 anyhow = { workspace = true }
-serde_yml = { workspace = true }
+serde-saphyr = { workspace = true }
+serde_json = { workspace = true }
 unicode-width = { workspace = true }

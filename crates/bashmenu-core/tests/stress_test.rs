@@ -36,7 +36,7 @@ fn test_stress_macro_engine_massive_string() {
     let mut config = BashMenuConfig::default();
     config.user.insert(
         "token".to_string(),
-        serde_yml::Value::String("TEST_VALUE".to_string()),
+        serde_json::Value::String("TEST_VALUE".to_string()),
     );
     let ctx = MacroContext::new(&config);
 
@@ -231,11 +231,11 @@ fn test_stress_menu_schema_scale() {
     }
 
     // Serialize to YAML
-    let yml_str = serde_yml::to_string(&schema).expect("Serialization must succeed");
+    let yml_str = serde_saphyr::to_string(&schema).expect("Serialization must succeed");
     assert!(yml_str.len() > 50_000);
 
     // Deserialize back
     let roundtrip: MenuSchema =
-        serde_yml::from_str(&yml_str).expect("Deserialization must succeed");
+        serde_saphyr::from_str(&yml_str).expect("Deserialization must succeed");
     assert_eq!(roundtrip.items.len(), 2000);
 }

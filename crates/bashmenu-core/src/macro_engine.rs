@@ -412,7 +412,7 @@ pub struct MarkdownFrontmatter {
 }
 
 /// Parses a percentage value (`80`, `"80"`, `"80%"`) from a YAML value, clamped to `1..=100`.
-fn parse_percent_value(val: &serde_yml::Value) -> Option<u16> {
+fn parse_percent_value(val: &serde_json::Value) -> Option<u16> {
     if let Some(n) = val.as_u64() {
         return Some((n as u16).clamp(1, 100));
     }
@@ -451,7 +451,7 @@ pub fn parse_markdown_frontmatter_full(raw: &str) -> (MarkdownFrontmatter, &str)
             let yaml_block = &after_open[..offset];
             let body = &after_open[offset + line.len()..];
             let mut fm = MarkdownFrontmatter::default();
-            if let Ok(val) = serde_yml::from_str::<serde_yml::Value>(yaml_block) {
+            if let Ok(val) = serde_saphyr::from_str::<serde_json::Value>(yaml_block) {
                 fm.title = val
                     .get("title")
                     .and_then(|v| v.as_str())
@@ -2099,7 +2099,7 @@ mod tests {
         };
         config.user.insert(
             "postal_code".to_string(),
-            serde_yml::Value::String("49079".to_string()),
+            serde_json::Value::String("49079".to_string()),
         );
 
         let mut ctx = MacroContext::new(&config);

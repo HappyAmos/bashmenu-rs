@@ -91,27 +91,27 @@ pub fn activity_override_tokens(activity_key: &str) -> &'static [&'static str] {
 
 /// Builds default `-1` (inherit from base theme) activity override sub-maps for
 /// `bashedit`, `modals`, `menuedit`, `toasts`, `themeedit`, and `shortcutedit`.
-pub fn default_activity_overrides_map() -> HashMap<String, serde_yml::Value> {
-    let inherit_val = || serde_yml::Value::Number((-1).into());
+pub fn default_activity_overrides_map() -> HashMap<String, serde_json::Value> {
+    let inherit_val = || serde_json::Value::Number((-1).into());
     let inherit_pair = || {
-        serde_yml::Value::Sequence(vec![
-            serde_yml::Value::Number((-1).into()),
-            serde_yml::Value::Number((-1).into()),
+        serde_json::Value::Array(vec![
+            serde_json::Value::Number((-1).into()),
+            serde_json::Value::Number((-1).into()),
         ])
     };
 
     let mut overrides = HashMap::new();
     for &activity in &ACTIVITY_OVERRIDE_KEYS {
-        let mut sub_map = serde_yml::Mapping::new();
+        let mut sub_map = serde_json::Map::new();
         for &tok in activity_override_tokens(activity) {
             let val = if is_scalar_color_token(tok) {
                 inherit_val()
             } else {
                 inherit_pair()
             };
-            sub_map.insert(serde_yml::Value::String(tok.to_string()), val);
+            sub_map.insert(tok.to_string(), val);
         }
-        overrides.insert(activity.to_string(), serde_yml::Value::Mapping(sub_map));
+        overrides.insert(activity.to_string(), serde_json::Value::Object(sub_map));
     }
     overrides
 }
@@ -414,15 +414,15 @@ pub struct Theme {
 
     /// 256-color palette tier mapping token names to [fg, bg] or color identifiers
     #[serde(rename = "256", skip_serializing_if = "Option::is_none")]
-    pub colors_256: Option<HashMap<String, serde_yml::Value>>,
+    pub colors_256: Option<HashMap<String, serde_json::Value>>,
 
     /// 16-color ANSI fallback palette tier
     #[serde(rename = "16", skip_serializing_if = "Option::is_none")]
-    pub colors_16: Option<HashMap<String, serde_yml::Value>>,
+    pub colors_16: Option<HashMap<String, serde_json::Value>>,
 
     /// 8-color ANSI fallback palette tier
     #[serde(rename = "8", skip_serializing_if = "Option::is_none")]
-    pub colors_8: Option<HashMap<String, serde_yml::Value>>,
+    pub colors_8: Option<HashMap<String, serde_json::Value>>,
 
     /// Background wallpaper configuration
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -430,7 +430,7 @@ pub struct Theme {
 
     /// Additional arbitrary theme fields
     #[serde(flatten)]
-    pub extra: HashMap<String, serde_yml::Value>,
+    pub extra: HashMap<String, serde_json::Value>,
 }
 
 impl Theme {
@@ -444,7 +444,7 @@ impl Theme {
             .get("theme_background")
             .or_else(|| self.extra.get("wallpaper"))
         {
-            if let Ok(setting) = serde_yml::from_value::<WallpaperSetting>(val.clone()) {
+            if let Ok(setting) = serde_json::from_value::<WallpaperSetting>(val.clone()) {
                 return Some(setting.to_config());
             }
         }
@@ -495,19 +495,22 @@ impl Theme {
         });
 
         let mut colors = HashMap::new();
-        let make_pair = |fg: i64, bg: i64| -> serde_yml::Value {
-            serde_yml::Value::Sequence(vec![
-                serde_yml::Value::Number(fg.into()),
-                serde_yml::Value::Number(bg.into()),
+        let make_pair = |fg: i64, bg: i64| -> serde_json::Value {
+            serde_json::Value::Array(vec![
+                serde_json::Value::Number(fg.into()),
+                serde_json::Value::Number(bg.into()),
             ])
         };
-        colors.insert("background".to_string(), serde_yml::Value::Number(0.into()));
+        colors.insert(
+            "background".to_string(),
+            serde_json::Value::Number(0.into()),
+        );
         colors.insert("title".to_string(), make_pair(255, -1));
         colors.insert("text".to_string(), make_pair(255, -1));
         colors.insert("highlight".to_string(), make_pair(0, 255));
         colors.insert(
             "highlight_text".to_string(),
-            serde_yml::Value::Number(0.into()),
+            serde_json::Value::Number(0.into()),
         );
         colors.insert("border".to_string(), make_pair(250, -1));
         colors.insert("divider".to_string(), make_pair(245, -1));
@@ -587,7 +590,7 @@ pub fn load_themes<P: AsRef<Path>>(path: P) -> Result<ThemeCollection> {
         path: p.to_path_buf(),
         source: e,
     })?;
-    let themes: ThemeCollection = serde_yml::from_str(&content)?;
+    let themes: ThemeCollection = serde_saphyr::from_str(&content)?;
     Ok(themes)
 }
 
@@ -600,11 +603,11 @@ pub fn save_themes<P: AsRef<Path>>(path: P, themes: &ThemeCollection) -> Result<
             .cmp(&b.to_ascii_lowercase())
             .then_with(|| a.cmp(b))
     });
-    let mut map = serde_yml::Mapping::new();
+    let mut map = serde_json::Map::new();
     for (k, v) in entries {
-        map.insert(serde_yml::Value::String(k.clone()), serde_yml::to_value(v)?);
+        map.insert(k.clone(), serde_json::to_value(v)?);
     }
-    let yaml_body = serde_yml::to_string(&map)?.replace(": =\n", ": '='\n");
+    let yaml_body = serde_saphyr::to_string(&map)?.replace(": =\n", ": '='\n");
     fs::write(p, yaml_body).map_err(|e| BashMenuError::Io {
         path: p.to_path_buf(),
         source: e,

@@ -781,33 +781,26 @@ impl ItemEditModal {
         let on_yes_val = item.on_yes().unwrap_or_default();
         let on_no_val = item.on_no().unwrap_or_default();
 
-        let radio_lines =
-            if let Some(opts) = item.extra.get("options").and_then(|v| v.as_sequence()) {
-                opts.iter()
-                    .filter_map(|o| {
-                        if let Some(map) = o.as_mapping() {
-                            let lbl = map
-                                .get(serde_yml::Value::String("label".to_string()))
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("");
-                            let val = map
-                                .get(serde_yml::Value::String("value".to_string()))
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("");
-                            if lbl.is_empty() || lbl == val {
-                                Some(val.to_string())
-                            } else {
-                                Some(format!("{} = {}", lbl, val))
-                            }
+        let radio_lines = if let Some(opts) = item.extra.get("options").and_then(|v| v.as_array()) {
+            opts.iter()
+                .filter_map(|o| {
+                    if let Some(map) = o.as_object() {
+                        let lbl = map.get("label").and_then(|v| v.as_str()).unwrap_or("");
+                        let val = map.get("value").and_then(|v| v.as_str()).unwrap_or("");
+                        if lbl.is_empty() || lbl == val {
+                            Some(val.to_string())
                         } else {
-                            o.as_str().map(|s| s.to_string())
+                            Some(format!("{} = {}", lbl, val))
                         }
-                    })
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            } else {
-                String::new()
-            };
+                    } else {
+                        o.as_str().map(|s| s.to_string())
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("\n")
+        } else {
+            String::new()
+        };
 
         let template_val = item
             .extra
@@ -1745,11 +1738,11 @@ impl ItemEditModal {
             let l = self.length_input.as_string();
             if !c.is_empty() && c != "{ascii:196}" {
                 item.extra
-                    .insert("char".to_string(), serde_yml::Value::String(c));
+                    .insert("char".to_string(), serde_json::Value::String(c));
             }
             if !l.is_empty() && l != "{window_width}" {
                 item.extra
-                    .insert("length".to_string(), serde_yml::Value::String(l));
+                    .insert("length".to_string(), serde_json::Value::String(l));
             }
             return item;
         }
@@ -1836,7 +1829,7 @@ impl ItemEditModal {
                 "config" | "toggle" | "radio" => {
                     if !action.is_empty() {
                         item.extra
-                            .insert("key".to_string(), serde_yml::Value::String(action.clone()));
+                            .insert("key".to_string(), serde_json::Value::String(action.clone()));
                     } else {
                         item.extra.remove("key");
                     }
@@ -1850,7 +1843,7 @@ impl ItemEditModal {
                     if !action.is_empty() {
                         item.extra.insert(
                             "python".to_string(),
-                            serde_yml::Value::String(action.clone()),
+                            serde_json::Value::String(action.clone()),
                         );
                     } else {
                         item.extra.remove("python");
@@ -1887,21 +1880,21 @@ impl ItemEditModal {
 
         if !template.is_empty() {
             item.extra
-                .insert("template".to_string(), serde_yml::Value::String(template));
+                .insert("template".to_string(), serde_json::Value::String(template));
         } else {
             item.extra.remove("template");
         }
 
         if !target.is_empty() {
             item.extra
-                .insert("target".to_string(), serde_yml::Value::String(target));
+                .insert("target".to_string(), serde_json::Value::String(target));
         } else {
             item.extra.remove("target");
         }
 
         if !block_id.is_empty() {
             item.extra
-                .insert("block_id".to_string(), serde_yml::Value::String(block_id));
+                .insert("block_id".to_string(), serde_json::Value::String(block_id));
         } else {
             item.extra.remove("block_id");
         }
@@ -1922,40 +1915,40 @@ impl ItemEditModal {
                 if line.is_empty() {
                     continue;
                 }
-                let mut map = serde_yml::Mapping::new();
+                let mut map = serde_json::Map::new();
                 if let Some((lbl, val)) = line.split_once('=') {
                     map.insert(
-                        serde_yml::Value::String("label".to_string()),
-                        serde_yml::Value::String(lbl.trim().to_string()),
+                        "label".to_string(),
+                        serde_json::Value::String(lbl.trim().to_string()),
                     );
                     map.insert(
-                        serde_yml::Value::String("value".to_string()),
-                        serde_yml::Value::String(val.trim().to_string()),
+                        "value".to_string(),
+                        serde_json::Value::String(val.trim().to_string()),
                     );
                 } else if let Some((lbl, val)) = line.split_once(':') {
                     map.insert(
-                        serde_yml::Value::String("label".to_string()),
-                        serde_yml::Value::String(lbl.trim().to_string()),
+                        "label".to_string(),
+                        serde_json::Value::String(lbl.trim().to_string()),
                     );
                     map.insert(
-                        serde_yml::Value::String("value".to_string()),
-                        serde_yml::Value::String(val.trim().to_string()),
+                        "value".to_string(),
+                        serde_json::Value::String(val.trim().to_string()),
                     );
                 } else {
                     map.insert(
-                        serde_yml::Value::String("label".to_string()),
-                        serde_yml::Value::String(line.to_string()),
+                        "label".to_string(),
+                        serde_json::Value::String(line.to_string()),
                     );
                     map.insert(
-                        serde_yml::Value::String("value".to_string()),
-                        serde_yml::Value::String(line.to_string()),
+                        "value".to_string(),
+                        serde_json::Value::String(line.to_string()),
                     );
                 }
-                opts.push(serde_yml::Value::Mapping(map));
+                opts.push(serde_json::Value::Object(map));
             }
             if !opts.is_empty() {
                 item.extra
-                    .insert("options".to_string(), serde_yml::Value::Sequence(opts));
+                    .insert("options".to_string(), serde_json::Value::Array(opts));
             } else {
                 item.extra.remove("options");
             }
@@ -1965,10 +1958,10 @@ impl ItemEditModal {
         match self.exec_mode {
             0 => {
                 item.extra
-                    .insert("stream".to_string(), serde_yml::Value::Bool(true));
+                    .insert("stream".to_string(), serde_json::Value::Bool(true));
                 item.extra.insert(
                     "exec_mode".to_string(),
-                    serde_yml::Value::String("streaming".to_string()),
+                    serde_json::Value::String("streaming".to_string()),
                 );
                 item.extra.remove("floating");
                 item.interactive = Some(false);
@@ -1983,18 +1976,18 @@ impl ItemEditModal {
                     .clamp(20, 100);
                 item.extra.insert(
                     "window_percent".to_string(),
-                    serde_yml::Value::Number(pct.into()),
+                    serde_json::Value::Number(pct.into()),
                 );
             }
             1 => {
                 item.extra
-                    .insert("stream".to_string(), serde_yml::Value::Bool(false));
+                    .insert("stream".to_string(), serde_json::Value::Bool(false));
                 item.extra.insert(
                     "exec_mode".to_string(),
-                    serde_yml::Value::String("interactive".to_string()),
+                    serde_json::Value::String("interactive".to_string()),
                 );
                 item.extra
-                    .insert("floating".to_string(), serde_yml::Value::Bool(true));
+                    .insert("floating".to_string(), serde_json::Value::Bool(true));
                 item.interactive = Some(true);
                 item.quiet = Some(true);
                 let pct = self
@@ -2007,15 +2000,15 @@ impl ItemEditModal {
                     .clamp(20, 100);
                 item.extra.insert(
                     "window_percent".to_string(),
-                    serde_yml::Value::Number(pct.into()),
+                    serde_json::Value::Number(pct.into()),
                 );
             }
             _ => {
                 item.extra
-                    .insert("stream".to_string(), serde_yml::Value::Bool(false));
+                    .insert("stream".to_string(), serde_json::Value::Bool(false));
                 item.extra.insert(
                     "exec_mode".to_string(),
-                    serde_yml::Value::String("console".to_string()),
+                    serde_json::Value::String("console".to_string()),
                 );
                 item.extra.remove("floating");
                 item.interactive = Some(true);
@@ -2026,19 +2019,19 @@ impl ItemEditModal {
 
         item.extra.insert(
             "no_formatting".to_string(),
-            serde_yml::Value::Bool(self.no_formatting),
+            serde_json::Value::Bool(self.no_formatting),
         );
         item.extra
-            .insert("masked".to_string(), serde_yml::Value::Bool(self.masked));
+            .insert("masked".to_string(), serde_json::Value::Bool(self.masked));
         item.extra
-            .insert("refresh".to_string(), serde_yml::Value::Bool(self.refresh));
+            .insert("refresh".to_string(), serde_json::Value::Bool(self.refresh));
         item.extra.insert(
             "show_whitespace".to_string(),
-            serde_yml::Value::Bool(self.show_whitespace),
+            serde_json::Value::Bool(self.show_whitespace),
         );
         item.extra.insert(
             "external".to_string(),
-            serde_yml::Value::Bool(self.external),
+            serde_json::Value::Bool(self.external),
         );
 
         item

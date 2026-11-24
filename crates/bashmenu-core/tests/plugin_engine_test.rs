@@ -27,7 +27,7 @@ weather:
 alienware:
   sleep: 15000
 "#;
-    let plugins_val: serde_yml::Value = serde_yml::from_str(yaml_str).unwrap();
+    let plugins_val: serde_json::Value = serde_saphyr::from_str(yaml_str).unwrap();
     let config = BashMenuConfig {
         version: "1.0".to_string(),
         theme: "dracula".to_string(),
@@ -69,42 +69,36 @@ fn test_plugin_cache_and_table_formatting() {
     engine.set_cached("weather", vec!["72°F Sunny".to_string()]);
     engine.set_cached("system", vec!["CPU: 12%".to_string()]);
 
-    let mut plugins_map = serde_yml::Mapping::new();
+    let mut plugins_map = serde_json::Map::new();
     plugins_map.insert(
-        serde_yml::Value::String("type".to_string()),
-        serde_yml::Value::String("table".to_string()),
+        "type".to_string(),
+        serde_json::Value::String("table".to_string()),
     );
     plugins_map.insert(
-        serde_yml::Value::String("entries".to_string()),
-        serde_yml::Value::Number(serde_yml::Number::from(2)),
+        "entries".to_string(),
+        serde_json::Value::Number(serde_json::Number::from(2)),
     );
 
-    let mut w_map = serde_yml::Mapping::new();
+    let mut w_map = serde_json::Map::new();
     w_map.insert(
-        serde_yml::Value::String("script".to_string()),
-        serde_yml::Value::String("dummy".to_string()),
+        "script".to_string(),
+        serde_json::Value::String("dummy".to_string()),
     );
-    plugins_map.insert(
-        serde_yml::Value::String("weather".to_string()),
-        serde_yml::Value::Mapping(w_map),
-    );
+    plugins_map.insert("weather".to_string(), serde_json::Value::Object(w_map));
 
-    let mut s_map = serde_yml::Mapping::new();
+    let mut s_map = serde_json::Map::new();
     s_map.insert(
-        serde_yml::Value::String("script".to_string()),
-        serde_yml::Value::String("dummy".to_string()),
+        "script".to_string(),
+        serde_json::Value::String("dummy".to_string()),
     );
-    plugins_map.insert(
-        serde_yml::Value::String("system".to_string()),
-        serde_yml::Value::Mapping(s_map),
-    );
+    plugins_map.insert("system".to_string(), serde_json::Value::Object(s_map));
 
     let config = BashMenuConfig {
         version: "1.0".to_string(),
         theme: "dracula".to_string(),
         user: Default::default(),
         settings: Settings {
-            plugins: Some(serde_yml::Value::Mapping(plugins_map)),
+            plugins: Some(serde_json::Value::Object(plugins_map)),
             ..Default::default()
         },
         extra: Default::default(),
@@ -123,19 +117,19 @@ fn test_plugin_background_trigger_and_mpsc_notification() {
     let (tx, rx) = mpsc::channel();
     let engine = PluginEngine::new().with_sender(tx);
 
-    let mut plugins_map = serde_yml::Mapping::new();
-    let mut echo_map = serde_yml::Mapping::new();
+    let mut plugins_map = serde_json::Map::new();
+    let mut echo_map = serde_json::Map::new();
     echo_map.insert(
-        serde_yml::Value::String("script".to_string()),
-        serde_yml::Value::String("echo 'Async Output'".to_string()),
+        "script".to_string(),
+        serde_json::Value::String("echo 'Async Output'".to_string()),
     );
     echo_map.insert(
-        serde_yml::Value::String("sleep".to_string()),
-        serde_yml::Value::Number(serde_yml::Number::from(10)),
+        "sleep".to_string(),
+        serde_json::Value::Number(serde_json::Number::from(10)),
     );
     plugins_map.insert(
-        serde_yml::Value::String("async_plugin".to_string()),
-        serde_yml::Value::Mapping(echo_map),
+        "async_plugin".to_string(),
+        serde_json::Value::Object(echo_map),
     );
 
     let config = BashMenuConfig {
@@ -143,7 +137,7 @@ fn test_plugin_background_trigger_and_mpsc_notification() {
         theme: "dracula".to_string(),
         user: Default::default(),
         settings: Settings {
-            plugins: Some(serde_yml::Value::Mapping(plugins_map)),
+            plugins: Some(serde_json::Value::Object(plugins_map)),
             ..Default::default()
         },
         extra: Default::default(),

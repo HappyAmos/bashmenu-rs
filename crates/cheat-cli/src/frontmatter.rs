@@ -26,22 +26,21 @@ pub fn extract_tags_from_frontmatter(file_path: &Path) -> Vec<String> {
     };
 
     let yaml_str = &rest[..end_idx];
-    let parsed: serde_yml::Value = match serde_yml::from_str(yaml_str) {
+    let parsed: serde_json::Value = match serde_saphyr::from_str(yaml_str) {
         Ok(v) => v,
         Err(_) => return Vec::new(),
     };
 
-    if let serde_yml::Value::Mapping(map) = parsed {
-        let key = serde_yml::Value::String("tags".to_string());
-        if let Some(tags_val) = map.get(&key) {
+    if let serde_json::Value::Object(map) = parsed {
+        if let Some(tags_val) = map.get("tags") {
             match tags_val {
-                serde_yml::Value::Sequence(seq) => {
+                serde_json::Value::Array(seq) => {
                     let mut tags = Vec::new();
                     for item in seq {
                         let val = match item {
-                            serde_yml::Value::String(s) => s.trim().to_lowercase(),
-                            serde_yml::Value::Number(n) => n.to_string(),
-                            serde_yml::Value::Bool(b) => b.to_string(),
+                            serde_json::Value::String(s) => s.trim().to_lowercase(),
+                            serde_json::Value::Number(n) => n.to_string(),
+                            serde_json::Value::Bool(b) => b.to_string(),
                             _ => String::new(),
                         };
                         if !val.is_empty() {
@@ -50,7 +49,7 @@ pub fn extract_tags_from_frontmatter(file_path: &Path) -> Vec<String> {
                     }
                     return tags;
                 }
-                serde_yml::Value::String(s) => {
+                serde_json::Value::String(s) => {
                     return s
                         .split(',')
                         .map(|t| t.trim().to_lowercase())

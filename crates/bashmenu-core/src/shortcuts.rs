@@ -205,7 +205,7 @@ pub struct ShortcutEntry {
     pub show_in_gutter: bool,
     /// Additional custom properties forwarded to `MenuItem`.
     #[serde(flatten)]
-    pub extra: HashMap<String, serde_yml::Value>,
+    pub extra: HashMap<String, serde_json::Value>,
 }
 
 impl Default for ShortcutEntry {
@@ -280,34 +280,34 @@ impl ShortcutEntry {
             };
             extra.insert(
                 "exec_mode".to_string(),
-                serde_yml::Value::String(mode_str.to_string()),
+                serde_json::Value::String(mode_str.to_string()),
             );
         }
         if let Some(pct) = self.window_percent {
             extra.insert(
                 "window_percent".to_string(),
-                serde_yml::Value::Number(pct.into()),
+                serde_json::Value::Number(pct.into()),
             );
         }
         if let Some(ref t) = self.title {
             if !t.trim().is_empty() {
-                extra.insert("title".to_string(), serde_yml::Value::String(t.clone()));
+                extra.insert("title".to_string(), serde_json::Value::String(t.clone()));
             }
         } else if !self.description.trim().is_empty() {
             extra.insert(
                 "title".to_string(),
-                serde_yml::Value::String(self.description.clone()),
+                serde_json::Value::String(self.description.clone()),
             );
         }
         if let Some(ref m) = self.message {
             if !m.trim().is_empty() {
-                extra.insert("message".to_string(), serde_yml::Value::String(m.clone()));
+                extra.insert("message".to_string(), serde_json::Value::String(m.clone()));
             }
         }
         if let Some(secs) = self.timeout {
             extra.insert(
                 "timeout".to_string(),
-                serde_yml::Value::String(secs.to_string()),
+                serde_json::Value::String(secs.to_string()),
             );
         }
 
@@ -659,7 +659,7 @@ pub fn load_shortcuts<P: AsRef<Path>>(path: P) -> Result<ShortcutsConfig> {
     if content.trim().is_empty() {
         return Ok(ShortcutsConfig::default());
     }
-    let mut cfg: ShortcutsConfig = serde_yml::from_str(&content)?;
+    let mut cfg: ShortcutsConfig = serde_saphyr::from_str(&content)?;
     cfg.leader_key = normalize_key_spec(&cfg.leader_key);
     for entry in &mut cfg.shortcuts {
         entry.key = normalize_key_spec(&entry.key);
@@ -675,7 +675,7 @@ pub fn save_shortcuts<P: AsRef<Path>>(path: P, config: &ShortcutsConfig) -> Resu
             let _ = fs::create_dir_all(parent);
         }
     }
-    let yaml_body = serde_yml::to_string(config)?;
+    let yaml_body = serde_saphyr::to_string(config)?;
     let full_content = format!("{}\n{}", SHORTCUTS_HEADER.trim_end(), yaml_body);
     fs::write(p, full_content).map_err(|e| BashMenuError::Io {
         path: p.to_path_buf(),

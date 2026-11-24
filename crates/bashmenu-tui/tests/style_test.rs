@@ -5,21 +5,21 @@ use bashmenu_tui::{
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Color;
-use serde_yml::{Mapping, Value};
+use serde_json::{Map, Value};
 
 fn set_activity_override(theme: &mut Theme, activity: ThemeActivity, key: &str, val: Value) {
     let palette = theme.colors_256.get_or_insert_with(Default::default);
     let act_key = activity.yaml_key();
     let entry = palette
         .entry(act_key.to_string())
-        .or_insert_with(|| Value::Mapping(Mapping::new()));
-    if let Value::Mapping(map) = entry {
-        map.insert(Value::String(key.to_string()), val);
+        .or_insert_with(|| Value::Object(Map::new()));
+    if let Value::Object(map) = entry {
+        map.insert(key.to_string(), val);
     }
 }
 
 fn pair(fg: i64, bg: i64) -> Value {
-    Value::Sequence(vec![Value::Number(fg.into()), Value::Number(bg.into())])
+    Value::Array(vec![Value::Number(fg.into()), Value::Number(bg.into())])
 }
 
 #[test]
@@ -140,7 +140,7 @@ fn test_shadow_fg_bg_sync_and_drop_shadow_rendering() {
         &mut theme,
         ThemeActivity::Modals,
         "shadow",
-        Value::Sequence(vec![
+        Value::Array(vec![
             Value::String("#445566".to_string()),
             Value::Number((-1).into()),
         ]),

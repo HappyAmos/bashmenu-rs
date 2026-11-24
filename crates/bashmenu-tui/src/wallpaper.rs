@@ -810,7 +810,7 @@ struct ExtractedColor {
 /// Auto-derives a harmonious 256-color theme palette (`colors_256` map) from an image file.
 pub fn derive_palette_from_image(
     image_path: &Path,
-) -> Result<std::collections::HashMap<String, serde_yml::Value>, String> {
+) -> Result<std::collections::HashMap<String, serde_json::Value>, String> {
     let dyn_img = image::open(image_path)
         .map_err(|e| format!("Failed to open image '{}': {}", image_path.display(), e))?;
     let rgb_img = dyn_img.to_rgb8();
@@ -951,17 +951,17 @@ pub fn derive_palette_from_image(
         .map(|c| c.idx)
         .unwrap_or(214);
 
-    let make_pair = |fg: i64, bg: i64| -> serde_yml::Value {
-        serde_yml::Value::Sequence(vec![
-            serde_yml::Value::Number(fg.into()),
-            serde_yml::Value::Number(bg.into()),
+    let make_pair = |fg: i64, bg: i64| -> serde_json::Value {
+        serde_json::Value::Array(vec![
+            serde_json::Value::Number(fg.into()),
+            serde_json::Value::Number(bg.into()),
         ])
     };
 
     let mut colors = std::collections::HashMap::new();
     colors.insert(
         "background".to_string(),
-        serde_yml::Value::Number((bg_color as i64).into()),
+        serde_json::Value::Number((bg_color as i64).into()),
     );
     colors.insert("title".to_string(), make_pair(primary_accent as i64, -1));
     colors.insert("border".to_string(), make_pair(border_color as i64, -1));
@@ -972,7 +972,7 @@ pub fn derive_palette_from_image(
     );
     colors.insert(
         "highlight_text".to_string(),
-        serde_yml::Value::Number((selection_fg as i64).into()),
+        serde_json::Value::Number((selection_fg as i64).into()),
     );
     colors.insert("accent".to_string(), make_pair(secondary_accent as i64, -1));
     colors.insert("footer".to_string(), make_pair(border_color as i64, -1));
@@ -1131,27 +1131,27 @@ pub fn rgb_to_ansi8_name(r: u8, g: u8, b: u8) -> &'static str {
 
 /// Downsamples an arbitrary color value (sequence, number, hex string,
 /// or named token) into a valid ANSI 16-color representation.
-pub fn downsample_color_value_to_16(val: &serde_yml::Value) -> serde_yml::Value {
+pub fn downsample_color_value_to_16(val: &serde_json::Value) -> serde_json::Value {
     match val {
-        serde_yml::Value::Sequence(seq) => {
-            serde_yml::Value::Sequence(seq.iter().map(downsample_color_value_to_16).collect())
+        serde_json::Value::Array(seq) => {
+            serde_json::Value::Array(seq.iter().map(downsample_color_value_to_16).collect())
         }
-        serde_yml::Value::Mapping(map) => {
-            let mut out = serde_yml::Mapping::new();
+        serde_json::Value::Object(map) => {
+            let mut out = serde_json::Map::new();
             for (k, v) in map {
                 out.insert(k.clone(), downsample_color_value_to_16(v));
             }
-            serde_yml::Value::Mapping(out)
+            serde_json::Value::Object(out)
         }
-        serde_yml::Value::Number(n) => {
+        serde_json::Value::Number(n) => {
             if let Some(i) = n.as_i64() {
                 if i < 0 {
-                    serde_yml::Value::Number((-1).into())
+                    serde_json::Value::Number((-1).into())
                 } else if i < 16 {
-                    serde_yml::Value::String(ANSI16_NAMES[i as usize].to_string())
+                    serde_json::Value::String(ANSI16_NAMES[i as usize].to_string())
                 } else if i <= 255 {
                     let (r, g, b) = indexed_to_rgb(i as u8);
-                    serde_yml::Value::String(rgb_to_ansi16_name(r, g, b).to_string())
+                    serde_json::Value::String(rgb_to_ansi16_name(r, g, b).to_string())
                 } else {
                     val.clone()
                 }
@@ -1159,13 +1159,13 @@ pub fn downsample_color_value_to_16(val: &serde_yml::Value) -> serde_yml::Value 
                 val.clone()
             }
         }
-        serde_yml::Value::String(s) => {
+        serde_json::Value::String(s) => {
             let s_trim = s.trim();
             if s_trim == "-1" {
-                return serde_yml::Value::Number((-1).into());
+                return serde_json::Value::Number((-1).into());
             }
             if let Ok(i) = s_trim.parse::<i64>() {
-                return downsample_color_value_to_16(&serde_yml::Value::Number(i.into()));
+                return downsample_color_value_to_16(&serde_json::Value::Number(i.into()));
             }
             if s_trim.starts_with('#') {
                 let hex = s_trim.trim_start_matches('#');
@@ -1174,20 +1174,20 @@ pub fn downsample_color_value_to_16(val: &serde_yml::Value) -> serde_yml::Value 
                         let r = ((rgb >> 16) & 0xFF) as u8;
                         let g = ((rgb >> 8) & 0xFF) as u8;
                         let b = (rgb & 0xFF) as u8;
-                        return serde_yml::Value::String(rgb_to_ansi16_name(r, g, b).to_string());
+                        return serde_json::Value::String(rgb_to_ansi16_name(r, g, b).to_string());
                     }
                 }
             }
             let upper = s_trim.to_uppercase();
             if ANSI16_NAMES.contains(&upper.as_str()) {
-                return serde_yml::Value::String(upper);
+                return serde_json::Value::String(upper);
             }
             if let Some(c) = crate::style::parse_color_value(val) {
                 if c == ratatui::style::Color::Reset {
-                    serde_yml::Value::Number((-1).into())
+                    serde_json::Value::Number((-1).into())
                 } else {
                     let (r, g, b) = color_to_rgb(c);
-                    serde_yml::Value::String(rgb_to_ansi16_name(r, g, b).to_string())
+                    serde_json::Value::String(rgb_to_ansi16_name(r, g, b).to_string())
                 }
             } else {
                 val.clone()
@@ -1199,34 +1199,34 @@ pub fn downsample_color_value_to_16(val: &serde_yml::Value) -> serde_yml::Value 
 
 /// Downsamples an arbitrary color value (sequence, number, hex string,
 /// or named token) into a valid ANSI 8-color representation.
-pub fn downsample_color_value_to_8(val: &serde_yml::Value) -> serde_yml::Value {
+pub fn downsample_color_value_to_8(val: &serde_json::Value) -> serde_json::Value {
     match val {
-        serde_yml::Value::Sequence(seq) => {
-            serde_yml::Value::Sequence(seq.iter().map(downsample_color_value_to_8).collect())
+        serde_json::Value::Array(seq) => {
+            serde_json::Value::Array(seq.iter().map(downsample_color_value_to_8).collect())
         }
-        serde_yml::Value::Mapping(map) => {
-            let mut out = serde_yml::Mapping::new();
+        serde_json::Value::Object(map) => {
+            let mut out = serde_json::Map::new();
             for (k, v) in map {
                 out.insert(k.clone(), downsample_color_value_to_8(v));
             }
-            serde_yml::Value::Mapping(out)
+            serde_json::Value::Object(out)
         }
-        serde_yml::Value::Number(n) => {
+        serde_json::Value::Number(n) => {
             if let Some(i) = n.as_i64() {
                 if i < 0 {
-                    serde_yml::Value::Number((-1).into())
+                    serde_json::Value::Number((-1).into())
                 } else if i < 8 {
-                    serde_yml::Value::String(ANSI8_NAMES[i as usize].to_string())
+                    serde_json::Value::String(ANSI8_NAMES[i as usize].to_string())
                 } else if i < 16 {
                     let name = if i == 8 {
                         "COLOR_BLACK"
                     } else {
                         ANSI8_NAMES[(i % 8) as usize]
                     };
-                    serde_yml::Value::String(name.to_string())
+                    serde_json::Value::String(name.to_string())
                 } else if i <= 255 {
                     let (r, g, b) = indexed_to_rgb(i as u8);
-                    serde_yml::Value::String(rgb_to_ansi8_name(r, g, b).to_string())
+                    serde_json::Value::String(rgb_to_ansi8_name(r, g, b).to_string())
                 } else {
                     val.clone()
                 }
@@ -1234,13 +1234,13 @@ pub fn downsample_color_value_to_8(val: &serde_yml::Value) -> serde_yml::Value {
                 val.clone()
             }
         }
-        serde_yml::Value::String(s) => {
+        serde_json::Value::String(s) => {
             let s_trim = s.trim();
             if s_trim == "-1" {
-                return serde_yml::Value::Number((-1).into());
+                return serde_json::Value::Number((-1).into());
             }
             if let Ok(i) = s_trim.parse::<i64>() {
-                return downsample_color_value_to_8(&serde_yml::Value::Number(i.into()));
+                return downsample_color_value_to_8(&serde_json::Value::Number(i.into()));
             }
             if s_trim.starts_with('#') {
                 let hex = s_trim.trim_start_matches('#');
@@ -1249,37 +1249,41 @@ pub fn downsample_color_value_to_8(val: &serde_yml::Value) -> serde_yml::Value {
                         let r = ((rgb >> 16) & 0xFF) as u8;
                         let g = ((rgb >> 8) & 0xFF) as u8;
                         let b = (rgb & 0xFF) as u8;
-                        return serde_yml::Value::String(rgb_to_ansi8_name(r, g, b).to_string());
+                        return serde_json::Value::String(rgb_to_ansi8_name(r, g, b).to_string());
                     }
                 }
             }
             let upper = s_trim.to_uppercase();
             if ANSI8_NAMES.contains(&upper.as_str()) {
-                return serde_yml::Value::String(upper);
+                return serde_json::Value::String(upper);
             }
             match upper.as_str() {
-                "COLOR_BRIGHT_RED" => return serde_yml::Value::String("COLOR_RED".to_string()),
-                "COLOR_BRIGHT_GREEN" => return serde_yml::Value::String("COLOR_GREEN".to_string()),
+                "COLOR_BRIGHT_RED" => return serde_json::Value::String("COLOR_RED".to_string()),
+                "COLOR_BRIGHT_GREEN" => {
+                    return serde_json::Value::String("COLOR_GREEN".to_string())
+                }
                 "COLOR_BRIGHT_YELLOW" => {
-                    return serde_yml::Value::String("COLOR_YELLOW".to_string())
+                    return serde_json::Value::String("COLOR_YELLOW".to_string())
                 }
-                "COLOR_BRIGHT_BLUE" => return serde_yml::Value::String("COLOR_BLUE".to_string()),
+                "COLOR_BRIGHT_BLUE" => return serde_json::Value::String("COLOR_BLUE".to_string()),
                 "COLOR_BRIGHT_MAGENTA" => {
-                    return serde_yml::Value::String("COLOR_MAGENTA".to_string())
+                    return serde_json::Value::String("COLOR_MAGENTA".to_string())
                 }
-                "COLOR_BRIGHT_CYAN" => return serde_yml::Value::String("COLOR_CYAN".to_string()),
-                "COLOR_BRIGHT_WHITE" => return serde_yml::Value::String("COLOR_WHITE".to_string()),
+                "COLOR_BRIGHT_CYAN" => return serde_json::Value::String("COLOR_CYAN".to_string()),
+                "COLOR_BRIGHT_WHITE" => {
+                    return serde_json::Value::String("COLOR_WHITE".to_string())
+                }
                 "COLOR_BRIGHT_BLACK" | "COLOR_GREY" | "COLOR_GRAY" => {
-                    return serde_yml::Value::String("COLOR_BLACK".to_string())
+                    return serde_json::Value::String("COLOR_BLACK".to_string())
                 }
                 _ => {}
             }
             if let Some(c) = crate::style::parse_color_value(val) {
                 if c == ratatui::style::Color::Reset {
-                    serde_yml::Value::Number((-1).into())
+                    serde_json::Value::Number((-1).into())
                 } else {
                     let (r, g, b) = color_to_rgb(c);
-                    serde_yml::Value::String(rgb_to_ansi8_name(r, g, b).to_string())
+                    serde_json::Value::String(rgb_to_ansi8_name(r, g, b).to_string())
                 }
             } else {
                 val.clone()
@@ -1291,8 +1295,8 @@ pub fn downsample_color_value_to_8(val: &serde_yml::Value) -> serde_yml::Value {
 
 /// Downsamples a 256-color palette map into an ANSI 16-color fallback palette map.
 pub fn downsample_palette_to_16(
-    palette_256: &std::collections::HashMap<String, serde_yml::Value>,
-) -> std::collections::HashMap<String, serde_yml::Value> {
+    palette_256: &std::collections::HashMap<String, serde_json::Value>,
+) -> std::collections::HashMap<String, serde_json::Value> {
     let mut out = std::collections::HashMap::new();
     for (k, v) in palette_256 {
         out.insert(k.clone(), downsample_color_value_to_16(v));
@@ -1302,8 +1306,8 @@ pub fn downsample_palette_to_16(
 
 /// Downsamples a 256-color palette map into an ANSI 8-color fallback palette map.
 pub fn downsample_palette_to_8(
-    palette_256: &std::collections::HashMap<String, serde_yml::Value>,
-) -> std::collections::HashMap<String, serde_yml::Value> {
+    palette_256: &std::collections::HashMap<String, serde_json::Value>,
+) -> std::collections::HashMap<String, serde_json::Value> {
     let mut out = std::collections::HashMap::new();
     for (k, v) in palette_256 {
         out.insert(k.clone(), downsample_color_value_to_8(v));

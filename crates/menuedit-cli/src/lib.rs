@@ -377,9 +377,9 @@ pub fn format_inspector_text(
     for (k, v) in &item.extra {
         if !known_keys.contains(&k.as_str()) {
             let val_str = match v {
-                serde_yml::Value::String(s) => s.clone(),
-                serde_yml::Value::Bool(b) => b.to_string(),
-                serde_yml::Value::Number(n) => n.to_string(),
+                serde_json::Value::String(s) => s.clone(),
+                serde_json::Value::Bool(b) => b.to_string(),
+                serde_json::Value::Number(n) => n.to_string(),
                 other => format!("{:?}", other),
             };
             extras.push(format!("{}={}", k, val_str));

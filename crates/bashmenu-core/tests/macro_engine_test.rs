@@ -99,10 +99,11 @@ fn test_right_aligned_bracket_placeholders_expansion() {
     config.settings.tab_to_spaces = Some(true);
     config.settings.tabstop = Some(4);
     config.settings.pager_editor = Some("vim".to_string());
-    config.settings.refresh_interval = Some(serde_yml::Value::Number(serde_yml::Number::from(10)));
+    config.settings.refresh_interval =
+        Some(serde_json::Value::Number(serde_json::Number::from(10)));
     config.user.insert(
         "postal_code".to_string(),
-        serde_yml::Value::String("49079".to_string()),
+        serde_json::Value::String("49079".to_string()),
     );
 
     let mut ctx = MacroContext::new(&config);
@@ -289,7 +290,7 @@ fn test_cmd_alias_matches_command_placeholder() {
     let mut config = load_config(fixture).expect("load config");
     config.user.insert(
         "name".to_string(),
-        serde_yml::Value::String("bashmenu_tester".to_string()),
+        serde_json::Value::String("bashmenu_tester".to_string()),
     );
     let mut ctx = MacroContext::new(&config);
     ctx.home_dir = std::path::PathBuf::from("/home/testuser");
@@ -682,7 +683,7 @@ fn test_double_brace_escaping_all_macro_tiers() {
     };
     config.user.insert(
         "postal_code".to_string(),
-        serde_yml::Value::String("49079".to_string()),
+        serde_json::Value::String("49079".to_string()),
     );
     let ctx = MacroContext::new(&config).with_app_version("1.2.3");
 

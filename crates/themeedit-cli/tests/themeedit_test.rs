@@ -1701,13 +1701,13 @@ fn test_themeedit_highlight_text_token_configuration() {
     let c256_map = state.current_theme.colors_256.as_ref().unwrap();
     assert_eq!(
         c256_map.get("highlight_text"),
-        Some(&serde_yml::Value::Number(46.into()))
+        Some(&serde_json::Value::Number(46.into()))
     );
     let hl_seq = c256_map
         .get("highlight")
-        .and_then(|v| v.as_sequence())
+        .and_then(|v| v.as_array())
         .unwrap();
-    assert_eq!(hl_seq[0], serde_yml::Value::Number(46.into()));
+    assert_eq!(hl_seq[0], serde_json::Value::Number(46.into()));
 
     // 5. Resolved styles must have fg=46 and bg intact
     let styles = ResolvedThemeStyles::from_theme(&state.current_theme, true);
@@ -2251,11 +2251,11 @@ fn test_themeedit_activity_override_and_inherit_reset() {
             .unwrap()
             .get("bashedit")
             .unwrap()
-            .as_mapping()
+            .as_object()
             .unwrap()
-            .get(serde_yml::Value::String("help_text".to_string()))
+            .get("help_text")
             .unwrap()
-            .as_sequence()
+            .as_array()
             .unwrap();
         assert_ne!(
             seq[0].as_i64(),
@@ -2280,11 +2280,11 @@ fn test_themeedit_activity_override_and_inherit_reset() {
             .unwrap()
             .get("modals")
             .unwrap()
-            .as_mapping()
+            .as_object()
             .unwrap()
-            .get(serde_yml::Value::String("shadow".to_string()))
+            .get("shadow")
             .unwrap()
-            .as_sequence()
+            .as_array()
             .unwrap()
             .iter()
             .map(|v| v.as_i64())
@@ -2305,11 +2305,11 @@ fn test_themeedit_activity_override_and_inherit_reset() {
             .unwrap()
             .get("bashedit")
             .unwrap()
-            .as_mapping()
+            .as_object()
             .unwrap()
-            .get(serde_yml::Value::String("help_text".to_string()))
+            .get("help_text")
             .unwrap()
-            .as_sequence()
+            .as_array()
             .unwrap();
         assert_eq!(seq[0].as_i64(), Some(-1));
         assert_eq!(seq[1].as_i64(), Some(-1));

@@ -649,121 +649,121 @@ impl ThemeEditorState {
         let mut colors = HashMap::new();
         colors.insert(
             "title".to_string(),
-            serde_yml::Value::Sequence(vec![
-                serde_yml::Value::Number(201.into()),
-                serde_yml::Value::Number((-1).into()),
+            serde_json::Value::Array(vec![
+                serde_json::Value::Number(201.into()),
+                serde_json::Value::Number((-1).into()),
             ]),
         );
         colors.insert(
             "text".to_string(),
-            serde_yml::Value::Sequence(vec![
-                serde_yml::Value::Number(255.into()),
-                serde_yml::Value::Number((-1).into()),
+            serde_json::Value::Array(vec![
+                serde_json::Value::Number(255.into()),
+                serde_json::Value::Number((-1).into()),
             ]),
         );
         colors.insert(
             "highlight".to_string(),
-            serde_yml::Value::Sequence(vec![
-                serde_yml::Value::Number(255.into()),
-                serde_yml::Value::Number(201.into()),
+            serde_json::Value::Array(vec![
+                serde_json::Value::Number(255.into()),
+                serde_json::Value::Number(201.into()),
             ]),
         );
         colors.insert(
             "border".to_string(),
-            serde_yml::Value::Sequence(vec![
-                serde_yml::Value::Number(61.into()),
-                serde_yml::Value::Number((-1).into()),
+            serde_json::Value::Array(vec![
+                serde_json::Value::Number(61.into()),
+                serde_json::Value::Number((-1).into()),
             ]),
         );
         colors.insert(
             "divider".to_string(),
-            serde_yml::Value::Sequence(vec![
-                serde_yml::Value::Number(61.into()),
-                serde_yml::Value::Number((-1).into()),
+            serde_json::Value::Array(vec![
+                serde_json::Value::Number(61.into()),
+                serde_json::Value::Number((-1).into()),
             ]),
         );
         colors.insert(
             "accent".to_string(),
-            serde_yml::Value::Sequence(vec![
-                serde_yml::Value::Number(117.into()),
-                serde_yml::Value::Number((-1).into()),
+            serde_json::Value::Array(vec![
+                serde_json::Value::Number(117.into()),
+                serde_json::Value::Number((-1).into()),
             ]),
         );
         colors.insert(
             "shortcut_key".to_string(),
-            serde_yml::Value::Sequence(vec![
-                serde_yml::Value::Number(201.into()),
-                serde_yml::Value::Number((-1).into()),
+            serde_json::Value::Array(vec![
+                serde_json::Value::Number(201.into()),
+                serde_json::Value::Number((-1).into()),
             ]),
         );
         colors.insert(
             "gutter".to_string(),
-            serde_yml::Value::Sequence(vec![
-                serde_yml::Value::Number(239.into()),
-                serde_yml::Value::Number((-1).into()),
+            serde_json::Value::Array(vec![
+                serde_json::Value::Number(239.into()),
+                serde_json::Value::Number((-1).into()),
             ]),
         );
         colors.insert(
             "plugin".to_string(),
-            serde_yml::Value::Sequence(vec![
-                serde_yml::Value::Number(212.into()),
-                serde_yml::Value::Number((-1).into()),
+            serde_json::Value::Array(vec![
+                serde_json::Value::Number(212.into()),
+                serde_json::Value::Number((-1).into()),
             ]),
         );
         colors.insert(
             "footer".to_string(),
-            serde_yml::Value::Sequence(vec![
-                serde_yml::Value::Number(61.into()),
-                serde_yml::Value::Number((-1).into()),
+            serde_json::Value::Array(vec![
+                serde_json::Value::Number(61.into()),
+                serde_json::Value::Number((-1).into()),
             ]),
         );
         colors.insert(
             "window_close_button".to_string(),
-            serde_yml::Value::Sequence(vec![
-                serde_yml::Value::Number(203.into()),
-                serde_yml::Value::Number((-1).into()),
+            serde_json::Value::Array(vec![
+                serde_json::Value::Number(203.into()),
+                serde_json::Value::Number((-1).into()),
             ]),
         );
         colors.insert(
             "shadow".to_string(),
-            serde_yml::Value::Sequence(vec![
-                serde_yml::Value::Number(236.into()),
-                serde_yml::Value::Number((-1).into()),
+            serde_json::Value::Array(vec![
+                serde_json::Value::Number(236.into()),
+                serde_json::Value::Number((-1).into()),
             ]),
         );
         colors.insert(
             "selection".to_string(),
-            serde_yml::Value::Sequence(vec![
-                serde_yml::Value::Number(255.into()),
-                serde_yml::Value::Number(201.into()),
+            serde_json::Value::Array(vec![
+                serde_json::Value::Number(255.into()),
+                serde_json::Value::Number(201.into()),
             ]),
         );
         colors.insert(
             "whitespace".to_string(),
-            serde_yml::Value::Sequence(vec![
-                serde_yml::Value::Number(239.into()),
-                serde_yml::Value::Number((-1).into()),
+            serde_json::Value::Array(vec![
+                serde_json::Value::Number(239.into()),
+                serde_json::Value::Number((-1).into()),
             ]),
         );
         colors.insert(
             "toast_info".to_string(),
-            serde_yml::Value::Sequence(vec![
-                serde_yml::Value::Number(117.into()),
-                serde_yml::Value::Number((-1).into()),
+            serde_json::Value::Array(vec![
+                serde_json::Value::Number(117.into()),
+                serde_json::Value::Number((-1).into()),
             ]),
         );
         colors.insert(
             "toast_warning".to_string(),
-            serde_yml::Value::Sequence(vec![
-                serde_yml::Value::Number(214.into()),
-                serde_yml::Value::Number((-1).into()),
+            serde_json::Value::Array(vec![
+                serde_json::Value::Number(214.into()),
+                serde_json::Value::Number((-1).into()),
             ]),
         );
         colors.insert(
             "toast_error".to_string(),
-            serde_yml::Value::Sequence(vec![
-                serde_yml::Value::Number(196.into()),
-                serde_yml::Value::Number((-1).into()),
+            serde_json::Value::Array(vec![
+                serde_json::Value::Number(196.into()),
+                serde_json::Value::Number((-1).into()),
             ]),
         );
         colors.extend(default_activity_overrides_map());
@@ -967,11 +967,11 @@ impl ThemeEditorState {
             return false;
         }
         let inherit_val = if is_scalar_color_token(key) {
-            serde_yml::Value::Number((-1).into())
+            serde_json::Value::Number((-1).into())
         } else {
-            serde_yml::Value::Sequence(vec![
-                serde_yml::Value::Number((-1).into()),
-                serde_yml::Value::Number((-1).into()),
+            serde_json::Value::Array(vec![
+                serde_json::Value::Number((-1).into()),
+                serde_json::Value::Number((-1).into()),
             ])
         };
 
@@ -1001,12 +1001,12 @@ impl ThemeEditorState {
             self.current_theme.colors_256 = Some(HashMap::new());
         }
         let raw_val = match color {
-            Color::Reset => serde_yml::Value::Number((-1).into()),
-            Color::Indexed(code) => serde_yml::Value::Number((code as i64).into()),
-            Color::Rgb(r, g, b) => serde_yml::Value::String(format!("#{r:02x}{g:02x}{b:02x}")),
+            Color::Reset => serde_json::Value::Number((-1).into()),
+            Color::Indexed(code) => serde_json::Value::Number((code as i64).into()),
+            Color::Rgb(r, g, b) => serde_json::Value::String(format!("#{r:02x}{g:02x}{b:02x}")),
             _ => {
                 let (r, g, b) = bashmenu_tui::color_to_rgb(color);
-                serde_yml::Value::String(format!("#{r:02x}{g:02x}{b:02x}"))
+                serde_json::Value::String(format!("#{r:02x}{g:02x}{b:02x}"))
             }
         };
 
@@ -1736,25 +1736,25 @@ enum PaletteTierTarget {
 
 /// Mutable view into either a top-level palette map or an activity sub-map.
 enum TierMapMut<'a> {
-    Top(&'a mut HashMap<String, serde_yml::Value>),
-    Sub(&'a mut serde_yml::Mapping),
+    Top(&'a mut HashMap<String, serde_json::Value>),
+    Sub(&'a mut serde_json::Map<String, serde_json::Value>),
 }
 
 impl<'a> TierMapMut<'a> {
-    fn get(&self, key: &str) -> Option<&serde_yml::Value> {
+    fn get(&self, key: &str) -> Option<&serde_json::Value> {
         match self {
             Self::Top(m) => m.get(key),
-            Self::Sub(m) => m.get(serde_yml::Value::String(key.to_string())),
+            Self::Sub(m) => m.get(key),
         }
     }
 
-    fn insert(&mut self, key: &str, val: serde_yml::Value) {
+    fn insert(&mut self, key: &str, val: serde_json::Value) {
         match self {
             Self::Top(m) => {
                 m.insert(key.to_string(), val);
             }
             Self::Sub(m) => {
-                m.insert(serde_yml::Value::String(key.to_string()), val);
+                m.insert(key.to_string(), val);
             }
         }
     }
@@ -1762,26 +1762,25 @@ impl<'a> TierMapMut<'a> {
 
 /// Looks up a token's raw YAML value for `activity` inside a tier map.
 fn find_tier_token_value<'a>(
-    c_map: &'a HashMap<String, serde_yml::Value>,
+    c_map: &'a HashMap<String, serde_json::Value>,
     activity: ThemeActivity,
     key: &str,
-) -> Option<&'a serde_yml::Value> {
+) -> Option<&'a serde_json::Value> {
     if activity == ThemeActivity::MainMenu {
         return c_map.get(key);
     }
-    let yaml_key = serde_yml::Value::String(key.to_string());
     if let Some(val) = c_map
         .get(activity.yaml_key())
-        .and_then(|v| v.as_mapping())
-        .and_then(|m| m.get(&yaml_key))
+        .and_then(|v| v.as_object())
+        .and_then(|m| m.get(key))
     {
         return Some(val);
     }
     for leg in activity.legacy_yaml_keys() {
         if let Some(val) = c_map
             .get(*leg)
-            .and_then(|v| v.as_mapping())
-            .and_then(|m| m.get(&yaml_key))
+            .and_then(|v| v.as_object())
+            .and_then(|m| m.get(key))
         {
             return Some(val);
         }
@@ -1790,12 +1789,12 @@ fn find_tier_token_value<'a>(
 }
 
 /// Returns `true` when `val` represents `-1` inheritance for `key`.
-fn is_token_value_inherited_for_key(key: &str, val: &serde_yml::Value) -> bool {
+fn is_token_value_inherited_for_key(key: &str, val: &serde_json::Value) -> bool {
     if is_inherited_color_value(val) {
         return true;
     }
     if key == "highlight" || key == "selection" {
-        if let Some(seq) = val.as_sequence() {
+        if let Some(seq) = val.as_array() {
             return seq.get(1).is_none_or(is_inherited_color_value);
         }
     }
@@ -1803,7 +1802,7 @@ fn is_token_value_inherited_for_key(key: &str, val: &serde_yml::Value) -> bool {
 }
 
 /// Formats a scalar YAML color value (`i64` or string) for display.
-fn format_yaml_scalar_value(val: &serde_yml::Value) -> Option<String> {
+fn format_yaml_scalar_value(val: &serde_json::Value) -> Option<String> {
     if is_inherited_color_value(val) {
         return None;
     }
@@ -1818,12 +1817,12 @@ fn format_yaml_scalar_value(val: &serde_yml::Value) -> Option<String> {
 
 /// Extracts the display string for `key` within `activity` in `c_map`.
 fn format_yaml_token_display(
-    c_map: &HashMap<String, serde_yml::Value>,
+    c_map: &HashMap<String, serde_json::Value>,
     activity: ThemeActivity,
     key: &str,
 ) -> Option<String> {
     if let Some(val) = find_tier_token_value(c_map, activity, key) {
-        if let Some(seq) = val.as_sequence() {
+        if let Some(seq) = val.as_array() {
             if key == "highlight" || key == "selection" {
                 if let Some(bg_val) = seq.get(1) {
                     if let Some(s) = format_yaml_scalar_value(bg_val) {
@@ -1845,7 +1844,7 @@ fn format_yaml_token_display(
     }
     if key == "highlight_text" {
         if let Some(hl_val) = find_tier_token_value(c_map, activity, "highlight") {
-            if let Some(fg_val) = hl_val.as_sequence().and_then(|s| s.first()) {
+            if let Some(fg_val) = hl_val.as_array().and_then(|s| s.first()) {
                 if let Some(s) = format_yaml_scalar_value(fg_val) {
                     return Some(s);
                 }
@@ -1891,7 +1890,7 @@ fn resolve_activity_color(theme: &Theme, activity: ThemeActivity, key: &str) -> 
                     }
                 }
                 if let Some(val) = find_tier_token_value(c_map, act, "highlight") {
-                    if let Some(fg) = val.as_sequence().and_then(|s| s.first()) {
+                    if let Some(fg) = val.as_array().and_then(|s| s.first()) {
                         if !is_inherited_color_value(fg) {
                             if let Some(c) = bashmenu_tui::parse_color_value(fg) {
                                 if c != Color::Reset {
@@ -1905,7 +1904,7 @@ fn resolve_activity_color(theme: &Theme, activity: ThemeActivity, key: &str) -> 
             }
             if key == "highlight" || key == "selection" {
                 if let Some(val) = find_tier_token_value(c_map, act, key) {
-                    if let Some(seq) = val.as_sequence() {
+                    if let Some(seq) = val.as_array() {
                         if let Some(bg) = seq.get(1) {
                             if !is_inherited_color_value(bg) {
                                 if let Some(c) = bashmenu_tui::parse_color_value(bg) {
@@ -1983,14 +1982,14 @@ fn resolve_activity_color(theme: &Theme, activity: ThemeActivity, key: &str) -> 
 }
 
 /// Computes a high-contrast foreground color YAML value for a background color.
-fn contrast_fg_value(color: Color, tier: PaletteTierTarget) -> serde_yml::Value {
+fn contrast_fg_value(color: Color, tier: PaletteTierTarget) -> serde_json::Value {
     let (r, g, b) = bashmenu_tui::color_to_rgb(color);
     let lum = (r as u32 * 299 + g as u32 * 587 + b as u32 * 114) / 1000;
     match tier {
         PaletteTierTarget::Color256 => {
-            serde_yml::Value::Number(if lum > 128 { 16 } else { 255 }.into())
+            serde_json::Value::Number(if lum > 128 { 16 } else { 255 }.into())
         }
-        PaletteTierTarget::Color16 | PaletteTierTarget::Color8 => serde_yml::Value::String(
+        PaletteTierTarget::Color16 | PaletteTierTarget::Color8 => serde_json::Value::String(
             if lum > 128 {
                 "COLOR_BLACK"
             } else {
@@ -2003,51 +2002,51 @@ fn contrast_fg_value(color: Color, tier: PaletteTierTarget) -> serde_yml::Value 
 
 /// Gets or initializes the activity override YAML mapping inside `tier_map`.
 fn get_or_init_activity_mapping(
-    tier_map: &mut HashMap<String, serde_yml::Value>,
+    tier_map: &mut HashMap<String, serde_json::Value>,
     activity: ThemeActivity,
-) -> Option<&mut serde_yml::Mapping> {
+) -> Option<&mut serde_json::Map<String, serde_json::Value>> {
     let key = activity.yaml_key();
-    let needs_seed = !matches!(tier_map.get(key), Some(serde_yml::Value::Mapping(_)));
+    let needs_seed = !matches!(tier_map.get(key), Some(serde_json::Value::Object(_)));
     if needs_seed {
         let mut migrated = None;
         for leg in activity.legacy_yaml_keys() {
             if let Some(val) = tier_map.remove(*leg) {
-                if val.is_mapping() {
+                if val.is_object() {
                     migrated = Some(val);
                     break;
                 }
             }
         }
         let val = migrated.unwrap_or_else(|| {
-            let mut m = serde_yml::Mapping::new();
+            let mut m = serde_json::Map::new();
             for tok in bashmenu_core::activity_override_tokens(key) {
                 let default_v = if is_scalar_color_token(tok) {
-                    serde_yml::Value::Number((-1).into())
+                    serde_json::Value::Number((-1).into())
                 } else {
-                    serde_yml::Value::Sequence(vec![
-                        serde_yml::Value::Number((-1).into()),
-                        serde_yml::Value::Number((-1).into()),
+                    serde_json::Value::Array(vec![
+                        serde_json::Value::Number((-1).into()),
+                        serde_json::Value::Number((-1).into()),
                     ])
                 };
-                m.insert(serde_yml::Value::String((*tok).to_string()), default_v);
+                m.insert((*tok).to_string(), default_v);
             }
-            serde_yml::Value::Mapping(m)
+            serde_json::Value::Object(m)
         });
         tier_map.insert(key.to_string(), val);
     }
     match tier_map.get_mut(key) {
-        Some(serde_yml::Value::Mapping(m)) => Some(m),
+        Some(serde_json::Value::Object(m)) => Some(m),
         _ => None,
     }
 }
 
 /// Writes `key` with `raw_val` (downsampled for `tier`) into top-level or activity map.
 fn write_color_token_to_tier(
-    tier_map: &mut HashMap<String, serde_yml::Value>,
+    tier_map: &mut HashMap<String, serde_json::Value>,
     activity: ThemeActivity,
     key: &str,
     color: Color,
-    raw_val: &serde_yml::Value,
+    raw_val: &serde_json::Value,
     tier: PaletteTierTarget,
 ) {
     let val = match tier {
@@ -2075,7 +2074,7 @@ fn write_color_token_to_tier(
             .or_else(|| {
                 target
                     .get("highlight")
-                    .and_then(|v| v.as_sequence())
+                    .and_then(|v| v.as_array())
                     .and_then(|seq| seq.first())
                     .filter(|v| !is_inherited_color_value(v))
                     .cloned()
@@ -2084,67 +2083,63 @@ fn write_color_token_to_tier(
             if bashmenu_tui::parse_color_value(&efg).is_some_and(|c| c != Color::Reset) {
                 efg
             } else if is_override {
-                serde_yml::Value::Number((-1).into())
+                serde_json::Value::Number((-1).into())
             } else {
                 contrast_fg_value(color, tier)
             }
         } else if is_override {
-            serde_yml::Value::Number((-1).into())
+            serde_json::Value::Number((-1).into())
         } else {
             contrast_fg_value(color, tier)
         };
-        target.insert(key, serde_yml::Value::Sequence(vec![fg_val, val]));
+        target.insert(key, serde_json::Value::Array(vec![fg_val, val]));
     } else if key == "selection" {
         let fg_val = contrast_fg_value(color, tier);
-        target.insert(key, serde_yml::Value::Sequence(vec![fg_val, val]));
+        target.insert(key, serde_json::Value::Array(vec![fg_val, val]));
     } else if key == "highlight_text" {
         if is_override {
             target.insert(key, val);
         } else {
             let existing_bg = target
                 .get("highlight")
-                .and_then(|v| v.as_sequence())
+                .and_then(|v| v.as_array())
                 .and_then(|seq| seq.get(1))
                 .cloned()
                 .unwrap_or_else(|| match tier {
-                    PaletteTierTarget::Color256 => serde_yml::Value::Number(201.into()),
+                    PaletteTierTarget::Color256 => serde_json::Value::Number(201.into()),
                     PaletteTierTarget::Color16 | PaletteTierTarget::Color8 => {
-                        serde_yml::Value::String("COLOR_BLUE".to_string())
+                        serde_json::Value::String("COLOR_BLUE".to_string())
                     }
                 });
             target.insert(
                 "highlight",
-                serde_yml::Value::Sequence(vec![val.clone(), existing_bg]),
+                serde_json::Value::Array(vec![val.clone(), existing_bg]),
             );
             target.insert(key, val);
         }
     } else {
         target.insert(
             key,
-            serde_yml::Value::Sequence(vec![val, serde_yml::Value::Number((-1).into())]),
+            serde_json::Value::Array(vec![val, serde_json::Value::Number((-1).into())]),
         );
     }
 }
 
 /// Resets an override token inside `tier_map` to `-1` / `[-1, -1]`.
 fn reset_tier_token_entry(
-    tier_map: &mut HashMap<String, serde_yml::Value>,
+    tier_map: &mut HashMap<String, serde_json::Value>,
     activity: ThemeActivity,
     key: &str,
-    inherit_val: &serde_yml::Value,
+    inherit_val: &serde_json::Value,
 ) {
     let Some(sub) = get_or_init_activity_mapping(tier_map, activity) else {
         return;
     };
-    sub.insert(
-        serde_yml::Value::String(key.to_string()),
-        inherit_val.clone(),
-    );
+    sub.insert(key.to_string(), inherit_val.clone());
     if key == "highlight_text" {
-        let hl_key = serde_yml::Value::String("highlight".to_string());
-        if let Some(serde_yml::Value::Sequence(seq)) = sub.get_mut(&hl_key) {
+        if let Some(serde_json::Value::Array(seq)) = sub.get_mut("highlight") {
             if !seq.is_empty() {
-                seq[0] = serde_yml::Value::Number((-1).into());
+                seq[0] = serde_json::Value::Number((-1).into());
             }
         }
     }

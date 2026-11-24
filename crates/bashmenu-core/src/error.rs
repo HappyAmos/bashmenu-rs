@@ -16,9 +16,17 @@ pub enum BashMenuError {
         source: std::io::Error,
     },
 
-    /// YAML serialization or deserialization error
-    #[error("YAML serialization/deserialization error: {0}")]
-    Yaml(#[from] serde_yml::Error),
+    /// YAML deserialization error
+    #[error("YAML deserialization error: {0}")]
+    Yaml(#[from] serde_saphyr::Error),
+
+    /// YAML serialization error
+    #[error("YAML serialization error: {0}")]
+    YamlSerialize(#[from] serde_saphyr::SerializeError),
+
+    /// JSON/Value conversion error
+    #[error("Value conversion error: {0}")]
+    Value(#[from] serde_json::Error),
 
     /// Invalid configuration or menu schema
     #[error("Schema error: {0}")]
