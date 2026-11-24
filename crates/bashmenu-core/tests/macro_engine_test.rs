@@ -673,3 +673,91 @@ fn test_info_macro_and_frontmatter_dimensions() {
 
     let _ = std::fs::remove_dir_all(&td);
 }
+
+#[test]
+fn test_double_brace_escaping_all_macro_tiers() {
+    let mut config = BashMenuConfig {
+        theme: "cyberpunk".to_string(),
+        ..Default::default()
+    };
+    config.user.insert(
+        "postal_code".to_string(),
+        serde_yml::Value::String("49079".to_string()),
+    );
+    let ctx = MacroContext::new(&config).with_app_version("1.2.3");
+
+    // Basic literal placeholder escaping
+    assert_eq!(interpolate_placeholders("{{user}}", &ctx), "{user}");
+    assert_eq!(interpolate_placeholders("{{version}}", &ctx), "{version}");
+    assert_eq!(interpolate_placeholders("{{env:HOME}}", &ctx), "{env:HOME}");
+    assert_eq!(
+        interpolate_placeholders("{{user.postal_code}}", &ctx),
+        "{user.postal_code}"
+    );
+    assert_eq!(
+        interpolate_placeholders("{{ascii:196}}", &ctx),
+        "{ascii:196}"
+    );
+    assert_eq!(
+        interpolate_placeholders("{{command:echo hi}}", &ctx),
+        "{command:echo hi}"
+    );
+    assert_eq!(
+        interpolate_placeholders("{{info:docs/test.md}}", &ctx),
+        "{info:docs/test.md}"
+    );
+
+    // Triple braces: outer literal braces around expanded inner value
+    assert_eq!(interpolate_placeholders("{{{version}}}", &ctx), "{1.2.3}");
+
+    // Mixed literal and expanded in the same Markdown line
+    assert_eq!(
+        interpolate_placeholders("| {{version}} | {version} |", &ctx),
+        "| {version} | 1.2.3 |"
+    );
+}
+
+#[test]
+fn test_render_placeholder_help_text_tables_and_values() {
+    let config = BashMenuConfig {
+        theme: "cyberpunk".to_string(),
+        ..Default::default()
+    };
+    let ctx = MacroContext::new(&config)
+        .with_app_version("2.5.0")
+        .with_color_mode("truecolor")
+        .with_tty_mode("pty");
+
+    let rendered = bashmenu_core::render_placeholder_help_text(&ctx);
+
+    // 3-column System Status rows show literal placeholder + live expanded value
+    assert!(
+        rendered.contains("| {version} | Application release version | 2.5.0 |"),
+        "Expected live version value in 3-column table:\n{}",
+        rendered
+    );
+    assert!(
+        rendered.contains("| {theme} | Active color theme name | cyberpunk |"),
+        "Expected live theme value in 3-column table"
+    );
+    assert!(
+        rendered.contains("| {color_mode} | Current terminal color mode | truecolor |"),
+        "Expected live color_mode value in 3-column table"
+    );
+
+    // 2-column Interactive Input Directives have no live Value column
+    assert!(rendered.contains("| {param} | Prompts for text input modal (masked=true supported) |"));
+
+    // Escaping & Frontmatter documentation sections are present
+    assert!(rendered.contains("## Escaping Literal Braces"));
+    assert!(rendered.contains("| {{user}} | Renders literal {user} without expanding its value |"));
+    assert!(rendered.contains("## Markdown Modal Frontmatter ({info:<path>})"));
+    assert!(rendered.contains("| title: <text> |"));
+    assert!(rendered.contains("| width: <1..100>[%] |"));
+    assert!(rendered.contains("| height: <1..100>[%] |"));
+
+    // On non-Windows without APPDATA, Windows-only placeholders show `na`
+    if !cfg!(windows) && std::env::var("APPDATA").is_err() {
+        assert!(rendered.contains("| {appdata} | Windows AppData roaming directory | na |"));
+    }
+}

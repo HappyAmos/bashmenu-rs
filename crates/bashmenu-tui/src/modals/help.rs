@@ -2,11 +2,13 @@
 
 use super::frame::render_modal_frame;
 use super::note_viewer::wrap_footer_tokens;
+use crate::marquee::{get_marquee_slice, MarqueeTracker};
 use crate::style::ResolvedThemeStyles;
 use crossterm::event::{KeyCode, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
+use unicode_width::UnicodeWidthStr;
 
 /// Scrollable markdown / text help modal
 #[derive(Debug, Clone)]
@@ -19,6 +21,10 @@ pub struct HelpModal {
     pub lines: Vec<String>,
     /// Vertical scroll offset in lines
     pub scroll_offset: usize,
+    /// Horizontal marquee ticker for overflowing value cells in 3-column tables
+    pub marquee: MarqueeTracker,
+    /// Whether overflowing cells in the final column of 3+ column tables scroll via marquee
+    pub marquee_last_col: bool,
 }
 
 impl HelpModal {
@@ -30,7 +36,24 @@ impl HelpModal {
             raw_content: content.to_string(),
             lines,
             scroll_offset: 0,
+            marquee: MarqueeTracker::default(),
+            marquee_last_col: false,
         }
+    }
+
+    /// Enables or disables single-line marquee scrolling for overflowing cells in the
+    /// final column of 3+ column Markdown tables (such as the live Value column).
+    pub fn with_value_marquee(mut self, enabled: bool) -> Self {
+        self.marquee_last_col = enabled;
+        self
+    }
+
+    /// Advances the table value marquee ticker. Returns `true` when offset advanced.
+    pub fn tick_marquee(&mut self) -> bool {
+        if !self.marquee_last_col {
+            return false;
+        }
+        self.marquee.tick()
     }
 
     /// Handles keyboard input. Returns `true` when dismissed.
@@ -189,7 +212,14 @@ impl HelpModal {
                     line_idx += 1;
                 }
 
-                render_table(&table_rows, avail_w, styles, &mut wrapped_lines);
+                render_table(
+                    &table_rows,
+                    avail_w,
+                    styles,
+                    self.marquee_last_col,
+                    self.marquee.offset,
+                    &mut wrapped_lines,
+                );
                 continue;
             }
 
@@ -339,6 +369,8 @@ fn render_table(
     table_rows: &[Vec<String>],
     avail_w: usize,
     styles: &ResolvedThemeStyles,
+    marquee_last_col: bool,
+    marquee_offset: usize,
     wrapped_lines: &mut Vec<ratatui::text::Line<'static>>,
 ) {
     if table_rows.is_empty() {
@@ -352,7 +384,10 @@ fn render_table(
     let mut col_widths = vec![0usize; cols];
     for row in table_rows {
         for (c, cw) in col_widths.iter_mut().enumerate() {
-            let len = row.get(c).map(|s| s.chars().count()).unwrap_or(0);
+            let len = row
+                .get(c)
+                .map(|s| UnicodeWidthStr::width(s.as_str()))
+                .unwrap_or(0);
             *cw = (*cw).max(len);
         }
     }
@@ -373,6 +408,8 @@ fn render_table(
             col_widths[max_c] -= 1;
         }
     }
+
+    let use_last_col_marquee = marquee_last_col && cols >= 3;
 
     let border_style = Style::default().fg(Color::DarkGray).bg(styles.background);
     let header_style = Style::default()
@@ -405,7 +442,7 @@ fn render_table(
     hdr_spans.push(ratatui::text::Span::styled("│", border_style));
     for (c, &cw) in col_widths.iter().enumerate() {
         let cell_text = table_rows[0].get(c).map(|s| s.as_str()).unwrap_or("");
-        let cell_vis = cell_text.chars().count();
+        let cell_vis = UnicodeWidthStr::width(cell_text);
         let pad = cw.saturating_sub(cell_vis);
         hdr_spans.push(ratatui::text::Span::styled(
             format!(" {}{} ", cell_text, " ".repeat(pad)),
@@ -435,7 +472,22 @@ fn render_table(
         let cell_lines: Vec<Vec<String>> = (0..cols)
             .map(|c| {
                 let cell_text = r.get(c).map(|s| s.as_str()).unwrap_or("");
-                wrap_help_text(cell_text, col_widths[c])
+                if use_last_col_marquee && c == cols - 1 {
+                    let vis_w = UnicodeWidthStr::width(cell_text);
+                    if vis_w > col_widths[c] {
+                        vec![get_marquee_slice(
+                            cell_text,
+                            col_widths[c],
+                            marquee_offset,
+                            &styles.marquee_char,
+                            styles.marquee_gap,
+                        )]
+                    } else {
+                        vec![cell_text.to_string()]
+                    }
+                } else {
+                    wrap_help_text(cell_text, col_widths[c])
+                }
             })
             .collect();
         let row_height = cell_lines.iter().map(|l| l.len()).max().unwrap_or(1);
@@ -444,7 +496,7 @@ fn render_table(
             row_spans.push(ratatui::text::Span::styled("│", border_style));
             for c in 0..cols {
                 let line_text = cell_lines[c].get(h).map(|s| s.as_str()).unwrap_or("");
-                let cell_vis = line_text.chars().count();
+                let cell_vis = UnicodeWidthStr::width(line_text);
                 let pad = col_widths[c].saturating_sub(cell_vis);
                 let cell_style = if c == 0 {
                     code_col_style
@@ -475,4 +527,57 @@ fn render_table(
     }
     bot_spans.push(ratatui::text::Span::styled("┘", border_style));
     wrapped_lines.push(ratatui::text::Line::from(bot_spans));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_help_modal_3col_table_value_marquee() {
+        let md = "\
+## System & Path Placeholders
+| Macro | Description | Value |
+| :--- | :--- | :--- |
+| {bashmenu_yml} | Currently loaded bashmenu.yml | /very/long/path/to/configuration/directory/bashmenu.yml |
+";
+        let mut modal = HelpModal::new("Placeholders", md).with_value_marquee(true);
+        let styles = ResolvedThemeStyles::default();
+        let area = Rect::new(0, 0, 70, 20);
+
+        // Render initial frame (offset 0)
+        let mut buf0 = Buffer::empty(area);
+        modal.render(area, &styles, &mut buf0);
+        let frame0: String = (0..area.height)
+            .map(|y| {
+                (0..area.width)
+                    .map(|x| buf0[(x, y)].symbol())
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        // Advance past the 4-tick initial pause and tick several steps
+        for _ in 0..8 {
+            modal.tick_marquee();
+        }
+        assert!(modal.marquee.offset > 0);
+
+        let mut buf1 = Buffer::empty(area);
+        modal.render(area, &styles, &mut buf1);
+        let frame1: String = (0..area.height)
+            .map(|y| {
+                (0..area.width)
+                    .map(|x| buf1[(x, y)].symbol())
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        assert!(frame0.contains("{bashmenu_yml}"));
+        assert_ne!(
+            frame0, frame1,
+            "Overflowing value cell should scroll horizontally via marquee"
+        );
+    }
 }

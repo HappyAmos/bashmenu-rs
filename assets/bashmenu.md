@@ -1096,6 +1096,7 @@ These variables are dynamically resolved using active configuration and environm
 | `{toast:SECONDS:"Message"}` / `{toast:"Message"}` | Configurable non-blocking toast notification directive. Displays a brief floating toast notification on the bottom-right corner for specified seconds (defaults to 1-2 seconds if omitted) and resolves to an empty string. Supports double quotes, single quotes, or unquoted strings (e.g. `{toast: 2: "Saved"}` or `{toast: "Done"}`). |
 | `{env}` / `{environment}` | Displays an environment overview table modal showing active file locations for `bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `cheat.yml`, and application version. Can also be interpolated inline as a Markdown table. |
 | `{info:<path>}` | Loads a user-defined Markdown file (supporting nested placeholders such as `{info:{bashmenu_dir}/info.md}` or tilde paths `{info:~/.config/bashmenu/info.md}`), parses optional YAML frontmatter (`title`, `width` %, `height` %), expands all placeholders in the body, and displays it in a popup modal. Automatically renders a vertical scrollbar when content exceeds the modal height, supporting keyboard (`Up`/`Down`/`PgUp`/`PgDn`/`Home`/`End`) and mouse (scroll wheel and scrollbar clicks/drags) scrolling. |
+| `{{<placeholder>}}` | Double-brace escaping: renders literal `{<placeholder>}` without expanding its value (e.g., `{{user}}` → `{user}`, `{{{user}}}` → `{andrew}`). Works across `{info:<path>}` Markdown files, `about.md`, labels, titles, and messages. |
 | `{help}` | Built-in action macro: opens BashMenu documentation (`assets/bashmenu.md`) via `bmpager --markdown` (with built-in Help modal fallback). |
 | `{theme_picker}` | Built-in action macro: opens the interactive theme selector modal. |
 | `{text_editor}` | Built-in action macro: launches `bashedit` text editor. |
@@ -1115,6 +1116,17 @@ These variables are dynamically resolved using active configuration and environm
 | `{cheat_yml}` | Full canonical path to the currently loaded `cheat.yml` cheatsheet file. |
 | `{color_mode}` | Current terminal color depth mode (e.g., `3-bit (8 color)`, `16 color`, `256 color`, `truecolor`). |
 | `{tty_mode}` | Current TTY session mode (e.g., `virtual console (tty)`, `pty`, `serial console (tty)`). |
+
+#### Markdown Modal YAML Frontmatter (`{info:<path>}`)
+Custom Markdown files loaded via `{info:<path>}` (and `assets/about.md`) support an optional YAML frontmatter header delimited by `---` lines:
+
+```yaml
+---
+title: Custom Modal Title ({host})   # Optional; supports placeholders (defaults to filename)
+width: 80%                           # Optional; 1..=100 (% of terminal width; accepts 80, "80", "80%")
+height: 70%                          # Optional; 1..=100 (% of terminal height; accepts 70, "70", "70%")
+---
+```
 
 ### 6.3 Nerd Fonts & Emoji Adaptive Resolution
 The application resolves icons dynamically according to terminal features and

@@ -1597,6 +1597,84 @@ pub fn extract_toasts(text: &str, ctx: &MacroContext) -> (String, Vec<ToastNotif
 /// Recursively interpolates macro placeholders within a text string.
 ///
 /// # Supported Directives
+/// Internal sentinel used to preserve escaped `{{` during macro interpolation.
+const ESCAPED_LBRACE_SENTINEL: &str = "\u{FDD0}";
+
+/// Internal sentinel used to preserve escaped `}}` during macro interpolation.
+const ESCAPED_RBRACE_SENTINEL: &str = "\u{FDD1}";
+
+/// Masks doubled curly braces (`{{` / `}}`) with internal sentinels so literal
+/// braces survive macro interpolation passes untouched, while preserving nested
+/// single-brace macros such as `{command:echo {home}}` and `{info:{bashmenu_dir}/info.md}`.
+fn mask_escaped_braces(text: &str) -> String {
+    if !text.contains("{{") && !text.contains("}}") {
+        return text.to_string();
+    }
+
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    enum BraceKind {
+        Single,
+        Escaped,
+    }
+
+    let chars: Vec<char> = text.chars().collect();
+    let mut stack: Vec<BraceKind> = Vec::new();
+    let mut out = String::with_capacity(text.len());
+    let mut i = 0;
+
+    while i < chars.len() {
+        if chars[i] == '{' {
+            if i + 1 < chars.len() && chars[i + 1] == '{' {
+                stack.push(BraceKind::Escaped);
+                out.push_str(ESCAPED_LBRACE_SENTINEL);
+                i += 2;
+                continue;
+            }
+            stack.push(BraceKind::Single);
+            out.push('{');
+            i += 1;
+            continue;
+        }
+        if chars[i] == '}' {
+            if matches!(stack.last(), Some(BraceKind::Single)) {
+                stack.pop();
+                out.push('}');
+                i += 1;
+                continue;
+            }
+            if i + 1 < chars.len() && chars[i + 1] == '}' {
+                if matches!(stack.last(), Some(BraceKind::Escaped)) {
+                    stack.pop();
+                }
+                out.push_str(ESCAPED_RBRACE_SENTINEL);
+                i += 2;
+                continue;
+            }
+            out.push('}');
+            i += 1;
+            continue;
+        }
+        out.push(chars[i]);
+        i += 1;
+    }
+
+    out
+}
+
+/// Restores masked double-brace sentinels back into single literal `{` and `}`.
+fn unmask_escaped_braces(text: &str) -> String {
+    if text.contains(ESCAPED_LBRACE_SENTINEL) || text.contains(ESCAPED_RBRACE_SENTINEL) {
+        text.replace(ESCAPED_LBRACE_SENTINEL, "{")
+            .replace(ESCAPED_RBRACE_SENTINEL, "}")
+    } else {
+        text.to_string()
+    }
+}
+
+/// Interpolates all dynamic placeholders in `text` using the provided [`MacroContext`].
+///
+/// # Supported Tiers
+/// - Escaped literal braces: `{{` → `{`, `}}` → `}` (e.g. `{{user}}` → `{user}`)
 /// - Environment variables: `{env:VAR_NAME}`
 /// - Adaptive glyphs: `{nf:[char]:[nerd_hex]:[emoji]}`
 /// - ASCII byte translations: `{ascii:NNN}`
@@ -1609,7 +1687,12 @@ pub fn extract_toasts(text: &str, ctx: &MacroContext) -> (String, Vec<ToastNotif
 /// Supports nested placeholders (e.g. `{command:echo {user.name}}`) up to a maximum
 /// depth of 3 iterations to prevent infinite loops.
 pub fn interpolate_placeholders(text: &str, ctx: &MacroContext) -> String {
-    interpolate_internal(text, ctx, 0)
+    if text.is_empty() || (!text.contains('{') && !text.contains('}')) {
+        return text.to_string();
+    }
+    let masked = mask_escaped_braces(text);
+    let resolved = interpolate_internal(&masked, ctx, 0);
+    unmask_escaped_braces(&resolved)
 }
 
 /// Internal recursive helper for macro interpolation with recursion depth limit protection.
@@ -1990,7 +2073,8 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
                 } else {
                     raw_cmd.to_string()
                 };
-                eval_command_substitution(&resolved_cmd)
+                let unmasked_cmd = unmask_escaped_braces(&resolved_cmd);
+                eval_command_substitution(&unmasked_cmd)
             })
             .to_string();
     }

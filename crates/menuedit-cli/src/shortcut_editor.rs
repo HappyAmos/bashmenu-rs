@@ -3,9 +3,9 @@
 use anyhow::Result;
 use bashmenu_core::{
     interpolate_placeholders, load_config, load_shortcuts, load_themes, normalize_key_spec,
-    resolve_app_path, save_shortcuts, t, validate_key_spec, BashMenuConfig, ExecutionMode,
-    MacroContext, MenuItemType, ShortcutEntry, ShortcutsConfig, ToastNotification,
-    PLACEHOLDER_HELP_TEXT,
+    render_placeholder_help_text, resolve_app_path, save_shortcuts, t, validate_key_spec,
+    BashMenuConfig, ExecutionMode, MacroContext, MenuItemType, ShortcutEntry, ShortcutsConfig,
+    ToastNotification,
 };
 use bashmenu_tui::{
     compute_modal_inner, has_hidden_gutter_text, is_close_button_clicked, key_event_to_token,
@@ -1663,6 +1663,8 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
     let mut toast_rack = ToastRack::new();
     let mut guard = TerminalGuard::init()?;
     let mut need_redraw = true;
+    let mut last_marquee_tick = std::time::Instant::now();
+    let marquee_interval = Duration::from_millis(250);
 
     loop {
         if toast_rack.tick() {
@@ -1746,6 +1748,20 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                     .check_hover_timeout(has_hidden && area.height >= 8)
             {
                 need_redraw = true;
+            }
+            if last_marquee_tick.elapsed() >= marquee_interval {
+                let ticked = match &mut active_modal {
+                    ActiveShortcutModal::Help(modal) => modal.tick_marquee(),
+                    ActiveShortcutModal::Edit {
+                        child_help: Some(modal),
+                        ..
+                    } => modal.tick_marquee(),
+                    _ => false,
+                };
+                if ticked {
+                    need_redraw = true;
+                }
+                last_marquee_tick = std::time::Instant::now();
             }
             continue;
         }
@@ -2059,10 +2075,12 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                 if let Event::Mouse(m) = ev {
                     match modal.handle_mouse(m, area) {
                         ShortcutEditAction::ShowMacros => {
-                            *child_help = Some(HelpModal::new(
-                                "BashMenu Placeholders & Macros",
-                                PLACEHOLDER_HELP_TEXT,
-                            ));
+                            let ph_ctx = MacroContext::new(&app_config);
+                            let ph_text = render_placeholder_help_text(&ph_ctx);
+                            *child_help = Some(
+                                HelpModal::new("BashMenu Placeholders & Macros", &ph_text)
+                                    .with_value_marquee(true),
+                            );
                         }
                         ShortcutEditAction::CaptureKey => {
                             *child_capture = Some(KeyCaptureModal::new(
@@ -2110,10 +2128,12 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                     if k.modifiers.contains(KeyModifiers::CONTROL)
                         && matches!(k.code, KeyCode::Char('p') | KeyCode::Char('P'))
                     {
-                        *child_help = Some(HelpModal::new(
-                            "BashMenu Placeholders & Macros",
-                            PLACEHOLDER_HELP_TEXT,
-                        ));
+                        let ph_ctx = MacroContext::new(&app_config);
+                        let ph_text = render_placeholder_help_text(&ph_ctx);
+                        *child_help = Some(
+                            HelpModal::new("BashMenu Placeholders & Macros", &ph_text)
+                                .with_value_marquee(true),
+                        );
                         continue;
                     }
                     if k.code == KeyCode::F(2)
@@ -2324,10 +2344,12 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                                 continue;
                             }
                             KeyCode::Char('p') | KeyCode::Char('P') => {
-                                active_modal = ActiveShortcutModal::Help(HelpModal::new(
-                                    "BashMenu Placeholders & Macros",
-                                    PLACEHOLDER_HELP_TEXT,
-                                ));
+                                let ph_ctx = MacroContext::new(&app_config);
+                                let ph_text = render_placeholder_help_text(&ph_ctx);
+                                active_modal = ActiveShortcutModal::Help(
+                                    HelpModal::new("BashMenu Placeholders & Macros", &ph_text)
+                                        .with_value_marquee(true),
+                                );
                                 continue;
                             }
                             _ => {}
@@ -2442,10 +2464,12 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                         }
                         // [F1] / [?] Placeholders & Macros reference modal
                         KeyCode::F(1) | KeyCode::Char('?') => {
-                            active_modal = ActiveShortcutModal::Help(HelpModal::new(
-                                "BashMenu Placeholders & Macros",
-                                PLACEHOLDER_HELP_TEXT,
-                            ));
+                            let ph_ctx = MacroContext::new(&app_config);
+                            let ph_text = render_placeholder_help_text(&ph_ctx);
+                            active_modal = ActiveShortcutModal::Help(
+                                HelpModal::new("BashMenu Placeholders & Macros", &ph_text)
+                                    .with_value_marquee(true),
+                            );
                         }
                         // [Esc] / [q] Quit application (prompts confirmation if unsaved changes exist)
                         KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q') => {
