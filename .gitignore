@@ -4,8 +4,19 @@ debug/
 *.rs.bk
 *.pdb
 rustc-ice-*.txt
+
+# Editors & OS metadata
 .idea/
 .vscode/
 .agents/
 *.swp
 .*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# Secrets & local environment
+.env
+.env.*
+*.pem
+*.key
