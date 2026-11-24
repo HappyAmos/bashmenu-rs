@@ -2,8 +2,9 @@
 
 use anyhow::Result;
 use bashmenu_core::{
-    interpolate_placeholders, load_config, load_menu, run_glyphs_search, save_menu, t,
-    MacroContext, MenuItem, MenuSchema, ToastNotification, ToastSeverity,
+    interpolate_placeholders, load_config, load_menu, render_placeholder_help_text,
+    run_glyphs_search, save_menu, t, MacroContext, MenuItem, MenuSchema, ToastNotification,
+    ToastSeverity,
 };
 use bashmenu_tui::{
     compute_modal_inner, get_marquee_slice, install_panic_hook, AsciiGridModal, ConfirmModal,
@@ -16,7 +17,7 @@ use menuedit_cli::{
     delete_item, find_item_mut, find_node_path, flatten_tree, format_inspector_text,
     get_type_badge, indent_item, insert_item_after, move_down_sibling, move_up_sibling,
     mutate_item_type, outdent_item, toggle_all_nodes, BrowseTarget, ItemEditModal, ItemEditResult,
-    ItemTypePickerModal, ITEM_EDIT_HELP_TEXT, PLACEHOLDER_HELP_TEXT,
+    ItemTypePickerModal, ITEM_EDIT_HELP_TEXT,
 };
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
@@ -997,10 +998,13 @@ fn main() -> Result<()> {
                                     ))));
                             }
                             ItemEditResult::ShowPlaceholders => {
-                                *child_opt = Some(Box::new(ChildModal::Help(HelpModal::new(
-                                    "Placeholders & Macros",
-                                    PLACEHOLDER_HELP_TEXT,
-                                ))));
+                                let ph_cfg = cfg.clone().unwrap_or_default();
+                                let ph_ctx = MacroContext::new(&ph_cfg);
+                                let ph_text = render_placeholder_help_text(&ph_ctx);
+                                *child_opt = Some(Box::new(ChildModal::Help(
+                                    HelpModal::new("Placeholders & Macros", &ph_text)
+                                        .with_value_marquee(true),
+                                )));
                             }
                             ItemEditResult::Browse(target) => {
                                 let (title, only_dirs) = match target {
@@ -1205,10 +1209,13 @@ fn main() -> Result<()> {
                                                 ));
                                         }
                                         MenuEditFooterAction::Placeholders => {
-                                            active_modal = ActiveModal::Help(HelpModal::new(
-                                                "Placeholders & Macros",
-                                                PLACEHOLDER_HELP_TEXT,
-                                            ));
+                                            let ph_cfg = cfg.clone().unwrap_or_default();
+                                            let ph_ctx = MacroContext::new(&ph_cfg);
+                                            let ph_text = render_placeholder_help_text(&ph_ctx);
+                                            active_modal = ActiveModal::Help(
+                                                HelpModal::new("Placeholders & Macros", &ph_text)
+                                                    .with_value_marquee(true),
+                                            );
                                         }
                                         MenuEditFooterAction::Add => {
                                             active_modal = ActiveModal::TypePicker(
@@ -1485,10 +1492,13 @@ fn main() -> Result<()> {
                                         continue;
                                     }
                                     KeyCode::Char('p') => {
-                                        active_modal = ActiveModal::Help(HelpModal::new(
-                                            "Placeholders & Macros",
-                                            PLACEHOLDER_HELP_TEXT,
-                                        ));
+                                        let ph_cfg = cfg.clone().unwrap_or_default();
+                                        let ph_ctx = MacroContext::new(&ph_cfg);
+                                        let ph_text = render_placeholder_help_text(&ph_ctx);
+                                        active_modal = ActiveModal::Help(
+                                            HelpModal::new("Placeholders & Macros", &ph_text)
+                                                .with_value_marquee(true),
+                                        );
                                         continue;
                                     }
                                     KeyCode::Char('t') => {
@@ -1573,10 +1583,13 @@ fn main() -> Result<()> {
                                     ));
                                 }
                                 KeyCode::F(5) => {
-                                    active_modal = ActiveModal::Help(HelpModal::new(
-                                        "Placeholders & Macros",
-                                        PLACEHOLDER_HELP_TEXT,
-                                    ));
+                                    let ph_cfg = cfg.clone().unwrap_or_default();
+                                    let ph_ctx = MacroContext::new(&ph_cfg);
+                                    let ph_text = render_placeholder_help_text(&ph_ctx);
+                                    active_modal = ActiveModal::Help(
+                                        HelpModal::new("Placeholders & Macros", &ph_text)
+                                            .with_value_marquee(true),
+                                    );
                                 }
                                 KeyCode::Char('a') | KeyCode::Char('A') | KeyCode::Insert => {
                                     active_modal = ActiveModal::TypePicker(
@@ -1763,8 +1776,19 @@ fn main() -> Result<()> {
         }
 
         if last_marquee_tick.elapsed() >= marquee_interval {
-            if matches!(active_modal, ActiveModal::None) {
-                marquee_tracker.tick();
+            match &mut active_modal {
+                ActiveModal::None => {
+                    marquee_tracker.tick();
+                }
+                ActiveModal::Help(modal) => {
+                    modal.tick_marquee();
+                }
+                ActiveModal::ItemEdit(_, _, Some(child)) => {
+                    if let ChildModal::Help(modal) = child.as_mut() {
+                        modal.tick_marquee();
+                    }
+                }
+                _ => {}
             }
             last_marquee_tick = std::time::Instant::now();
         }

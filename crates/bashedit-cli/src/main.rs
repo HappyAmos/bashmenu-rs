@@ -8,8 +8,8 @@ use bashedit_cli::{
     read_swap_file, remove_swap_file, EditorBuffer, SwapHeader, VisualLine,
 };
 use bashmenu_core::{
-    load_config, load_themes, t, ToastNotification, ToastSeverity, BASHEDIT_HELP_TEXT,
-    MARKDOWN_REFERENCE_TEXT, PLACEHOLDER_HELP_TEXT,
+    load_config, load_themes, render_placeholder_help_text, t, MacroContext, ToastNotification,
+    ToastSeverity, BASHEDIT_HELP_TEXT, MARKDOWN_REFERENCE_TEXT,
 };
 use bashmenu_tui::{
     color_to_rgb, install_panic_hook, AsciiGridModal, ColorGridModal, ConfirmModal,
@@ -348,6 +348,8 @@ fn main() -> Result<()> {
 
     let mut last_grid_origin = (0, 0);
     let mut toast_rack = ToastRack::new();
+    let mut last_marquee_tick = std::time::Instant::now();
+    let marquee_interval = Duration::from_millis(250);
 
     loop {
         let size = guard.terminal_mut().size()?;
@@ -778,6 +780,12 @@ fn main() -> Result<()> {
         })?;
 
         toast_rack.tick();
+        if last_marquee_tick.elapsed() >= marquee_interval {
+            if let ActiveModal::PlaceholdersHelp(ref mut modal) = active_modal {
+                modal.tick_marquee();
+            }
+            last_marquee_tick = std::time::Instant::now();
+        }
 
         let poll_dur = if !toast_rack.is_empty() {
             Duration::from_millis(30)
@@ -870,10 +878,12 @@ fn main() -> Result<()> {
                             continue;
                         }
                         KeyCode::F(5) => {
-                            active_modal = ActiveModal::PlaceholdersHelp(HelpModal::new(
-                                t!("bashedit.placeholders_title"),
-                                PLACEHOLDER_HELP_TEXT,
-                            ));
+                            let ph_ctx = MacroContext::new(&config);
+                            let ph_text = render_placeholder_help_text(&ph_ctx);
+                            active_modal = ActiveModal::PlaceholdersHelp(
+                                HelpModal::new(t!("bashedit.placeholders_title"), &ph_text)
+                                    .with_value_marquee(true),
+                            );
                             continue;
                         }
                         KeyCode::F(6) => {
@@ -1413,11 +1423,15 @@ fn main() -> Result<()> {
                                             ));
                                     }
                                     FooterAction::PlaceholdersHelp => {
-                                        active_modal =
-                                            ActiveModal::PlaceholdersHelp(HelpModal::new(
+                                        let ph_ctx = MacroContext::new(&config);
+                                        let ph_text = render_placeholder_help_text(&ph_ctx);
+                                        active_modal = ActiveModal::PlaceholdersHelp(
+                                            HelpModal::new(
                                                 t!("bashedit.placeholders_title"),
-                                                PLACEHOLDER_HELP_TEXT,
-                                            ));
+                                                &ph_text,
+                                            )
+                                            .with_value_marquee(true),
+                                        );
                                     }
                                     FooterAction::MarkdownPreview => {
                                         launch_markdown_preview(&mut guard, &tabs[active_tab_idx]);
