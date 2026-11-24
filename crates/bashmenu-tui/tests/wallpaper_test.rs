@@ -309,20 +309,20 @@ fn test_downsample_palette_to_16_and_8() {
     let mut pal256 = HashMap::new();
     pal256.insert(
         "background".to_string(),
-        serde_yml::Value::Number(16.into()),
+        serde_json::Value::Number(16.into()),
     );
     pal256.insert(
         "title".to_string(),
-        serde_yml::Value::Sequence(vec![
-            serde_yml::Value::Number(201.into()),
-            serde_yml::Value::Number((-1).into()),
+        serde_json::Value::Array(vec![
+            serde_json::Value::Number(201.into()),
+            serde_json::Value::Number((-1).into()),
         ]),
     );
     pal256.insert(
         "text".to_string(),
-        serde_yml::Value::Sequence(vec![
-            serde_yml::Value::Number(255.into()),
-            serde_yml::Value::Number((-1).into()),
+        serde_json::Value::Array(vec![
+            serde_json::Value::Number(255.into()),
+            serde_json::Value::Number((-1).into()),
         ]),
     );
 
@@ -331,18 +331,18 @@ fn test_downsample_palette_to_16_and_8() {
 
     assert_eq!(
         pal16.get("background"),
-        Some(&serde_yml::Value::String("COLOR_BLACK".to_string()))
+        Some(&serde_json::Value::String("COLOR_BLACK".to_string()))
     );
     assert_eq!(
         pal8.get("background"),
-        Some(&serde_yml::Value::String("COLOR_BLACK".to_string()))
+        Some(&serde_json::Value::String("COLOR_BLACK".to_string()))
     );
 
-    let title16 = pal16.get("title").and_then(|v| v.as_sequence()).unwrap();
+    let title16 = pal16.get("title").and_then(|v| v.as_array()).unwrap();
     assert_eq!(title16[0].as_str(), Some("COLOR_BRIGHT_MAGENTA"));
     assert_eq!(title16[1].as_i64(), Some(-1));
 
-    let title8 = pal8.get("title").and_then(|v| v.as_sequence()).unwrap();
+    let title8 = pal8.get("title").and_then(|v| v.as_array()).unwrap();
     assert_eq!(title8[0].as_str(), Some("COLOR_MAGENTA"));
     assert_eq!(title8[1].as_i64(), Some(-1));
 }

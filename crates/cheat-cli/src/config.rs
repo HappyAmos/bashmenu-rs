@@ -97,7 +97,7 @@ pub fn get_root_directory(config_path: &Path) -> Result<PathBuf> {
     let content = fs::read_to_string(config_path)
         .with_context(|| format!("Error reading config file {}", config_path.display()))?;
 
-    let config: CheatConfig = serde_yml::from_str(&content)
+    let config: CheatConfig = serde_saphyr::from_str(&content)
         .with_context(|| format!("Error reading config file {}", config_path.display()))?;
 
     let dir_str = match config.dir {

@@ -147,24 +147,24 @@ fn test_menuedit_inspector_properties_parity() {
     use std::collections::HashMap;
 
     let mut extra = HashMap::new();
-    extra.insert("no_formatting".to_string(), serde_yml::Value::Bool(true));
-    extra.insert("show_whitespace".to_string(), serde_yml::Value::Bool(true));
-    extra.insert("external".to_string(), serde_yml::Value::Bool(true));
+    extra.insert("no_formatting".to_string(), serde_json::Value::Bool(true));
+    extra.insert("show_whitespace".to_string(), serde_json::Value::Bool(true));
+    extra.insert("external".to_string(), serde_json::Value::Bool(true));
     extra.insert(
         "picker".to_string(),
-        serde_yml::Value::String("file_picker".to_string()),
+        serde_json::Value::String("file_picker".to_string()),
     );
     extra.insert(
         "on_yes".to_string(),
-        serde_yml::Value::String("echo yes".to_string()),
+        serde_json::Value::String("echo yes".to_string()),
     );
     extra.insert(
         "on_no".to_string(),
-        serde_yml::Value::String("echo no".to_string()),
+        serde_json::Value::String("echo no".to_string()),
     );
     extra.insert(
         "custom_prop".to_string(),
-        serde_yml::Value::String("custom_val".to_string()),
+        serde_json::Value::String("custom_val".to_string()),
     );
 
     let test_item = MenuItem {
@@ -581,29 +581,29 @@ fn test_item_edit_modal_radio_multiline_editor() {
 
     // 2. ItemEditModal with Radio Item
     let mut extra = HashMap::new();
-    let mut opt1 = serde_yml::Mapping::new();
+    let mut opt1 = serde_json::Map::new();
     opt1.insert(
-        serde_yml::Value::String("label".to_string()),
-        serde_yml::Value::String("Theme 1".to_string()),
+        "label".to_string(),
+        serde_json::Value::String("Theme 1".to_string()),
     );
     opt1.insert(
-        serde_yml::Value::String("value".to_string()),
-        serde_yml::Value::String("alaska-train".to_string()),
+        "value".to_string(),
+        serde_json::Value::String("alaska-train".to_string()),
     );
-    let mut opt2 = serde_yml::Mapping::new();
+    let mut opt2 = serde_json::Map::new();
     opt2.insert(
-        serde_yml::Value::String("label".to_string()),
-        serde_yml::Value::String("Theme 2".to_string()),
+        "label".to_string(),
+        serde_json::Value::String("Theme 2".to_string()),
     );
     opt2.insert(
-        serde_yml::Value::String("value".to_string()),
-        serde_yml::Value::String("alaska-mountain".to_string()),
+        "value".to_string(),
+        serde_json::Value::String("alaska-mountain".to_string()),
     );
     extra.insert(
         "options".to_string(),
-        serde_yml::Value::Sequence(vec![
-            serde_yml::Value::Mapping(opt1),
-            serde_yml::Value::Mapping(opt2),
+        serde_json::Value::Array(vec![
+            serde_json::Value::Object(opt1),
+            serde_json::Value::Object(opt2),
         ]),
     );
 
@@ -659,21 +659,13 @@ fn test_item_edit_modal_radio_multiline_editor() {
     let saved_opts = updated
         .extra
         .get("options")
-        .and_then(|v| v.as_sequence())
+        .and_then(|v| v.as_array())
         .expect("options sequence expected");
     assert_eq!(saved_opts.len(), 3);
 
-    let opt3 = saved_opts[2].as_mapping().unwrap();
-    assert_eq!(
-        opt3.get(serde_yml::Value::String("label".to_string()))
-            .and_then(|v| v.as_str()),
-        Some("Theme 3")
-    );
-    assert_eq!(
-        opt3.get(serde_yml::Value::String("value".to_string()))
-            .and_then(|v| v.as_str()),
-        Some("matrix")
-    );
+    let opt3 = saved_opts[2].as_object().unwrap();
+    assert_eq!(opt3.get("label").and_then(|v| v.as_str()), Some("Theme 3"));
+    assert_eq!(opt3.get("value").and_then(|v| v.as_str()), Some("matrix"));
 
     // Render modal to verify buffer draws 5-row multiline box
     let area = Rect::new(0, 0, 100, 35);
@@ -1093,7 +1085,7 @@ fn test_item_edit_modal_field_visibility_per_type() {
         r#type: MenuItemType::Config,
         extra: [(
             "key".to_string(),
-            serde_yml::Value::String("settings.theme".to_string()),
+            serde_json::Value::String("settings.theme".to_string()),
         )]
         .into_iter()
         .collect(),

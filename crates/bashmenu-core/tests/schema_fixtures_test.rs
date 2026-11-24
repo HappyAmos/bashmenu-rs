@@ -20,8 +20,8 @@ fn fixture_path(filename: &str) -> PathBuf {
 #[test]
 fn test_libyml_string_join_overflow_bug_fixed() {
     let input = "description: 'This is a long string that spans across multiple lines\n\nand has trailing breaks and spaces to ensure JOIN macro extends capacity without panic'\n";
-    let val: serde_yml::Value =
-        serde_yml::from_str(input).expect("Should parse multiline flow scalar");
+    let val: serde_json::Value =
+        serde_saphyr::from_str(input).expect("Should parse multiline flow scalar");
     assert!(val.get("description").is_some());
 }
 
@@ -129,7 +129,7 @@ fn test_menu_item_execution_mode_and_window_percent() {
     let mut item_stream = MenuItem::default();
     item_stream
         .extra
-        .insert("stream".to_string(), serde_yml::Value::Bool(true));
+        .insert("stream".to_string(), serde_json::Value::Bool(true));
     assert_eq!(item_stream.execution_mode(), ExecutionMode::Streaming);
     assert!(item_stream.is_streaming());
     assert_eq!(item_stream.window_percent(), 65);
@@ -149,11 +149,11 @@ fn test_menu_item_execution_mode_and_window_percent() {
     let mut item_interact = MenuItem::default();
     item_interact.extra.insert(
         "exec_mode".to_string(),
-        serde_yml::Value::String("interactive".to_string()),
+        serde_json::Value::String("interactive".to_string()),
     );
     item_interact.extra.insert(
         "window_percent".to_string(),
-        serde_yml::Value::Number(80.into()),
+        serde_json::Value::Number(80.into()),
     );
     assert_eq!(item_interact.execution_mode(), ExecutionMode::Interactive);
     assert_eq!(item_interact.window_percent(), 80);
@@ -224,7 +224,7 @@ fn test_config_get_set_value_and_menu_item_helpers() {
     );
 
     // Test set_value
-    config.set_value("settings.use_nerd_fonts", serde_yml::Value::Bool(false));
+    config.set_value("settings.use_nerd_fonts", serde_json::Value::Bool(false));
     assert_eq!(config.settings.use_nerd_fonts, Some(false));
     assert_eq!(
         config.get_value("settings.use_nerd_fonts"),
@@ -233,7 +233,7 @@ fn test_config_get_set_value_and_menu_item_helpers() {
 
     config.set_value(
         "settings.ping_target",
-        serde_yml::Value::String("8.8.4.4".to_string()),
+        serde_json::Value::String("8.8.4.4".to_string()),
     );
     assert_eq!(config.settings.ping_target, Some("8.8.4.4".to_string()));
     assert_eq!(
@@ -243,7 +243,7 @@ fn test_config_get_set_value_and_menu_item_helpers() {
 
     config.set_value(
         "settings.pager_editor",
-        serde_yml::Value::String("nano".to_string()),
+        serde_json::Value::String("nano".to_string()),
     );
     assert_eq!(config.settings.pager_editor, Some("nano".to_string()));
 
@@ -294,7 +294,7 @@ fn test_menu_item_param_placeholder_and_masked() {
         ..Default::default()
     };
     item.extra
-        .insert("masked".to_string(), serde_yml::Value::Bool(true));
+        .insert("masked".to_string(), serde_json::Value::Bool(true));
 
     assert!(item.has_param_placeholder());
     assert!(item.masked());
@@ -364,7 +364,7 @@ items:
     user_mode: "root"
 "#;
     let schema: bashmenu_core::MenuSchema =
-        serde_yml::from_str(raw_yaml).expect("Must parse inject_block");
+        serde_saphyr::from_str(raw_yaml).expect("Must parse inject_block");
     let item = &schema.items[0];
     assert_eq!(item.label, "Configure Sudo Prompt");
     assert_eq!(item.r#type, MenuItemType::Other("inject_block".to_string()));
@@ -456,7 +456,7 @@ settings:
     command: "{scripts_dir}/screensaver.sh"
 "#;
     let config: bashmenu_core::BashMenuConfig =
-        serde_yml::from_str(raw_config).expect("Must parse config with inactivity_timeout");
+        serde_saphyr::from_str(raw_config).expect("Must parse config with inactivity_timeout");
     let timeout = config
         .settings
         .inactivity_timeout

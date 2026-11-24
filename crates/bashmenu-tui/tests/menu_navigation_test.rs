@@ -125,7 +125,7 @@ items:
                   - Change Theme:
                       type: theme_selector
 "#;
-    let menu: MenuSchema = serde_yml::from_str(yaml).expect("Failed to deserialize menu");
+    let menu: MenuSchema = serde_saphyr::from_str(yaml).expect("Failed to deserialize menu");
     let mut view = MenuView::new(
         menu,
         ResolvedThemeStyles::default(),
@@ -416,7 +416,7 @@ fn test_bbcode_placeholder_and_right_aligned_brackets() {
 
     let mut cfg = BashMenuConfig::default();
     cfg.settings.ping_target = Some("1.1.1.1".to_string());
-    cfg.settings.refresh_interval = Some(serde_yml::Value::Number(serde_yml::Number::from(10)));
+    cfg.settings.refresh_interval = Some(serde_json::Value::Number(serde_json::Number::from(10)));
 
     let mut view = MenuView::new(
         schema,

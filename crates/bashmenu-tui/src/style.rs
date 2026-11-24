@@ -93,12 +93,12 @@ impl ThemeActivity {
 }
 
 /// Returns `true` if a YAML color token or `[fg, bg]` pair represents `-1` inheritance.
-pub fn is_inherited_color_value(val: &serde_yml::Value) -> bool {
+pub fn is_inherited_color_value(val: &serde_json::Value) -> bool {
     match val {
-        serde_yml::Value::Null => true,
-        serde_yml::Value::Number(n) => n.as_i64().is_some_and(|i| i < 0),
-        serde_yml::Value::String(s) => s.trim().parse::<i64>().is_ok_and(|i| i < 0),
-        serde_yml::Value::Sequence(seq) => {
+        serde_json::Value::Null => true,
+        serde_json::Value::Number(n) => n.as_i64().is_some_and(|i| i < 0),
+        serde_json::Value::String(s) => s.trim().parse::<i64>().is_ok_and(|i| i < 0),
+        serde_json::Value::Array(seq) => {
             !seq.is_empty() && seq.iter().all(is_inherited_color_value)
         }
         _ => false,
@@ -422,12 +422,12 @@ impl Default for ResolvedThemeStyles {
 
 /// Parses a color identifier (number, hex string, or named constant) into a
 /// Ratatui Color respecting the given terminal color tier.
-pub fn parse_color_value_with_tier(val: &serde_yml::Value, tier: ColorTier) -> Option<Color> {
+pub fn parse_color_value_with_tier(val: &serde_json::Value, tier: ColorTier) -> Option<Color> {
     let raw_color = match val {
-        serde_yml::Value::Sequence(seq) => seq
+        serde_json::Value::Array(seq) => seq
             .first()
             .and_then(|v| parse_color_value_with_tier(v, tier)),
-        serde_yml::Value::Number(n) => {
+        serde_json::Value::Number(n) => {
             if let Some(i) = n.as_i64() {
                 if i < 0 {
                     Some(Color::Reset)
@@ -440,7 +440,7 @@ pub fn parse_color_value_with_tier(val: &serde_yml::Value, tier: ColorTier) -> O
                 None
             }
         }
-        serde_yml::Value::String(s) => {
+        serde_json::Value::String(s) => {
             let s_trim = s.trim();
             if s_trim == "-1" {
                 return Some(Color::Reset);
@@ -492,18 +492,18 @@ pub fn parse_color_value_with_tier(val: &serde_yml::Value, tier: ColorTier) -> O
 
 /// Parses a color identifier (number, hex string, or named constant) into a
 /// Ratatui Color using the detected environment color tier.
-pub fn parse_color_value(val: &serde_yml::Value) -> Option<Color> {
+pub fn parse_color_value(val: &serde_json::Value) -> Option<Color> {
     parse_color_value_with_tier(val, ColorTier::detect())
 }
 
 /// Resolves a pair [fg, bg] into a Ratatui Style respecting the color tier.
 pub fn parse_style_pair_with_tier(
-    val: Option<&serde_yml::Value>,
+    val: Option<&serde_json::Value>,
     tier: ColorTier,
 ) -> Option<Style> {
     let v = val?;
     match v {
-        serde_yml::Value::Sequence(seq) => {
+        serde_json::Value::Array(seq) => {
             let mut style = Style::default();
             if let Some(fg_val) = seq.first() {
                 if let Some(fg) = parse_color_value_with_tier(fg_val, tier) {
@@ -533,22 +533,22 @@ pub fn parse_style_pair_with_tier(
 
 /// Resolves a pair [fg, bg] into a Ratatui Style using detected environment
 /// color tier.
-pub fn parse_style_pair(val: Option<&serde_yml::Value>) -> Option<Style> {
+pub fn parse_style_pair(val: Option<&serde_json::Value>) -> Option<Style> {
     parse_style_pair_with_tier(val, ColorTier::detect())
 }
 
 /// Finds the override sub-map matching `activity`'s canonical key or legacy alias.
 fn find_activity_map(
-    p: &HashMap<String, serde_yml::Value>,
+    p: &HashMap<String, serde_json::Value>,
     activity: ThemeActivity,
-) -> Option<&serde_yml::Mapping> {
+) -> Option<&serde_json::Map<String, serde_json::Value>> {
     p.get(activity.yaml_key())
-        .and_then(|v| v.as_mapping())
+        .and_then(|v| v.as_object())
         .or_else(|| {
             activity
                 .legacy_yaml_keys()
                 .iter()
-                .find_map(|k| p.get(*k).and_then(|v| v.as_mapping()))
+                .find_map(|k| p.get(*k).and_then(|v| v.as_object()))
         })
 }
 
@@ -576,7 +576,7 @@ impl ResolvedThemeStyles {
     /// `gutter` -> `whitespace`) is skipped.
     fn apply_palette_map(
         &mut self,
-        p: &HashMap<String, serde_yml::Value>,
+        p: &HashMap<String, serde_json::Value>,
         tier: ColorTier,
         is_override: bool,
     ) {
@@ -866,7 +866,7 @@ impl ResolvedThemeStyles {
             return resolved;
         }
 
-        let palette_candidates: [Option<&HashMap<String, serde_yml::Value>>; 3] = match tier {
+        let palette_candidates: [Option<&HashMap<String, serde_json::Value>>; 3] = match tier {
             ColorTier::Color8 => [
                 theme.colors_8.as_ref(),
                 theme.colors_16.as_ref(),
@@ -891,9 +891,7 @@ impl ResolvedThemeStyles {
         {
             let mut override_map = HashMap::new();
             for (k, v) in sub_mapping {
-                if let Some(ks) = k.as_str() {
-                    override_map.insert(ks.to_string(), v.clone());
-                }
+                override_map.insert(k.clone(), v.clone());
             }
             resolved.apply_palette_map(&override_map, tier, true);
         }
@@ -962,9 +960,9 @@ mod tests {
         let mut c8_map = std::collections::HashMap::new();
         c8_map.insert(
             "title".to_string(),
-            serde_yml::Value::Sequence(vec![
-                serde_yml::Value::String("COLOR_MAGENTA".to_string()),
-                serde_yml::Value::Number((-1).into()),
+            serde_json::Value::Array(vec![
+                serde_json::Value::String("COLOR_MAGENTA".to_string()),
+                serde_json::Value::Number((-1).into()),
             ]),
         );
         theme.colors_8 = Some(c8_map);

@@ -172,7 +172,7 @@ struct Cli {
 fn validate_yaml_syntax(path: &Path) -> bool {
     println!("Checking YAML syntax for {}...", path.display());
     match fs::read_to_string(path) {
-        Ok(content) => match serde_yml::from_str::<serde_yml::Value>(&content) {
+        Ok(content) => match serde_saphyr::from_str::<serde_json::Value>(&content) {
             Ok(_) => {
                 println!("SUCCESS: '{}' contains valid YAML syntax!", path.display());
                 true
@@ -195,14 +195,14 @@ fn validate_yaml_syntax(path: &Path) -> bool {
 
 /// Validates a single palette color element (number, `-1` inherit, hex, or ANSI constant).
 fn validate_palette_scalar(
-    elem: &serde_yml::Value,
+    elem: &serde_json::Value,
     tier_name: &str,
     valid_constants: Option<&HashSet<&str>>,
     ctx: &str,
     errors: &mut Vec<String>,
 ) {
     match elem {
-        serde_yml::Value::Number(n) => {
+        serde_json::Value::Number(n) => {
             let Some(i) = n.as_i64() else {
                 errors.push(format!("{}: Color value must be an integer", ctx));
                 return;
@@ -222,7 +222,7 @@ fn validate_palette_scalar(
                 ));
             }
         }
-        serde_yml::Value::String(s) => {
+        serde_json::Value::String(s) => {
             let s_trim = s.trim();
             if s_trim == "-1" {
                 return;
@@ -263,7 +263,7 @@ fn validate_palette_scalar(
 #[allow(clippy::too_many_arguments)]
 fn validate_palette_entry(
     key: &str,
-    val: &serde_yml::Value,
+    val: &serde_json::Value,
     theme_name: &str,
     tier_name: &str,
     activity_scope: Option<&str>,
@@ -292,7 +292,7 @@ fn validate_palette_entry(
             ));
             return;
         }
-        if matches!(val, serde_yml::Value::Mapping(_)) {
+        if matches!(val, serde_json::Value::Object(_)) {
             errors.push(format!(
                 "{}: Nested mappings are not allowed inside activity overrides",
                 path_ctx
@@ -300,7 +300,7 @@ fn validate_palette_entry(
             return;
         }
     } else if valid_activities.contains(key) {
-        let Some(sub_map) = val.as_mapping() else {
+        let Some(sub_map) = val.as_object() else {
             errors.push(format!(
                 "{}: Activity override section must be a YAML map",
                 path_ctx
@@ -308,15 +308,8 @@ fn validate_palette_entry(
             return;
         };
         for (sk, sv) in sub_map {
-            let Some(sk_str) = sk.as_str() else {
-                errors.push(format!(
-                    "{}: Activity override keys must be strings",
-                    path_ctx
-                ));
-                continue;
-            };
             validate_palette_entry(
-                sk_str,
+                sk.as_str(),
                 sv,
                 theme_name,
                 tier_name,
@@ -338,7 +331,7 @@ fn validate_palette_entry(
     }
 
     match val {
-        serde_yml::Value::Sequence(seq) => {
+        serde_json::Value::Array(seq) => {
             if seq.len() != 2 {
                 errors.push(format!("{}: Must be a 2-element list [fg, bg]", path_ctx));
                 return;
@@ -357,7 +350,7 @@ fn validate_palette_entry(
                 validate_palette_scalar(elem, tier_name, tier_constants, &elem_ctx, errors);
             }
         }
-        serde_yml::Value::Number(_) | serde_yml::Value::String(_) => {
+        serde_json::Value::Number(_) | serde_json::Value::String(_) => {
             validate_palette_scalar(val, tier_name, tier_constants, &path_ctx, errors);
         }
         _ => {
@@ -834,7 +827,7 @@ items:
     block_id: "my_env"
 "#;
         let menu: bashmenu_core::MenuSchema =
-            serde_yml::from_str(raw_yaml).expect("Must parse test menu");
+            serde_saphyr::from_str(raw_yaml).expect("Must parse test menu");
         let valid_types: std::collections::HashSet<&str> =
             VALID_OPTION_TYPES.iter().copied().collect();
         let mut errors = Vec::new();

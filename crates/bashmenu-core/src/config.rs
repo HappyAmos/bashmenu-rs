@@ -89,7 +89,7 @@ pub struct Settings {
 
     /// Periodic refresh rate in seconds
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub refresh_interval: Option<serde_yml::Value>,
+    pub refresh_interval: Option<serde_json::Value>,
 
     /// Pager / editor executable (e.g. "vim", "nano")
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -97,7 +97,7 @@ pub struct Settings {
 
     /// Plugin configuration table or mappings
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub plugins: Option<serde_yml::Value>,
+    pub plugins: Option<serde_json::Value>,
 
     /// Background wallpaper configuration
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -133,7 +133,7 @@ pub struct Settings {
 
     /// Additional arbitrary user-defined settings preserved across saves
     #[serde(flatten)]
-    pub extra: HashMap<String, serde_yml::Value>,
+    pub extra: HashMap<String, serde_json::Value>,
 }
 
 impl Settings {
@@ -178,7 +178,7 @@ pub struct BashMenuConfig {
 
     /// User-defined custom variables accessible via {user.<key>}
     #[serde(default)]
-    pub user: HashMap<String, serde_yml::Value>,
+    pub user: HashMap<String, serde_json::Value>,
 
     /// Global application settings
     #[serde(default)]
@@ -186,7 +186,7 @@ pub struct BashMenuConfig {
 
     /// Additional arbitrary top-level fields preserved across saves
     #[serde(flatten)]
-    pub extra: HashMap<String, serde_yml::Value>,
+    pub extra: HashMap<String, serde_json::Value>,
 }
 
 /// Default configuration schema version string (`"0.0.1"`).
@@ -280,7 +280,7 @@ impl BashMenuConfig {
             .remove("inactivity_timeout.milliseconds")
         {
             let ms = match &val {
-                serde_yml::Value::Number(n) => n
+                serde_json::Value::Number(n) => n
                     .as_u64()
                     .or_else(|| {
                         n.as_i64()
@@ -290,7 +290,7 @@ impl BashMenuConfig {
                         n.as_f64()
                             .and_then(|v| if v >= 0.0 { Some(v as u64) } else { None })
                     }),
-                serde_yml::Value::String(s) => s.trim().parse::<u64>().ok(),
+                serde_json::Value::String(s) => s.trim().parse::<u64>().ok(),
                 _ => None,
             };
             if let Some(ms_val) = ms {
@@ -302,7 +302,7 @@ impl BashMenuConfig {
         }
         if let Some(val) = self.settings.extra.remove("inactivity_timeout.command") {
             let cmd = match &val {
-                serde_yml::Value::String(s) => {
+                serde_json::Value::String(s) => {
                     let trimmed = s.trim();
                     if trimmed.is_empty() {
                         None
@@ -310,7 +310,7 @@ impl BashMenuConfig {
                         Some(trimmed.to_string())
                     }
                 }
-                serde_yml::Value::Number(n) => Some(n.to_string()),
+                serde_json::Value::Number(n) => Some(n.to_string()),
                 _ => None,
             };
             if cmd.is_some() {
@@ -327,7 +327,7 @@ impl BashMenuConfig {
         self.extra.remove("inactivity_timeout.command");
 
         // Migrate any stray dotted flat keys in settings.extra into nested mappings
-        let stray_settings_keys: Vec<(String, serde_yml::Value)> = self
+        let stray_settings_keys: Vec<(String, serde_json::Value)> = self
             .settings
             .extra
             .iter()
@@ -340,7 +340,7 @@ impl BashMenuConfig {
         }
 
         // Migrate any stray dotted flat keys in self.extra into nested mappings
-        let stray_extra_keys: Vec<(String, serde_yml::Value)> = self
+        let stray_extra_keys: Vec<(String, serde_json::Value)> = self
             .extra
             .iter()
             .filter(|(k, _)| k.contains('.'))
@@ -359,7 +359,7 @@ impl BashMenuConfig {
     }
 
     /// Set value in configuration using dot-notation string.
-    pub fn set_value(&mut self, key_path: &str, value: serde_yml::Value) -> bool {
+    pub fn set_value(&mut self, key_path: &str, value: serde_json::Value) -> bool {
         let norm = if let Some(stripped) = key_path.strip_prefix("app.") {
             stripped
         } else if let Some(stripped) = key_path.strip_prefix("bashmenu.") {
@@ -371,85 +371,85 @@ impl BashMenuConfig {
         match norm {
             "settings.use_nerd_fonts" => {
                 self.settings.use_nerd_fonts = match &value {
-                    serde_yml::Value::Bool(b) => Some(*b),
-                    serde_yml::Value::String(s) => Some(s.eq_ignore_ascii_case("true")),
+                    serde_json::Value::Bool(b) => Some(*b),
+                    serde_json::Value::String(s) => Some(s.eq_ignore_ascii_case("true")),
                     _ => None,
                 };
             }
             "settings.check_for_updates" => {
                 self.settings.check_for_updates = match &value {
-                    serde_yml::Value::Bool(b) => Some(*b),
-                    serde_yml::Value::String(s) => Some(s.eq_ignore_ascii_case("true")),
+                    serde_json::Value::Bool(b) => Some(*b),
+                    serde_json::Value::String(s) => Some(s.eq_ignore_ascii_case("true")),
                     _ => None,
                 };
             }
             "settings.tab_to_spaces" => {
                 self.settings.tab_to_spaces = match &value {
-                    serde_yml::Value::Bool(b) => Some(*b),
-                    serde_yml::Value::String(s) => Some(s.eq_ignore_ascii_case("true")),
+                    serde_json::Value::Bool(b) => Some(*b),
+                    serde_json::Value::String(s) => Some(s.eq_ignore_ascii_case("true")),
                     _ => None,
                 };
             }
             "settings.show_menu_shortcuts" => {
                 self.settings.show_menu_shortcuts = match &value {
-                    serde_yml::Value::Bool(b) => Some(*b),
-                    serde_yml::Value::String(s) => Some(s.eq_ignore_ascii_case("true")),
+                    serde_json::Value::Bool(b) => Some(*b),
+                    serde_json::Value::String(s) => Some(s.eq_ignore_ascii_case("true")),
                     _ => None,
                 };
             }
             "settings.nerd_font_width" => {
                 self.settings.nerd_font_width = match &value {
-                    serde_yml::Value::String(s) => Some(s.clone()),
-                    serde_yml::Value::Number(n) => Some(n.to_string()),
+                    serde_json::Value::String(s) => Some(s.clone()),
+                    serde_json::Value::Number(n) => Some(n.to_string()),
                     _ => None,
                 };
             }
             "settings.tabstop" => {
                 self.settings.tabstop = match &value {
-                    serde_yml::Value::Number(n) => n.as_u64().map(|v| v as usize),
-                    serde_yml::Value::String(s) => s.parse::<usize>().ok(),
+                    serde_json::Value::Number(n) => n.as_u64().map(|v| v as usize),
+                    serde_json::Value::String(s) => s.parse::<usize>().ok(),
                     _ => None,
                 };
             }
             "settings.pager_editor" => {
                 self.settings.pager_editor = match &value {
-                    serde_yml::Value::String(s) => Some(s.clone()),
+                    serde_json::Value::String(s) => Some(s.clone()),
                     _ => None,
                 };
             }
             "settings.ping_target" => {
                 self.settings.ping_target = match &value {
-                    serde_yml::Value::String(s) => Some(s.clone()),
+                    serde_json::Value::String(s) => Some(s.clone()),
                     _ => None,
                 };
             }
             "settings.toast_timeout" | "settings.toast.timeout" => {
                 self.settings.toast_timeout = match &value {
-                    serde_yml::Value::Number(n) => {
+                    serde_json::Value::Number(n) => {
                         n.as_f64().or_else(|| n.as_u64().map(|v| v as f64))
                     }
-                    serde_yml::Value::String(s) => s.parse::<f64>().ok(),
+                    serde_json::Value::String(s) => s.parse::<f64>().ok(),
                     _ => None,
                 };
             }
             "settings.help_gutter_delay" | "settings.help_gutter_hover_delay" => {
                 self.settings.help_gutter_delay = match &value {
-                    serde_yml::Value::Number(n) => {
+                    serde_json::Value::Number(n) => {
                         n.as_f64().or_else(|| n.as_u64().map(|v| v as f64))
                     }
-                    serde_yml::Value::String(s) => s.parse::<f64>().ok(),
+                    serde_json::Value::String(s) => s.parse::<f64>().ok(),
                     _ => None,
                 };
             }
             "settings.status_gutter" => {
                 self.settings.status_gutter = match &value {
-                    serde_yml::Value::String(s) => Some(s.clone()),
+                    serde_json::Value::String(s) => Some(s.clone()),
                     _ => None,
                 };
             }
             "settings.inactivity_timeout.milliseconds" | "inactivity_timeout.milliseconds" => {
                 let ms = match &value {
-                    serde_yml::Value::Number(n) => n
+                    serde_json::Value::Number(n) => n
                         .as_u64()
                         .or_else(|| {
                             n.as_i64()
@@ -459,7 +459,7 @@ impl BashMenuConfig {
                             n.as_f64()
                                 .and_then(|v| if v >= 0.0 { Some(v as u64) } else { None })
                         }),
-                    serde_yml::Value::String(s) => s.trim().parse::<u64>().ok(),
+                    serde_json::Value::String(s) => s.trim().parse::<u64>().ok(),
                     _ => None,
                 };
                 let timeout = self
@@ -476,7 +476,7 @@ impl BashMenuConfig {
             }
             "settings.inactivity_timeout.command" | "inactivity_timeout.command" => {
                 let cmd = match &value {
-                    serde_yml::Value::String(s) => {
+                    serde_json::Value::String(s) => {
                         let trimmed = s.trim();
                         if trimmed.is_empty() {
                             None
@@ -484,7 +484,7 @@ impl BashMenuConfig {
                             Some(trimmed.to_string())
                         }
                     }
-                    serde_yml::Value::Number(n) => Some(n.to_string()),
+                    serde_json::Value::Number(n) => Some(n.to_string()),
                     _ => None,
                 };
                 let timeout = self
@@ -497,7 +497,7 @@ impl BashMenuConfig {
                 self.extra.remove("inactivity_timeout.command");
             }
             "settings.inactivity_timeout" | "inactivity_timeout" => {
-                if let Ok(timeout) = serde_yml::from_value::<InactivityTimeout>(value) {
+                if let Ok(timeout) = serde_json::from_value::<InactivityTimeout>(value) {
                     self.settings.inactivity_timeout = Some(timeout);
                     self.settings.extra.remove("inactivity_timeout");
                     self.extra.remove("settings.inactivity_timeout");
@@ -506,48 +506,50 @@ impl BashMenuConfig {
             }
             "settings.transition" => {
                 self.settings.transition = match &value {
-                    serde_yml::Value::String(s) => Some(s.clone()),
+                    serde_json::Value::String(s) => Some(s.clone()),
                     _ => None,
                 };
             }
             "settings.transition_speed" => {
                 self.settings.transition_speed = match &value {
-                    serde_yml::Value::String(s) => Some(s.clone()),
-                    serde_yml::Value::Number(n) => Some(n.to_string()),
+                    serde_json::Value::String(s) => Some(s.clone()),
+                    serde_json::Value::Number(n) => Some(n.to_string()),
                     _ => None,
                 };
             }
             "settings.modal_animation" => {
                 self.settings.modal_animation = match &value {
-                    serde_yml::Value::String(s) => Some(s.clone()),
-                    serde_yml::Value::Bool(b) => Some(if *b { "zoom" } else { "none" }.to_string()),
+                    serde_json::Value::String(s) => Some(s.clone()),
+                    serde_json::Value::Bool(b) => {
+                        Some(if *b { "zoom" } else { "none" }.to_string())
+                    }
                     _ => None,
                 };
             }
             "settings.modal_animation_speed" => {
                 self.settings.modal_animation_speed = match &value {
-                    serde_yml::Value::String(s) => Some(s.clone()),
-                    serde_yml::Value::Number(n) => Some(n.to_string()),
+                    serde_json::Value::String(s) => Some(s.clone()),
+                    serde_json::Value::Number(n) => Some(n.to_string()),
                     _ => None,
                 };
             }
             "settings.marquee_speed" => {
                 self.settings.marquee_speed = match &value {
-                    serde_yml::Value::String(s) => Some(s.clone()),
-                    serde_yml::Value::Number(n) => Some(n.to_string()),
+                    serde_json::Value::String(s) => Some(s.clone()),
+                    serde_json::Value::Number(n) => Some(n.to_string()),
                     _ => None,
                 };
             }
             "settings.framebuffer" => {
                 self.settings.framebuffer = match &value {
-                    serde_yml::Value::String(s) => Some(s.clone()),
-                    serde_yml::Value::Bool(b) => Some(b.to_string()),
+                    serde_json::Value::String(s) => Some(s.clone()),
+                    serde_json::Value::Bool(b) => Some(b.to_string()),
                     _ => None,
                 };
             }
             "settings.locale" | "locale" => {
                 self.settings.locale = match &value {
-                    serde_yml::Value::String(s) => {
+                    serde_json::Value::String(s) => {
                         let trimmed = s.trim();
                         if trimmed.is_empty() {
                             None
@@ -563,24 +565,24 @@ impl BashMenuConfig {
             }
             "settings.cache_dir" => {
                 self.settings.cache_dir = match &value {
-                    serde_yml::Value::String(s) => Some(s.clone()),
+                    serde_json::Value::String(s) => Some(s.clone()),
                     _ => None,
                 };
             }
             "settings.scripts_dir" => {
                 self.settings.scripts_dir = match &value {
-                    serde_yml::Value::String(s) => Some(s.clone()),
+                    serde_json::Value::String(s) => Some(s.clone()),
                     _ => None,
                 };
             }
             "settings.templates_dir" => {
                 self.settings.templates_dir = match &value {
-                    serde_yml::Value::String(s) => Some(s.clone()),
+                    serde_json::Value::String(s) => Some(s.clone()),
                     _ => None,
                 };
             }
             "theme" => {
-                if let serde_yml::Value::String(s) = value {
+                if let serde_json::Value::String(s) = value {
                     self.theme = s;
                 }
             }
@@ -601,9 +603,9 @@ impl BashMenuConfig {
 /// Inserts a value into a YAML map, decomposing dot-separated paths into nested mappings
 /// to guarantee that dotted flat keys are never emitted in configuration YAML.
 fn insert_nested_yaml_value(
-    map: &mut HashMap<String, serde_yml::Value>,
+    map: &mut HashMap<String, serde_json::Value>,
     path: &str,
-    value: serde_yml::Value,
+    value: serde_json::Value,
 ) {
     let parts: Vec<&str> = path.split('.').collect();
     if parts.is_empty() {
@@ -617,29 +619,28 @@ fn insert_nested_yaml_value(
     let top_key = parts[0].to_string();
     let entry = map
         .entry(top_key)
-        .or_insert_with(|| serde_yml::Value::Mapping(serde_yml::Mapping::new()));
+        .or_insert_with(|| serde_json::Value::Object(serde_json::Map::new()));
 
     let mut curr = entry;
     for &part in &parts[1..parts.len() - 1] {
-        if !curr.is_mapping() {
-            *curr = serde_yml::Value::Mapping(serde_yml::Mapping::new());
+        if !curr.is_object() {
+            *curr = serde_json::Value::Object(serde_json::Map::new());
         }
-        let mapping = curr.as_mapping_mut().unwrap();
-        let key = serde_yml::Value::String(part.to_string());
-        if !mapping.contains_key(&key) || !mapping.get(&key).is_some_and(|v| v.is_mapping()) {
+        let mapping = curr.as_object_mut().unwrap();
+        if !mapping.contains_key(part) || !mapping.get(part).is_some_and(|v| v.is_object()) {
             mapping.insert(
-                key.clone(),
-                serde_yml::Value::Mapping(serde_yml::Mapping::new()),
+                part.to_string(),
+                serde_json::Value::Object(serde_json::Map::new()),
             );
         }
-        curr = mapping.get_mut(&key).unwrap();
+        curr = mapping.get_mut(part).unwrap();
     }
 
-    if !curr.is_mapping() {
-        *curr = serde_yml::Value::Mapping(serde_yml::Mapping::new());
+    if !curr.is_object() {
+        *curr = serde_json::Value::Object(serde_json::Map::new());
     }
-    if let Some(mapping) = curr.as_mapping_mut() {
-        let leaf_key = serde_yml::Value::String(parts.last().unwrap().to_string());
+    if let Some(mapping) = curr.as_object_mut() {
+        let leaf_key = parts.last().unwrap().to_string();
         mapping.insert(leaf_key, value);
     }
 }
@@ -728,7 +729,7 @@ pub fn load_config<P: AsRef<Path>>(path: P) -> Result<BashMenuConfig> {
         path: p.to_path_buf(),
         source: e,
     })?;
-    let mut config: BashMenuConfig = serde_yml::from_str(&content)?;
+    let mut config: BashMenuConfig = serde_saphyr::from_str(&content)?;
     config.sanitize();
     Ok(config)
 }
@@ -745,7 +746,7 @@ pub fn save_config<P: AsRef<Path>>(path: P, config: &BashMenuConfig) -> Result<(
             source: e,
         })?;
         if !existing.trim().is_empty() {
-            if let Err(parse_err) = serde_yml::from_str::<BashMenuConfig>(&existing) {
+            if let Err(parse_err) = serde_saphyr::from_str::<BashMenuConfig>(&existing) {
                 let backup_path = p.with_extension("yml.bak");
                 let _ = fs::write(&backup_path, &existing);
                 return Err(BashMenuError::Schema(format!(
@@ -757,7 +758,7 @@ pub fn save_config<P: AsRef<Path>>(path: P, config: &BashMenuConfig) -> Result<(
             }
         }
     }
-    let yaml_body = serde_yml::to_string(config)?;
+    let yaml_body = serde_saphyr::to_string(config)?;
     let output = format!("{}\n{}", CONFIG_HEADER.trim(), yaml_body);
     fs::write(p, output).map_err(|e| BashMenuError::Io {
         path: p.to_path_buf(),
@@ -798,7 +799,7 @@ mod tests {
         // Test set_value with float number
         assert!(config.set_value(
             "settings.help_gutter_delay",
-            serde_yml::to_value(2.5).unwrap(),
+            serde_json::to_value(2.5).unwrap(),
         ));
         assert_eq!(config.settings.help_gutter_delay, Some(2.5));
         assert_eq!(config.help_gutter_delay(), 2.5);
@@ -806,7 +807,7 @@ mod tests {
         // Test set_value with string
         assert!(config.set_value(
             "app.settings.help_gutter_delay",
-            serde_yml::Value::String("0.0".to_string()),
+            serde_json::Value::String("0.0".to_string()),
         ));
         assert_eq!(config.settings.help_gutter_delay, Some(0.0));
         assert_eq!(config.help_gutter_delay(), 0.0);
@@ -826,7 +827,7 @@ mod tests {
         // Set milliseconds via app.settings.inactivity_timeout.milliseconds
         assert!(config.set_value(
             "app.settings.inactivity_timeout.milliseconds",
-            serde_yml::Value::Number(serde_yml::Number::from(60000)),
+            serde_json::Value::Number(serde_json::Number::from(60000)),
         ));
         assert_eq!(
             config
@@ -844,7 +845,7 @@ mod tests {
         // Set command via settings.inactivity_timeout.command
         assert!(config.set_value(
             "settings.inactivity_timeout.command",
-            serde_yml::Value::String("kcchase".to_string()),
+            serde_json::Value::String("kcchase".to_string()),
         ));
         assert_eq!(
             config
@@ -885,11 +886,11 @@ mod tests {
         let mut legacy_config = BashMenuConfig::default();
         legacy_config.settings.extra.insert(
             "inactivity_timeout.milliseconds".to_string(),
-            serde_yml::Value::Number(serde_yml::Number::from(120000)),
+            serde_json::Value::Number(serde_json::Number::from(120000)),
         );
         legacy_config.settings.extra.insert(
             "inactivity_timeout.command".to_string(),
-            serde_yml::Value::String("cmatrix -s".to_string()),
+            serde_json::Value::String("cmatrix -s".to_string()),
         );
         legacy_config.sanitize();
         assert_eq!(
@@ -925,19 +926,19 @@ mod tests {
         // Set arbitrary nested dotted path under user
         assert!(config.set_value(
             "user.profile.contact.email",
-            serde_yml::Value::String("user@example.com".to_string()),
+            serde_json::Value::String("user@example.com".to_string()),
         ));
 
         // Set arbitrary nested dotted path under settings
         assert!(config.set_value(
             "settings.custom_feature.sub_option.enabled",
-            serde_yml::Value::Bool(true),
+            serde_json::Value::Bool(true),
         ));
 
         // Set arbitrary nested dotted path in extra
         assert!(config.set_value(
             "experimental.flags.speed",
-            serde_yml::Value::String("ludicrous".to_string()),
+            serde_json::Value::String("ludicrous".to_string()),
         ));
 
         // Verify none of the maps contain literal keys with dots
@@ -1017,7 +1018,7 @@ mod tests {
 
         config.set_value(
             "settings.marquee_speed",
-            serde_yml::Value::String("fast".to_string()),
+            serde_json::Value::String("fast".to_string()),
         );
         assert_eq!(config.settings.marquee_speed.as_deref(), Some("fast"));
         assert_eq!(
@@ -1031,7 +1032,7 @@ mod tests {
 
         config.set_value(
             "settings.marquee_speed",
-            serde_yml::Value::String("slow".to_string()),
+            serde_json::Value::String("slow".to_string()),
         );
         assert_eq!(
             config.settings.marquee_speed_duration(),
@@ -1040,7 +1041,7 @@ mod tests {
 
         config.set_value(
             "settings.marquee_speed",
-            serde_yml::Value::String("150".to_string()),
+            serde_json::Value::String("150".to_string()),
         );
         assert_eq!(
             config.settings.marquee_speed_duration(),

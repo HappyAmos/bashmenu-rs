@@ -337,7 +337,7 @@ pub fn discover_locales() -> Vec<LocaleInfo> {
                 Err(_) => continue,
             };
 
-            let header: Option<LocaleMetaHeader> = serde_yml::from_str(&content).ok();
+            let header: Option<LocaleMetaHeader> = serde_saphyr::from_str(&content).ok();
             let raw_code = header
                 .as_ref()
                 .and_then(|h| h.meta.as_ref())
@@ -399,36 +399,34 @@ pub fn interpolate_string(template: &str, vars: &[(&str, &str)]) -> String {
 }
 
 /// Parse a YAML string and recursively flatten mappings into dot-delimited paths.
-pub fn parse_and_flatten_yaml(content: &str) -> Result<HashMap<String, String>, serde_yml::Error> {
-    let value: serde_yml::Value = serde_yml::from_str(content)?;
+pub fn parse_and_flatten_yaml(
+    content: &str,
+) -> Result<HashMap<String, String>, serde_saphyr::Error> {
+    let value: serde_json::Value = serde_saphyr::from_str(content)?;
     let mut map = HashMap::new();
-    if let serde_yml::Value::Mapping(root) = value {
+    if let serde_json::Value::Object(root) = value {
         for (k, v) in root {
-            if let Some(prefix) = k.as_str() {
-                flatten_recursive(prefix, &v, &mut map);
-            }
+            flatten_recursive(&k, &v, &mut map);
         }
     }
     Ok(map)
 }
 
-fn flatten_recursive(prefix: &str, val: &serde_yml::Value, out: &mut HashMap<String, String>) {
+fn flatten_recursive(prefix: &str, val: &serde_json::Value, out: &mut HashMap<String, String>) {
     match val {
-        serde_yml::Value::Mapping(m) => {
+        serde_json::Value::Object(m) => {
             for (k, v) in m {
-                if let Some(subkey) = k.as_str() {
-                    let next_prefix = format!("{}.{}", prefix, subkey);
-                    flatten_recursive(&next_prefix, v, out);
-                }
+                let next_prefix = format!("{}.{}", prefix, k);
+                flatten_recursive(&next_prefix, v, out);
             }
         }
-        serde_yml::Value::String(s) => {
+        serde_json::Value::String(s) => {
             out.insert(prefix.to_string(), s.clone());
         }
-        serde_yml::Value::Number(n) => {
+        serde_json::Value::Number(n) => {
             out.insert(prefix.to_string(), n.to_string());
         }
-        serde_yml::Value::Bool(b) => {
+        serde_json::Value::Bool(b) => {
             out.insert(prefix.to_string(), b.to_string());
         }
         _ => {}
