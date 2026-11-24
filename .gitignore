@@ -6,5 +6,6 @@ debug/
 rustc-ice-*.txt
 .idea/
 .vscode/
+.agents/
 *.swp
 .*.swp
