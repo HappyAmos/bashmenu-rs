@@ -55,7 +55,12 @@ pub fn compute_file_sha256(path: &Path) -> String {
     };
     let mut hasher = Sha256::new();
     hasher.update(&data);
-    format!("{:x}", hasher.finalize())
+    let digest = hasher.finalize();
+    let mut hex = String::with_capacity(digest.len() * 2);
+    for byte in digest {
+        let _ = std::fmt::Write::write_fmt(&mut hex, format_args!("{:02x}", byte));
+    }
+    hex
 }
 
 /// Checks whether a process with the given PID is actively running on the system.
