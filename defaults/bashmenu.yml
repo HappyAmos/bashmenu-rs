@@ -7,9 +7,10 @@
 version: '0.0.1'
 theme: alaska-train
 user:
-  example_filepath: '{bashmenu_dir}'
-  example_boolean: true
   example_string: A string of text
+  example_boolean: true
+  postal_code: ''
+  example_filepath: '{bashmenu_dir}'
 settings:
   cache_dir: '{home}/.cache/bashmenu'
   check_for_updates: false
@@ -26,7 +27,7 @@ settings:
   status_gutter: '| Theme: {theme} | {user} | Battery: {battery} ({battery_stat}) | Version: {version} | {localip} | [b]{date_time_24_short}[/b]'
   inactivity_timeout:
     milliseconds: 300000
-    command: kcchase --keyboard
+    command: ''
   refresh_interval: 10
   pager_editor: vim
   plugins:
