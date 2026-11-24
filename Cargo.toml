@@ -24,7 +24,7 @@ bashmenu-core = { path = "crates/bashmenu-core" }
 bashmenu-tui = { path = "crates/bashmenu-tui" }
 
 # TUI & Terminal
-ratatui = "0.29"
+ratatui = "0.30"
 crossterm = { version = "0.28", features = ["use-dev-tty"] }
 
 # Serialization & Data
