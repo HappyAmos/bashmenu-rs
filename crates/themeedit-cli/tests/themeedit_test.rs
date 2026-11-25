@@ -3123,3 +3123,46 @@ fn test_modal_yes_no_cancel_button_tokens_and_preview() {
         );
     }
 }
+
+#[test]
+fn test_title_leading_border_dash_uses_border_color() {
+    use bashmenu_tui::{render_modal_frame, ResolvedThemeStyles};
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::style::{Color, Style};
+    use themeedit_cli::{render_preview_pane, render_root_frame, PreviewMode};
+
+    let styles = ResolvedThemeStyles {
+        border: Color::Indexed(39),
+        title: Style::default().fg(Color::Indexed(226)),
+        ..Default::default()
+    };
+
+    // 1. ThemeEdit root frame: "┌─[ ThemeEdit: canopy ]" -> '─' at x+1 uses border color
+    let area = Rect::new(0, 0, 80, 24);
+    let mut buf = Buffer::empty(area);
+    render_root_frame(area, &mut buf, "canopy", false, &styles);
+    assert_eq!(buf[(1, 0)].symbol(), "─");
+    assert_eq!(buf[(1, 0)].fg, Color::Indexed(39));
+    assert_eq!(buf[(2, 0)].symbol(), "[");
+    assert_eq!(buf[(2, 0)].fg, Color::Indexed(226));
+
+    // 2. Preview pane outer border: '─' at x+1 uses border color
+    let mut pbuf = Buffer::empty(area);
+    let mut wp = None;
+    render_preview_pane(area, &mut pbuf, PreviewMode::Menu, &styles, &mut wp);
+    assert_eq!(pbuf[(1, 0)].symbol(), "─");
+    assert_eq!(pbuf[(1, 0)].fg, Color::Indexed(39));
+    assert_eq!(pbuf[(2, 0)].symbol(), "[");
+    assert_eq!(pbuf[(2, 0)].fg, Color::Indexed(226));
+
+    // 3. Modal frame: '─' at modal_x+1 uses border color
+    let mut mbuf = Buffer::empty(area);
+    let inner = render_modal_frame(area, 40, 10, "Test Modal", &styles, &mut mbuf);
+    let mx = inner.x - 1;
+    let my = inner.y - 1;
+    assert_eq!(mbuf[(mx + 1, my)].symbol(), "─");
+    assert_eq!(mbuf[(mx + 1, my)].fg, Color::Indexed(39));
+    assert_eq!(mbuf[(mx + 2, my)].symbol(), "[");
+    assert_eq!(mbuf[(mx + 2, my)].fg, Color::Indexed(226));
+}

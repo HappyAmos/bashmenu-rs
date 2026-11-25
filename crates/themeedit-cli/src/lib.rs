@@ -16,6 +16,7 @@ use bashmenu_tui::{is_inherited_color_value, ResolvedThemeStyles, TextInput, The
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
+use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Widget};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -2723,15 +2724,21 @@ pub fn render_root_frame(
         }
     }
 
+    let border_style = Style::default().fg(styles.border);
     let root_block = Block::default()
         .borders(Borders::ALL)
-        .title(format!(
-            "─[ ThemeEdit: {}{} ]",
-            theme_name,
-            if is_modified { " (Modified)" } else { "" }
-        ))
-        .border_style(Style::default().fg(styles.border))
-        .title_style(styles.title)
+        .title(Line::from(vec![
+            Span::styled("─", border_style),
+            Span::styled(
+                format!(
+                    "[ ThemeEdit: {}{} ]",
+                    theme_name,
+                    if is_modified { " (Modified)" } else { "" }
+                ),
+                styles.title,
+            ),
+        ]))
+        .border_style(border_style)
         .style(Style::default().bg(styles.background));
     root_block.render(area, buf);
 }

@@ -550,11 +550,14 @@ pub fn render_preview_pane_with_base(
                 }
             }
 
+            let modal_border_style = Style::default().fg(preview_styles.border);
             let modal_block = Block::default()
                 .borders(Borders::ALL)
-                .title("─[ Confirmation Dialog ]")
-                .title_style(preview_styles.title)
-                .border_style(Style::default().fg(preview_styles.border))
+                .title(Line::from(vec![
+                    Span::styled("─", modal_border_style),
+                    Span::styled("[ Confirmation Dialog ]", preview_styles.title),
+                ]))
+                .border_style(modal_border_style)
                 .style(Style::default().bg(preview_styles.background));
             modal_block.render(Rect::new(mod_x, mod_y, mod_w, mod_h), buf);
 
@@ -928,19 +931,23 @@ fn render_theme_editor_preview(
 
         Block::default()
             .borders(Borders::ALL)
-            .title("─[ Tokens ]")
-            .title_style(preview_styles.title)
+            .title(Line::from(vec![
+                Span::styled("─", border_style),
+                Span::styled("[ Tokens ]", preview_styles.title),
+            ]))
             .border_style(border_style)
             .style(Style::default().bg(preview_styles.background))
             .render(tree_rect, buf);
 
+        let sample_border_style =
+            Style::default().fg(preview_styles.accent.fg.unwrap_or(preview_styles.border));
         Block::default()
             .borders(Borders::ALL)
-            .title("─[ Preview Pane ]")
-            .title_style(preview_styles.title)
-            .border_style(
-                Style::default().fg(preview_styles.accent.fg.unwrap_or(preview_styles.border)),
-            )
+            .title(Line::from(vec![
+                Span::styled("─", sample_border_style),
+                Span::styled("[ Preview Pane ]", preview_styles.title),
+            ]))
+            .border_style(sample_border_style)
             .style(Style::default().bg(preview_styles.background))
             .render(sample_rect, buf);
 
@@ -1044,8 +1051,10 @@ fn render_shortcut_editor_preview(
 
     Block::default()
         .borders(Borders::ALL)
-        .title("─[ Keyboard Shortcuts ]")
-        .title_style(preview_styles.title)
+        .title(Line::from(vec![
+            Span::styled("─", border_style),
+            Span::styled("[ Keyboard Shortcuts ]", preview_styles.title),
+        ]))
         .border_style(border_style)
         .style(Style::default().bg(preview_styles.background))
         .render(list_rect, buf);
@@ -1093,8 +1102,10 @@ fn render_shortcut_editor_preview(
     if insp_rect.width >= 6 {
         Block::default()
             .borders(Borders::ALL)
-            .title("─[ Shortcut Inspector ]")
-            .title_style(preview_styles.title)
+            .title(Line::from(vec![
+                Span::styled("─", border_style),
+                Span::styled("[ Shortcut Inspector ]", preview_styles.title),
+            ]))
             .border_style(border_style)
             .style(Style::default().bg(preview_styles.background))
             .render(insp_rect, buf);
