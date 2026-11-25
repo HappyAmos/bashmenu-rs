@@ -141,4 +141,16 @@ Quick summary:
 4. **Interactive Testing:** Test your changes in a real terminal emulator (e.g., Alacritty, Kitty, WezTerm, tmux) to verify visual rendering and keyboard navigation.
 5. **Open a PR:** Fill out the [Pull Request Template](.github/PULL_REQUEST_TEMPLATE.md) and link any relevant issues.
 
+---
+
+## Release Cycle
+
+BashMenu-RS follows **trunk-based development** and [Semantic Versioning](https://semver.org/):
+
+- **`main` is the live development branch:** Every PR merged into `main` passes full CI checks (Linux, macOS, Windows, and ShellCheck), keeping `main` continuously buildable.
+- **Weekly Friday Evening Release PRs:** Every Friday at `23:00 UTC` (6:00 PM EST / 7:00 PM EDT), [`.github/workflows/weekly-release.yml`](.github/workflows/weekly-release.yml) checks for new user-facing commits (`feat:`, `fix:`, `perf:`, `refactor:`) since the latest `v*.*.*` tag.
+  - If none exist, the week is skipped automatically (no empty releases).
+  - If releasable changes exist, the workflow bumps version files (`Cargo.toml`, `Cargo.lock`, `assets/bashmenu.md`, `assets/bashmenu.1`), updates [`CHANGELOG.md`](CHANGELOG.md), and opens a `chore(release): prepare vX.Y.Z` PR for review.
+- **Automated Tagging & Publishing:** Squash-merging a Release PR automatically creates and pushes the immutable `vX.Y.Z` tag and runs [`.github/workflows/release.yml`](.github/workflows/release.yml) to build and publish release archives with `SHA256SUMS.txt`. Published release tags are never moved retroactively.
+
 Thank you for helping make BashMenu-RS better!
