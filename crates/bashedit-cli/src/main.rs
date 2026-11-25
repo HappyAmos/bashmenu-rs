@@ -505,7 +505,7 @@ fn main() -> Result<()> {
 
                 let is_active = idx == active_tab_idx;
                 let tab_style = if is_active {
-                    styles.selection.add_modifier(Modifier::BOLD)
+                    styles.selected_tab.add_modifier(Modifier::BOLD)
                 } else {
                     styles.text.add_modifier(Modifier::DIM)
                 };

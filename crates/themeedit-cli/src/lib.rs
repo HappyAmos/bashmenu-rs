@@ -472,6 +472,10 @@ impl ThemeEditorState {
                 kind: TokenKind::Color("selection".to_string()),
             },
             TokenItem {
+                label: "Selected Tab Color".to_string(),
+                kind: TokenKind::Color("selected_tab".to_string()),
+            },
+            TokenItem {
                 label: "Border Color".to_string(),
                 kind: TokenKind::Color("border".to_string()),
             },
@@ -733,6 +737,13 @@ impl ThemeEditorState {
         );
         colors.insert(
             "selection".to_string(),
+            serde_json::Value::Array(vec![
+                serde_json::Value::Number(255.into()),
+                serde_json::Value::Number(201.into()),
+            ]),
+        );
+        colors.insert(
+            "selected_tab".to_string(),
             serde_json::Value::Array(vec![
                 serde_json::Value::Number(255.into()),
                 serde_json::Value::Number(201.into()),
@@ -1680,6 +1691,8 @@ impl ThemeEditorState {
                             || (k == "footer" && key == "bottom_bar")
                             || (k == "selection"
                                 && (key == "sel" || key == "selection_color" || key == "select"))
+                            || (k == "selected_tab"
+                                && (key == "active_tab" || key == "selected_tab_color"))
                             || (k == "whitespace"
                                 && (key == "ws"
                                     || key == "whitespace_color"
@@ -1902,7 +1915,7 @@ fn resolve_activity_color(theme: &Theme, activity: ThemeActivity, key: &str) -> 
                 }
                 return None;
             }
-            if key == "highlight" || key == "selection" {
+            if key == "highlight" || key == "selection" || key == "selected_tab" {
                 if let Some(val) = find_tier_token_value(c_map, act, key) {
                     if let Some(seq) = val.as_array() {
                         if let Some(bg) = seq.get(1) {
@@ -1914,7 +1927,7 @@ fn resolve_activity_color(theme: &Theme, activity: ThemeActivity, key: &str) -> 
                                 }
                             }
                         }
-                        if key == "selection" {
+                        if key == "selection" || key == "selected_tab" {
                             if let Some(fg) = seq.first() {
                                 if !is_inherited_color_value(fg) {
                                     if let Some(c) = bashmenu_tui::parse_color_value(fg) {
@@ -1961,6 +1974,11 @@ fn resolve_activity_color(theme: &Theme, activity: ThemeActivity, key: &str) -> 
             .selection
             .bg
             .or(styles.selection.fg)
+            .unwrap_or(Color::Cyan),
+        "selected_tab" => styles
+            .selected_tab
+            .bg
+            .or(styles.selected_tab.fg)
             .unwrap_or(Color::Cyan),
         "whitespace" => styles.whitespace.fg.unwrap_or(Color::DarkGray),
         "border" => styles.border,
@@ -2093,7 +2111,7 @@ fn write_color_token_to_tier(
             contrast_fg_value(color, tier)
         };
         target.insert(key, serde_json::Value::Array(vec![fg_val, val]));
-    } else if key == "selection" {
+    } else if key == "selection" || key == "selected_tab" {
         let fg_val = contrast_fg_value(color, tier);
         target.insert(key, serde_json::Value::Array(vec![fg_val, val]));
     } else if key == "highlight_text" {
@@ -2310,10 +2328,20 @@ pub fn get_token_preview_spans(
         }
         TokenKind::Color(key) if key == "selection" => {
             if mode == PreviewMode::TextEditor {
-                spans.push((content_start_y, p_inner_x, p_inner_x + 17));
                 spans.push((content_start_y + 5, p_inner_x + 7, p_inner_x + 25));
             } else {
                 spans.push((content_start_y, p_inner_x, p_inner_x + p_avail_w));
+            }
+        }
+        TokenKind::Color(key) if key == "selected_tab" => {
+            if let Some(active_tab) = preview_tab_bar_layout(right_area, mode)
+                .into_iter()
+                .find(|t| t.mode == mode)
+            {
+                spans.push((right_area.y, active_tab.x_start, active_tab.x_end));
+            }
+            if mode == PreviewMode::TextEditor {
+                spans.push((content_start_y, p_inner_x, p_inner_x + 17));
             }
         }
         TokenKind::Color(key) if key == "whitespace" => {

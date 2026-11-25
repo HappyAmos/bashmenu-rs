@@ -32,6 +32,7 @@ pub fn activity_override_tokens(activity_key: &str) -> &'static [&'static str] {
             "divider",
             "accent",
             "selection",
+            "selected_tab",
             "whitespace",
             "gutter",
             "help_text",
@@ -58,7 +59,7 @@ pub fn activity_override_tokens(activity_key: &str) -> &'static [&'static str] {
             "shadow",
             "window_close_button",
         ],
-        "menuedit" | "themeedit" | "shortcutedit" => &[
+        "menuedit" | "shortcutedit" => &[
             "background",
             "title",
             "text",
@@ -68,6 +69,24 @@ pub fn activity_override_tokens(activity_key: &str) -> &'static [&'static str] {
             "divider",
             "accent",
             "selection",
+            "shortcut_key",
+            "help_text",
+            "gutter",
+            "footer",
+            "scrollbar",
+            "window_close_button",
+        ],
+        "themeedit" => &[
+            "background",
+            "title",
+            "text",
+            "highlight",
+            "highlight_text",
+            "border",
+            "divider",
+            "accent",
+            "selection",
+            "selected_tab",
             "shortcut_key",
             "help_text",
             "gutter",
@@ -517,6 +536,7 @@ impl Theme {
         colors.insert("accent".to_string(), make_pair(255, -1));
         colors.insert("shortcut_key".to_string(), make_pair(255, -1));
         colors.insert("selection".to_string(), make_pair(0, 255));
+        colors.insert("selected_tab".to_string(), make_pair(0, 255));
         colors.insert("whitespace".to_string(), make_pair(242, -1));
         colors.insert("gutter".to_string(), make_pair(242, -1));
         colors.insert("footer".to_string(), make_pair(245, -1));

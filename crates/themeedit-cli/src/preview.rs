@@ -113,18 +113,31 @@ pub fn render_preview_pane_with_base(
     }
 
     let tabs = preview_tab_bar_layout(right_area, mode);
-    let tab_labels: Vec<&str> = tabs.iter().map(|t| t.label.as_str()).collect();
-    let preview_title = format!("─[ {} ]", tab_labels.join(" | "));
     let canvas_styles = if mode == PreviewMode::Toast {
         base_styles
     } else {
         preview_styles
     };
 
+    let mut title_spans = Vec::with_capacity(tabs.len() * 2 + 3);
+    title_spans.push(Span::styled("─", Style::default().fg(canvas_styles.border)));
+    title_spans.push(Span::styled("[ ", canvas_styles.title));
+    for (idx, tab) in tabs.iter().enumerate() {
+        if idx > 0 {
+            title_spans.push(Span::styled(" | ", canvas_styles.title));
+        }
+        let tab_style = if tab.mode == mode {
+            canvas_styles.selected_tab.add_modifier(Modifier::BOLD)
+        } else {
+            canvas_styles.title
+        };
+        title_spans.push(Span::styled(tab.label.clone(), tab_style));
+    }
+    title_spans.push(Span::styled(" ]", canvas_styles.title));
+
     let preview_block = Block::default()
         .borders(Borders::ALL)
-        .title(preview_title)
-        .title_style(canvas_styles.title)
+        .title(Line::from(title_spans))
         .border_style(Style::default().fg(canvas_styles.border))
         .style(Style::default().bg(canvas_styles.background));
     preview_block.render(right_area, buf);
@@ -392,7 +405,7 @@ pub fn render_preview_pane_with_base(
             let tab_line = Line::from(vec![
                 Span::styled(
                     " [bashmenu.yml*] ",
-                    preview_styles.selection.add_modifier(Modifier::BOLD),
+                    preview_styles.selected_tab.add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(" [notes.yml] ", preview_styles.text),
                 Span::styled(" [+] ", preview_styles.accent),
