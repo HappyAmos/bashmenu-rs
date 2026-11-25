@@ -64,7 +64,7 @@ pub fn activity_override_tokens(activity_key: &str) -> &'static [&'static str] {
             "modal_cancel_button",
             "window_close_button",
         ],
-        "menuedit" | "shortcutedit" => &[
+        "menuedit" => &[
             "background",
             "title",
             "text",
@@ -75,6 +75,24 @@ pub fn activity_override_tokens(activity_key: &str) -> &'static [&'static str] {
             "accent",
             "selection",
             "shortcut_key",
+            "help_text",
+            "gutter",
+            "footer",
+            "scrollbar",
+            "window_close_button",
+        ],
+        "shortcutedit" => &[
+            "background",
+            "title",
+            "text",
+            "highlight",
+            "highlight_text",
+            "border",
+            "divider",
+            "accent",
+            "selection",
+            "shortcut_key",
+            "key_color",
             "help_text",
             "gutter",
             "footer",
@@ -541,6 +559,7 @@ impl Theme {
         colors.insert("divider".to_string(), make_pair(245, -1));
         colors.insert("accent".to_string(), make_pair(255, -1));
         colors.insert("shortcut_key".to_string(), make_pair(255, -1));
+        colors.insert("key_color".to_string(), make_pair(255, -1));
         colors.insert("selection".to_string(), make_pair(0, 255));
         colors.insert("selected_tab".to_string(), make_pair(0, 255));
         colors.insert("unselected_tab".to_string(), make_pair(245, -1));

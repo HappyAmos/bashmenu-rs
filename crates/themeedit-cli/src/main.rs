@@ -2040,6 +2040,8 @@ fn open_selected_token_picker(state: &mut ThemeEditorState, active_modal: &mut A
                 "Pick Unselected Tab Color"
             } else if key == "line_numbers" {
                 "Pick Line Numbers Color"
+            } else if key == "key_color" {
+                "Pick Key Color"
             } else {
                 "Pick Theme Color"
             };
@@ -2858,7 +2860,7 @@ fn hit_test_preview_with_style(
                         ));
                     }
                     if col > list_rect.x && col < list_rect.x + 10 {
-                        return Some(("shortcut_key", row, list_rect.x + 1, list_rect.x + 10));
+                        return Some(("key_color", row, list_rect.x + 1, list_rect.x + 10));
                     }
                     return Some((
                         "text",
@@ -2868,17 +2870,9 @@ fn hit_test_preview_with_style(
                     ));
                 }
                 if col > insp_rect.x && col < insp_rect.right().saturating_sub(1) {
-                    if row == p_inner_y + 1 {
+                    if row == p_inner_y + 1 || row == p_inner_y + 3 {
                         return Some((
                             "accent",
-                            row,
-                            insp_rect.x + 2,
-                            insp_rect.right().saturating_sub(2),
-                        ));
-                    }
-                    if row == p_inner_y + 3 {
-                        return Some((
-                            "shortcut_key",
                             row,
                             insp_rect.x + 2,
                             insp_rect.right().saturating_sub(2),
@@ -3006,7 +3000,7 @@ mod tests {
                 false
             )
             .map(|r| r.0),
-            Some("shortcut_key")
+            Some("key_color")
         );
         assert_eq!(
             hit_test_preview(

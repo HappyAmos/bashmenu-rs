@@ -993,6 +993,10 @@ pub fn derive_palette_from_image(
         "shortcut_key".to_string(),
         make_pair(secondary_accent as i64, -1),
     );
+    colors.insert(
+        "key_color".to_string(),
+        make_pair(secondary_accent as i64, -1),
+    );
     colors.insert("divider".to_string(), make_pair(border_color as i64, -1));
     colors.insert(
         "help_text".to_string(),

@@ -1108,7 +1108,7 @@ fn render_shortcut_editor_preview(
             buf.set_string(list_rect.x + 1, y, &text, preview_styles.highlight);
         } else {
             let line = Line::from(vec![
-                Span::styled(*key, preview_styles.shortcut_key),
+                Span::styled(*key, preview_styles.key_color),
                 Span::styled(" ", preview_styles.text),
                 Span::styled(*desc, preview_styles.text),
             ]);
@@ -1144,7 +1144,7 @@ fn render_shortcut_editor_preview(
                     preview_styles.accent.add_modifier(Modifier::BOLD),
                 ),
                 ("Description: Launch Terminal", preview_styles.text),
-                ("Key Chord:   [1]", preview_styles.shortcut_key),
+                ("Key Chord:   [1]", preview_styles.accent),
                 ("Action:      alacritty", preview_styles.text),
                 ("Mode:        Console", preview_styles.help_text),
             ];

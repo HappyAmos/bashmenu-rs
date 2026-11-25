@@ -2650,6 +2650,12 @@ pub fn render_shortcut_editor_screen(
                 styles.text.bg(base_bg)
             };
             buf.set_string(2, y, &clipped, row_style);
+            if !is_sel && entry.enabled {
+                let key_col = format!("{:<13}", key_disp);
+                let key_clipped: String =
+                    key_col.chars().take(item_max_w.saturating_sub(4)).collect();
+                buf.set_string(6, y, &key_clipped, styles.key_color.bg(base_bg));
+            }
         }
 
         // Scrollbar 1 column inside right border when overflowing
