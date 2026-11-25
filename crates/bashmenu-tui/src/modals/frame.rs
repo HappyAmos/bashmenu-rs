@@ -4,6 +4,7 @@ use crate::style::ResolvedThemeStyles;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Widget};
 
 /// Calculates the outer `Rect` for a modal dialog box within the viewport.
@@ -128,7 +129,7 @@ pub fn render_modal_frame(
     if max_title_w > 0 && !clean_title.is_empty() {
         let cur_w = unicode_width::UnicodeWidthStr::width(clean_title);
         if cur_w <= max_title_w {
-            title_str = format!("─[ {} ]", clean_title);
+            title_str = format!("[ {} ]", clean_title);
         } else if max_title_w > 1 {
             let mut clipped = String::new();
             let mut w_count = 0;
@@ -141,19 +142,21 @@ pub fn render_modal_frame(
                 w_count += cw;
             }
             clipped.push('…');
-            title_str = format!("─[ {} ]", clipped);
+            title_str = format!("[ {} ]", clipped);
         }
     }
 
+    let border_style = Style::default().fg(styles.border);
     let mut block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(styles.border))
+        .border_style(border_style)
         .style(Style::default().bg(styles.background));
 
     if !title_str.is_empty() {
-        block = block
-            .title(title_str)
-            .title_style(styles.title.add_modifier(Modifier::BOLD));
+        block = block.title(Line::from(vec![
+            Span::styled("─", border_style),
+            Span::styled(title_str, styles.title.add_modifier(Modifier::BOLD)),
+        ]));
     }
 
     let inner = block.inner(dialog_rect);
