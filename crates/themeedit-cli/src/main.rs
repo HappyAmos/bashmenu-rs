@@ -9,8 +9,8 @@ use bashmenu_core::{run_glyphs_search, t, ToastNotification, ToastSeverity, Toas
 use bashmenu_tui::{
     get_marquee_slice, install_panic_hook, AsciiGridModal, BackgroundConfigAction,
     BackgroundConfigModal, BackgroundFocus, ColorPickerModal, ConfirmModal, FilePickerModal,
-    HelpModal, InputModal, MarqueeTracker, ResolvedThemeStyles, TerminalGuard, ThemePickerModal,
-    ToastRack, WallpaperCompositor,
+    HelpModal, InputModal, MarqueeTracker, ResolvedThemeStyles, TerminalGuard, ThemeActivity,
+    ThemePickerModal, ToastRack, WallpaperCompositor,
 };
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers, MouseButton, MouseEventKind};
@@ -22,8 +22,9 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use themeedit_cli::{
     default_wallpaper_dir, extract_preview_cell_color, extract_preview_color_at, format_color_code,
-    get_token_preview_spans, relativize_wallpaper_path, render_preview_pane, render_root_frame,
-    toast_preview_boxes, PreviewMode, ThemeEditorState, TokenKind, TreeRow,
+    get_token_preview_spans, preview_tab_bar_layout, relativize_wallpaper_path,
+    render_preview_pane_with_base, render_root_frame, toast_preview_boxes, PreviewMode,
+    ThemeEditorState, TokenKind, TreeRow,
 };
 
 /// Command-line argument configuration for the Theme Editor (`themeedit`).
@@ -150,6 +151,22 @@ fn trigger_derive_colors(
     }
 }
 
+/// Resolves which preview tab (if any) was clicked on the preview header row.
+fn resolve_clicked_preview_tab(
+    col: u16,
+    row: u16,
+    right_area: Rect,
+    current: PreviewMode,
+) -> Option<PreviewMode> {
+    if row != right_area.y {
+        return None;
+    }
+    preview_tab_bar_layout(right_area, current)
+        .into_iter()
+        .find(|t| col >= t.x_start && col < t.x_end)
+        .map(|t| t.mode)
+}
+
 /// Opens the interactive theme picker modal populated with loaded themes.
 fn open_theme_picker(state: &ThemeEditorState) -> ThemePickerModal {
     let names: Vec<String> = state.themes.keys().cloned().collect();
@@ -263,7 +280,17 @@ fn main() -> Result<()> {
         let area = Rect::new(0, 0, size.width, size.height);
 
         // Derive resolved styles from current edited theme for live preview
-        let preview_styles = ResolvedThemeStyles::from_theme(&state.current_theme, true);
+        let base_styles = ResolvedThemeStyles::from_theme(&state.current_theme, true);
+        let preview_styles = ResolvedThemeStyles::from_theme_for_activity(
+            &state.current_theme,
+            true,
+            state.active_activity(),
+        );
+        let themeedit_styles = ResolvedThemeStyles::from_theme_for_activity(
+            &state.current_theme,
+            true,
+            ThemeActivity::ThemeEdit,
+        );
 
         if need_redraw {
             let wp_cfg = state.current_theme.wallpaper_config();
@@ -282,13 +309,13 @@ fn main() -> Result<()> {
                     buf,
                     &state.current_name,
                     state.is_modified,
-                    &preview_styles,
+                    &themeedit_styles,
                 );
 
                 // Universal close button [X] on top right just left of border
                 if area.width > 6 {
                     let close_x = area.x + area.width - 4;
-                    buf.set_string(close_x, area.y, "[X]", preview_styles.window_close_button);
+                    buf.set_string(close_x, area.y, "[X]", themeedit_styles.window_close_button);
                 }
 
                 if area.width < 50 || area.height < 15 {
@@ -323,9 +350,7 @@ fn main() -> Result<()> {
                     left_area.x,
                     left_area.y,
                     theme_label,
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
+                    themeedit_styles.title.add_modifier(Modifier::BOLD),
                 );
                 let input_box_x = left_area.x + theme_label.len() as u16;
                 let input_box_w = (left_area.width.saturating_sub(theme_label.len() as u16)).max(8);
@@ -396,9 +421,7 @@ fn main() -> Result<()> {
                     left_area.x,
                     left_area.y + 2,
                     list_title,
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
+                    themeedit_styles.title.add_modifier(Modifier::BOLD),
                 );
 
                 for (v_idx, tree_row) in tree_rows
@@ -415,14 +438,9 @@ fn main() -> Result<()> {
                             let expanded = state.is_category_expanded(cat);
                             let icon = if expanded { "▾ " } else { "▸ " };
                             let row_style = if is_sel {
-                                Style::default()
-                                    .fg(Color::Black)
-                                    .bg(Color::Cyan)
-                                    .add_modifier(Modifier::BOLD)
+                                themeedit_styles.highlight.add_modifier(Modifier::BOLD)
                             } else {
-                                Style::default()
-                                    .fg(Color::Yellow)
-                                    .add_modifier(Modifier::BOLD)
+                                themeedit_styles.accent.add_modifier(Modifier::BOLD)
                             };
                             let label_text = format!(" {}{:<25}", icon, cat.label());
                             buf.set_line(
@@ -437,9 +455,9 @@ fn main() -> Result<()> {
                             let val_str = state.get_token_value_display(token);
                             let cursor = if is_sel { "  ▶ " } else { "    " };
                             let row_style = if is_sel {
-                                Style::default().fg(Color::Black).bg(Color::Cyan)
+                                themeedit_styles.highlight
                             } else {
-                                Style::default().fg(Color::White)
+                                themeedit_styles.text
                             };
                             let label_text = format!("{}{:<20} {}", cursor, token.label, val_str);
                             let label_vis =
@@ -469,11 +487,12 @@ fn main() -> Result<()> {
                 }
 
                 // 2. Render Right Panel: Live Multi-View Preview Block
-                render_preview_pane(
+                render_preview_pane_with_base(
                     right_area,
                     buf,
                     state.preview_mode,
                     &preview_styles,
+                    &base_styles,
                     &mut wp_compositor,
                 );
 
@@ -1341,21 +1360,15 @@ fn main() -> Result<()> {
                                     continue;
                                 }
 
-                                // 2. Click on preview mode tab header
-                                let title_text = format!(
-                                    " {} ",
-                                    t!(
-                                        "themeedit.preview_mode_switch",
-                                        mode => state.preview_mode.title()
-                                    )
-                                );
-                                let title_start = right_area.x + 3;
-                                let title_end = title_start + title_text.len() as u16;
-                                if m.row == right_area.y
-                                    && m.column >= title_start
-                                    && m.column < title_end
-                                {
-                                    state.preview_mode = state.preview_mode.next();
+                                // 2. Click on preview mode tab header -> switch directly to clicked tab
+                                if let Some(clicked_mode) = resolve_clicked_preview_tab(
+                                    m.column,
+                                    m.row,
+                                    right_area,
+                                    state.preview_mode,
+                                ) {
+                                    state.preview_mode = clicked_mode;
+                                    need_redraw = true;
                                     continue;
                                 }
 
@@ -3051,6 +3064,34 @@ mod tests {
             )
             .map(|r| r.0),
             Some("text")
+        );
+    }
+
+    #[test]
+    fn test_resolve_clicked_preview_tab_switches_to_exact_tab() {
+        let right_area = Rect::new(43, 2, 100, 24);
+        let tabs = preview_tab_bar_layout(right_area, PreviewMode::Menu);
+        assert_eq!(tabs.len(), 7);
+        for tab in &tabs {
+            let mid_x = tab.x_start + (tab.x_end - tab.x_start) / 2;
+            assert_eq!(
+                resolve_clicked_preview_tab(mid_x, right_area.y, right_area, PreviewMode::Menu),
+                Some(tab.mode),
+                "Clicking tab {:?} at x={} must switch directly to {:?}",
+                tab.mode,
+                mid_x,
+                tab.mode
+            );
+        }
+        // Clicking a non-header row returns None
+        assert_eq!(
+            resolve_clicked_preview_tab(
+                tabs[0].x_start,
+                right_area.y + 1,
+                right_area,
+                PreviewMode::Menu
+            ),
+            None
         );
     }
 

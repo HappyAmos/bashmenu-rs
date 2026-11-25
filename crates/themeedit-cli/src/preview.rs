@@ -945,22 +945,22 @@ fn render_theme_editor_preview(
             .borders(Borders::ALL)
             .title(Line::from(vec![
                 Span::styled("─", sample_border_style),
-                Span::styled("[ Preview Pane ]", preview_styles.title),
+                Span::styled("[ Main Menu ]", preview_styles.title),
             ]))
             .border_style(sample_border_style)
             .style(Style::default().bg(preview_styles.background))
             .render(sample_rect, buf);
 
-        // Tree rows
-        let rows: [(&str, Style); 5] = [
-            (
-                "▾ Colors",
-                preview_styles.accent.add_modifier(Modifier::BOLD),
-            ),
+        // Tree rows matching real ThemeEdit collapsible category dropdowns
+        let cat_style = preview_styles.accent.add_modifier(Modifier::BOLD);
+        let rows: [(&str, Style); 7] = [
+            ("▾ Theme:", cat_style),
+            ("▾ Colors:", cat_style),
             ("  Background    Color 234", preview_styles.text),
             ("▶ Text Color    Color 255", preview_styles.highlight),
             ("  Help Text     Inherit", preview_styles.text),
             ("  Divider       Color 81", preview_styles.text),
+            ("▸ Borders:", cat_style),
         ];
         for (idx, (txt, st)) in rows.iter().enumerate() {
             let y = tree_rect.y + 1 + idx as u16;
@@ -983,21 +983,45 @@ fn render_theme_editor_preview(
                 .set_style(preview_styles.scrollbar);
         }
 
-        // Right sample preview content
-        let sx = sample_rect.x + 2;
+        // Right sample preview content: miniature Main Menu
+        let sx = sample_rect.x + 1;
+        let sw = sample_rect.width.saturating_sub(2) as usize;
         let sy = sample_rect.y + 1;
         let smax = sample_rect.bottom().saturating_sub(1);
-        if sy < smax {
-            buf.set_string(sx, sy, "Sample Header", preview_styles.title);
+        if sy < smax && sw > 0 {
+            let active_row = format!(
+                "{:<w$}",
+                "► 1. Terminal".chars().take(sw).collect::<String>(),
+                w = sw
+            );
+            buf.set_string(sx, sy, &active_row, preview_styles.highlight);
         }
-        if sy + 1 < smax {
-            buf.set_string(sx, sy + 1, "Active Highlight", preview_styles.highlight);
+        if sy + 1 < smax && sw > 0 {
+            let line = Line::from(vec![
+                Span::styled("  ", preview_styles.text),
+                Span::styled("2.", preview_styles.shortcut_key),
+                Span::styled(" Files ", preview_styles.text),
+                Span::styled("»", preview_styles.accent),
+            ]);
+            buf.set_line(sx, sy + 1, &line, sw as u16);
         }
-        if sy + 2 < smax {
-            buf.set_string(sx, sy + 2, "────────", preview_styles.divider);
+        if sy + 2 < smax && sw > 0 {
+            buf.set_string(sx, sy + 2, "─".repeat(sw), preview_styles.divider);
         }
-        if sy + 3 < smax {
-            buf.set_string(sx, sy + 3, "Hint / Inherit -1", preview_styles.help_text);
+        if sy + 3 < smax && sw > 0 {
+            let line = Line::from(vec![
+                Span::styled("  ", preview_styles.text),
+                Span::styled("3.", preview_styles.shortcut_key),
+                Span::styled(" Settings", preview_styles.text),
+            ]);
+            buf.set_line(sx, sy + 3, &line, sw as u16);
+        }
+        if sy + 4 < smax && sw > 0 {
+            let line = Line::from(vec![
+                Span::styled("F1 Help ", preview_styles.help_text),
+                Span::styled("│ 12:00", preview_styles.gutter),
+            ]);
+            buf.set_line(sx, sy + 4, &line, sw as u16);
         }
     }
 
