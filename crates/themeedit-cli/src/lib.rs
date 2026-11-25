@@ -497,6 +497,10 @@ impl ThemeEditorState {
                 kind: TokenKind::Color("shortcut_key".to_string()),
             },
             TokenItem {
+                label: "Key Color".to_string(),
+                kind: TokenKind::Color("key_color".to_string()),
+            },
+            TokenItem {
                 label: "Help Text Color".to_string(),
                 kind: TokenKind::Color("help_text".to_string()),
             },
@@ -782,6 +786,13 @@ impl ThemeEditorState {
             serde_json::Value::Array(vec![
                 serde_json::Value::Number(255.into()),
                 serde_json::Value::Number(201.into()),
+            ]),
+        );
+        colors.insert(
+            "key_color".to_string(),
+            serde_json::Value::Array(vec![
+                serde_json::Value::Number(226.into()),
+                serde_json::Value::Number((-1).into()),
             ]),
         );
         colors.insert(
@@ -1735,6 +1746,8 @@ impl ThemeEditorState {
                 self.tokens.iter().position(|t| match &t.kind {
                     TokenKind::Color(k) => {
                         (k == "shortcut_key" && (key == "shortcut_gutter" || key == "shortcut"))
+                            || (k == "key_color"
+                                && (key == "key_assignment" || key == "shortcut_key_color"))
                             || (k == "text" && key == "content")
                             || (k == "plugin" && (key == "plugin_text" || key == "plugins"))
                             || (k == "highlight_text"
@@ -2054,6 +2067,7 @@ fn resolve_activity_color(theme: &Theme, activity: ThemeActivity, key: &str) -> 
         "divider" => styles.divider.fg.unwrap_or(Color::Cyan),
         "accent" => styles.accent.fg.unwrap_or(Color::LightCyan),
         "shortcut_key" => styles.shortcut_key.fg.unwrap_or(Color::Yellow),
+        "key_color" => styles.key_color.fg.unwrap_or(Color::Yellow),
         "help_text" => styles.help_text.fg.unwrap_or(Color::Cyan),
         "plugin" => styles.plugin.fg.unwrap_or(Color::Cyan),
         "gutter" => styles.gutter.fg.unwrap_or(Color::DarkGray),
@@ -2646,6 +2660,7 @@ pub fn get_token_preview_spans(
                 let insp_x = p_inner_x + left_w;
                 if right_w > 4 {
                     spans.push((content_start_y + 1, insp_x + 2, insp_x + right_w - 2));
+                    spans.push((content_start_y + 3, insp_x + 2, insp_x + right_w - 2));
                 }
             }
             _ => {
@@ -2653,6 +2668,18 @@ pub fn get_token_preview_spans(
                 spans.push((content_start_y + 1, p_inner_x + 25, p_inner_x + 28));
             }
         },
+        TokenKind::Color(key) if key == "key_color" => {
+            if mode == PreviewMode::ShortcutEditor {
+                let left_w = p_avail_w / 2;
+                for r in 2..=4_u16 {
+                    spans.push((
+                        content_start_y + r,
+                        p_inner_x + 1,
+                        (p_inner_x + 9).min(p_inner_x + left_w - 1),
+                    ));
+                }
+            }
+        }
         TokenKind::Color(key) if key == "shortcut_key" => match mode {
             PreviewMode::TextEditor => {
                 let footer_y = bot_y.saturating_sub(1);
@@ -2667,21 +2694,6 @@ pub fn get_token_preview_spans(
                 let insp_x = p_inner_x + left_w;
                 if right_w > 2 {
                     spans.push((content_start_y + 3, insp_x + 1, insp_x + right_w - 1));
-                }
-            }
-            PreviewMode::ShortcutEditor => {
-                let left_w = p_avail_w / 2;
-                let right_w = p_avail_w.saturating_sub(left_w);
-                let insp_x = p_inner_x + left_w;
-                for r in 2..=4_u16 {
-                    spans.push((
-                        content_start_y + r,
-                        p_inner_x + 1,
-                        (p_inner_x + 9).min(p_inner_x + left_w - 1),
-                    ));
-                }
-                if right_w > 4 {
-                    spans.push((content_start_y + 3, insp_x + 2, insp_x + right_w - 2));
                 }
             }
             _ => {

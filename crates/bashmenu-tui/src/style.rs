@@ -79,6 +79,7 @@ impl ThemeActivity {
                 "line_numbers",
                 "whitespace",
                 "shortcut_key",
+                "key_color",
                 "help_text",
                 "plugin",
                 "gutter",
@@ -340,6 +341,8 @@ pub struct ResolvedThemeStyles {
     pub selection: Style,
     /// Shortcut key indicator style (e.g., [1] or <F1>)
     pub shortcut_key: Style,
+    /// Key assignment badge color in shortcuts lists
+    pub key_color: Style,
     /// Divider rule style
     pub divider: Style,
     /// Divider rule character
@@ -413,6 +416,9 @@ impl Default for ResolvedThemeStyles {
             plugin: Style::default().fg(Color::Cyan),
             selection: Style::default().fg(Color::Black).bg(Color::Cyan),
             shortcut_key: Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+            key_color: Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
             divider: Style::default().fg(Color::Cyan),
@@ -756,7 +762,18 @@ impl ResolvedThemeStyles {
             .filter(|v| !is_inherited_color_value(v))
             .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
         {
-            self.shortcut_key = merge_style_pair(self.shortcut_key, st, Some(Modifier::BOLD));
+            let merged = merge_style_pair(self.shortcut_key, st, Some(Modifier::BOLD));
+            self.shortcut_key = merged;
+            if !is_override && !p.contains_key("key_color") {
+                self.key_color = merged;
+            }
+        }
+        if let Some(st) = p
+            .get("key_color")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
+        {
+            self.key_color = merge_style_pair(self.key_color, st, Some(Modifier::BOLD));
         }
         if let Some(st) = p
             .get("divider")

@@ -3209,3 +3209,69 @@ fn test_flash_spans_mode_aware_across_preview_tabs() {
         );
     }
 }
+
+#[test]
+fn test_shortcuts_key_color_and_key_chord_accent() {
+    use bashmenu_tui::{ResolvedThemeStyles, ThemeActivity};
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::style::Color;
+    use themeedit_cli::{get_token_preview_spans, render_preview_pane, PreviewMode};
+
+    let themes_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(themes_path, Some("dracula".to_string()));
+    state.preview_mode = PreviewMode::ShortcutEditor;
+
+    assert!(state.select_token_by_key("key_color"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Key Color");
+    state.set_color_token_value("key_color", Color::Indexed(208));
+
+    assert!(state.select_token_by_key("accent"));
+    state.set_color_token_value("accent", Color::Indexed(51));
+
+    let resolved = ResolvedThemeStyles::from_theme_for_activity(
+        &state.current_theme,
+        true,
+        ThemeActivity::ShortcutEdit,
+    );
+    assert_eq!(resolved.key_color.fg, Some(Color::Indexed(208)));
+    assert_eq!(resolved.accent.fg, Some(Color::Indexed(51)));
+
+    let area = Rect::new(0, 0, 96, 24);
+    let mut buf = Buffer::empty(area);
+    let mut wp = None;
+    render_preview_pane(
+        area,
+        &mut buf,
+        PreviewMode::ShortcutEditor,
+        &resolved,
+        &mut wp,
+    );
+
+    let p_inner_x = area.x + 2;
+    let p_inner_y = area.y + 2;
+    let p_avail_w = area.width.saturating_sub(4);
+    let left_w = p_avail_w / 2;
+
+    // "[2]" on row p_inner_y + 2 must use key_color (208)
+    assert_eq!(buf[(p_inner_x + 1, p_inner_y + 2)].fg, Color::Indexed(208));
+    // "Key Chord:   [1]" on inspector row p_inner_y + 3 must use accent (51)
+    assert_eq!(
+        buf[(p_inner_x + left_w + 2, p_inner_y + 3)].fg,
+        Color::Indexed(51)
+    );
+
+    // Flash spans for key_color cover rows p_inner_y + 2..=4
+    assert!(state.select_token_by_key("key_color"));
+    let key_tok = state.tokens[state.selected_idx].clone();
+    let key_spans = get_token_preview_spans(&key_tok, area, PreviewMode::ShortcutEditor, &resolved);
+    assert_eq!(key_spans.len(), 3);
+    assert_eq!(key_spans[0].0, p_inner_y + 2);
+
+    // Flash spans for accent on ShortcutEditor include both Shortcut Properties and Key Chord
+    assert!(state.select_token_by_key("accent"));
+    let acc_tok = state.tokens[state.selected_idx].clone();
+    let acc_spans = get_token_preview_spans(&acc_tok, area, PreviewMode::ShortcutEditor, &resolved);
+    assert!(acc_spans.iter().any(|s| s.0 == p_inner_y + 1));
+    assert!(acc_spans.iter().any(|s| s.0 == p_inner_y + 3));
+}
