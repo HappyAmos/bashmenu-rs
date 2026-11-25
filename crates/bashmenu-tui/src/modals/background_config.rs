@@ -678,7 +678,7 @@ impl BackgroundConfigModal {
         let b_cancel_st = if self.focus == BackgroundFocus::Cancel {
             btn_focused
         } else {
-            btn_normal
+            styles.modal_cancel_button
         };
 
         let btn_apply = t!("themeedit.bg_btn_apply");

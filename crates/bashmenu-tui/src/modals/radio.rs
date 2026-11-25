@@ -278,12 +278,12 @@ impl RadioModal {
         let ok_style = if ok_focused {
             styles.accent.add_modifier(Modifier::REVERSED)
         } else {
-            styles.text
+            styles.modal_yes_button
         };
         let cancel_style = if cancel_focused {
             styles.accent.add_modifier(Modifier::REVERSED)
         } else {
-            styles.text
+            styles.modal_cancel_button
         };
 
         let right_bound = inner.x + inner.width;

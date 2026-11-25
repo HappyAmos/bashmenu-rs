@@ -588,20 +588,27 @@ pub fn render_preview_pane_with_base(
             );
             buf.set_string(mod_x + 2, mod_y + 5, &inp_str, preview_styles.text);
 
-            // Action Buttons
-            let ok_btn = " [ OK / Confirm ] ";
-            let cancel_btn = " [ Cancel ] ";
+            // Action Buttons: [ Yes ]  [ No ]  [ Cancel ]
+            let yes_btn = "[ Yes ]";
+            let no_btn = "[ No ]";
+            let cancel_btn = "[ Cancel ]";
             buf.set_string(
                 mod_x + 3,
                 mod_y + 7,
-                ok_btn,
-                preview_styles.accent.add_modifier(Modifier::BOLD),
+                yes_btn,
+                preview_styles.modal_yes_button.add_modifier(Modifier::BOLD),
             );
             buf.set_string(
-                mod_x + 3 + ok_btn.len() as u16 + 2,
+                mod_x + 12,
+                mod_y + 7,
+                no_btn,
+                preview_styles.modal_no_button,
+            );
+            buf.set_string(
+                mod_x + 20,
                 mod_y + 7,
                 cancel_btn,
-                preview_styles.text,
+                preview_styles.modal_cancel_button,
             );
 
             // Modal Gutter Divider

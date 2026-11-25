@@ -1005,6 +1005,15 @@ pub fn derive_palette_from_image(
         make_pair(primary_accent as i64, 236),
     );
     colors.insert("shadow".to_string(), make_pair(236, -1));
+    colors.insert(
+        "modal_yes_button".to_string(),
+        make_pair(primary_accent as i64, -1),
+    );
+    colors.insert("modal_no_button".to_string(), make_pair(203, -1));
+    colors.insert(
+        "modal_cancel_button".to_string(),
+        make_pair(gutter_color as i64, -1),
+    );
     colors.insert("whitespace".to_string(), make_pair(gutter_color as i64, -1));
     colors.insert(
         "line_numbers".to_string(),

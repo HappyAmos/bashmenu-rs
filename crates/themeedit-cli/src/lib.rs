@@ -524,6 +524,18 @@ impl ThemeEditorState {
                 kind: TokenKind::Color("shadow".to_string()),
             },
             TokenItem {
+                label: "Modal Yes Button".to_string(),
+                kind: TokenKind::Color("modal_yes_button".to_string()),
+            },
+            TokenItem {
+                label: "Modal No Button".to_string(),
+                kind: TokenKind::Color("modal_no_button".to_string()),
+            },
+            TokenItem {
+                label: "Modal Cancel Button".to_string(),
+                kind: TokenKind::Color("modal_cancel_button".to_string()),
+            },
+            TokenItem {
                 label: "Line Numbers Color".to_string(),
                 kind: TokenKind::Color("line_numbers".to_string()),
             },
@@ -740,6 +752,27 @@ impl ThemeEditorState {
             "shadow".to_string(),
             serde_json::Value::Array(vec![
                 serde_json::Value::Number(236.into()),
+                serde_json::Value::Number((-1).into()),
+            ]),
+        );
+        colors.insert(
+            "modal_yes_button".to_string(),
+            serde_json::Value::Array(vec![
+                serde_json::Value::Number(117.into()),
+                serde_json::Value::Number((-1).into()),
+            ]),
+        );
+        colors.insert(
+            "modal_no_button".to_string(),
+            serde_json::Value::Array(vec![
+                serde_json::Value::Number(203.into()),
+                serde_json::Value::Number((-1).into()),
+            ]),
+        );
+        colors.insert(
+            "modal_cancel_button".to_string(),
+            serde_json::Value::Array(vec![
+                serde_json::Value::Number(245.into()),
                 serde_json::Value::Number((-1).into()),
             ]),
         );
@@ -1726,6 +1759,11 @@ impl ThemeEditorState {
                                     || key == "whitespace_color"
                                     || key == "indent_guide"))
                             || (k == "shadow" && (key == "shadow_color" || key == "drop_shadow"))
+                            || (k == "modal_yes_button"
+                                && (key == "yes_button" || key == "modal_yes"))
+                            || (k == "modal_no_button" && (key == "no_button" || key == "modal_no"))
+                            || (k == "modal_cancel_button"
+                                && (key == "cancel_button" || key == "modal_cancel"))
                     }
                     TokenKind::Border(k) => {
                         (k == "top_tee" && key == "gutter_top_tee")
@@ -2022,6 +2060,9 @@ fn resolve_activity_color(theme: &Theme, activity: ThemeActivity, key: &str) -> 
         "window_close_button" => styles.window_close_button.fg.unwrap_or(Color::Red),
         "scrollbar" => styles.scrollbar.fg.unwrap_or(Color::Cyan),
         "shadow" => styles.shadow.fg.unwrap_or(Color::DarkGray),
+        "modal_yes_button" => styles.modal_yes_button.fg.unwrap_or(Color::LightCyan),
+        "modal_no_button" => styles.modal_no_button.fg.unwrap_or(Color::LightRed),
+        "modal_cancel_button" => styles.modal_cancel_button.fg.unwrap_or(Color::DarkGray),
         "toast_info" => styles.toast_info,
         "toast_warning" => styles.toast_warning,
         "toast_error" => styles.toast_error,
@@ -2484,6 +2525,27 @@ pub fn get_token_preview_spans(
                     right_area.x + right_area.width.saturating_sub(1),
                     right_area.x + right_area.width,
                 ));
+            }
+        }
+        TokenKind::Color(key)
+            if key == "modal_yes_button"
+                || key == "modal_no_button"
+                || key == "modal_cancel_button" =>
+        {
+            if mode == PreviewMode::Modals {
+                let p_avail_h = right_area.height.saturating_sub(4);
+                let mod_w = (p_avail_w.saturating_sub(4)).clamp(32, 50);
+                let mod_h = 12_u16.min(p_avail_h);
+                let mod_x = p_inner_x + (p_avail_w.saturating_sub(mod_w)) / 2;
+                let mod_y = content_start_y + (p_avail_h.saturating_sub(mod_h)) / 2;
+                let btn_y = mod_y + 7;
+                if key == "modal_yes_button" {
+                    spans.push((btn_y, mod_x + 3, mod_x + 10));
+                } else if key == "modal_no_button" {
+                    spans.push((btn_y, mod_x + 12, mod_x + 18));
+                } else {
+                    spans.push((btn_y, mod_x + 20, mod_x + 30));
+                }
             }
         }
         TokenKind::Color(key) if key == "shadow" => {

@@ -181,17 +181,17 @@ impl ToggleModal {
         let true_style = if self.focused_idx == 0 {
             styles.accent.add_modifier(Modifier::REVERSED)
         } else {
-            styles.text
+            styles.modal_yes_button
         };
         let false_style = if self.focused_idx == 1 {
             styles.accent.add_modifier(Modifier::REVERSED)
         } else {
-            styles.text
+            styles.modal_no_button
         };
         let cancel_style = if self.focused_idx == 2 {
             styles.accent.add_modifier(Modifier::REVERSED)
         } else {
-            styles.text
+            styles.modal_cancel_button
         };
 
         let t_x = inner.x + 2;
