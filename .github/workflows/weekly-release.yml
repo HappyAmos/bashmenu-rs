@@ -1,0 +1,224 @@
+name: Weekly Friday Release
+
+on:
+  schedule:
+    # Fridays at 23:00 UTC (6:00 PM EST / 7:00 PM EDT)
+    - cron: "0 23 * * 5"
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump level"
+        type: choice
+        default: patch
+        options:
+          - patch
+          - minor
+      force:
+        description: "Open Release PR even if only chore/docs commits exist"
+        type: boolean
+        default: false
+  push:
+    branches:
+      - "main"
+
+permissions:
+  contents: read
+
+jobs:
+  prepare-release-pr:
+    name: Prepare Weekly Release PR
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout main with full tag history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+
+      - name: Check for releasable commits and compute next version
+        id: plan
+        env:
+          BUMP_TYPE: ${{ inputs.bump || 'patch' }}
+          FORCE_RELEASE: ${{ inputs.force || false }}
+        run: |
+          LAST_TAG=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n 1)
+          if [ -z "$LAST_TAG" ]; then
+            echo "No previous v*.*.* tag found; skipping."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          COMMITS=$(git log "${LAST_TAG}..HEAD" --pretty=format:"%s")
+          if [ -z "$COMMITS" ]; then
+            echo "No new commits since ${LAST_TAG}; skipping."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "$FORCE_RELEASE" != "true" ]; then
+            if ! printf '%s\n' "$COMMITS" | grep -Eq '^(feat|fix|perf|refactor)(\([^)]*\))?!?:'; then
+              echo "No user-facing feat/fix/perf/refactor commits since ${LAST_TAG}; skipping."
+              echo "should_release=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+
+          CUR_VER=$(grep -m1 '^version = "' Cargo.toml | sed -E 's/version = "([^"]+)"/\1/')
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CUR_VER"
+          if [ "$BUMP_TYPE" = "minor" ]; then
+            NEXT_VER="${MAJOR}.$((MINOR + 1)).0"
+          else
+            NEXT_VER="${MAJOR}.${MINOR}.$((PATCH + 1))"
+          fi
+
+          echo "last_tag=${LAST_TAG}" >> "$GITHUB_OUTPUT"
+          echo "cur_ver=${CUR_VER}" >> "$GITHUB_OUTPUT"
+          echo "next_ver=${NEXT_VER}" >> "$GITHUB_OUTPUT"
+          echo "should_release=true" >> "$GITHUB_OUTPUT"
+          echo "Planned release: v${CUR_VER} -> v${NEXT_VER}"
+
+      - name: Bump version files and update CHANGELOG.md
+        if: steps.plan.outputs.should_release == 'true'
+        env:
+          LAST_TAG: ${{ steps.plan.outputs.last_tag }}
+          CUR_VER: ${{ steps.plan.outputs.cur_ver }}
+          NEXT_VER: ${{ steps.plan.outputs.next_ver }}
+        run: |
+          python3 - <<'PY'
+          import datetime, os, pathlib, re, subprocess
+
+          last_tag = os.environ["LAST_TAG"]
+          cur_ver = os.environ["CUR_VER"]
+          next_ver = os.environ["NEXT_VER"]
+          today = datetime.date.today().isoformat()
+
+          # 1. Cargo.toml
+          cargo_toml = pathlib.Path("Cargo.toml")
+          cargo_toml.write_text(
+              cargo_toml.read_text().replace(f'version = "{cur_ver}"', f'version = "{next_ver}"', 1)
+          )
+
+          # 2. assets/bashmenu.md
+          md = pathlib.Path("assets/bashmenu.md")
+          md.write_text(md.read_text().replace(f"(v{cur_ver})", f"(v{next_ver})", 1))
+
+          # 3. assets/bashmenu.1
+          man = pathlib.Path("assets/bashmenu.1")
+          man_text = man.read_text()
+          man_text = re.sub(
+              r'(\.TH BASHMENU 1 ")[^"]+(" ")v[^"]+(")',
+              rf'\g<1>{today}\g<2>v{next_ver}\g<3>',
+              man_text,
+              count=1,
+          )
+          man.write_text(man_text)
+
+          # 4. CHANGELOG.md
+          raw_commits = subprocess.check_output(
+              ["git", "log", f"{last_tag}..HEAD", "--pretty=format:%s"], text=True
+          ).splitlines()
+          added, fixed, changed = [], [], []
+          for msg in raw_commits:
+              if msg.startswith("chore(release):"):
+                  continue
+              if re.match(r"^feat(\([^)]*\))?!?:", msg):
+                  added.append(f"- {msg}")
+              elif re.match(r"^fix(\([^)]*\))?!?:", msg):
+                  fixed.append(f"- {msg}")
+              else:
+                  changed.append(f"- {msg}")
+
+          section = [f"## [{next_ver}] - {today}", ""]
+          if added:
+              section += ["### Added", *added, ""]
+          if fixed:
+              section += ["### Fixed", *fixed, ""]
+          if changed:
+              section += ["### Changed", *changed, ""]
+          section_text = "\n".join(section).rstrip() + "\n"
+
+          cl = pathlib.Path("CHANGELOG.md")
+          cl_text = cl.read_text()
+          cl_text = cl_text.replace("## [Unreleased]\n", f"## [Unreleased]\n\n{section_text}", 1)
+          cl_text = cl_text.replace(
+              f"[Unreleased]: https://github.com/HappyAmos/bashmenu-rs/compare/{last_tag}...HEAD",
+              f"[Unreleased]: https://github.com/HappyAmos/bashmenu-rs/compare/v{next_ver}...HEAD\n"
+              f"[{next_ver}]: https://github.com/HappyAmos/bashmenu-rs/compare/{last_tag}...v{next_ver}",
+              1,
+          )
+          cl.write_text(cl_text)
+          PY
+
+          cargo update --workspace
+
+      - name: Push release branch and open/update PR
+        if: steps.plan.outputs.should_release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEXT_VER: ${{ steps.plan.outputs.next_ver }}
+          LAST_TAG: ${{ steps.plan.outputs.last_tag }}
+        run: |
+          BRANCH="release/v${NEXT_VER}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$BRANCH"
+          git add Cargo.toml Cargo.lock CHANGELOG.md assets/bashmenu.md assets/bashmenu.1
+          git commit -m "chore(release): prepare v${NEXT_VER}"
+          git push --force origin "$BRANCH"
+
+          EXISTING_PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -z "$EXISTING_PR" ]; then
+            gh pr create --base main --head "$BRANCH" \
+              --title "chore(release): prepare v${NEXT_VER}" \
+              --body "Automated weekly Friday release PR for **v${NEXT_VER}** (changes since \`${LAST_TAG}\`).
+
+          Review the \`CHANGELOG.md\` entries and squash-merge when ready—merging this PR will automatically tag \`v${NEXT_VER}\` and publish the GitHub Release."
+          else
+            echo "Updated existing Release PR #${EXISTING_PR}"
+          fi
+
+  tag-on-release-merge:
+    name: Tag Merged Release
+    if: github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(release): prepare v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Create and push release tag
+        id: tag
+        run: |
+          VER=$(grep -m1 '^version = "' Cargo.toml | sed -E 's/version = "([^"]+)"/\1/')
+          TAG="v${VER}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag ${TAG} already exists; skipping."
+            echo "tag=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release ${TAG}"
+          git push origin "$TAG"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+  call-release:
+    name: Build & Publish Release
+    needs: tag-on-release-merge
+    if: needs.tag-on-release-merge.outputs.tag != ''
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.tag-on-release-merge.outputs.tag }}
