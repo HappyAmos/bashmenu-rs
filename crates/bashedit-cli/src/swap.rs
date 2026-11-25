@@ -68,7 +68,14 @@ pub fn is_pid_running(pid: u32) -> bool {
     if pid == 0 {
         return false;
     }
-    unsafe { libc::kill(pid as i32, 0) == 0 }
+    #[cfg(unix)]
+    {
+        unsafe { libc::kill(pid as i32, 0) == 0 }
+    }
+    #[cfg(not(unix))]
+    {
+        pid == std::process::id()
+    }
 }
 
 /// Writes buffer contents to the swap file with metadata header.

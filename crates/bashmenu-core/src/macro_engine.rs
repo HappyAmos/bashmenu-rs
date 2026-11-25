@@ -878,19 +878,67 @@ struct LocalTimeStrings {
     time_12_short: String,
 }
 
-/// Queries the system local time via libc `localtime_r` and produces formatted date/time strings.
+/// Queries the system local time (via `localtime_r` on Unix, or UTC fallback on
+/// non-Unix targets) and produces formatted date/time strings.
 fn get_local_time_strings() -> LocalTimeStrings {
-    let now = unsafe { libc::time(std::ptr::null_mut()) };
-    let mut tm = std::mem::MaybeUninit::<libc::tm>::uninit();
-    let tm_ptr = unsafe { libc::localtime_r(&now, tm.as_mut_ptr()) };
-    if !tm_ptr.is_null() {
+    #[cfg(unix)]
+    let (year, month, day, hour, min, sec) = {
+        let now = unsafe { libc::time(std::ptr::null_mut()) };
+        let mut tm = std::mem::MaybeUninit::<libc::tm>::uninit();
+        let tm_ptr = unsafe { libc::localtime_r(&now, tm.as_mut_ptr()) };
+        if tm_ptr.is_null() {
+            return LocalTimeStrings {
+                date_time_24: String::new(),
+                date_time_24_short: String::new(),
+                date_time_12: String::new(),
+                date_time_12_short: String::new(),
+                date: String::new(),
+                time_24: String::new(),
+                time_24_short: String::new(),
+                time_12: String::new(),
+                time_12_short: String::new(),
+            };
+        }
         let tm = unsafe { tm.assume_init() };
-        let year = tm.tm_year + 1900;
-        let month = tm.tm_mon + 1;
-        let day = tm.tm_mday;
-        let hour = tm.tm_hour;
-        let min = tm.tm_min;
-        let sec = tm.tm_sec;
+        (
+            tm.tm_year + 1900,
+            tm.tm_mon + 1,
+            tm.tm_mday,
+            tm.tm_hour,
+            tm.tm_min,
+            tm.tm_sec,
+        )
+    };
+
+    #[cfg(not(unix))]
+    let (year, month, day, hour, min, sec) = {
+        let secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+        let days = secs.div_euclid(86_400);
+        let rem = secs.rem_euclid(86_400);
+        let z = days + 719_468;
+        let era = z.div_euclid(146_097);
+        let doe = z.rem_euclid(146_097);
+        let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+        let y = yoe + era * 400;
+        let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+        let mp = (5 * doy + 2) / 153;
+        let d = doy - (153 * mp + 2) / 5 + 1;
+        let m = if mp < 10 { mp + 3 } else { mp - 9 };
+        let y = if m <= 2 { y + 1 } else { y };
+        (
+            y as i32,
+            m as i32,
+            d as i32,
+            (rem / 3600) as i32,
+            ((rem % 3600) / 60) as i32,
+            (rem % 60) as i32,
+        )
+    };
+
+    {
         let hour12 = if hour == 0 {
             12
         } else if hour > 12 {
@@ -930,18 +978,6 @@ fn get_local_time_strings() -> LocalTimeStrings {
             time_24_short,
             time_12,
             time_12_short,
-        }
-    } else {
-        LocalTimeStrings {
-            date_time_24: String::new(),
-            date_time_24_short: String::new(),
-            date_time_12: String::new(),
-            date_time_12_short: String::new(),
-            date: String::new(),
-            time_24: String::new(),
-            time_24_short: String::new(),
-            time_12: String::new(),
-            time_12_short: String::new(),
         }
     }
 }
@@ -1923,7 +1959,10 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
         direct_map.insert("{hostname}", host_name);
     }
     if res.contains("{user-mode}") {
+        #[cfg(unix)]
         let is_root = unsafe { libc::geteuid() } == 0;
+        #[cfg(not(unix))]
+        let is_root = false;
         let user_mode = if is_root { "Root" } else { "User" };
         direct_map.insert("{user-mode}", user_mode.to_string());
     }
@@ -2001,7 +2040,10 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
         direct_map.insert("{time_12_short}", times.time_12_short);
     }
     if res.contains("{utc_seconds}") {
-        let now = unsafe { libc::time(std::ptr::null_mut()) };
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
         direct_map.insert("{utc_seconds}", now.to_string());
     }
 

@@ -2956,7 +2956,10 @@ fn main() -> Result<()> {
                                                 .get("user_mode")
                                                 .and_then(|v| v.as_str())
                                                 == Some("root");
+                                            #[cfg(unix)]
                                             let is_root = unsafe { libc::geteuid() } == 0;
+                                            #[cfg(not(unix))]
+                                            let is_root = false;
                                             let effective_cmd = if requires_root && !is_root {
                                                 let trimmed = final_cmd.trim();
                                                 if trimmed.starts_with("sudo ")
