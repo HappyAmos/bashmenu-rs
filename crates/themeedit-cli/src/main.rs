@@ -2008,6 +2008,8 @@ fn open_selected_token_picker(state: &mut ThemeEditorState, active_modal: &mut A
                 "Pick Footer Color"
             } else if key == "shadow" {
                 "Pick Shadow Color"
+            } else if key == "selected_tab" {
+                "Pick Selected Tab Color"
             } else {
                 "Pick Theme Color"
             };
@@ -2397,6 +2399,14 @@ fn hit_test_preview_with_style(
             ))
         }
         PreviewMode::TextEditor => {
+            if row == p_inner_y {
+                if col >= p_inner_x && col < p_inner_x + 17 {
+                    return Some(("selected_tab", row, p_inner_x, p_inner_x + 17));
+                }
+                if col >= p_inner_x + 30 && col < p_inner_x + 35 {
+                    return Some(("accent", row, p_inner_x + 30, p_inner_x + 35));
+                }
+            }
             if row == right_area.y + 1 {
                 return Some(("highlight", row, p_inner_x, p_inner_x + p_avail_w));
             }

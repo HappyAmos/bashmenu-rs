@@ -2935,3 +2935,48 @@ fn test_themeedit_cli_locale_flag() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("--locale"));
 }
+
+#[test]
+fn test_selected_tab_color_token_and_preview() {
+    use bashmenu_tui::{ResolvedThemeStyles, ThemeActivity};
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::style::Color;
+    use themeedit_cli::{
+        get_token_preview_spans, preview_tab_bar_layout, render_preview_pane, PreviewMode,
+    };
+
+    let themes_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(themes_path, Some("dracula".to_string()));
+    assert!(state.select_token_by_key("selected_tab"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Selected Tab Color");
+
+    // Customize selected_tab color and verify resolution
+    state.set_color_token_value("selected_tab", Color::Indexed(196));
+    let resolved = ResolvedThemeStyles::from_theme_for_activity(
+        &state.current_theme,
+        true,
+        ThemeActivity::BashEdit,
+    );
+    assert_eq!(resolved.selected_tab.bg, Some(Color::Indexed(196)));
+
+    // Render TextEditor preview and verify both preview header active tab and editor active tab use selected_tab bg
+    let area = Rect::new(0, 0, 96, 24);
+    let mut buf = Buffer::empty(area);
+    let mut wp = None;
+    render_preview_pane(area, &mut buf, PreviewMode::TextEditor, &resolved, &mut wp);
+
+    let tabs = preview_tab_bar_layout(area, PreviewMode::TextEditor);
+    let active_tab = tabs
+        .iter()
+        .find(|t| t.mode == PreviewMode::TextEditor)
+        .expect("TextEditor tab must exist");
+    assert_eq!(buf[(active_tab.x_start, area.y)].bg, Color::Indexed(196));
+    assert_eq!(buf[(area.x + 2, area.y + 2)].bg, Color::Indexed(196));
+
+    // Verify flash spans cover both active header tab and editor active tab
+    let token = state.tokens[state.selected_idx].clone();
+    let spans = get_token_preview_spans(&token, area, PreviewMode::TextEditor, &resolved);
+    assert!(spans.contains(&(area.y, active_tab.x_start, active_tab.x_end)));
+    assert!(spans.contains(&(area.y + 2, area.x + 2, area.x + 19)));
+}

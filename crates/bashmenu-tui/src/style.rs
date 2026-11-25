@@ -74,6 +74,7 @@ impl ThemeActivity {
                 "divider",
                 "accent",
                 "selection",
+                "selected_tab",
                 "whitespace",
                 "shortcut_key",
                 "help_text",
@@ -368,6 +369,8 @@ pub struct ResolvedThemeStyles {
     pub scrollbar: Style,
     /// Modal dialog drop-shadow style
     pub shadow: Style,
+    /// Active / selected tab style in tabbed interfaces
+    pub selected_tab: Style,
     /// Visible whitespace glyph style in text editors
     pub whitespace: Style,
     /// Active terminal color capability tier
@@ -414,6 +417,10 @@ impl Default for ResolvedThemeStyles {
             toast_error: Color::Rgb(255, 85, 85),
             scrollbar: Style::default().fg(Color::Cyan),
             shadow: Style::default().fg(Color::DarkGray).bg(Color::Black),
+            selected_tab: Style::default()
+                .fg(Color::Black)
+                .bg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
             whitespace: Style::default().fg(Color::DarkGray),
             tier: ColorTier::TrueColor,
         }
@@ -683,7 +690,18 @@ impl ResolvedThemeStyles {
             .filter(|v| !is_inherited_color_value(v))
             .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
         {
-            self.selection = merge_style_pair(self.selection, st, None);
+            let merged = merge_style_pair(self.selection, st, None);
+            self.selection = merged;
+            if !is_override && !p.contains_key("selected_tab") {
+                self.selected_tab = merged.add_modifier(Modifier::BOLD);
+            }
+        }
+        if let Some(st) = p
+            .get("selected_tab")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
+        {
+            self.selected_tab = merge_style_pair(self.selected_tab, st, Some(Modifier::BOLD));
         }
         if let Some(st) = p
             .get("shortcut_key")
