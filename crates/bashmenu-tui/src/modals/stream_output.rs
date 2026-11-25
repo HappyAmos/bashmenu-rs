@@ -164,8 +164,15 @@ impl StreamOutputModal {
     pub fn terminate(&mut self) {
         if self.is_running {
             if let Some(pid) = self.child_pid {
+                #[cfg(unix)]
                 unsafe {
                     libc::kill(pid as i32, libc::SIGKILL);
+                }
+                #[cfg(windows)]
+                {
+                    let _ = std::process::Command::new("taskkill")
+                        .args(["/PID", &pid.to_string(), "/T", "/F"])
+                        .status();
                 }
             }
             self.is_running = false;
