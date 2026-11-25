@@ -34,6 +34,7 @@ pub fn activity_override_tokens(activity_key: &str) -> &'static [&'static str] {
             "selection",
             "selected_tab",
             "unselected_tab",
+            "line_numbers",
             "whitespace",
             "gutter",
             "help_text",
@@ -540,6 +541,7 @@ impl Theme {
         colors.insert("selection".to_string(), make_pair(0, 255));
         colors.insert("selected_tab".to_string(), make_pair(0, 255));
         colors.insert("unselected_tab".to_string(), make_pair(245, -1));
+        colors.insert("line_numbers".to_string(), make_pair(242, -1));
         colors.insert("whitespace".to_string(), make_pair(242, -1));
         colors.insert("gutter".to_string(), make_pair(242, -1));
         colors.insert("footer".to_string(), make_pair(245, -1));

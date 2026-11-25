@@ -541,7 +541,7 @@ fn main() -> Result<()> {
                     let v_idx = active_tab.scroll_row + view_row;
 
                     if v_idx >= v_lines.len() {
-                        buf.set_string(inner_x, screen_y, "~", styles.gutter);
+                        buf.set_string(inner_x, screen_y, "~", styles.line_numbers);
                         continue;
                     }
 
@@ -551,10 +551,10 @@ fn main() -> Result<()> {
                     if show_line_numbers {
                         if vl.is_first_chunk {
                             let l_num_str = format!("{:>4} │ ", doc_row + 1);
-                            buf.set_string(inner_x, screen_y, &l_num_str, styles.gutter);
+                            buf.set_string(inner_x, screen_y, &l_num_str, styles.line_numbers);
                         } else {
                             let blank_gutter = "     │ ";
-                            buf.set_string(inner_x, screen_y, blank_gutter, styles.gutter);
+                            buf.set_string(inner_x, screen_y, blank_gutter, styles.line_numbers);
                         }
                     }
 
@@ -604,13 +604,13 @@ fn main() -> Result<()> {
                     let doc_row = active_tab.scroll_row + view_row;
 
                     if doc_row >= active_tab.lines.len() {
-                        buf.set_string(inner_x, screen_y, "~", styles.gutter);
+                        buf.set_string(inner_x, screen_y, "~", styles.line_numbers);
                         continue;
                     }
 
                     if show_line_numbers {
                         let l_num_str = format!("{:>4} │ ", doc_row + 1);
-                        buf.set_string(inner_x, screen_y, &l_num_str, styles.gutter);
+                        buf.set_string(inner_x, screen_y, &l_num_str, styles.line_numbers);
                     }
 
                     let line_str = &active_tab.lines[doc_row];

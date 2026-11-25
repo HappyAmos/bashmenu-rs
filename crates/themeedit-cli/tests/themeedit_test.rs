@@ -3025,3 +3025,37 @@ fn test_unselected_tab_color_token_and_preview() {
     assert!(spans.contains(&(area.y, inactive_tab.x_start, inactive_tab.x_end)));
     assert!(spans.contains(&(area.y + 2, area.x + 19, area.x + 32)));
 }
+
+#[test]
+fn test_line_numbers_color_token_and_preview() {
+    use bashmenu_tui::{ResolvedThemeStyles, ThemeActivity};
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::style::Color;
+    use themeedit_cli::{get_token_preview_spans, render_preview_pane, PreviewMode};
+
+    let themes_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(themes_path, Some("dracula".to_string()));
+    assert!(state.select_token_by_key("line_numbers"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Line Numbers Color");
+
+    state.set_color_token_value("line_numbers", Color::Indexed(214));
+    let resolved = ResolvedThemeStyles::from_theme_for_activity(
+        &state.current_theme,
+        true,
+        ThemeActivity::BashEdit,
+    );
+    assert_eq!(resolved.line_numbers.fg, Some(Color::Indexed(214)));
+
+    let area = Rect::new(0, 0, 96, 24);
+    let mut buf = Buffer::empty(area);
+    let mut wp = None;
+    render_preview_pane(area, &mut buf, PreviewMode::TextEditor, &resolved, &mut wp);
+
+    // Line number " 1 │ " starts at (area.x + 2, area.y + 4)
+    assert_eq!(buf[(area.x + 3, area.y + 4)].fg, Color::Indexed(214));
+
+    let token = state.tokens[state.selected_idx].clone();
+    let spans = get_token_preview_spans(&token, area, PreviewMode::TextEditor, &resolved);
+    assert!(spans.contains(&(area.y + 4, area.x + 2, area.x + 7)));
+}

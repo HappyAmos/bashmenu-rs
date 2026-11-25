@@ -524,6 +524,10 @@ impl ThemeEditorState {
                 kind: TokenKind::Color("shadow".to_string()),
             },
             TokenItem {
+                label: "Line Numbers Color".to_string(),
+                kind: TokenKind::Color("line_numbers".to_string()),
+            },
+            TokenItem {
                 label: "Whitespace Color".to_string(),
                 kind: TokenKind::Color("whitespace".to_string()),
             },
@@ -757,6 +761,13 @@ impl ThemeEditorState {
             "unselected_tab".to_string(),
             serde_json::Value::Array(vec![
                 serde_json::Value::Number(245.into()),
+                serde_json::Value::Number((-1).into()),
+            ]),
+        );
+        colors.insert(
+            "line_numbers".to_string(),
+            serde_json::Value::Array(vec![
+                serde_json::Value::Number(242.into()),
                 serde_json::Value::Number((-1).into()),
             ]),
         );
@@ -1706,6 +1717,10 @@ impl ThemeEditorState {
                                 && (key == "active_tab" || key == "selected_tab_color"))
                             || (k == "unselected_tab"
                                 && (key == "inactive_tab" || key == "unselected_tab_color"))
+                            || (k == "line_numbers"
+                                && (key == "line_number"
+                                    || key == "linenumbers"
+                                    || key == "line_numbers_color"))
                             || (k == "whitespace"
                                 && (key == "ws"
                                     || key == "whitespace_color"
@@ -1994,6 +2009,7 @@ fn resolve_activity_color(theme: &Theme, activity: ThemeActivity, key: &str) -> 
             .or(styles.selected_tab.fg)
             .unwrap_or(Color::Cyan),
         "unselected_tab" => styles.unselected_tab.fg.unwrap_or(Color::DarkGray),
+        "line_numbers" => styles.line_numbers.fg.unwrap_or(Color::DarkGray),
         "whitespace" => styles.whitespace.fg.unwrap_or(Color::DarkGray),
         "border" => styles.border,
         "divider" => styles.divider.fg.unwrap_or(Color::Cyan),
@@ -2366,6 +2382,18 @@ pub fn get_token_preview_spans(
             }
             if mode == PreviewMode::TextEditor {
                 spans.push((content_start_y, p_inner_x + 17, p_inner_x + 30));
+            }
+        }
+        TokenKind::Color(key) if key == "line_numbers" => {
+            if mode == PreviewMode::TextEditor {
+                let rows_end = right_area.y + right_area.height.saturating_sub(3);
+                for row in 0..7_u16 {
+                    let y = content_start_y + 2 + row;
+                    if y >= rows_end {
+                        break;
+                    }
+                    spans.push((y, p_inner_x, p_inner_x + 5));
+                }
             }
         }
         TokenKind::Color(key) if key == "whitespace" => {

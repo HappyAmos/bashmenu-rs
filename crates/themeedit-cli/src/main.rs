@@ -2012,6 +2012,8 @@ fn open_selected_token_picker(state: &mut ThemeEditorState, active_modal: &mut A
                 "Pick Selected Tab Color"
             } else if key == "unselected_tab" {
                 "Pick Unselected Tab Color"
+            } else if key == "line_numbers" {
+                "Pick Line Numbers Color"
             } else {
                 "Pick Theme Color"
             };
@@ -2425,7 +2427,7 @@ fn hit_test_preview_with_style(
                 return Some(("gutter", row, p_inner_x, p_inner_x + p_avail_w));
             }
             if col < p_inner_x + 6 {
-                return Some(("gutter", row, p_inner_x, p_inner_x + 6));
+                return Some(("line_numbers", row, p_inner_x, p_inner_x + 5));
             }
             if row == right_area.y + 5 {
                 return Some(("highlight", row, p_inner_x, p_inner_x + p_avail_w));
