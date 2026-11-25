@@ -666,7 +666,7 @@ impl NoteEditorModal {
                 let max_footer_w = inner.width.saturating_sub(4) as usize;
                 let footer_lines = wrap_footer_tokens(&footer_tokens, max_footer_w);
                 let footer_h = footer_lines.len().max(1);
-                let footer_start_y = inner.y + inner.height.saturating_sub(1 + footer_h as u16);
+                let footer_start_y = inner.y + inner.height.saturating_sub(footer_h as u16);
 
                 if mouse.row >= footer_start_y && mouse.row < footer_start_y + footer_h as u16 {
                     let f_idx = (mouse.row - footer_start_y) as usize;
@@ -918,11 +918,22 @@ impl NoteEditorModal {
         let footer_lines = wrap_footer_tokens(&footer_tokens, max_footer_w);
         let footer_h = footer_lines.len().max(1);
 
-        let content_h = inner.height.saturating_sub(1 + footer_h as u16 + 1) as usize;
-        let inner_w = inner.width.saturating_sub(4) as usize;
-        self.last_inner_w = inner_w;
+        let footer_start_y = inner.y + inner.height.saturating_sub(footer_h as u16);
+        let div_y = footer_start_y.saturating_sub(1);
+        let content_h = div_y.saturating_sub(inner.y + 1) as usize;
 
-        let (visual_lines, cursor_vis_idx) = self.compute_visual_lines(inner_w);
+        // Reserve 1 column for trailing end-of-line cursor; increase right margin by 1 when scrollbar is visible
+        let mut inner_w = inner.width.saturating_sub(4).max(2) as usize;
+        let mut wrap_w = inner_w.saturating_sub(1).max(1);
+        let (mut visual_lines, mut cursor_vis_idx) = self.compute_visual_lines(wrap_w);
+        if visual_lines.len() > content_h && content_h > 0 {
+            inner_w = inner.width.saturating_sub(5).max(2) as usize;
+            wrap_w = inner_w.saturating_sub(1).max(1);
+            let recomputed = self.compute_visual_lines(wrap_w);
+            visual_lines = recomputed.0;
+            cursor_vis_idx = recomputed.1;
+        }
+        self.last_inner_w = wrap_w;
 
         // Ensure cursor is visible in scroll window
         if cursor_vis_idx < self.scroll_offset {
@@ -994,8 +1005,28 @@ impl NoteEditorModal {
             }
         }
 
+        // Render horizontal divider above help gutter with T-connectors on both ends
+        let border_style = Style::default().fg(styles.border).bg(styles.background);
+        let left_border_x = inner.x.saturating_sub(1);
+        let right_border_x = inner.x + inner.width;
+        buf.set_string(left_border_x, div_y, &styles.borders.left_tee, border_style);
+        buf.set_string(
+            inner.x,
+            div_y,
+            styles
+                .borders
+                .border_horizontal_bottom
+                .repeat(inner.width as usize),
+            border_style,
+        );
+        buf.set_string(
+            right_border_x,
+            div_y,
+            &styles.borders.right_tee,
+            border_style,
+        );
+
         // Render wrapped footer help lines
-        let footer_start_y = inner.y + inner.height.saturating_sub(1 + footer_h as u16);
         for (idx, line) in footer_lines.iter().enumerate() {
             let footer_x = inner.x + (inner.width.saturating_sub(line.len() as u16) / 2);
             buf.set_string(

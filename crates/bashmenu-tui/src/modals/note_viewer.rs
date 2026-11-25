@@ -282,7 +282,7 @@ impl NoteViewerModal {
                 }
 
                 // Check footer button clicks
-                let footer_start_y = inner.y + inner.height.saturating_sub(1 + footer_h as u16);
+                let footer_start_y = inner.y + inner.height.saturating_sub(footer_h as u16);
                 if mouse.row >= footer_start_y && mouse.row < footer_start_y + footer_h as u16 {
                     let f_idx = (mouse.row - footer_start_y) as usize;
                     if f_idx < footer_lines.len() {
@@ -397,249 +397,17 @@ impl NoteViewerModal {
         let footer_lines = wrap_footer_tokens(&footer_tokens, max_footer_w);
         let footer_h = footer_lines.len().max(1);
 
-        let content_h = inner.height.saturating_sub(1 + footer_h as u16 + 1) as usize;
-        let avail_w = inner.width.saturating_sub(4) as usize;
+        let footer_start_y = inner.y + inner.height.saturating_sub(footer_h as u16);
+        let div_y = footer_start_y.saturating_sub(1);
+        let content_h = div_y.saturating_sub(inner.y + 1) as usize;
+        let base_w = inner.width.saturating_sub(4) as usize;
 
-        // Build rendered visual lines
-        let mut visible_entries: Vec<(usize, Line<'static>)> = Vec::new();
-
-        if self.content.trim().is_empty() {
-            let empty_span = Span::styled(
-                "*(Empty note — press 'e' to edit content)*",
-                Style::default()
-                    .fg(Color::DarkGray)
-                    .add_modifier(Modifier::ITALIC),
-            );
-            visible_entries.push((0, Line::from(vec![empty_span])));
-        } else {
-            let raw_lines: Vec<&str> = self.content.lines().collect();
-            let mut in_code_block = false;
-
-            for (idx, line) in raw_lines.iter().enumerate() {
-                let trimmed = line.trim();
-
-                // 1. Fenced Code Block Markers
-                if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
-                    if !in_code_block {
-                        in_code_block = true;
-                        let lang = trimmed.trim_start_matches(['`', '~']).trim();
-                        let label = if lang.is_empty() { "Code" } else { lang };
-                        let bar_len = avail_w.saturating_sub(label.len() + 7);
-                        let top_str = format!("┌─ [{}] {}", label, "─".repeat(bar_len));
-                        visible_entries.push((
-                            idx,
-                            Line::from(vec![Span::styled(
-                                top_str,
-                                Style::default().fg(Color::Cyan).add_modifier(Modifier::DIM),
-                            )]),
-                        ));
-                    } else {
-                        in_code_block = false;
-                        let bot_str = format!("└{}", "─".repeat(avail_w.saturating_sub(1)));
-                        visible_entries.push((
-                            idx,
-                            Line::from(vec![Span::styled(
-                                bot_str,
-                                Style::default().fg(Color::Cyan).add_modifier(Modifier::DIM),
-                            )]),
-                        ));
-                    }
-                    continue;
-                }
-
-                // 2. Lines Inside Fenced Code Block
-                if in_code_block {
-                    let code_w = avail_w.saturating_sub(3).max(10);
-                    let chars: Vec<char> = line.chars().collect();
-                    if chars.is_empty() {
-                        let border_span = Span::styled(
-                            "│",
-                            Style::default().fg(Color::Cyan).add_modifier(Modifier::DIM),
-                        );
-                        visible_entries.push((idx, Line::from(vec![border_span])));
-                    } else {
-                        let mut start = 0;
-                        while start < chars.len() {
-                            let end = (start + code_w).min(chars.len());
-                            let chunk: String = chars[start..end].iter().collect();
-                            let border_span = Span::styled(
-                                "│ ",
-                                Style::default().fg(Color::Cyan).add_modifier(Modifier::DIM),
-                            );
-                            let code_span = Span::styled(chunk, Style::default().fg(Color::Yellow));
-                            visible_entries.push((idx, Line::from(vec![border_span, code_span])));
-                            start = end;
-                        }
-                    }
-                    continue;
-                }
-
-                // 3. Skip completed checkboxes if hide-completed is active
-                if !self.show_completed && is_completed_checkbox(line) {
-                    continue;
-                }
-
-                // 4. Horizontal Rules
-                if trimmed == "---" || trimmed == "***" || trimmed == "___" {
-                    visible_entries.push((
-                        idx,
-                        Line::from(vec![Span::styled("─".repeat(avail_w), styles.divider)]),
-                    ));
-                    continue;
-                }
-
-                // 5. Headings
-                if let Some(h1) = trimmed.strip_prefix("# ") {
-                    for wl in textwrap_simple(h1, avail_w.saturating_sub(2)) {
-                        visible_entries.push((
-                            idx,
-                            Line::from(vec![Span::styled(
-                                format!("# {}", wl),
-                                Style::default()
-                                    .fg(Color::Cyan)
-                                    .add_modifier(Modifier::BOLD),
-                            )]),
-                        ));
-                    }
-                    continue;
-                }
-                if let Some(h2) = trimmed.strip_prefix("## ") {
-                    for wl in textwrap_simple(h2, avail_w.saturating_sub(3)) {
-                        visible_entries.push((
-                            idx,
-                            Line::from(vec![Span::styled(
-                                format!("## {}", wl),
-                                styles.accent.add_modifier(Modifier::BOLD),
-                            )]),
-                        ));
-                    }
-                    continue;
-                }
-                if let Some(h3) = trimmed.strip_prefix("### ") {
-                    for wl in textwrap_simple(h3, avail_w.saturating_sub(4)) {
-                        visible_entries.push((
-                            idx,
-                            Line::from(vec![Span::styled(
-                                format!("### {}", wl),
-                                styles.text.add_modifier(Modifier::BOLD),
-                            )]),
-                        ));
-                    }
-                    continue;
-                }
-
-                // 6. Blockquotes
-                if let Some(bq) = trimmed.strip_prefix("> ") {
-                    for wl in textwrap_simple(bq, avail_w.saturating_sub(3)) {
-                        let bar = Span::styled(
-                            "│ ",
-                            Style::default().fg(Color::Cyan).add_modifier(Modifier::DIM),
-                        );
-                        let mut spans = vec![bar];
-                        spans.extend(parse_markdown_spans(
-                            &wl,
-                            styles.text.add_modifier(Modifier::ITALIC),
-                        ));
-                        visible_entries.push((idx, Line::from(spans)));
-                    }
-                    continue;
-                }
-
-                // 7. Checkboxes
-                if let Some((indent_len, is_checked, rest)) = parse_checkbox_line(line) {
-                    let margin = indent_len + 6;
-                    let is_sel = idx == self.selected_line;
-                    let (check_box_span, base_st) = if is_checked {
-                        let cb_style = if is_sel {
-                            Style::default()
-                                .fg(Color::DarkGray)
-                                .add_modifier(Modifier::DIM)
-                        } else {
-                            Style::default().fg(Color::Green)
-                        };
-                        (
-                            Span::styled("- [x] ", cb_style),
-                            Style::default()
-                                .fg(Color::DarkGray)
-                                .add_modifier(Modifier::DIM),
-                        )
-                    } else {
-                        let cb_style = if is_sel {
-                            styles.text
-                        } else {
-                            Style::default()
-                                .fg(Color::Yellow)
-                                .add_modifier(Modifier::BOLD)
-                        };
-                        (Span::styled("- [ ] ", cb_style), styles.text)
-                    };
-
-                    let wrapped = textwrap_simple(rest, avail_w.saturating_sub(margin));
-                    if wrapped.is_empty() {
-                        let mut spans = Vec::new();
-                        if indent_len > 0 {
-                            spans.push(Span::styled(" ".repeat(indent_len), base_st));
-                        }
-                        spans.push(check_box_span);
-                        visible_entries.push((idx, Line::from(spans)));
-                    } else {
-                        for (w_idx, wl) in wrapped.iter().enumerate() {
-                            let mut spans = Vec::new();
-                            if w_idx == 0 {
-                                if indent_len > 0 {
-                                    spans.push(Span::styled(" ".repeat(indent_len), base_st));
-                                }
-                                spans.push(check_box_span.clone());
-                            } else {
-                                spans.push(Span::styled(" ".repeat(margin), base_st));
-                            }
-                            spans.extend(parse_markdown_spans(wl, base_st));
-                            visible_entries.push((idx, Line::from(spans)));
-                        }
-                    }
-                    continue;
-                }
-
-                // 8. Bullet Lists (- , * , + )
-                if let Some((indent_len, bullet_rest)) = parse_bullet_line(line) {
-                    let margin = indent_len + 2;
-                    let wrapped = textwrap_simple(bullet_rest, avail_w.saturating_sub(margin));
-                    if wrapped.is_empty() {
-                        let mut spans = Vec::new();
-                        if indent_len > 0 {
-                            spans.push(Span::styled(" ".repeat(indent_len), styles.text));
-                        }
-                        spans.push(Span::styled("• ", Style::default().fg(Color::Cyan)));
-                        visible_entries.push((idx, Line::from(spans)));
-                    } else {
-                        for (w_idx, wl) in wrapped.iter().enumerate() {
-                            let mut spans = Vec::new();
-                            if w_idx == 0 {
-                                if indent_len > 0 {
-                                    spans.push(Span::styled(" ".repeat(indent_len), styles.text));
-                                }
-                                spans.push(Span::styled("• ", Style::default().fg(Color::Cyan)));
-                            } else {
-                                spans.push(Span::styled(" ".repeat(margin), styles.text));
-                            }
-                            spans.extend(parse_markdown_spans(wl, styles.text));
-                            visible_entries.push((idx, Line::from(spans)));
-                        }
-                    }
-                    continue;
-                }
-
-                // 9. Standard Text Lines with Inline Markdown
-                let wrapped = textwrap_simple(line, avail_w);
-                if wrapped.is_empty() {
-                    visible_entries.push((idx, Line::from(vec![Span::styled("", styles.text)])));
-                } else {
-                    for wl in wrapped {
-                        let spans = parse_markdown_spans(&wl, styles.text);
-                        visible_entries.push((idx, Line::from(spans)));
-                    }
-                }
-            }
+        // Build rendered visual lines (increase right margin by 1 when scrollbar is visible)
+        let mut avail_w = base_w;
+        let mut visible_entries = self.build_visible_entries(styles, avail_w);
+        if visible_entries.len() > content_h && content_h > 0 {
+            avail_w = inner.width.saturating_sub(5).max(1) as usize;
+            visible_entries = self.build_visible_entries(styles, avail_w);
         }
 
         self.last_visible_raw_indices = visible_entries
@@ -759,8 +527,28 @@ impl NoteViewerModal {
             }
         }
 
+        // Render horizontal divider above help gutter with T-connectors on both ends
+        let border_style = Style::default().fg(styles.border).bg(styles.background);
+        let left_border_x = inner.x.saturating_sub(1);
+        let right_border_x = inner.x + inner.width;
+        buf.set_string(left_border_x, div_y, &styles.borders.left_tee, border_style);
+        buf.set_string(
+            inner.x,
+            div_y,
+            styles
+                .borders
+                .border_horizontal_bottom
+                .repeat(inner.width as usize),
+            border_style,
+        );
+        buf.set_string(
+            right_border_x,
+            div_y,
+            &styles.borders.right_tee,
+            border_style,
+        );
+
         // Render wrapped footer help lines with equal spacing
-        let footer_start_y = inner.y + inner.height.saturating_sub(1 + footer_h as u16);
         for (idx, line) in footer_lines.iter().enumerate() {
             let footer_x = inner.x + (inner.width.saturating_sub(line.len() as u16) / 2);
             buf.set_string(
@@ -772,6 +560,277 @@ impl NoteViewerModal {
         }
 
         inner
+    }
+
+    /// Builds wrapped visual markdown lines for the note body constrained to `avail_w`.
+    fn build_visible_entries(
+        &self,
+        styles: &ResolvedThemeStyles,
+        avail_w: usize,
+    ) -> Vec<(usize, Line<'static>)> {
+        let mut visible_entries: Vec<(usize, Line<'static>)> = Vec::new();
+
+        if self.content.trim().is_empty() {
+            let empty_span = Span::styled(
+                "*(Empty note — press 'e' to edit content)*",
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::ITALIC),
+            );
+            visible_entries.push((0, Line::from(vec![empty_span])));
+            return visible_entries;
+        }
+
+        let raw_lines: Vec<&str> = self.content.lines().collect();
+        let mut in_code_block = false;
+        let code_border_style = Style::default().fg(Color::Cyan).add_modifier(Modifier::DIM);
+        let heading_style = Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD);
+
+        for (idx, line) in raw_lines.iter().enumerate() {
+            let trimmed = line.trim();
+
+            // 1. Fenced Code Block Markers
+            if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+                if !in_code_block {
+                    in_code_block = true;
+                    let lang = trimmed.trim_start_matches(['`', '~']).trim();
+                    let label = if lang.is_empty() { "Code" } else { lang };
+                    let prefix = format!("┌─ [{}] ", label);
+                    let prefix_w = unicode_width::UnicodeWidthStr::width(prefix.as_str());
+                    let top_str = if avail_w <= 2 {
+                        "─".repeat(avail_w)
+                    } else if prefix_w + 1 >= avail_w {
+                        let clipped: String =
+                            prefix.chars().take(avail_w.saturating_sub(1)).collect();
+                        format!("{clipped}┐")
+                    } else {
+                        let bar_len = avail_w.saturating_sub(prefix_w + 1);
+                        format!("{prefix}{}┐", "─".repeat(bar_len))
+                    };
+                    visible_entries.push((
+                        idx,
+                        Line::from(vec![Span::styled(top_str, code_border_style)]),
+                    ));
+                } else {
+                    in_code_block = false;
+                    let bot_str = if avail_w >= 2 {
+                        format!("└{}┘", "─".repeat(avail_w.saturating_sub(2)))
+                    } else {
+                        "─".repeat(avail_w)
+                    };
+                    visible_entries.push((
+                        idx,
+                        Line::from(vec![Span::styled(bot_str, code_border_style)]),
+                    ));
+                }
+                continue;
+            }
+
+            // 2. Lines Inside Fenced Code Block
+            if in_code_block {
+                let code_w = avail_w.saturating_sub(4).max(1);
+                let chars: Vec<char> = line.chars().collect();
+                if chars.is_empty() {
+                    visible_entries.push((
+                        idx,
+                        Line::from(vec![
+                            Span::styled("│ ", code_border_style),
+                            Span::styled(" ".repeat(code_w), Style::default().fg(Color::Yellow)),
+                            Span::styled(" │", code_border_style),
+                        ]),
+                    ));
+                } else {
+                    let mut start = 0;
+                    while start < chars.len() {
+                        let mut end = start;
+                        let mut cur_w = 0;
+                        while end < chars.len() {
+                            let cw =
+                                unicode_width::UnicodeWidthChar::width(chars[end]).unwrap_or(1);
+                            if cur_w + cw > code_w && end > start {
+                                break;
+                            }
+                            cur_w += cw;
+                            end += 1;
+                        }
+                        let chunk: String = chars[start..end].iter().collect();
+                        let pad = code_w.saturating_sub(cur_w);
+                        visible_entries.push((
+                            idx,
+                            Line::from(vec![
+                                Span::styled("│ ", code_border_style),
+                                Span::styled(
+                                    format!("{chunk}{}", " ".repeat(pad)),
+                                    Style::default().fg(Color::Yellow),
+                                ),
+                                Span::styled(" │", code_border_style),
+                            ]),
+                        ));
+                        start = end;
+                    }
+                }
+                continue;
+            }
+
+            // 3. Skip completed checkboxes if hide-completed is active
+            if !self.show_completed && is_completed_checkbox(line) {
+                continue;
+            }
+
+            // 4. Horizontal Rules
+            if trimmed == "---" || trimmed == "***" || trimmed == "___" {
+                visible_entries.push((
+                    idx,
+                    Line::from(vec![Span::styled("─".repeat(avail_w), styles.divider)]),
+                ));
+                continue;
+            }
+
+            // 5. Headings
+            if let Some(h1) = trimmed.strip_prefix("# ") {
+                for wl in textwrap_simple(h1, avail_w.saturating_sub(2)) {
+                    visible_entries.push((
+                        idx,
+                        Line::from(vec![Span::styled(format!("# {}", wl), heading_style)]),
+                    ));
+                }
+                continue;
+            }
+            if let Some(h2) = trimmed.strip_prefix("## ") {
+                for wl in textwrap_simple(h2, avail_w.saturating_sub(3)) {
+                    visible_entries.push((
+                        idx,
+                        Line::from(vec![Span::styled(format!("## {}", wl), heading_style)]),
+                    ));
+                }
+                continue;
+            }
+            if let Some(h3) = trimmed.strip_prefix("### ") {
+                for wl in textwrap_simple(h3, avail_w.saturating_sub(4)) {
+                    visible_entries.push((
+                        idx,
+                        Line::from(vec![Span::styled(format!("### {}", wl), heading_style)]),
+                    ));
+                }
+                continue;
+            }
+
+            // 6. Blockquotes
+            if let Some(bq) = trimmed.strip_prefix("> ") {
+                for wl in textwrap_simple(bq, avail_w.saturating_sub(3)) {
+                    let bar = Span::styled(
+                        "│ ",
+                        Style::default().fg(Color::Cyan).add_modifier(Modifier::DIM),
+                    );
+                    let mut spans = vec![bar];
+                    spans.extend(parse_markdown_spans(
+                        &wl,
+                        styles.text.add_modifier(Modifier::ITALIC),
+                    ));
+                    visible_entries.push((idx, Line::from(spans)));
+                }
+                continue;
+            }
+
+            // 7. Checkboxes
+            if let Some((indent_len, is_checked, rest)) = parse_checkbox_line(line) {
+                let margin = indent_len + 6;
+                let is_sel = idx == self.selected_line;
+                let (check_box_span, base_st) = if is_checked {
+                    let cb_style = if is_sel {
+                        Style::default()
+                            .fg(Color::DarkGray)
+                            .add_modifier(Modifier::DIM)
+                    } else {
+                        Style::default().fg(Color::Green)
+                    };
+                    (
+                        Span::styled("- [x] ", cb_style),
+                        Style::default()
+                            .fg(Color::DarkGray)
+                            .add_modifier(Modifier::DIM),
+                    )
+                } else {
+                    let cb_style = if is_sel {
+                        styles.text
+                    } else {
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD)
+                    };
+                    (Span::styled("- [ ] ", cb_style), styles.text)
+                };
+
+                let wrapped = textwrap_simple(rest, avail_w.saturating_sub(margin));
+                if wrapped.is_empty() {
+                    let mut spans = Vec::new();
+                    if indent_len > 0 {
+                        spans.push(Span::styled(" ".repeat(indent_len), base_st));
+                    }
+                    spans.push(check_box_span);
+                    visible_entries.push((idx, Line::from(spans)));
+                } else {
+                    for (w_idx, wl) in wrapped.iter().enumerate() {
+                        let mut spans = Vec::new();
+                        if w_idx == 0 {
+                            if indent_len > 0 {
+                                spans.push(Span::styled(" ".repeat(indent_len), base_st));
+                            }
+                            spans.push(check_box_span.clone());
+                        } else {
+                            spans.push(Span::styled(" ".repeat(margin), base_st));
+                        }
+                        spans.extend(parse_markdown_spans(wl, base_st));
+                        visible_entries.push((idx, Line::from(spans)));
+                    }
+                }
+                continue;
+            }
+
+            // 8. Bullet Lists (- , * , + )
+            if let Some((indent_len, bullet_rest)) = parse_bullet_line(line) {
+                let margin = indent_len + 2;
+                let wrapped = textwrap_simple(bullet_rest, avail_w.saturating_sub(margin));
+                if wrapped.is_empty() {
+                    let mut spans = Vec::new();
+                    if indent_len > 0 {
+                        spans.push(Span::styled(" ".repeat(indent_len), styles.text));
+                    }
+                    spans.push(Span::styled("• ", Style::default().fg(Color::Cyan)));
+                    visible_entries.push((idx, Line::from(spans)));
+                } else {
+                    for (w_idx, wl) in wrapped.iter().enumerate() {
+                        let mut spans = Vec::new();
+                        if w_idx == 0 {
+                            if indent_len > 0 {
+                                spans.push(Span::styled(" ".repeat(indent_len), styles.text));
+                            }
+                            spans.push(Span::styled("• ", Style::default().fg(Color::Cyan)));
+                        } else {
+                            spans.push(Span::styled(" ".repeat(margin), styles.text));
+                        }
+                        spans.extend(parse_markdown_spans(wl, styles.text));
+                        visible_entries.push((idx, Line::from(spans)));
+                    }
+                }
+                continue;
+            }
+
+            // 9. Standard Text Lines with Inline Markdown
+            let wrapped = textwrap_simple(line, avail_w);
+            if wrapped.is_empty() {
+                visible_entries.push((idx, Line::from(vec![Span::styled("", styles.text)])));
+            } else {
+                for wl in wrapped {
+                    let spans = parse_markdown_spans(&wl, styles.text);
+                    visible_entries.push((idx, Line::from(spans)));
+                }
+            }
+        }
+
+        visible_entries
     }
 }
 

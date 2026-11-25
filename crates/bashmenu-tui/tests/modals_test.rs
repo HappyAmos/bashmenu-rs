@@ -2537,3 +2537,90 @@ fn test_confirm_modal_with_default_cancel() {
     assert_eq!(modal2.selected_index, 1);
     assert_eq!(modal2.handle_key(KeyCode::Enter), Some(ConfirmChoice::No));
 }
+
+#[test]
+fn test_notebook_viewer_and_editor_ui_bugfixes() {
+    use crossterm::event::KeyModifiers;
+    use ratatui::style::{Color, Modifier};
+
+    let styles = ResolvedThemeStyles::default();
+    let area = Rect::new(0, 0, 80, 24);
+
+    // 1. Viewer: ## heading uses Cyan Bold, code block has closed right borders (┐/│/┘),
+    //    and help gutter sits at bottom with horizontal divider + T-connectors above it
+    let md = "# Top Heading\n## Sub Heading\n```rust\nlet x = 42;\n```\n";
+    let mut viewer = NoteViewerModal::new("Notes", "notes.yml", md);
+    // Move selection away from line 1 so REVERSED doesn't mask color
+    viewer.handle_key(KeyCode::Down);
+    viewer.handle_key(KeyCode::Down);
+    let mut vbuf = Buffer::empty(area);
+    let vinner = viewer.render(area, &styles, &mut vbuf);
+
+    // Row 1 (## Sub Heading) at vinner.y + 2 must be Cyan + BOLD
+    assert_eq!(vbuf[(vinner.x + 2, vinner.y + 2)].fg, Color::Cyan);
+    assert!(vbuf[(vinner.x + 2, vinner.y + 2)]
+        .modifier
+        .contains(Modifier::BOLD));
+
+    // Code block top/mid/bottom right borders must be ┐, │, ┘ within avail_w
+    let avail_w = vinner.width.saturating_sub(4);
+    let right_col = vinner.x + 2 + avail_w - 1;
+    assert_eq!(vbuf[(right_col, vinner.y + 3)].symbol(), "┐");
+    assert_eq!(vbuf[(right_col, vinner.y + 4)].symbol(), "│");
+    assert_eq!(vbuf[(right_col, vinner.y + 5)].symbol(), "┘");
+
+    // Divider with T-connectors directly above footer in viewer
+    let v_footer_y = vinner.y + vinner.height - 2; // 2-line wrapped footer or 1-line; check row above footer
+    let v_has_tees = (vinner.y + 1..vinner.y + vinner.height).any(|y| {
+        vbuf[(vinner.x - 1, y)].symbol() == styles.borders.left_tee
+            && vbuf[(vinner.x + vinner.width, y)].symbol() == styles.borders.right_tee
+    });
+    assert!(v_has_tees, "NoteViewerModal must render T-connector divider above help gutter (footer near y={v_footer_y})");
+
+    // 2. Editor: trailing cursor remains visible at end of a full-width line,
+    //    and T-connector divider appears above help gutter
+    let mut editor = NoteEditorModal::new("Edit Test", "notes.yml", "");
+    let mut ebuf = Buffer::empty(area);
+    let einner = editor.render(area, &styles, &mut ebuf);
+    let wrap_w = (einner.width.saturating_sub(4).max(2) as usize)
+        .saturating_sub(1)
+        .max(1);
+    let full_line = "a".repeat(wrap_w);
+    let mut editor2 = NoteEditorModal::new("Edit Test", "notes.yml", &full_line);
+    // Place cursor at very end of full-width line
+    editor2.handle_key(KeyCode::End, KeyModifiers::NONE);
+    let mut ebuf2 = Buffer::empty(area);
+    let einner2 = editor2.render(area, &styles, &mut ebuf2);
+    // Trailing cursor cell at (einner2.x + 2 + wrap_w, einner2.y + 1) must have cursor bg (non-Reset/non-background)
+    let cursor_cell = &ebuf2[(einner2.x + 2 + wrap_w as u16, einner2.y + 1)];
+    assert_eq!(
+        cursor_cell.bg,
+        styles.text.fg.unwrap_or(Color::White),
+        "Cursor at end of full-width line must remain visible"
+    );
+
+    let e_has_tees = (einner2.y + 1..einner2.y + einner2.height).any(|y| {
+        ebuf2[(einner2.x - 1, y)].symbol() == styles.borders.left_tee
+            && ebuf2[(einner2.x + einner2.width, y)].symbol() == styles.borders.right_tee
+    });
+    assert!(
+        e_has_tees,
+        "NoteEditorModal must render T-connector divider above help gutter"
+    );
+
+    // 3. Scrollbar visible -> right margin increased by 1 (code block right corner shifts left by 1)
+    let long_md = format!(
+        "```rust\nlet y = 1;\n```\n{}",
+        (0..40).map(|i| format!("Line {i}\n")).collect::<String>()
+    );
+    let mut long_viewer = NoteViewerModal::new("Long Note", "notes.yml", &long_md);
+    let mut lbuf = Buffer::empty(area);
+    let linner = long_viewer.render(area, &styles, &mut lbuf);
+    let sb_avail_w = linner.width.saturating_sub(5);
+    let sb_right_col = linner.x + 2 + sb_avail_w - 1;
+    assert_eq!(lbuf[(sb_right_col, linner.y + 1)].symbol(), "┐");
+    assert_eq!(
+        lbuf[(linner.x + linner.width - 1, linner.y + 1)].symbol(),
+        "▲"
+    );
+}
