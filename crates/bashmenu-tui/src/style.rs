@@ -75,6 +75,7 @@ impl ThemeActivity {
                 "accent",
                 "selection",
                 "selected_tab",
+                "unselected_tab",
                 "whitespace",
                 "shortcut_key",
                 "help_text",
@@ -371,6 +372,8 @@ pub struct ResolvedThemeStyles {
     pub shadow: Style,
     /// Active / selected tab style in tabbed interfaces
     pub selected_tab: Style,
+    /// Inactive / unselected tab style in tabbed interfaces
+    pub unselected_tab: Style,
     /// Visible whitespace glyph style in text editors
     pub whitespace: Style,
     /// Active terminal color capability tier
@@ -421,6 +424,9 @@ impl Default for ResolvedThemeStyles {
                 .fg(Color::Black)
                 .bg(Color::Cyan)
                 .add_modifier(Modifier::BOLD),
+            unselected_tab: Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::DIM),
             whitespace: Style::default().fg(Color::DarkGray),
             tier: ColorTier::TrueColor,
         }
@@ -622,6 +628,9 @@ impl ResolvedThemeStyles {
             if !is_override && !p.contains_key("plugin") {
                 self.plugin = merged;
             }
+            if !is_override && !p.contains_key("unselected_tab") {
+                self.unselected_tab = merged.add_modifier(Modifier::DIM);
+            }
         }
         if let Some(st) = p
             .get("highlight")
@@ -702,6 +711,13 @@ impl ResolvedThemeStyles {
             .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
         {
             self.selected_tab = merge_style_pair(self.selected_tab, st, Some(Modifier::BOLD));
+        }
+        if let Some(st) = p
+            .get("unselected_tab")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
+        {
+            self.unselected_tab = merge_style_pair(self.unselected_tab, st, None);
         }
         if let Some(st) = p
             .get("shortcut_key")

@@ -986,6 +986,10 @@ pub fn derive_palette_from_image(
         make_pair(selection_fg as i64, primary_accent as i64),
     );
     colors.insert(
+        "unselected_tab".to_string(),
+        make_pair(gutter_color as i64, -1),
+    );
+    colors.insert(
         "shortcut_key".to_string(),
         make_pair(secondary_accent as i64, -1),
     );

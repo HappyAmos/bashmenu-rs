@@ -33,6 +33,7 @@ pub fn activity_override_tokens(activity_key: &str) -> &'static [&'static str] {
             "accent",
             "selection",
             "selected_tab",
+            "unselected_tab",
             "whitespace",
             "gutter",
             "help_text",
@@ -87,6 +88,7 @@ pub fn activity_override_tokens(activity_key: &str) -> &'static [&'static str] {
             "accent",
             "selection",
             "selected_tab",
+            "unselected_tab",
             "shortcut_key",
             "help_text",
             "gutter",
@@ -537,6 +539,7 @@ impl Theme {
         colors.insert("shortcut_key".to_string(), make_pair(255, -1));
         colors.insert("selection".to_string(), make_pair(0, 255));
         colors.insert("selected_tab".to_string(), make_pair(0, 255));
+        colors.insert("unselected_tab".to_string(), make_pair(245, -1));
         colors.insert("whitespace".to_string(), make_pair(242, -1));
         colors.insert("gutter".to_string(), make_pair(242, -1));
         colors.insert("footer".to_string(), make_pair(245, -1));

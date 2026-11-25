@@ -129,7 +129,7 @@ pub fn render_preview_pane_with_base(
         let tab_style = if tab.mode == mode {
             canvas_styles.selected_tab.add_modifier(Modifier::BOLD)
         } else {
-            canvas_styles.title
+            canvas_styles.unselected_tab
         };
         title_spans.push(Span::styled(tab.label.clone(), tab_style));
     }
@@ -407,7 +407,7 @@ pub fn render_preview_pane_with_base(
                     " [bashmenu.yml*] ",
                     preview_styles.selected_tab.add_modifier(Modifier::BOLD),
                 ),
-                Span::styled(" [notes.yml] ", preview_styles.text),
+                Span::styled(" [notes.yml] ", preview_styles.unselected_tab),
                 Span::styled(" [+] ", preview_styles.accent),
             ]);
             buf.set_line(p_inner_x, p_inner_y, &tab_line, p_avail_w);
