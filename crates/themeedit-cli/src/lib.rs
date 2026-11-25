@@ -2385,22 +2385,114 @@ pub fn get_token_preview_spans(
         TokenKind::Border(key) if key == "gutter_separator" => {
             spans.push((gt_y + 1, sep_x, sep_x + 1));
         }
-        TokenKind::Color(key) if key == "title" => {
-            spans.push((
-                right_area.y,
-                right_area.x + 2,
-                right_area.x + right_area.width.saturating_sub(2),
-            ));
-        }
-        TokenKind::Color(key) if key == "highlight" => {
-            spans.push((content_start_y, p_inner_x, p_inner_x + p_avail_w));
-        }
-        TokenKind::Color(key) if key == "highlight_text" => {
-            spans.push((content_start_y, p_inner_x + 2, p_inner_x + 28));
-        }
+        TokenKind::Color(key) if key == "title" => match mode {
+            PreviewMode::Modals => {
+                let p_avail_h = right_area.height.saturating_sub(4);
+                let mod_w = (p_avail_w.saturating_sub(4)).clamp(32, 50);
+                let mod_h = 12_u16.min(p_avail_h);
+                let mod_x = p_inner_x + (p_avail_w.saturating_sub(mod_w)) / 2;
+                let mod_y = content_start_y + (p_avail_h.saturating_sub(mod_h)) / 2;
+                spans.push((mod_y, mod_x + 2, (mod_x + 27).min(mod_x + mod_w - 4)));
+            }
+            PreviewMode::MenuEditor => {
+                let left_w = p_avail_w / 2;
+                spans.push((content_start_y + 1, p_inner_x + 1, p_inner_x + left_w - 1));
+            }
+            PreviewMode::ThemeEditor => {
+                let left_w = ((p_avail_w as usize * 48) / 100).max(16) as u16;
+                let right_w = p_avail_w.saturating_sub(left_w + 1);
+                let sample_x = p_inner_x + left_w + 1;
+                spans.push((
+                    content_start_y,
+                    p_inner_x + 2,
+                    (p_inner_x + 12).min(p_inner_x + left_w - 1),
+                ));
+                if right_w >= 10 {
+                    spans.push((
+                        content_start_y,
+                        sample_x + 2,
+                        (sample_x + 18).min(sample_x + right_w - 1),
+                    ));
+                    spans.push((
+                        content_start_y + 1,
+                        sample_x + 2,
+                        (sample_x + 15).min(sample_x + right_w - 1),
+                    ));
+                }
+            }
+            PreviewMode::ShortcutEditor => {
+                let left_w = p_avail_w / 2;
+                let right_w = p_avail_w.saturating_sub(left_w);
+                let insp_x = p_inner_x + left_w;
+                spans.push((
+                    content_start_y,
+                    p_inner_x + 2,
+                    (p_inner_x + 24).min(p_inner_x + left_w - 1),
+                ));
+                if right_w >= 6 {
+                    spans.push((
+                        content_start_y,
+                        insp_x + 2,
+                        (insp_x + 24).min(insp_x + right_w - 1),
+                    ));
+                }
+            }
+            _ => {
+                spans.push((
+                    right_area.y,
+                    right_area.x + 2,
+                    right_area.x + right_area.width.saturating_sub(2),
+                ));
+            }
+        },
+        TokenKind::Color(key) if key == "highlight" || key == "highlight_text" => match mode {
+            PreviewMode::TextEditor => {
+                let max_x = p_inner_x + p_avail_w;
+                let status_y = bot_y.saturating_sub(2);
+                spans.push((
+                    content_start_y + 4,
+                    p_inner_x + 7,
+                    (p_inner_x + 23).min(max_x),
+                ));
+                spans.push((status_y, p_inner_x, max_x));
+            }
+            PreviewMode::MenuEditor => {
+                let left_w = p_avail_w / 2;
+                spans.push((content_start_y + 3, p_inner_x + 1, p_inner_x + left_w - 1));
+            }
+            PreviewMode::ThemeEditor => {
+                let left_w = ((p_avail_w as usize * 48) / 100).max(16) as u16;
+                let right_w = p_avail_w.saturating_sub(left_w + 1);
+                let sample_x = p_inner_x + left_w + 1;
+                spans.push((content_start_y + 3, p_inner_x + 1, p_inner_x + left_w - 1));
+                if right_w >= 10 {
+                    spans.push((
+                        content_start_y + 2,
+                        sample_x + 2,
+                        (sample_x + 18).min(sample_x + right_w - 1),
+                    ));
+                }
+            }
+            PreviewMode::ShortcutEditor => {
+                let left_w = p_avail_w / 2;
+                spans.push((content_start_y + 1, p_inner_x + 1, p_inner_x + left_w - 1));
+            }
+            _ => {
+                if key == "highlight_text" {
+                    spans.push((content_start_y, p_inner_x + 2, p_inner_x + 28));
+                } else {
+                    spans.push((content_start_y, p_inner_x, p_inner_x + p_avail_w));
+                }
+            }
+        },
         TokenKind::Color(key) if key == "selection" => {
             if mode == PreviewMode::TextEditor {
-                spans.push((content_start_y + 5, p_inner_x + 7, p_inner_x + 25));
+                let max_x = p_inner_x + p_avail_w;
+                spans.push((
+                    content_start_y + 5,
+                    p_inner_x + 24,
+                    (p_inner_x + 28).min(max_x),
+                ));
             } else {
                 spans.push((content_start_y, p_inner_x, p_inner_x + p_avail_w));
             }
@@ -2440,8 +2532,13 @@ pub fn get_token_preview_spans(
         }
         TokenKind::Color(key) if key == "whitespace" => {
             if mode == PreviewMode::TextEditor {
-                spans.push((content_start_y + 4, p_inner_x + 5, p_inner_x + 9));
-                spans.push((content_start_y + 5, p_inner_x + 5, p_inner_x + 9));
+                let rows_end = right_area.y + right_area.height.saturating_sub(3);
+                for row in [2_u16, 3, 5] {
+                    let y = content_start_y + 2 + row;
+                    if y < rows_end {
+                        spans.push((y, p_inner_x + 5, p_inner_x + 7));
+                    }
+                }
             } else {
                 spans.push((
                     gt_y + 1,
@@ -2450,21 +2547,150 @@ pub fn get_token_preview_spans(
                 ));
             }
         }
-        TokenKind::Color(key) if key == "text" => {
-            spans.push((content_start_y + 1, p_inner_x + 2, p_inner_x + 22));
-            spans.push((content_start_y + 2, p_inner_x + 2, p_inner_x + 28));
-            spans.push((content_start_y + 4, p_inner_x + 2, p_inner_x + 24));
-        }
-        TokenKind::Color(key) if key == "accent" => {
-            // Accent is the submenu chevron indicator glyph '»' on inactive submenu item 2
-            spans.push((content_start_y + 1, p_inner_x + 25, p_inner_x + 28));
-        }
-        TokenKind::Color(key) if key == "shortcut_key" => {
-            // Shortcut keys in inactive menu items (active item shortcut adopts highlight_text)
-            spans.push((content_start_y + 1, p_inner_x + 6, p_inner_x + 9));
-            spans.push((content_start_y + 2, p_inner_x + 6, p_inner_x + 9));
-            spans.push((content_start_y + 4, p_inner_x + 6, p_inner_x + 9));
-        }
+        TokenKind::Color(key) if key == "text" => match mode {
+            PreviewMode::TextEditor => {
+                let max_x = p_inner_x + p_avail_w;
+                let rows_end = right_area.y + right_area.height.saturating_sub(3);
+                let text_rows: [(u16, u16, u16); 5] =
+                    [(0, 5, 21), (1, 5, 14), (3, 7, 24), (4, 5, 10), (5, 7, 30)];
+                for (r, x0, x1) in text_rows {
+                    let y = content_start_y + 2 + r;
+                    if y < rows_end {
+                        spans.push((y, p_inner_x + x0, (p_inner_x + x1).min(max_x)));
+                    }
+                }
+            }
+            PreviewMode::Modals => {
+                let p_avail_h = right_area.height.saturating_sub(4);
+                let mod_w = (p_avail_w.saturating_sub(4)).clamp(32, 50);
+                let mod_h = 12_u16.min(p_avail_h);
+                let mod_x = p_inner_x + (p_avail_w.saturating_sub(mod_w)) / 2;
+                let mod_y = content_start_y + (p_avail_h.saturating_sub(mod_h)) / 2;
+                spans.push((mod_y + 2, mod_x + 2, (mod_x + 35).min(mod_x + mod_w - 1)));
+                spans.push((mod_y + 5, mod_x + 3, mod_x + mod_w.saturating_sub(3)));
+            }
+            PreviewMode::MenuEditor => {
+                let left_w = p_avail_w / 2;
+                let right_w = p_avail_w.saturating_sub(left_w);
+                let insp_x = p_inner_x + left_w;
+                for r in [2_u16, 4, 5] {
+                    spans.push((content_start_y + r, p_inner_x + 1, p_inner_x + left_w - 1));
+                }
+                if right_w > 2 {
+                    for r in [2_u16, 5] {
+                        spans.push((content_start_y + r, insp_x + 1, insp_x + right_w - 1));
+                    }
+                }
+            }
+            PreviewMode::Toast => {
+                let (toast_x, toast_w, boxes) =
+                    preview::toast_preview_boxes(right_area, preview_styles.toast_style);
+                let is_framed = preview_styles.toast_style == ToastStyle::Framed;
+                for (ty, _th) in boxes {
+                    let msg_y = if is_framed { ty + 2 } else { ty + 1 };
+                    let end_x = if is_framed {
+                        toast_x + toast_w.saturating_sub(1)
+                    } else {
+                        toast_x + toast_w
+                    };
+                    spans.push((msg_y, toast_x + 2, end_x));
+                }
+            }
+            PreviewMode::ThemeEditor => {
+                let left_w = ((p_avail_w as usize * 48) / 100).max(16) as u16;
+                for r in [2_u16, 4, 5] {
+                    spans.push((content_start_y + r, p_inner_x + 1, p_inner_x + left_w - 1));
+                }
+            }
+            PreviewMode::ShortcutEditor => {
+                let left_w = p_avail_w / 2;
+                let right_w = p_avail_w.saturating_sub(left_w);
+                let insp_x = p_inner_x + left_w;
+                for r in 2..=4_u16 {
+                    let start = (p_inner_x + 10).min(p_inner_x + left_w - 1);
+                    spans.push((content_start_y + r, start, p_inner_x + left_w - 1));
+                }
+                if right_w > 4 {
+                    for r in [2_u16, 4] {
+                        spans.push((content_start_y + r, insp_x + 2, insp_x + right_w - 2));
+                    }
+                }
+            }
+            PreviewMode::Menu => {
+                spans.push((content_start_y + 1, p_inner_x + 2, p_inner_x + 22));
+                spans.push((content_start_y + 2, p_inner_x + 2, p_inner_x + 28));
+                spans.push((content_start_y + 4, p_inner_x + 2, p_inner_x + 24));
+            }
+        },
+        TokenKind::Color(key) if key == "accent" => match mode {
+            PreviewMode::TextEditor => {
+                let max_x = p_inner_x + p_avail_w;
+                spans.push((content_start_y, p_inner_x + 30, (p_inner_x + 35).min(max_x)));
+            }
+            PreviewMode::MenuEditor => {
+                let left_w = p_avail_w / 2;
+                let right_w = p_avail_w.saturating_sub(left_w);
+                let insp_x = p_inner_x + left_w;
+                if right_w > 2 {
+                    spans.push((content_start_y + 1, insp_x + 1, insp_x + right_w - 1));
+                    spans.push((content_start_y + 4, insp_x + 1, insp_x + right_w - 1));
+                }
+            }
+            PreviewMode::ThemeEditor => {
+                let left_w = ((p_avail_w as usize * 48) / 100).max(16) as u16;
+                spans.push((content_start_y + 1, p_inner_x + 1, p_inner_x + left_w - 1));
+            }
+            PreviewMode::ShortcutEditor => {
+                let left_w = p_avail_w / 2;
+                let right_w = p_avail_w.saturating_sub(left_w);
+                let insp_x = p_inner_x + left_w;
+                if right_w > 4 {
+                    spans.push((content_start_y + 1, insp_x + 2, insp_x + right_w - 2));
+                }
+            }
+            _ => {
+                // Accent is the submenu chevron indicator glyph '»' on inactive submenu item 2
+                spans.push((content_start_y + 1, p_inner_x + 25, p_inner_x + 28));
+            }
+        },
+        TokenKind::Color(key) if key == "shortcut_key" => match mode {
+            PreviewMode::TextEditor => {
+                let footer_y = bot_y.saturating_sub(1);
+                spans.push((footer_y, p_inner_x, p_inner_x + 3));
+                spans.push((footer_y, p_inner_x + 9, p_inner_x + 12));
+                spans.push((footer_y, p_inner_x + 18, p_inner_x + 21));
+                spans.push((footer_y, p_inner_x + 27, p_inner_x + 30));
+            }
+            PreviewMode::MenuEditor => {
+                let left_w = p_avail_w / 2;
+                let right_w = p_avail_w.saturating_sub(left_w);
+                let insp_x = p_inner_x + left_w;
+                if right_w > 2 {
+                    spans.push((content_start_y + 3, insp_x + 1, insp_x + right_w - 1));
+                }
+            }
+            PreviewMode::ShortcutEditor => {
+                let left_w = p_avail_w / 2;
+                let right_w = p_avail_w.saturating_sub(left_w);
+                let insp_x = p_inner_x + left_w;
+                for r in 2..=4_u16 {
+                    spans.push((
+                        content_start_y + r,
+                        p_inner_x + 1,
+                        (p_inner_x + 9).min(p_inner_x + left_w - 1),
+                    ));
+                }
+                if right_w > 4 {
+                    spans.push((content_start_y + 3, insp_x + 2, insp_x + right_w - 2));
+                }
+            }
+            _ => {
+                // Shortcut keys in inactive menu items (active item shortcut adopts highlight_text)
+                spans.push((content_start_y + 1, p_inner_x + 6, p_inner_x + 9));
+                spans.push((content_start_y + 2, p_inner_x + 6, p_inner_x + 9));
+                spans.push((content_start_y + 4, p_inner_x + 6, p_inner_x + 9));
+            }
+        },
         TokenKind::Indicator => {
             let ind_w = preview_styles.indicator_symbol.width().max(2) as u16;
             spans.push((content_start_y, p_inner_x, p_inner_x + ind_w));
@@ -2472,12 +2698,43 @@ pub fn get_token_preview_spans(
         TokenKind::DefaultIcon => {
             spans.push((content_start_y + 2, p_inner_x + 2, p_inner_x + 6));
         }
-        TokenKind::Color(key) if key == "divider" => {
-            spans.push((content_start_y + 3, p_inner_x, p_inner_x + p_avail_w));
-            if content_avail_h >= 8 {
-                spans.push((plugin_start_y, p_inner_x, p_inner_x + p_avail_w));
+        TokenKind::Color(key) if key == "divider" => match mode {
+            PreviewMode::TextEditor => {
+                spans.push((content_start_y + 1, p_inner_x, p_inner_x + p_avail_w));
             }
-        }
+            PreviewMode::Modals => {
+                let p_avail_h = right_area.height.saturating_sub(4);
+                let mod_w = (p_avail_w.saturating_sub(4)).clamp(32, 50);
+                let mod_h = 12_u16.min(p_avail_h);
+                let mod_x = p_inner_x + (p_avail_w.saturating_sub(mod_w)) / 2;
+                let mod_y = content_start_y + (p_avail_h.saturating_sub(mod_h)) / 2;
+                spans.push((
+                    mod_y + mod_h.saturating_sub(3),
+                    mod_x + 1,
+                    mod_x + mod_w - 1,
+                ));
+            }
+            PreviewMode::ThemeEditor => {
+                let div_y = bot_y.saturating_sub(2);
+                spans.push((div_y, p_inner_x, p_inner_x + p_avail_w));
+                let left_w = ((p_avail_w as usize * 48) / 100).max(16) as u16;
+                let right_w = p_avail_w.saturating_sub(left_w + 1);
+                if right_w >= 10 {
+                    let sx = p_inner_x + left_w + 3;
+                    spans.push((content_start_y + 3, sx, (sx + 8).min(p_inner_x + p_avail_w)));
+                }
+            }
+            PreviewMode::ShortcutEditor => {
+                let div_y = bot_y.saturating_sub(2);
+                spans.push((div_y, p_inner_x, p_inner_x + p_avail_w));
+            }
+            _ => {
+                spans.push((content_start_y + 3, p_inner_x, p_inner_x + p_avail_w));
+                if content_avail_h >= 8 {
+                    spans.push((plugin_start_y, p_inner_x, p_inner_x + p_avail_w));
+                }
+            }
+        },
         TokenKind::DividerChar | TokenKind::DividerLength => {
             spans.push((content_start_y + 3, p_inner_x, p_inner_x + p_avail_w));
         }
@@ -2488,9 +2745,31 @@ pub fn get_token_preview_spans(
                 right_area.x + right_area.width.saturating_sub(6),
             ));
         }
-        TokenKind::Color(key) if key == "help_text" => {
-            spans.push((gt_y + 1, right_area.x + 2, sep_x));
-        }
+        TokenKind::Color(key) if key == "help_text" => match mode {
+            PreviewMode::Modals => {
+                let p_avail_h = right_area.height.saturating_sub(4);
+                let mod_w = (p_avail_w.saturating_sub(4)).clamp(32, 50);
+                let mod_h = 12_u16.min(p_avail_h);
+                let mod_x = p_inner_x + (p_avail_w.saturating_sub(mod_w)) / 2;
+                let mod_y = content_start_y + (p_avail_h.saturating_sub(mod_h)) / 2;
+                spans.push((mod_y + 3, mod_x + 2, (mod_x + 36).min(mod_x + mod_w - 1)));
+                spans.push((
+                    mod_y + mod_h.saturating_sub(2),
+                    mod_x + 2,
+                    mod_x + mod_w.saturating_sub(12),
+                ));
+            }
+            PreviewMode::TextEditor
+            | PreviewMode::MenuEditor
+            | PreviewMode::ThemeEditor
+            | PreviewMode::ShortcutEditor => {
+                let footer_y = bot_y.saturating_sub(1);
+                spans.push((footer_y, p_inner_x, p_inner_x + p_avail_w));
+            }
+            _ => {
+                spans.push((gt_y + 1, right_area.x + 2, sep_x));
+            }
+        },
         TokenKind::Color(key) if key == "plugin" => {
             if content_avail_h >= 8 {
                 spans.push((plugin_start_y + 1, p_inner_x, p_inner_x + p_avail_w));
@@ -2499,13 +2778,27 @@ pub fn get_token_preview_spans(
                 spans.push((gt_y.saturating_sub(1), p_inner_x, p_inner_x + p_avail_w));
             }
         }
-        TokenKind::Color(key) if key == "gutter" => {
-            spans.push((
-                gt_y + 1,
-                sep_x + 1,
-                right_area.x + right_area.width.saturating_sub(2),
-            ));
-        }
+        TokenKind::Color(key) if key == "gutter" => match mode {
+            PreviewMode::Modals => {
+                let p_avail_h = right_area.height.saturating_sub(4);
+                let mod_w = (p_avail_w.saturating_sub(4)).clamp(32, 50);
+                let mod_h = 12_u16.min(p_avail_h);
+                let mod_x = p_inner_x + (p_avail_w.saturating_sub(mod_w)) / 2;
+                let mod_y = content_start_y + (p_avail_h.saturating_sub(mod_h)) / 2;
+                spans.push((
+                    mod_y + mod_h.saturating_sub(2),
+                    mod_x + mod_w.saturating_sub(12),
+                    mod_x + mod_w - 1,
+                ));
+            }
+            _ => {
+                spans.push((
+                    gt_y + 1,
+                    sep_x + 1,
+                    right_area.x + right_area.width.saturating_sub(2),
+                ));
+            }
+        },
         TokenKind::Color(key) if key == "footer" => {
             spans.push((
                 bot_y,
@@ -2514,20 +2807,58 @@ pub fn get_token_preview_spans(
             ));
         }
         TokenKind::Color(key) if key == "window_close_button" => {
-            let close_x = right_area.x + right_area.width.saturating_sub(4);
-            spans.push((right_area.y, close_x, close_x + 3));
-        }
-        TokenKind::Color(key) if key == "scrollbar" => {
-            let top_sb = (right_area.y + 3).min(bot_y);
-            let bot_sb = (right_area.y + 6).min(bot_y);
-            for y in top_sb..=bot_sb {
-                spans.push((
-                    y,
-                    right_area.x + right_area.width.saturating_sub(1),
-                    right_area.x + right_area.width,
-                ));
+            if mode == PreviewMode::Modals {
+                let p_avail_h = right_area.height.saturating_sub(4);
+                let mod_w = (p_avail_w.saturating_sub(4)).clamp(32, 50);
+                let mod_h = 12_u16.min(p_avail_h);
+                let mod_x = p_inner_x + (p_avail_w.saturating_sub(mod_w)) / 2;
+                let mod_y = content_start_y + (p_avail_h.saturating_sub(mod_h)) / 2;
+                let close_x = mod_x + mod_w.saturating_sub(4);
+                spans.push((mod_y, close_x, close_x + 3));
+            } else {
+                let close_x = right_area.x + right_area.width.saturating_sub(4);
+                spans.push((right_area.y, close_x, close_x + 3));
             }
         }
+        TokenKind::Color(key) if key == "scrollbar" => match mode {
+            PreviewMode::Modals => {
+                let p_avail_h = right_area.height.saturating_sub(4);
+                let mod_w = (p_avail_w.saturating_sub(4)).clamp(32, 50);
+                let mod_h = 12_u16.min(p_avail_h);
+                let mod_x = p_inner_x + (p_avail_w.saturating_sub(mod_w)) / 2;
+                let mod_y = content_start_y + (p_avail_h.saturating_sub(mod_h)) / 2;
+                for y in (mod_y + 3)..=(mod_y + 5) {
+                    spans.push((y, mod_x + mod_w - 1, mod_x + mod_w));
+                }
+            }
+            PreviewMode::ThemeEditor => {
+                let left_w = ((p_avail_w as usize * 48) / 100).max(16) as u16;
+                spans.push((
+                    content_start_y + 2,
+                    p_inner_x + left_w - 1,
+                    p_inner_x + left_w,
+                ));
+            }
+            PreviewMode::ShortcutEditor => {
+                let left_w = p_avail_w / 2;
+                spans.push((
+                    content_start_y + 1,
+                    p_inner_x + left_w - 1,
+                    p_inner_x + left_w,
+                ));
+            }
+            _ => {
+                let top_sb = (right_area.y + 3).min(bot_y);
+                let bot_sb = (right_area.y + 6).min(bot_y);
+                for y in top_sb..=bot_sb {
+                    spans.push((
+                        y,
+                        right_area.x + right_area.width.saturating_sub(1),
+                        right_area.x + right_area.width,
+                    ));
+                }
+            }
+        },
         TokenKind::Color(key)
             if key == "modal_yes_button"
                 || key == "modal_no_button"
