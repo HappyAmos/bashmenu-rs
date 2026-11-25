@@ -258,6 +258,7 @@ themeedit:
   delete_theme_title: "Eliminar tema"
   delete_theme_confirm: "¿Está seguro de que desea eliminar el tema '{theme}'?"
   cannot_delete_last_theme: "No se puede eliminar el único tema restante"
+  gutter_themes: "Temas"
   gutter_derive: "Derivar"
   gutter_new: "Nuevo"
   gutter_rename: "Renombrar"
