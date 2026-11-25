@@ -3163,3 +3163,49 @@ fn test_title_leading_border_dash_uses_border_color() {
     assert_eq!(mbuf[(mx + 2, my)].symbol(), "[");
     assert_eq!(mbuf[(mx + 2, my)].fg, Color::Indexed(226));
 }
+
+#[test]
+fn test_flash_spans_mode_aware_across_preview_tabs() {
+    use bashmenu_tui::ResolvedThemeStyles;
+    use ratatui::layout::Rect;
+    use themeedit_cli::{get_token_preview_spans, PreviewMode, TokenItem, TokenKind};
+
+    let styles = ResolvedThemeStyles::default();
+    let area = Rect::new(40, 2, 60, 24);
+    let text_tok = TokenItem {
+        label: "Text Color".to_string(),
+        kind: TokenKind::Color("text".to_string()),
+    };
+    let hl_tok = TokenItem {
+        label: "Highlight Color".to_string(),
+        kind: TokenKind::Color("highlight".to_string()),
+    };
+
+    // 2:Editor: text flashes editor code rows (starting at area.y + 4), highlight flashes alt_buffer + status bar
+    let ed_text = get_token_preview_spans(&text_tok, area, PreviewMode::TextEditor, &styles);
+    assert_eq!(ed_text.len(), 5);
+    assert_eq!(ed_text[0].0, area.y + 4);
+    let ed_hl = get_token_preview_spans(&hl_tok, area, PreviewMode::TextEditor, &styles);
+    assert!(ed_hl.iter().any(|s| s.0 == area.y + 6)); // alt_buffer: true
+    assert!(ed_hl.iter().any(|s| s.0 == area.y + area.height - 3)); // status bar
+
+    // 3:Modals: text flashes modal body & input box (inside modal rect)
+    let mod_text = get_token_preview_spans(&text_tok, area, PreviewMode::Modals, &styles);
+    assert_eq!(mod_text.len(), 2);
+    assert!(mod_text[0].1 > area.x + 2);
+
+    // 4:MenuEdit, 5:Toasts, 6:ThemeEdit, 7:Shortcuts all produce non-empty mode-specific text spans
+    for mode in [
+        PreviewMode::MenuEditor,
+        PreviewMode::Toast,
+        PreviewMode::ThemeEditor,
+        PreviewMode::ShortcutEditor,
+    ] {
+        let spans = get_token_preview_spans(&text_tok, area, mode, &styles);
+        assert!(
+            !spans.is_empty(),
+            "Expected non-empty text flash spans for {:?}",
+            mode
+        );
+    }
+}
