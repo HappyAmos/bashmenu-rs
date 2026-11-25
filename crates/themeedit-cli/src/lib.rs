@@ -493,7 +493,7 @@ impl ThemeEditorState {
                 kind: TokenKind::Color("accent".to_string()),
             },
             TokenItem {
-                label: "Shortcut Gutter (1-9, a-z)".to_string(),
+                label: "Shortcut Gutter".to_string(),
                 kind: TokenKind::Color("shortcut_key".to_string()),
             },
             TokenItem {

@@ -1198,7 +1198,7 @@ fn main() -> Result<()> {
                     let panel_h = gt_y.saturating_sub(panel_y);
 
                     let left_w = (area.width * 45 / 100).clamp(30, 42);
-                    let left_area = Rect::new(area.x + 2, panel_y, left_w, panel_h);
+                    let left_area = Rect::new(area.x + 2, panel_y, left_w - 3, panel_h);
                     let right_x = area.x + left_w + 1;
                     let right_w = (area.x + area.width).saturating_sub(right_x + 2);
                     let right_area = Rect::new(right_x, panel_y, right_w, panel_h);
@@ -1711,6 +1711,9 @@ fn main() -> Result<()> {
                                 }
                                 KeyCode::Tab | KeyCode::Char('p') | KeyCode::Char('P') => {
                                     state.preview_mode = state.preview_mode.next();
+                                }
+                                KeyCode::BackTab => {
+                                    state.preview_mode = state.preview_mode.prev();
                                 }
                                 KeyCode::Char('1') => {
                                     state.preview_mode = PreviewMode::Menu;
@@ -2371,13 +2374,25 @@ fn hit_test_preview_with_style(
                     ));
                 }
                 if row == mod_y + 2 {
-                    return Some(("text", row, mod_x + 2, mod_x + mod_w - 2));
+                    let end = (mod_x + 2 + 33).min(mod_x + mod_w - 1);
+                    if col >= mod_x + 2 && col < end {
+                        return Some(("text", row, mod_x + 2, end));
+                    }
+                    return Some(("background", row, mod_x + 1, mod_x + mod_w - 1));
                 }
                 if row == mod_y + 3 {
-                    return Some(("help_text", row, mod_x + 2, mod_x + mod_w - 2));
+                    let end = (mod_x + 2 + 34).min(mod_x + mod_w - 1);
+                    if col >= mod_x + 2 && col < end {
+                        return Some(("help_text", row, mod_x + 2, end));
+                    }
+                    return Some(("background", row, mod_x + 1, mod_x + mod_w - 1));
                 }
                 if row == mod_y + 5 {
-                    return Some(("text", row, mod_x + 2, mod_x + mod_w - 2));
+                    let end = mod_x + mod_w.saturating_sub(3);
+                    if col >= mod_x + 3 && col < end {
+                        return Some(("text", row, mod_x + 3, end));
+                    }
+                    return Some(("background", row, mod_x + 1, mod_x + mod_w - 1));
                 }
                 if row == mod_y + 7 {
                     if col >= mod_x + 3 && col < mod_x + 10 {
@@ -2391,7 +2406,7 @@ fn hit_test_preview_with_style(
                     }
                     return Some(("background", row, mod_x + 1, mod_x + mod_w - 1));
                 }
-                return Some(("text", row, mod_x + 2, mod_x + mod_w - 2));
+                return Some(("background", row, mod_x + 1, mod_x + mod_w - 1));
             }
             let max_bound_x = right_area.x + right_area.width.saturating_sub(1);
             let max_bound_y = right_area.y + right_area.height.saturating_sub(1);
@@ -2419,6 +2434,42 @@ fn hit_test_preview_with_style(
             ))
         }
         PreviewMode::TextEditor => {
+            let bot_y = right_area.y + right_area.height.saturating_sub(1);
+            let footer_y = bot_y.saturating_sub(1);
+            let status_y = footer_y.saturating_sub(1);
+            let max_x = p_inner_x + p_avail_w;
+
+            if row == right_area.y {
+                if col == right_area.x {
+                    return Some(("border_top_left", row, col, col + 1));
+                }
+                if col == right_area.x + right_area.width - 1 {
+                    return Some(("border_top_right", row, col, col + 1));
+                }
+                return Some((
+                    "border_horizontal",
+                    row,
+                    right_area.x + 1,
+                    right_area.x + right_area.width - 1,
+                ));
+            }
+            if row == bot_y {
+                if col == right_area.x {
+                    return Some(("border_bottom_left", row, col, col + 1));
+                }
+                if col == right_area.x + right_area.width - 1 {
+                    return Some(("border_bottom_right", row, col, col + 1));
+                }
+                return Some((
+                    "border_horizontal",
+                    row,
+                    right_area.x + 1,
+                    right_area.x + right_area.width - 1,
+                ));
+            }
+            if col == right_area.x || col == right_area.x + right_area.width - 1 {
+                return Some(("border_vertical", row, col, col + 1));
+            }
             if row == p_inner_y {
                 if col >= p_inner_x && col < p_inner_x + 17 {
                     return Some(("selected_tab", row, p_inner_x, p_inner_x + 17));
@@ -2429,26 +2480,76 @@ fn hit_test_preview_with_style(
                 if col >= p_inner_x + 30 && col < p_inner_x + 35 {
                     return Some(("accent", row, p_inner_x + 30, p_inner_x + 35));
                 }
+                return Some(("background", row, p_inner_x, max_x));
             }
-            if row == right_area.y + 1 {
-                return Some(("highlight", row, p_inner_x, p_inner_x + p_avail_w));
+            if row == p_inner_y + 1 {
+                return Some(("divider", row, p_inner_x, max_x));
             }
-            if row == right_area.y + 2 {
-                return Some(("border", row, p_inner_x, p_inner_x + p_avail_w));
+            if row == status_y {
+                return Some(("highlight", row, p_inner_x, max_x));
             }
-            if row == right_area.y + right_area.height - 2 {
-                return Some(("highlight", row, p_inner_x, p_inner_x + p_avail_w));
+            if row == footer_y {
+                return Some(("help_text", row, p_inner_x, max_x));
             }
-            if row == right_area.y + right_area.height - 1 {
-                return Some(("gutter", row, p_inner_x, p_inner_x + p_avail_w));
+            if row >= p_inner_y + 2 && row < status_y {
+                if col >= p_inner_x && col < p_inner_x + 5 {
+                    return Some(("line_numbers", row, p_inner_x, p_inner_x + 5));
+                }
+                let line_idx = row - (p_inner_y + 2);
+                match line_idx {
+                    0 => {
+                        let end = (p_inner_x + 5 + 16).min(max_x);
+                        if col >= p_inner_x + 5 && col < end {
+                            return Some(("text", row, p_inner_x + 5, end));
+                        }
+                    }
+                    1 => {
+                        let end = (p_inner_x + 5 + 9).min(max_x);
+                        if col >= p_inner_x + 5 && col < end {
+                            return Some(("text", row, p_inner_x + 5, end));
+                        }
+                    }
+                    2 => {
+                        if col >= p_inner_x + 5 && col < p_inner_x + 7 {
+                            return Some(("whitespace", row, p_inner_x + 5, p_inner_x + 7));
+                        }
+                        let end = (p_inner_x + 7 + 16).min(max_x);
+                        if col >= p_inner_x + 7 && col < end {
+                            return Some(("highlight", row, p_inner_x + 7, end));
+                        }
+                    }
+                    3 => {
+                        if col >= p_inner_x + 5 && col < p_inner_x + 7 {
+                            return Some(("whitespace", row, p_inner_x + 5, p_inner_x + 7));
+                        }
+                        let txt_end = (p_inner_x + 7 + 17).min(max_x);
+                        if col >= p_inner_x + 7 && col < txt_end {
+                            return Some(("text", row, p_inner_x + 7, txt_end));
+                        }
+                        let sel_end = (p_inner_x + 24 + 4).min(max_x);
+                        if col >= p_inner_x + 24 && col < sel_end {
+                            return Some(("selection", row, p_inner_x + 24, sel_end));
+                        }
+                    }
+                    4 => {
+                        let end = (p_inner_x + 5 + 5).min(max_x);
+                        if col >= p_inner_x + 5 && col < end {
+                            return Some(("text", row, p_inner_x + 5, end));
+                        }
+                    }
+                    5 => {
+                        if col >= p_inner_x + 5 && col < p_inner_x + 7 {
+                            return Some(("whitespace", row, p_inner_x + 5, p_inner_x + 7));
+                        }
+                        let end = (p_inner_x + 7 + 23).min(max_x);
+                        if col >= p_inner_x + 7 && col < end {
+                            return Some(("text", row, p_inner_x + 7, end));
+                        }
+                    }
+                    _ => {}
+                }
             }
-            if col < p_inner_x + 6 {
-                return Some(("line_numbers", row, p_inner_x, p_inner_x + 5));
-            }
-            if row == right_area.y + 5 {
-                return Some(("highlight", row, p_inner_x, p_inner_x + p_avail_w));
-            }
-            Some(("background", row, p_inner_x, p_inner_x + p_avail_w))
+            Some(("background", row, p_inner_x, max_x))
         }
         PreviewMode::MenuEditor => {
             let bot_y = right_area.y + right_area.height.saturating_sub(1);
@@ -2997,5 +3098,113 @@ mod tests {
         apply_theme_picker_result(None, &mut state, &mut cancel_rack);
         assert_eq!(state.current_name, chosen_name);
         assert!(cancel_rack.is_empty());
+    }
+
+    #[test]
+    fn test_editor_and_modals_preview_hit_testing_fixes() {
+        let right_area = Rect::new(43, 2, 56, 20);
+        let p_inner_x = right_area.x + 2;
+        let p_inner_y = right_area.y + 2;
+
+        // 2:Editor tab: line 1 "theme: \"dracula\"" -> text
+        assert_eq!(
+            hit_test_preview(
+                p_inner_x + 6,
+                p_inner_y + 2,
+                right_area,
+                PreviewMode::TextEditor,
+                false
+            )
+            .map(|r| r.0),
+            Some("text")
+        );
+        // 2:Editor tab: line 2 "terminal:" -> text
+        assert_eq!(
+            hit_test_preview(
+                p_inner_x + 6,
+                p_inner_y + 3,
+                right_area,
+                PreviewMode::TextEditor,
+                false
+            )
+            .map(|r| r.0),
+            Some("text")
+        );
+        // 2:Editor tab: line 3 "alt_buffer: true" -> highlight
+        assert_eq!(
+            hit_test_preview(
+                p_inner_x + 10,
+                p_inner_y + 4,
+                right_area,
+                PreviewMode::TextEditor,
+                false
+            )
+            .map(|r| r.0),
+            Some("highlight")
+        );
+        // 2:Editor tab: line 4 "show_whitespace: " -> text, "true" -> selection
+        assert_eq!(
+            hit_test_preview(
+                p_inner_x + 10,
+                p_inner_y + 5,
+                right_area,
+                PreviewMode::TextEditor,
+                false
+            )
+            .map(|r| r.0),
+            Some("text")
+        );
+        assert_eq!(
+            hit_test_preview(
+                p_inner_x + 25,
+                p_inner_y + 5,
+                right_area,
+                PreviewMode::TextEditor,
+                false
+            )
+            .map(|r| r.0),
+            Some("selection")
+        );
+        // 2:Editor tab: line 5 "menu:" and line 6 "preferred_width_pct: 90" -> text
+        assert_eq!(
+            hit_test_preview(
+                p_inner_x + 6,
+                p_inner_y + 6,
+                right_area,
+                PreviewMode::TextEditor,
+                false
+            )
+            .map(|r| r.0),
+            Some("text")
+        );
+        assert_eq!(
+            hit_test_preview(
+                p_inner_x + 10,
+                p_inner_y + 7,
+                right_area,
+                PreviewMode::TextEditor,
+                false
+            )
+            .map(|r| r.0),
+            Some("text")
+        );
+
+        // 3:Modals tab: empty interior row inside faux modal -> background
+        let p_avail_w = right_area.width.saturating_sub(4);
+        let p_avail_h = right_area.height.saturating_sub(4);
+        let mod_w = (p_avail_w.saturating_sub(4)).clamp(32, 50);
+        let mod_h = 12_u16.min(p_avail_h);
+        let mod_x = p_inner_x + (p_avail_w.saturating_sub(mod_w)) / 2;
+        let mod_y = p_inner_y + (p_avail_h.saturating_sub(mod_h)) / 2;
+        assert_eq!(
+            hit_test_preview(mod_x + 5, mod_y + 1, right_area, PreviewMode::Modals, false)
+                .map(|r| r.0),
+            Some("background")
+        );
+        assert_eq!(
+            hit_test_preview(mod_x + 5, mod_y + 4, right_area, PreviewMode::Modals, false)
+                .map(|r| r.0),
+            Some("background")
+        );
     }
 }
