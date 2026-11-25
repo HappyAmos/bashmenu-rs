@@ -471,7 +471,7 @@ impl InputModal {
         if cancel_x < right_bound {
             let max_c = (right_bound - cancel_x) as usize;
             let clipped_cancel: String = cancel_str.chars().take(max_c).collect();
-            buf.set_string(cancel_x, btn_y, &clipped_cancel, styles.text);
+            buf.set_string(cancel_x, btn_y, &clipped_cancel, styles.modal_cancel_button);
         }
 
         inner

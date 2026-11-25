@@ -3059,3 +3059,67 @@ fn test_line_numbers_color_token_and_preview() {
     let spans = get_token_preview_spans(&token, area, PreviewMode::TextEditor, &resolved);
     assert!(spans.contains(&(area.y + 4, area.x + 2, area.x + 7)));
 }
+
+#[test]
+fn test_modal_yes_no_cancel_button_tokens_and_preview() {
+    use bashmenu_tui::{ResolvedThemeStyles, ThemeActivity};
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::style::Color;
+    use themeedit_cli::{get_token_preview_spans, render_preview_pane, PreviewMode};
+
+    let themes_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(themes_path, Some("dracula".to_string()));
+    state.preview_mode = PreviewMode::Modals;
+
+    assert!(state.select_token_by_key("modal_yes_button"));
+    state.set_color_token_value("modal_yes_button", Color::Indexed(82));
+    assert!(state.select_token_by_key("modal_no_button"));
+    state.set_color_token_value("modal_no_button", Color::Indexed(196));
+    assert!(state.select_token_by_key("modal_cancel_button"));
+    state.set_color_token_value("modal_cancel_button", Color::Indexed(244));
+
+    let resolved = ResolvedThemeStyles::from_theme_for_activity(
+        &state.current_theme,
+        true,
+        ThemeActivity::Modals,
+    );
+    assert_eq!(resolved.modal_yes_button.fg, Some(Color::Indexed(82)));
+    assert_eq!(resolved.modal_no_button.fg, Some(Color::Indexed(196)));
+    assert_eq!(resolved.modal_cancel_button.fg, Some(Color::Indexed(244)));
+
+    let area = Rect::new(0, 0, 96, 24);
+    let mut buf = Buffer::empty(area);
+    let mut wp = None;
+    render_preview_pane(area, &mut buf, PreviewMode::Modals, &resolved, &mut wp);
+
+    let p_avail_w = area.width.saturating_sub(4);
+    let p_avail_h = area.height.saturating_sub(4);
+    let mod_w = (p_avail_w.saturating_sub(4)).clamp(32, 50);
+    let mod_h = 12_u16.min(p_avail_h);
+    let mod_x = area.x + 2 + (p_avail_w.saturating_sub(mod_w)) / 2;
+    let mod_y = area.y + 2 + (p_avail_h.saturating_sub(mod_h)) / 2;
+    let btn_y = mod_y + 7;
+
+    assert_eq!(buf[(mod_x + 5, btn_y)].fg, Color::Indexed(82));
+    assert_eq!(buf[(mod_x + 14, btn_y)].fg, Color::Indexed(196));
+    assert_eq!(buf[(mod_x + 23, btn_y)].fg, Color::Indexed(244));
+
+    // Verify flash spans for all three tokens
+    for (key, expected_span) in [
+        ("modal_yes_button", (btn_y, mod_x + 3, mod_x + 10)),
+        ("modal_no_button", (btn_y, mod_x + 12, mod_x + 18)),
+        ("modal_cancel_button", (btn_y, mod_x + 20, mod_x + 30)),
+    ] {
+        assert!(state.select_token_by_key(key));
+        let token = state.tokens[state.selected_idx].clone();
+        let spans = get_token_preview_spans(&token, area, PreviewMode::Modals, &resolved);
+        assert!(
+            spans.contains(&expected_span),
+            "Expected flash span {:?} for {}, got {:?}",
+            expected_span,
+            key,
+            spans
+        );
+    }
+}

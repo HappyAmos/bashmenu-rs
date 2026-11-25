@@ -6,7 +6,7 @@ use bashmenu_core::t;
 use crossterm::event::{KeyCode, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::Modifier;
 
 /// Tri-state confirmation result.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -231,19 +231,19 @@ impl ConfirmModal {
         let yes_style = if self.selected_index == 0 {
             styles.highlight.add_modifier(Modifier::BOLD)
         } else {
-            styles.accent.add_modifier(Modifier::BOLD)
+            styles.modal_yes_button.add_modifier(Modifier::BOLD)
         };
 
         let no_style = if self.selected_index == 1 {
             styles.highlight.add_modifier(Modifier::BOLD)
         } else {
-            Style::default().fg(Color::LightRed)
+            styles.modal_no_button
         };
 
         let cancel_style = if self.selected_index == 2 {
             styles.highlight.add_modifier(Modifier::BOLD)
         } else {
-            Style::default().fg(Color::DarkGray)
+            styles.modal_cancel_button
         };
 
         let yes_x = start_x;

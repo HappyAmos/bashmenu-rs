@@ -86,6 +86,9 @@ impl ThemeActivity {
                 "window_close_button",
                 "scrollbar",
                 "shadow",
+                "modal_yes_button",
+                "modal_no_button",
+                "modal_cancel_button",
                 "toast_info",
                 "toast_warning",
                 "toast_error",
@@ -371,6 +374,12 @@ pub struct ResolvedThemeStyles {
     pub scrollbar: Style,
     /// Modal dialog drop-shadow style
     pub shadow: Style,
+    /// Affirmative / Yes button style in modal dialogs
+    pub modal_yes_button: Style,
+    /// Negative / No button style in modal dialogs
+    pub modal_no_button: Style,
+    /// Cancel button style in modal dialogs
+    pub modal_cancel_button: Style,
     /// Active / selected tab style in tabbed interfaces
     pub selected_tab: Style,
     /// Inactive / unselected tab style in tabbed interfaces
@@ -423,6 +432,11 @@ impl Default for ResolvedThemeStyles {
             toast_error: Color::Rgb(255, 85, 85),
             scrollbar: Style::default().fg(Color::Cyan),
             shadow: Style::default().fg(Color::DarkGray).bg(Color::Black),
+            modal_yes_button: Style::default()
+                .fg(Color::LightCyan)
+                .add_modifier(Modifier::BOLD),
+            modal_no_button: Style::default().fg(Color::LightRed),
+            modal_cancel_button: Style::default().fg(Color::DarkGray),
             selected_tab: Style::default()
                 .fg(Color::Black)
                 .bg(Color::Cyan)
@@ -657,7 +671,11 @@ impl ResolvedThemeStyles {
             .filter(|v| !is_inherited_color_value(v))
             .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
         {
-            self.accent = merge_style_pair(self.accent, st, None);
+            let merged = merge_style_pair(self.accent, st, None);
+            self.accent = merged;
+            if !is_override && !p.contains_key("modal_yes_button") {
+                self.modal_yes_button = merged.add_modifier(Modifier::BOLD);
+            }
         }
         if let Some(st) = p
             .get("footer")
@@ -772,6 +790,28 @@ impl ResolvedThemeStyles {
                 .unwrap_or_else(|| self.shadow.fg.unwrap_or(Color::DarkGray));
             let bg_color = st.bg.unwrap_or(fg_color);
             self.shadow = Style::default().fg(fg_color).bg(bg_color);
+        }
+        if let Some(st) = p
+            .get("modal_yes_button")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
+        {
+            self.modal_yes_button =
+                merge_style_pair(self.modal_yes_button, st, Some(Modifier::BOLD));
+        }
+        if let Some(st) = p
+            .get("modal_no_button")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
+        {
+            self.modal_no_button = merge_style_pair(self.modal_no_button, st, None);
+        }
+        if let Some(st) = p
+            .get("modal_cancel_button")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
+        {
+            self.modal_cancel_button = merge_style_pair(self.modal_cancel_button, st, None);
         }
         if let Some(c) = p
             .get("toast_info")

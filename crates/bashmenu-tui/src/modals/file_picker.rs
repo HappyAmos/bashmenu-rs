@@ -874,7 +874,7 @@ impl FilePickerModal {
             let cancel_style = if cancel_focused {
                 styles.highlight.add_modifier(Modifier::BOLD)
             } else {
-                styles.text
+                styles.modal_cancel_button
             };
 
             let save_btn_str = format!("[ {} ]", t!("common.buttons.save"));

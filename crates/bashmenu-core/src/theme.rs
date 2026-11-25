@@ -59,6 +59,9 @@ pub fn activity_override_tokens(activity_key: &str) -> &'static [&'static str] {
             "footer",
             "scrollbar",
             "shadow",
+            "modal_yes_button",
+            "modal_no_button",
+            "modal_cancel_button",
             "window_close_button",
         ],
         "menuedit" | "shortcutedit" => &[
@@ -550,6 +553,9 @@ impl Theme {
         colors.insert("window_close_button".to_string(), make_pair(255, -1));
         colors.insert("scrollbar".to_string(), make_pair(245, -1));
         colors.insert("shadow".to_string(), make_pair(236, -1));
+        colors.insert("modal_yes_button".to_string(), make_pair(255, -1));
+        colors.insert("modal_no_button".to_string(), make_pair(203, -1));
+        colors.insert("modal_cancel_button".to_string(), make_pair(245, -1));
         colors.insert("toast_info".to_string(), make_pair(255, -1));
         colors.insert("toast_warning".to_string(), make_pair(250, -1));
         colors.insert("toast_error".to_string(), make_pair(245, -1));

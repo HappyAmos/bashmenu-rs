@@ -1310,7 +1310,11 @@ fn main() -> Result<()> {
                                                     state.preview_mode = PreviewMode::Toast;
                                                 } else if matches!(
                                                     &token.kind,
-                                                    TokenKind::Color(ref k) if k == "shadow"
+                                                    TokenKind::Color(ref k)
+                                                        if k == "shadow"
+                                                            || k == "modal_yes_button"
+                                                            || k == "modal_no_button"
+                                                            || k == "modal_cancel_button"
                                                 ) {
                                                     state.preview_mode = PreviewMode::Modals;
                                                 }
@@ -2008,6 +2012,12 @@ fn open_selected_token_picker(state: &mut ThemeEditorState, active_modal: &mut A
                 "Pick Footer Color"
             } else if key == "shadow" {
                 "Pick Shadow Color"
+            } else if key == "modal_yes_button" {
+                "Pick Modal Yes Button Color"
+            } else if key == "modal_no_button" {
+                "Pick Modal No Button Color"
+            } else if key == "modal_cancel_button" {
+                "Pick Modal Cancel Button Color"
             } else if key == "selected_tab" {
                 "Pick Selected Tab Color"
             } else if key == "unselected_tab" {
@@ -2370,10 +2380,16 @@ fn hit_test_preview_with_style(
                     return Some(("text", row, mod_x + 2, mod_x + mod_w - 2));
                 }
                 if row == mod_y + 7 {
-                    if col < mod_x + 18 {
-                        return Some(("accent", row, mod_x + 2, mod_x + 18));
+                    if col >= mod_x + 3 && col < mod_x + 10 {
+                        return Some(("modal_yes_button", row, mod_x + 3, mod_x + 10));
                     }
-                    return Some(("text", row, mod_x + 18, mod_x + mod_w - 2));
+                    if col >= mod_x + 12 && col < mod_x + 18 {
+                        return Some(("modal_no_button", row, mod_x + 12, mod_x + 18));
+                    }
+                    if col >= mod_x + 20 && col < mod_x + 30 {
+                        return Some(("modal_cancel_button", row, mod_x + 20, mod_x + 30));
+                    }
+                    return Some(("background", row, mod_x + 1, mod_x + mod_w - 1));
                 }
                 return Some(("text", row, mod_x + 2, mod_x + mod_w - 2));
             }
