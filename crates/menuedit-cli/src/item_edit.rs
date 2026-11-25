@@ -1565,13 +1565,19 @@ impl ItemEditModal {
                 return ItemEditResult::ChangeType;
             }
 
-            // Click inside buttons row (Save / Cancel near bottom)
+            // Click inside buttons row (OK / Cancel near bottom)
             let btn_y = inner.y + inner.height.saturating_sub(4);
             if is_left_down && mouse.row == btn_y {
-                let mid_x = inner.x + inner.width / 2;
-                if mouse.column >= inner.x + 4 && mouse.column < mid_x {
+                let ok_text = format!(" [ {} ] ", t!("common.buttons.ok"));
+                let cancel_text = format!(" [ {} ] ", t!("common.buttons.cancel"));
+                let total_btn_w = ok_text.len() + cancel_text.len() + 4;
+                let start_btn_x = inner.x + (inner.width.saturating_sub(total_btn_w as u16)) / 2;
+                let ok_end = start_btn_x + ok_text.len() as u16;
+                let cancel_start = ok_end + 4;
+                let cancel_end = cancel_start + cancel_text.len() as u16;
+                if mouse.column >= start_btn_x && mouse.column < ok_end {
                     return ItemEditResult::Save(Box::new(self.build_updated_item()));
-                } else if mouse.column >= mid_x && mouse.column < inner.x + inner.width - 4 {
+                } else if mouse.column >= cancel_start && mouse.column < cancel_end {
                     return ItemEditResult::Cancel;
                 }
             }
@@ -2495,30 +2501,30 @@ impl ItemEditModal {
             );
         }
 
-        // 3. Action Buttons Row (Save / Cancel)
+        // 3. Action Buttons Row (OK / Cancel)
         let btn_y = inner.y + inner.height.saturating_sub(4);
-        let is_save_active = cur_ctrl == FocusControl::SaveBtn;
+        let is_ok_active = cur_ctrl == FocusControl::SaveBtn;
         let is_cancel_active = cur_ctrl == FocusControl::CancelBtn;
 
-        let save_text = format!(" [ {} (CTRL+S) ] ", t!("common.buttons.save"));
-        let cancel_text = format!(" [ {} (ESC) ] ", t!("common.buttons.cancel"));
-        let total_btn_w = save_text.len() + cancel_text.len() + 4;
+        let ok_text = format!(" [ {} ] ", t!("common.buttons.ok"));
+        let cancel_text = format!(" [ {} ] ", t!("common.buttons.cancel"));
+        let total_btn_w = ok_text.len() + cancel_text.len() + 4;
         let start_btn_x = inner.x + (inner.width.saturating_sub(total_btn_w as u16)) / 2;
 
-        let save_style = if is_save_active {
+        let ok_style = if is_ok_active {
             styles.highlight.add_modifier(Modifier::BOLD)
         } else {
-            styles.accent.add_modifier(Modifier::BOLD)
+            styles.modal_yes_button.add_modifier(Modifier::BOLD)
         };
         let cancel_style = if is_cancel_active {
             styles.highlight.add_modifier(Modifier::BOLD)
         } else {
-            styles.footer
+            styles.modal_cancel_button
         };
 
-        buf.set_string(start_btn_x, btn_y, &save_text, save_style);
+        buf.set_string(start_btn_x, btn_y, &ok_text, ok_style);
         buf.set_string(
-            start_btn_x + save_text.len() as u16 + 4,
+            start_btn_x + ok_text.len() as u16 + 4,
             btn_y,
             &cancel_text,
             cancel_style,
@@ -2529,12 +2535,12 @@ impl ItemEditModal {
         let footer_y2 = inner.y + inner.height.saturating_sub(1);
 
         let h_help = format!("[F1] {}", t!("common.gutters.help"));
-        let h_save = format!("[CTRL+S / F2] {}", t!("common.buttons.save"));
+        let h_ok = format!("[F2 / CTRL+S] {}", t!("common.buttons.ok"));
         let h_type = format!("[CTRL+T] {}", t!("menuedit.gutter_type"));
         let h_ascii = format!("[CTRL+A / F3] {}", t!("menuedit.gutter_ascii"));
         let items_r1 = [
             h_help.as_str(),
-            h_save.as_str(),
+            h_ok.as_str(),
             h_type.as_str(),
             h_ascii.as_str(),
         ];

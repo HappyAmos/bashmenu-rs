@@ -2208,3 +2208,51 @@ items:
 
     let _ = fs::remove_dir_all(&temp_dir);
 }
+
+#[test]
+fn test_item_edit_modal_uses_ok_button_instead_of_save_ctrl_s() {
+    use bashmenu_core::MenuItem;
+    use bashmenu_tui::ResolvedThemeStyles;
+    use crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+    use menuedit_cli::{ItemEditModal, ItemEditResult};
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+
+    let item = MenuItem {
+        label: "Test Action".to_string(),
+        command: Some("echo hi".to_string()),
+        ..Default::default()
+    };
+    let mut modal = ItemEditModal::new(&item);
+    let styles = ResolvedThemeStyles::default();
+    let area = Rect::new(0, 0, 90, 28);
+    let mut buf = Buffer::empty(area);
+
+    let inner = modal.render(area, &styles, &mut buf);
+    let btn_y = inner.y + inner.height.saturating_sub(4);
+    let btn_row: String = (inner.x..inner.x + inner.width)
+        .map(|x| buf[(x, btn_y)].symbol())
+        .collect();
+
+    assert!(
+        btn_row.contains("[ OK ]"),
+        "Expected '[ OK ]' button in ItemEditModal, got: {btn_row:?}"
+    );
+    assert!(
+        !btn_row.contains("Save (CTRL+S)"),
+        "ItemEditModal must not display 'Save (CTRL+S)', got: {btn_row:?}"
+    );
+
+    // Clicking '[ OK ]' applies the item changes
+    let ok_col = inner.x + btn_row.find("[ OK ]").expect("OK button") as u16 + 2;
+    let res = modal.handle_mouse(
+        MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: ok_col,
+            row: btn_y,
+            modifiers: KeyModifiers::NONE,
+        },
+        area,
+    );
+    assert!(matches!(res, ItemEditResult::Save(_)));
+}
