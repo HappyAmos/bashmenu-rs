@@ -476,6 +476,10 @@ impl ThemeEditorState {
                 kind: TokenKind::Color("selected_tab".to_string()),
             },
             TokenItem {
+                label: "Unselected Tab Color".to_string(),
+                kind: TokenKind::Color("unselected_tab".to_string()),
+            },
+            TokenItem {
                 label: "Border Color".to_string(),
                 kind: TokenKind::Color("border".to_string()),
             },
@@ -747,6 +751,13 @@ impl ThemeEditorState {
             serde_json::Value::Array(vec![
                 serde_json::Value::Number(255.into()),
                 serde_json::Value::Number(201.into()),
+            ]),
+        );
+        colors.insert(
+            "unselected_tab".to_string(),
+            serde_json::Value::Array(vec![
+                serde_json::Value::Number(245.into()),
+                serde_json::Value::Number((-1).into()),
             ]),
         );
         colors.insert(
@@ -1693,6 +1704,8 @@ impl ThemeEditorState {
                                 && (key == "sel" || key == "selection_color" || key == "select"))
                             || (k == "selected_tab"
                                 && (key == "active_tab" || key == "selected_tab_color"))
+                            || (k == "unselected_tab"
+                                && (key == "inactive_tab" || key == "unselected_tab_color"))
                             || (k == "whitespace"
                                 && (key == "ws"
                                     || key == "whitespace_color"
@@ -1980,6 +1993,7 @@ fn resolve_activity_color(theme: &Theme, activity: ThemeActivity, key: &str) -> 
             .bg
             .or(styles.selected_tab.fg)
             .unwrap_or(Color::Cyan),
+        "unselected_tab" => styles.unselected_tab.fg.unwrap_or(Color::DarkGray),
         "whitespace" => styles.whitespace.fg.unwrap_or(Color::DarkGray),
         "border" => styles.border,
         "divider" => styles.divider.fg.unwrap_or(Color::Cyan),
@@ -2342,6 +2356,16 @@ pub fn get_token_preview_spans(
             }
             if mode == PreviewMode::TextEditor {
                 spans.push((content_start_y, p_inner_x, p_inner_x + 17));
+            }
+        }
+        TokenKind::Color(key) if key == "unselected_tab" => {
+            for tab in preview_tab_bar_layout(right_area, mode) {
+                if tab.mode != mode {
+                    spans.push((right_area.y, tab.x_start, tab.x_end));
+                }
+            }
+            if mode == PreviewMode::TextEditor {
+                spans.push((content_start_y, p_inner_x + 17, p_inner_x + 30));
             }
         }
         TokenKind::Color(key) if key == "whitespace" => {

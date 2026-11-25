@@ -507,7 +507,7 @@ fn main() -> Result<()> {
                 let tab_style = if is_active {
                     styles.selected_tab.add_modifier(Modifier::BOLD)
                 } else {
-                    styles.text.add_modifier(Modifier::DIM)
+                    styles.unselected_tab
                 };
 
                 buf.set_string(tab_x, tab_bar_y, &tab_label, tab_style);

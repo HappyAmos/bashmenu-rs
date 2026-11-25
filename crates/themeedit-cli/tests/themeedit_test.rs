@@ -2980,3 +2980,48 @@ fn test_selected_tab_color_token_and_preview() {
     assert!(spans.contains(&(area.y, active_tab.x_start, active_tab.x_end)));
     assert!(spans.contains(&(area.y + 2, area.x + 2, area.x + 19)));
 }
+
+#[test]
+fn test_unselected_tab_color_token_and_preview() {
+    use bashmenu_tui::{ResolvedThemeStyles, ThemeActivity};
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::style::Color;
+    use themeedit_cli::{
+        get_token_preview_spans, preview_tab_bar_layout, render_preview_pane, PreviewMode,
+    };
+
+    let themes_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(themes_path, Some("dracula".to_string()));
+    assert!(state.select_token_by_key("unselected_tab"));
+    assert_eq!(
+        state.tokens[state.selected_idx].label,
+        "Unselected Tab Color"
+    );
+
+    state.set_color_token_value("unselected_tab", Color::Indexed(141));
+    let resolved = ResolvedThemeStyles::from_theme_for_activity(
+        &state.current_theme,
+        true,
+        ThemeActivity::BashEdit,
+    );
+    assert_eq!(resolved.unselected_tab.fg, Some(Color::Indexed(141)));
+
+    let area = Rect::new(0, 0, 96, 24);
+    let mut buf = Buffer::empty(area);
+    let mut wp = None;
+    render_preview_pane(area, &mut buf, PreviewMode::TextEditor, &resolved, &mut wp);
+
+    let tabs = preview_tab_bar_layout(area, PreviewMode::TextEditor);
+    let inactive_tab = tabs
+        .iter()
+        .find(|t| t.mode == PreviewMode::Menu)
+        .expect("Menu tab must exist");
+    assert_eq!(buf[(inactive_tab.x_start, area.y)].fg, Color::Indexed(141));
+    assert_eq!(buf[(area.x + 20, area.y + 2)].fg, Color::Indexed(141));
+
+    let token = state.tokens[state.selected_idx].clone();
+    let spans = get_token_preview_spans(&token, area, PreviewMode::TextEditor, &resolved);
+    assert!(spans.contains(&(area.y, inactive_tab.x_start, inactive_tab.x_end)));
+    assert!(spans.contains(&(area.y + 2, area.x + 19, area.x + 32)));
+}

@@ -2010,6 +2010,8 @@ fn open_selected_token_picker(state: &mut ThemeEditorState, active_modal: &mut A
                 "Pick Shadow Color"
             } else if key == "selected_tab" {
                 "Pick Selected Tab Color"
+            } else if key == "unselected_tab" {
+                "Pick Unselected Tab Color"
             } else {
                 "Pick Theme Color"
             };
@@ -2402,6 +2404,9 @@ fn hit_test_preview_with_style(
             if row == p_inner_y {
                 if col >= p_inner_x && col < p_inner_x + 17 {
                     return Some(("selected_tab", row, p_inner_x, p_inner_x + 17));
+                }
+                if col >= p_inner_x + 17 && col < p_inner_x + 30 {
+                    return Some(("unselected_tab", row, p_inner_x + 17, p_inner_x + 30));
                 }
                 if col >= p_inner_x + 30 && col < p_inner_x + 35 {
                     return Some(("accent", row, p_inner_x + 30, p_inner_x + 35));
