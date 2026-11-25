@@ -260,6 +260,7 @@ themeedit:
   delete_theme_title: "Delete Theme"
   delete_theme_confirm: "Are you sure you want to delete theme '{theme}'?"
   cannot_delete_last_theme: "Cannot delete the sole remaining theme"
+  gutter_themes: "Themes"
   gutter_derive: "Derive"
   gutter_new: "New"
   gutter_rename: "Rename"

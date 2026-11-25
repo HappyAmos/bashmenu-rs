@@ -9,8 +9,8 @@ use bashmenu_core::{run_glyphs_search, t, ToastNotification, ToastSeverity, Toas
 use bashmenu_tui::{
     get_marquee_slice, install_panic_hook, AsciiGridModal, BackgroundConfigAction,
     BackgroundConfigModal, BackgroundFocus, ColorPickerModal, ConfirmModal, FilePickerModal,
-    HelpModal, InputModal, MarqueeTracker, ResolvedThemeStyles, TerminalGuard, ToastRack,
-    WallpaperCompositor,
+    HelpModal, InputModal, MarqueeTracker, ResolvedThemeStyles, TerminalGuard, ThemePickerModal,
+    ToastRack, WallpaperCompositor,
 };
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers, MouseButton, MouseEventKind};
@@ -94,6 +94,8 @@ enum ActiveModal {
     BackgroundBrowse(Box<BackgroundConfigModal>, FilePickerModal),
     /// Search modal for glyphs / nerd fonts.
     GlyphSearch(InputModal),
+    /// Interactive theme selector modal dialog (`F2`).
+    ThemePicker(ThemePickerModal),
     /// Help / search results modal dialog.
     Help(HelpModal),
 }
@@ -148,8 +150,33 @@ fn trigger_derive_colors(
     }
 }
 
-fn get_bottom_items() -> [String; 10] {
+/// Opens the interactive theme picker modal populated with loaded themes.
+fn open_theme_picker(state: &ThemeEditorState) -> ThemePickerModal {
+    let names: Vec<String> = state.themes.keys().cloned().collect();
+    ThemePickerModal::new(names, &state.current_name)
+}
+
+/// Applies the result of a theme picker modal interaction.
+fn apply_theme_picker_result(
+    chosen: Option<String>,
+    state: &mut ThemeEditorState,
+    toast_rack: &mut ToastRack,
+) {
+    if let Some(theme_name) = chosen {
+        if state.switch_theme(&theme_name) {
+            toast_rack.add(ToastNotification {
+                title: Some(t!("bashmenu.theme_picker_title")),
+                message: t!("themeedit.theme_switched", theme => &state.current_name),
+                severity: ToastSeverity::Information,
+                timeout_secs: 1.5,
+            });
+        }
+    }
+}
+
+fn get_bottom_items() -> [String; 11] {
     [
+        format!("[F2] {}", t!("themeedit.gutter_themes")),
         format!("[F5] {}", t!("themeedit.gutter_derive")),
         format!("[F6] {}", t!("themeedit.gutter_new")),
         format!("[F7] {}", t!("themeedit.gutter_rename")),
@@ -553,6 +580,9 @@ fn main() -> Result<()> {
                         modal.render(area, &preview_styles, buf);
                     }
                     ActiveModal::GlyphSearch(modal) => {
+                        modal.render(area, &preview_styles, buf);
+                    }
+                    ActiveModal::ThemePicker(modal) => {
                         modal.render(area, &preview_styles, buf);
                     }
                     ActiveModal::Help(modal) => {
@@ -1140,6 +1170,17 @@ fn main() -> Result<()> {
                     }
                     _ => {}
                 },
+                ActiveModal::ThemePicker(modal) => {
+                    let picked = match ev {
+                        Event::Key(k) => modal.handle_key(k.code),
+                        Event::Mouse(m) => modal.handle_mouse(m, area),
+                        _ => None,
+                    };
+                    if let Some(res) = picked {
+                        apply_theme_picker_result(res, &mut state, &mut toast_rack);
+                        active_modal = ActiveModal::None;
+                    }
+                }
                 ActiveModal::Help(modal) => match ev {
                     Event::Key(k) if modal.handle_key(k.code) => {
                         active_modal = ActiveModal::None;
@@ -1375,7 +1416,13 @@ fn main() -> Result<()> {
                                         .position(|&(s, e)| rel_col >= s && rel_col < e)
                                     {
                                         if let Some(item_str) = bottom_items_str.get(idx) {
-                                            if item_str.contains("[F5]") {
+                                            if item_str.contains("[F2]") {
+                                                // [F2] Themes
+                                                active_modal = ActiveModal::ThemePicker(
+                                                    open_theme_picker(&state),
+                                                );
+                                                continue;
+                                            } else if item_str.contains("[F5]") {
                                                 // [F5] Derive
                                                 trigger_derive_colors(
                                                     &state,
@@ -1595,6 +1642,11 @@ fn main() -> Result<()> {
                             }
 
                             match k.code {
+                                KeyCode::F(2) => {
+                                    // F2 opens interactive theme selector modal
+                                    active_modal =
+                                        ActiveModal::ThemePicker(open_theme_picker(&state));
+                                }
                                 KeyCode::F(5) => {
                                     // F5 confirms auto-derivation of theme colors from wallpaper
                                     trigger_derive_colors(
@@ -1611,8 +1663,8 @@ fn main() -> Result<()> {
                                         "",
                                     ));
                                 }
-                                KeyCode::F(7) | KeyCode::F(2) => {
-                                    // F7 / F2 renames theme
+                                KeyCode::F(7) => {
+                                    // F7 renames theme
                                     is_editing_name = true;
                                     state.name_input.set_text(&state.current_name);
                                     state.name_input.select_all();
@@ -2866,5 +2918,51 @@ mod tests {
             .map(|r| r.0),
             Some("text")
         );
+    }
+
+    #[test]
+    fn test_bottom_gutter_includes_f2_themes_shortcut() {
+        let items = get_bottom_items();
+        assert!(
+            items[0].starts_with("[F2] "),
+            "Expected [F2] Themes as first gutter item, got: {:?}",
+            items
+        );
+        assert!(items.iter().any(|s| s.starts_with("[F5] ")));
+        assert!(items.iter().any(|s| s.starts_with("[F7] ")));
+    }
+
+    #[test]
+    fn test_open_and_apply_theme_picker() {
+        let defaults_themes =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../defaults/bashmenu.themes");
+        let mut state = ThemeEditorState::new(defaults_themes, Some("dracula".to_string()));
+        assert_eq!(state.current_name, "dracula");
+
+        let mut modal = open_theme_picker(&state);
+        assert_eq!(modal.themes[modal.selected_idx], "dracula");
+        assert!(modal.themes.len() >= 2);
+
+        // Selecting a different theme via modal switches state and emits toast
+        if modal.selected_idx + 1 < modal.themes.len() {
+            assert_eq!(modal.handle_key(KeyCode::Down), None);
+        } else {
+            assert_eq!(modal.handle_key(KeyCode::Up), None);
+        }
+        let chosen = modal.handle_key(KeyCode::Enter).flatten();
+        assert!(chosen.is_some());
+        let chosen_name = chosen.clone().unwrap();
+        assert_ne!(chosen_name, "dracula");
+
+        let mut toast_rack = ToastRack::new();
+        apply_theme_picker_result(chosen, &mut state, &mut toast_rack);
+        assert_eq!(state.current_name, chosen_name);
+        assert!(!toast_rack.is_empty());
+
+        // Cancelling leaves active theme unchanged and emits no toast
+        let mut cancel_rack = ToastRack::new();
+        apply_theme_picker_result(None, &mut state, &mut cancel_rack);
+        assert_eq!(state.current_name, chosen_name);
+        assert!(cancel_rack.is_empty());
     }
 }
