@@ -5,6 +5,12 @@ on:
     tags:
       - "v*.*.*"
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      tag:
+        description: "Release tag to build and publish (e.g. v0.1.7)"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -32,6 +38,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
 
       - name: Install system dependencies
         if: matrix.apt_packages != ''
@@ -57,8 +65,10 @@ jobs:
           cargo build --release --workspace --target ${{ matrix.target }}
 
       - name: Package Release Bundle
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
-          TAG="${GITHUB_REF_NAME:-snapshot}"
+          TAG="${INPUT_TAG:-${GITHUB_REF_NAME:-snapshot}}"
           PKG_NAME="bashmenu-rs-${TAG}-${{ matrix.target }}"
           mkdir -p "${PKG_NAME}/bin"
 
@@ -113,8 +123,9 @@ jobs:
 
       - name: Publish to GitHub Release
         uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
         with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
           generate_release_notes: true
           files: |
             bashmenu-rs-*.tar.gz
