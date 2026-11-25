@@ -76,6 +76,7 @@ impl ThemeActivity {
                 "selection",
                 "selected_tab",
                 "unselected_tab",
+                "line_numbers",
                 "whitespace",
                 "shortcut_key",
                 "help_text",
@@ -374,6 +375,8 @@ pub struct ResolvedThemeStyles {
     pub selected_tab: Style,
     /// Inactive / unselected tab style in tabbed interfaces
     pub unselected_tab: Style,
+    /// Line number gutter style in text editors
+    pub line_numbers: Style,
     /// Visible whitespace glyph style in text editors
     pub whitespace: Style,
     /// Active terminal color capability tier
@@ -427,6 +430,7 @@ impl Default for ResolvedThemeStyles {
             unselected_tab: Style::default()
                 .fg(Color::White)
                 .add_modifier(Modifier::DIM),
+            line_numbers: Style::default().fg(Color::DarkGray),
             whitespace: Style::default().fg(Color::DarkGray),
             tier: ColorTier::TrueColor,
         }
@@ -672,6 +676,16 @@ impl ResolvedThemeStyles {
             if !is_override && !p.contains_key("whitespace") {
                 self.whitespace = merged;
             }
+            if !is_override && !p.contains_key("line_numbers") {
+                self.line_numbers = merged;
+            }
+        }
+        if let Some(st) = p
+            .get("line_numbers")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
+        {
+            self.line_numbers = merge_style_pair(self.line_numbers, st, None);
         }
         if let Some(st) = p
             .get("whitespace")

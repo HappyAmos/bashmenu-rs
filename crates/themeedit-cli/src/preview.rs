@@ -419,35 +419,35 @@ pub fn render_preview_pane_with_base(
             let rows_area_end = right_area.y + right_area.height.saturating_sub(3);
             let lines: Vec<Line> = vec![
                 Line::from(vec![
-                    Span::styled(" 1 │ ", preview_styles.gutter),
+                    Span::styled(" 1 │ ", preview_styles.line_numbers),
                     Span::styled("theme: \"dracula\"", preview_styles.text),
                 ]),
                 Line::from(vec![
-                    Span::styled(" 2 │ ", preview_styles.gutter),
+                    Span::styled(" 2 │ ", preview_styles.line_numbers),
                     Span::styled("terminal:", preview_styles.text),
                 ]),
                 Line::from(vec![
-                    Span::styled(" 3 │ ", preview_styles.gutter),
+                    Span::styled(" 3 │ ", preview_styles.line_numbers),
                     Span::styled("··", preview_styles.whitespace),
                     Span::styled("alt_buffer: true", preview_styles.highlight),
                 ]),
                 Line::from(vec![
-                    Span::styled(" 4 │ ", preview_styles.gutter),
+                    Span::styled(" 4 │ ", preview_styles.line_numbers),
                     Span::styled("··", preview_styles.whitespace),
                     Span::styled("show_whitespace: ", preview_styles.text),
                     Span::styled("true", preview_styles.selection),
                 ]),
                 Line::from(vec![
-                    Span::styled(" 5 │ ", preview_styles.gutter),
+                    Span::styled(" 5 │ ", preview_styles.line_numbers),
                     Span::styled("menu:", preview_styles.text),
                 ]),
                 Line::from(vec![
-                    Span::styled(" 6 │ ", preview_styles.gutter),
+                    Span::styled(" 6 │ ", preview_styles.line_numbers),
                     Span::styled("··", preview_styles.whitespace),
                     Span::styled("preferred_width_pct: 90", preview_styles.text),
                 ]),
                 Line::from(vec![
-                    Span::styled(" ~ │ ", preview_styles.gutter),
+                    Span::styled(" ~ │ ", preview_styles.line_numbers),
                     Span::styled("", preview_styles.text),
                 ]),
             ];

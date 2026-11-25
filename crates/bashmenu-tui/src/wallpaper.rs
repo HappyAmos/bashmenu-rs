@@ -1007,6 +1007,10 @@ pub fn derive_palette_from_image(
     colors.insert("shadow".to_string(), make_pair(236, -1));
     colors.insert("whitespace".to_string(), make_pair(gutter_color as i64, -1));
     colors.insert(
+        "line_numbers".to_string(),
+        make_pair(gutter_color as i64, -1),
+    );
+    colors.insert(
         "toast_info".to_string(),
         make_pair(primary_accent as i64, -1),
     );
