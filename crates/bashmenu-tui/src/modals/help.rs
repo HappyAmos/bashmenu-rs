@@ -276,6 +276,10 @@ impl HelpModal {
         }
 
         // Render wrapped footer help lines with equal spacing
+        let mut footer_style = styles.help_text;
+        if footer_style.bg.is_none() || footer_style.bg == Some(Color::Reset) {
+            footer_style = footer_style.bg(styles.background);
+        }
         let footer_start_y = inner.y + inner.height.saturating_sub(1 + footer_h as u16);
         let avail_footer_w = inner.width.saturating_sub(2) as usize;
         for (idx, line) in footer_lines.iter().enumerate() {
@@ -285,7 +289,7 @@ impl HelpModal {
                 footer_x,
                 footer_start_y + idx as u16,
                 &clipped,
-                Style::default().fg(Color::DarkGray),
+                footer_style,
             );
         }
 

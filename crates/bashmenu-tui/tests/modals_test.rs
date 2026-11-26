@@ -2624,3 +2624,78 @@ fn test_notebook_viewer_and_editor_ui_bugfixes() {
         "▲"
     );
 }
+
+#[test]
+fn test_notes_modals_footer_uses_theme_help_text_and_f8_markdown_ref() {
+    use bashmenu_tui::{HelpModal, NoteEditorAction, NoteEditorModal, NoteViewerModal};
+    use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::style::{Color, Style};
+
+    let mut styles = ResolvedThemeStyles::default();
+    let custom_help_fg = Color::Indexed(214);
+    styles.help_text = Style::default().fg(custom_help_fg);
+    let area = Rect::new(0, 0, 100, 30);
+
+    // 1. NoteViewerModal footer uses styles.help_text
+    let mut viewer = NoteViewerModal::new("Note", "notes.yml", "Hello world");
+    let mut vbuf = Buffer::empty(area);
+    let vinner = viewer.render(area, &styles, &mut vbuf);
+    let v_footer_y = vinner.y + vinner.height - 1;
+    let v_has_themed_footer = (vinner.x..vinner.x + vinner.width).any(|x| {
+        vbuf[(x, v_footer_y)].symbol() == "[" && vbuf[(x, v_footer_y)].fg == custom_help_fg
+    });
+    assert!(
+        v_has_themed_footer,
+        "NoteViewerModal help gutter must use styles.help_text foreground color"
+    );
+
+    // 2. NoteEditorModal footer uses styles.help_text & exposes [F8] MD Ref
+    let mut editor = NoteEditorModal::new("Note", "notes.yml", "Hello world");
+    let mut ebuf = Buffer::empty(area);
+    let einner = editor.render(area, &styles, &mut ebuf);
+    let e_footer_y = einner.y + einner.height - 1;
+    let footer_row: String = (einner.x..einner.x + einner.width)
+        .map(|x| ebuf[(x, e_footer_y)].symbol())
+        .collect();
+    let md_pos = footer_row
+        .find("[F8] MD Ref")
+        .expect("NoteEditorModal footer must include '[F8] MD Ref'");
+    assert_eq!(
+        ebuf[(einner.x + md_pos as u16, e_footer_y)].fg,
+        custom_help_fg,
+        "NoteEditorModal help gutter must use styles.help_text foreground color"
+    );
+
+    // F8 keyboard shortcut triggers MarkdownReference
+    assert_eq!(
+        editor.handle_key(KeyCode::F(8), KeyModifiers::NONE),
+        NoteEditorAction::MarkdownReference
+    );
+
+    // Clicking [F8] MD Ref in the footer triggers MarkdownReference
+    let click = MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: einner.x + md_pos as u16 + 2,
+        row: e_footer_y,
+        modifiers: KeyModifiers::NONE,
+    };
+    assert_eq!(
+        editor.handle_mouse(click, area),
+        NoteEditorAction::MarkdownReference
+    );
+
+    // 3. HelpModal footer also uses styles.help_text
+    let help = HelpModal::new("Markdown Reference", "# Heading");
+    let mut hbuf = Buffer::empty(area);
+    let hinner = help.render(area, &styles, &mut hbuf);
+    let h_footer_y = hinner.y + hinner.height - 2;
+    let h_has_themed_footer = (hinner.x..hinner.x + hinner.width).any(|x| {
+        hbuf[(x, h_footer_y)].symbol() == "[" && hbuf[(x, h_footer_y)].fg == custom_help_fg
+    });
+    assert!(
+        h_has_themed_footer,
+        "HelpModal help gutter must use styles.help_text foreground color"
+    );
+}

@@ -27,7 +27,7 @@ use bashmenu_core::{
     load_shortcuts, load_themes, merge_note_content, rename_note, resolve_notebook_path,
     resolve_shortcuts_path, save_config, save_notebook, t, BashMenuConfig, ConfirmAction,
     ExecutionMode, MacroContext, MenuItem, MenuItemType, MenuSchema, NoteItem, NoteSwapFile,
-    PluginEngine, ShortcutsConfig, ToastNotification, ToastSeverity,
+    PluginEngine, ShortcutsConfig, ToastNotification, ToastSeverity, MARKDOWN_REFERENCE_TEXT,
 };
 use bashmenu_tui::{
     install_panic_hook, is_framebuffer_available, ColorTier, ConfirmChoice, ConfirmModal,
@@ -166,6 +166,13 @@ enum ActiveModal {
     NoteViewer(NoteViewerModal),
     /// Notebook note text editor modal.
     NoteEditor(NoteEditorModal),
+    /// Markdown syntax reference overlay opened from the note editor.
+    NoteMarkdownRef {
+        /// Suspended note editor state restored when the reference closes.
+        editor: Box<NoteEditorModal>,
+        /// Markdown reference help modal.
+        help: HelpModal,
+    },
     /// Input prompt modal for creating a new note title.
     NewNoteTitle(String, InputModal),
     /// Input prompt modal for renaming an existing note title.
@@ -223,6 +230,7 @@ impl ActiveModal {
             | ActiveModal::ParamInput(_, m) => m.dialog_dimensions(area),
             ActiveModal::NoteViewer(m) => m.dialog_dimensions(area),
             ActiveModal::NoteEditor(m) => m.dialog_dimensions(area),
+            ActiveModal::NoteMarkdownRef { help, .. } => help.dialog_dimensions(area),
             ActiveModal::ConfirmDeleteNote(_, _, m)
             | ActiveModal::ConfirmItem(_, m)
             | ActiveModal::ConfirmInjectBlock { modal: m, .. } => m.dialog_dimensions(area),
@@ -709,6 +717,9 @@ fn main() -> Result<()> {
                     }
                     ActiveModal::NoteEditor(modal) => {
                         modal.render(f.area(), &modal_styles, f.buffer_mut());
+                    }
+                    ActiveModal::NoteMarkdownRef { help, .. } => {
+                        help.render(f.area(), &modal_styles, f.buffer_mut());
                     }
                     ActiveModal::NewNoteTitle(_, modal) => {
                         modal.render(f.area(), &modal_styles, f.buffer_mut());
@@ -1210,7 +1221,28 @@ fn main() -> Result<()> {
                                 &modal.lines.join("\n"),
                             ));
                         }
+                        NoteEditorAction::MarkdownReference => {
+                            let editor_snapshot = modal.clone();
+                            active_modal = ActiveModal::NoteMarkdownRef {
+                                editor: Box::new(editor_snapshot),
+                                help: HelpModal::new(
+                                    t!("bashedit.markdown_ref_title"),
+                                    MARKDOWN_REFERENCE_TEXT,
+                                ),
+                            };
+                        }
                         NoteEditorAction::None => {}
+                    }
+                }
+                ActiveModal::NoteMarkdownRef { editor, help } => {
+                    let dismissed = match ev {
+                        Event::Key(key) => help.handle_key(key.code),
+                        Event::Mouse(mouse) => help.handle_mouse(mouse, area),
+                        _ => false,
+                    };
+                    if dismissed {
+                        let restored = (**editor).clone();
+                        active_modal = ActiveModal::NoteEditor(restored);
                     }
                 }
                 ActiveModal::NewNoteTitle(filepath, modal) => {
