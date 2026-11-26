@@ -175,7 +175,7 @@ Used as dynamic templates for code generation, settings, or block injections:
 *ItemEditModal Dialog Keybindings:*
 | Keybinding | Action |
 | :--- | :--- |
-| `CTRL+S` / `F2` | Save changes to item. |
+| `F2` / `CTRL+S` | Apply (`[ OK ]`) item property changes (save `bashmenu.mnu` from the main editor before exiting). |
 | `CTRL+T` | Change item type. |
 | `CTRL+A` / `F3` | View ASCII character table. |
 | `CTRL+N` / `F4` | Search Nerd Font & Emoji glyphs. |
