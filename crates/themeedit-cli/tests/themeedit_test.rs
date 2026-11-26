@@ -3357,3 +3357,101 @@ fn test_themeedit_mini_preview_composites_wallpaper() {
         "12:00 must be aligned to bottom-right"
     );
 }
+
+#[test]
+fn test_editor_chrome_theme_isolated_on_theme_switch() {
+    use bashmenu_tui::ResolvedThemeStyles;
+    use themeedit_cli::{EditorChromeTheme, PreviewMode};
+
+    let themes_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(themes_path, Some("dracula".to_string()));
+    let chrome = EditorChromeTheme::from_state(&state, Some("dracula"));
+    let initial_chrome_styles = chrome.resolve_styles(true);
+
+    // Pick a different theme from the fixture with distinct colors
+    let other_name = state
+        .themes
+        .keys()
+        .find(|name| name.as_str() != "dracula")
+        .expect("Fixture must contain at least two themes")
+        .clone();
+    assert!(state.switch_theme(&other_name));
+    assert_eq!(state.current_name, other_name);
+
+    // Editor chrome must remain locked to the configured theme ("dracula")
+    assert_eq!(chrome.configured_name, "dracula");
+    assert_eq!(
+        chrome.resolve_styles(true).border,
+        initial_chrome_styles.border
+    );
+    assert_eq!(
+        chrome.resolve_styles(true).background,
+        initial_chrome_styles.background
+    );
+    assert_eq!(
+        chrome.resolve_styles(true).title,
+        initial_chrome_styles.title
+    );
+
+    // Preview styles follow the newly selected theme across all 7 preview tabs
+    for mode in PreviewMode::ALL {
+        state.preview_mode = mode;
+        let preview_styles = ResolvedThemeStyles::from_theme_for_activity(
+            &state.current_theme,
+            true,
+            state.active_activity(),
+        );
+        let expected_other = ResolvedThemeStyles::from_theme_for_activity(
+            &state.themes[&other_name],
+            true,
+            state.active_activity(),
+        );
+        assert_eq!(preview_styles.border, expected_other.border);
+        assert_eq!(preview_styles.background, expected_other.background);
+    }
+
+    // Fallback behavior: "random", missing, or None falls back to state.current_name
+    let random_chrome = EditorChromeTheme::from_state(&state, Some("random"));
+    assert_eq!(random_chrome.configured_name, other_name);
+    let missing_chrome = EditorChromeTheme::from_state(&state, Some("nonexistent_theme"));
+    assert_eq!(missing_chrome.configured_name, other_name);
+    let none_chrome = EditorChromeTheme::from_state(&state, None);
+    assert_eq!(none_chrome.configured_name, other_name);
+}
+
+#[test]
+fn test_editor_chrome_theme_updates_only_when_configured_theme_saved() {
+    use ratatui::style::Color;
+    use themeedit_cli::{EditorChromeTheme, PreviewMode};
+
+    let themes_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(themes_path, Some("dracula".to_string()));
+    let mut chrome = EditorChromeTheme::from_state(&state, Some("dracula"));
+    let original_border = chrome.resolve_styles(true).border;
+
+    // Unsaved edits to the configured theme must NOT immediately alter editor chrome
+    state.preview_mode = PreviewMode::ThemeEditor;
+    let new_border = Color::Indexed(196);
+    assert_ne!(original_border, new_border);
+    state.set_color_token_value("border", new_border);
+    assert_eq!(chrome.resolve_styles(true).border, original_border);
+
+    // Saving a DIFFERENT theme must NOT alter editor chrome
+    let other_name = state
+        .themes
+        .keys()
+        .find(|name| name.as_str() != "dracula")
+        .expect("Fixture must contain at least two themes")
+        .clone();
+    assert!(state.switch_theme(&other_name));
+    state.set_color_token_value("border", Color::Indexed(46));
+    assert!(!chrome.sync_on_save(&state.current_name, &state.current_theme));
+    assert_eq!(chrome.resolve_styles(true).border, original_border);
+
+    // Saving the configured theme itself DOES refresh editor chrome
+    assert!(state.switch_theme("dracula"));
+    state.preview_mode = PreviewMode::ThemeEditor;
+    state.set_color_token_value("border", new_border);
+    assert!(chrome.sync_on_save(&state.current_name, &state.current_theme));
+    assert_eq!(chrome.resolve_styles(true).border, new_border);
+}

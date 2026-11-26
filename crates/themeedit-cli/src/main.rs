@@ -9,8 +9,8 @@ use bashmenu_core::{run_glyphs_search, t, ToastNotification, ToastSeverity, Toas
 use bashmenu_tui::{
     get_marquee_slice, install_panic_hook, AsciiGridModal, BackgroundConfigAction,
     BackgroundConfigModal, BackgroundFocus, ColorPickerModal, ConfirmModal, FilePickerModal,
-    HelpModal, InputModal, MarqueeTracker, ResolvedThemeStyles, TerminalGuard, ThemeActivity,
-    ThemePickerModal, ToastRack, WallpaperCompositor,
+    HelpModal, InputModal, MarqueeTracker, ResolvedThemeStyles, TerminalGuard, ThemePickerModal,
+    ToastRack, WallpaperCompositor,
 };
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers, MouseButton, MouseEventKind};
@@ -23,8 +23,8 @@ use std::time::Duration;
 use themeedit_cli::{
     default_wallpaper_dir, extract_preview_cell_color, extract_preview_color_at, format_color_code,
     get_token_preview_spans, preview_tab_bar_layout, relativize_wallpaper_path,
-    render_preview_pane_with_base, render_root_frame, toast_preview_boxes, PreviewMode,
-    ThemeEditorState, TokenKind, TreeRow,
+    render_preview_pane_with_base, render_root_frame, toast_preview_boxes, EditorChromeTheme,
+    PreviewMode, ThemeEditorState, TokenKind, TreeRow,
 };
 
 /// Command-line argument configuration for the Theme Editor (`themeedit`).
@@ -226,6 +226,8 @@ fn main() -> Result<()> {
         }
     };
     let mut state = ThemeEditorState::new(themes_path, cli.theme);
+    let mut chrome_theme =
+        EditorChromeTheme::from_state(&state, cfg.as_ref().map(|c| c.theme.as_str()));
 
     let mut guard = TerminalGuard::init()?;
     let mut active_modal = ActiveModal::None;
@@ -261,18 +263,14 @@ fn main() -> Result<()> {
         let size = guard.terminal_mut().size()?;
         let area = Rect::new(0, 0, size.width, size.height);
 
-        // Derive resolved styles from current edited theme for live preview
+        // Derive preview styles from edited theme; isolate editor chrome to configured theme
         let base_styles = ResolvedThemeStyles::from_theme(&state.current_theme, true);
         let preview_styles = ResolvedThemeStyles::from_theme_for_activity(
             &state.current_theme,
             true,
             state.active_activity(),
         );
-        let themeedit_styles = ResolvedThemeStyles::from_theme_for_activity(
-            &state.current_theme,
-            true,
-            ThemeActivity::ThemeEdit,
-        );
+        let themeedit_styles = chrome_theme.resolve_styles(true);
 
         if need_redraw {
             let wp_cfg = state.current_theme.wallpaper_config();
@@ -452,8 +450,8 @@ fn main() -> Result<()> {
                                     &label_text,
                                     left_area.width as usize,
                                     marquee_tracker.offset,
-                                    &preview_styles.marquee_char,
-                                    preview_styles.marquee_gap,
+                                    &themeedit_styles.marquee_char,
+                                    themeedit_styles.marquee_gap,
                                 )
                             } else {
                                 label_text
@@ -488,8 +486,8 @@ fn main() -> Result<()> {
                 }
 
                 // 3. Render Bottom Help Gutter with dedicated divider
-                let b = &preview_styles.borders;
-                let border_style = Style::default().fg(Color::Cyan);
+                let b = &themeedit_styles.borders;
+                let border_style = Style::default().fg(themeedit_styles.border);
 
                 // Gutter top border divider
                 buf.set_string(area.x, gt_y, &b.left_tee, border_style);
@@ -519,7 +517,7 @@ fn main() -> Result<()> {
                             y,
                             line,
                             Style::default()
-                                .fg(preview_styles.help_text.fg.unwrap_or(Color::White)),
+                                .fg(themeedit_styles.help_text.fg.unwrap_or(Color::White)),
                         );
                     }
                 } else {
@@ -536,58 +534,58 @@ fn main() -> Result<()> {
                         area.x + 2,
                         footer_y,
                         bottom_spread,
-                        Style::default().fg(preview_styles.help_text.fg.unwrap_or(Color::White)),
+                        Style::default().fg(themeedit_styles.help_text.fg.unwrap_or(Color::White)),
                     );
                 }
 
                 // 4. Render Active Toasts
-                toast_rack.render(area, &preview_styles, buf);
+                toast_rack.render(area, &themeedit_styles, buf);
 
                 // 4. Render Active Modal if present
                 match &mut active_modal {
                     ActiveModal::ColorPicker(_, modal) => {
-                        let (_, origin) = modal.render(area, &preview_styles, buf);
+                        let (_, origin) = modal.render(area, &themeedit_styles, buf);
                         last_grid_origin = origin;
                     }
                     ActiveModal::AsciiPicker(_, modal) => {
-                        let (_, origin) = modal.render(area, &preview_styles, buf);
+                        let (_, origin) = modal.render(area, &themeedit_styles, buf);
                         last_grid_origin = origin;
                     }
                     ActiveModal::IndicatorInput(modal) => {
-                        modal.render(area, &preview_styles, buf);
+                        modal.render(area, &themeedit_styles, buf);
                     }
                     ActiveModal::DefaultIconInput(modal) => {
-                        modal.render(area, &preview_styles, buf);
+                        modal.render(area, &themeedit_styles, buf);
                     }
                     ActiveModal::SaveAs(modal) => {
-                        modal.render(area, &preview_styles, buf);
+                        modal.render(area, &themeedit_styles, buf);
                     }
                     ActiveModal::NewTheme(modal) => {
-                        modal.render(area, &preview_styles, buf);
+                        modal.render(area, &themeedit_styles, buf);
                     }
                     ActiveModal::ConfirmDelete(modal) => {
-                        modal.render(area, &preview_styles, buf);
+                        modal.render(area, &themeedit_styles, buf);
                     }
                     ActiveModal::ConfirmDerive(modal) => {
-                        modal.render(area, &preview_styles, buf);
+                        modal.render(area, &themeedit_styles, buf);
                     }
                     ActiveModal::ConfirmExit(modal) => {
-                        modal.render(area, &preview_styles, buf);
+                        modal.render(area, &themeedit_styles, buf);
                     }
                     ActiveModal::BackgroundConfig(modal) => {
-                        modal.render(area, &preview_styles, buf);
+                        modal.render(area, &themeedit_styles, buf);
                     }
                     ActiveModal::BackgroundBrowse(_, modal) => {
-                        modal.render(area, &preview_styles, buf);
+                        modal.render(area, &themeedit_styles, buf);
                     }
                     ActiveModal::GlyphSearch(modal) => {
-                        modal.render(area, &preview_styles, buf);
+                        modal.render(area, &themeedit_styles, buf);
                     }
                     ActiveModal::ThemePicker(modal) => {
-                        modal.render(area, &preview_styles, buf);
+                        modal.render(area, &themeedit_styles, buf);
                     }
                     ActiveModal::Help(modal) => {
-                        modal.render(area, &preview_styles, buf);
+                        modal.render(area, &themeedit_styles, buf);
                     }
                     ActiveModal::None => {}
                 }
@@ -807,6 +805,10 @@ fn main() -> Result<()> {
                                 if !trimmed.is_empty() {
                                     match state.save_as_theme(trimmed) {
                                         Ok(_) => {
+                                            chrome_theme.sync_on_save(
+                                                &state.current_name,
+                                                &state.current_theme,
+                                            );
                                             toast_rack.add(ToastNotification {
                                                 title: Some(t!("themeedit.save_as_title")),
                                                 message: t!("themeedit.theme_saved_as", theme => &state.current_name),
@@ -836,6 +838,10 @@ fn main() -> Result<()> {
                                 if !trimmed.is_empty() {
                                     match state.save_as_theme(trimmed) {
                                         Ok(_) => {
+                                            chrome_theme.sync_on_save(
+                                                &state.current_name,
+                                                &state.current_theme,
+                                            );
                                             toast_rack.add(ToastNotification {
                                                 title: Some(t!("themeedit.save_as_title")),
                                                 message: t!("themeedit.theme_saved_as", theme => &state.current_name),
@@ -1044,7 +1050,13 @@ fn main() -> Result<()> {
                                     ));
                                 } else {
                                     match state.save_to_disk() {
-                                        Ok(_) => break,
+                                        Ok(_) => {
+                                            chrome_theme.sync_on_save(
+                                                &state.current_name,
+                                                &state.current_theme,
+                                            );
+                                            break;
+                                        }
                                         Err(e) => {
                                             toast_rack.add(ToastNotification {
                                                 title: Some("Save Failed".to_string()),
@@ -1576,6 +1588,10 @@ fn main() -> Result<()> {
                                         } else {
                                             match state.save_to_disk() {
                                                 Ok(_) => {
+                                                    chrome_theme.sync_on_save(
+                                                        &state.current_name,
+                                                        &state.current_theme,
+                                                    );
                                                     toast_rack.add(ToastNotification {
                                                         title: Some("Save Theme".to_string()),
                                                         message: format!(
