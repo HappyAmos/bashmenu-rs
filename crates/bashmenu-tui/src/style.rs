@@ -603,11 +603,12 @@ fn find_activity_map(
 /// Merges a resolved style pair onto `base`, keeping `base.fg` when `st.fg` is `-1`.
 fn merge_style_pair(base: Style, st: Style, extra_mod: Option<Modifier>) -> Style {
     let fg = st.fg.or(base.fg);
+    let bg = st.bg.or(base.bg);
     let mut out = Style::default();
     if let Some(c) = fg {
         out = out.fg(c);
     }
-    if let Some(c) = st.bg {
+    if let Some(c) = bg {
         out = out.bg(c);
     }
     if let Some(m) = extra_mod {

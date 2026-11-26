@@ -418,7 +418,13 @@ pub fn render_preview_pane_with_chrome(
                     right_area.height as usize,
                     preview_styles.background,
                 ) {
-                    composite_buffer(right_area, buf, grid, preview_styles.background);
+                    let inner_bounds = Rect::new(
+                        right_area.x + 1,
+                        right_area.y + 1,
+                        right_area.width.saturating_sub(2),
+                        right_area.height.saturating_sub(2),
+                    );
+                    composite_buffer(inner_bounds, buf, grid, preview_styles.background);
                 }
             }
         }
@@ -539,7 +545,13 @@ pub fn render_preview_pane_with_chrome(
                     right_area.height as usize,
                     preview_styles.background,
                 ) {
-                    composite_buffer(right_area, buf, grid, preview_styles.background);
+                    let inner_bounds = Rect::new(
+                        right_area.x + 1,
+                        right_area.y + 1,
+                        right_area.width.saturating_sub(2),
+                        right_area.height.saturating_sub(2),
+                    );
+                    composite_buffer(inner_bounds, buf, grid, preview_styles.background);
                 }
             }
 
@@ -601,7 +613,7 @@ pub fn render_preview_pane_with_chrome(
                 mod_x + 2,
                 mod_y + 3,
                 "All pending changes will be saved.",
-                preview_styles.help_text,
+                preview_styles.text,
             );
 
             // Focused faux text input box ("Example text field" + trailing empty input background)
@@ -675,7 +687,7 @@ pub fn render_preview_pane_with_chrome(
                     mod_x + mod_w - 2 - m_stat.len() as u16,
                     m_gutter_y,
                     m_stat,
-                    preview_styles.gutter,
+                    preview_styles.help_text,
                 );
             }
 
@@ -822,7 +834,13 @@ pub fn render_preview_pane_with_chrome(
                     right_area.height as usize,
                     canvas_styles.background,
                 ) {
-                    composite_buffer(right_area, buf, grid, canvas_styles.background);
+                    let inner_bounds = Rect::new(
+                        right_area.x + 1,
+                        right_area.y + 1,
+                        right_area.width.saturating_sub(2),
+                        right_area.height.saturating_sub(2),
+                    );
+                    composite_buffer(inner_bounds, buf, grid, canvas_styles.background);
                 }
             }
 

@@ -2659,9 +2659,9 @@ impl FormRow {
             } => {
                 let is_active = *ctrl == active_ctrl;
                 let box_style = if is_active {
-                    styles.highlight.add_modifier(Modifier::BOLD)
+                    styles.input_box.add_modifier(Modifier::BOLD)
                 } else {
-                    Style::default().fg(Color::White).bg(Color::DarkGray)
+                    styles.input_box_unfocused
                 };
                 let field_w = avail_w.saturating_sub(4);
                 let char_count = text.chars().count();
@@ -2729,9 +2729,9 @@ impl FormRow {
                 let is_ctrl_active = *ctrl == active_ctrl;
                 let line_active = is_ctrl_active && *is_focused_line;
                 let box_style = if line_active {
-                    styles.highlight.add_modifier(Modifier::BOLD)
+                    styles.input_box.add_modifier(Modifier::BOLD)
                 } else {
-                    Style::default().fg(Color::White).bg(Color::DarkGray)
+                    styles.input_box_unfocused
                 };
 
                 let content_w = avail_w.saturating_sub(4);
@@ -2828,9 +2828,9 @@ impl FormRow {
                 let inp_w = avail_w.saturating_sub(browse_btn.len() + 4);
 
                 let inp_style = if is_inp_active {
-                    styles.highlight.add_modifier(Modifier::BOLD)
+                    styles.input_box.add_modifier(Modifier::BOLD)
                 } else {
-                    Style::default().fg(Color::White).bg(Color::DarkGray)
+                    styles.input_box_unfocused
                 };
 
                 let char_count = text.chars().count();

@@ -2769,10 +2769,11 @@ fn draw_input(
     if rect.width == 0 {
         return;
     }
-    let base = styles
-        .text
-        .bg(styles.background)
-        .add_modifier(Modifier::UNDERLINED);
+    let base = if focused {
+        styles.input_box
+    } else {
+        styles.input_box_unfocused
+    };
     let w = rect.width as usize;
     let start = input.scroll_for_width(w);
     let sel = input.selection_range();
@@ -2784,10 +2785,7 @@ fn draw_input(
             st = st.add_modifier(Modifier::REVERSED);
         }
         if focused && idx == input.cursor {
-            st = styles
-                .text
-                .bg(styles.background)
-                .add_modifier(Modifier::REVERSED);
+            st = base.add_modifier(Modifier::REVERSED);
         }
         buf[(rect.x + col as u16, rect.y)]
             .set_symbol(&ch.to_string())

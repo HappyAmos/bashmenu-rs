@@ -2392,20 +2392,7 @@ fn hit_test_preview_with_style(
                     return Some(("divider", row, mod_x + 1, mod_x + mod_w - 1));
                 }
                 if row == m_gutter_y {
-                    if col < mod_x + mod_w.saturating_sub(12) {
-                        return Some((
-                            "help_text",
-                            row,
-                            mod_x + 2,
-                            mod_x + mod_w.saturating_sub(12),
-                        ));
-                    }
-                    return Some((
-                        "gutter",
-                        row,
-                        mod_x + mod_w.saturating_sub(12),
-                        mod_x + mod_w - 1,
-                    ));
+                    return Some(("help_text", row, mod_x + 2, mod_x + mod_w.saturating_sub(2)));
                 }
                 if row == mod_y + 2 {
                     let end = (mod_x + 2 + 33).min(mod_x + mod_w - 1);
@@ -2417,7 +2404,7 @@ fn hit_test_preview_with_style(
                 if row == mod_y + 3 {
                     let end = (mod_x + 2 + 34).min(mod_x + mod_w - 1);
                     if col >= mod_x + 2 && col < end {
-                        return Some(("help_text", row, mod_x + 2, end));
+                        return Some(("text", row, mod_x + 2, end));
                     }
                     return Some(("background", row, mod_x + 1, mod_x + mod_w - 1));
                 }
