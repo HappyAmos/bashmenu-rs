@@ -110,6 +110,9 @@ pub struct MenuView {
     framebuffer_image_mode: bool,
     /// Marquee scroll offset and pause tracker for long selected item labels
     marquee_tracker: MarqueeTracker,
+    /// Whether the most recent `render()` encountered any overflowing text
+    /// that requires periodic marquee ticking
+    has_marquee_overflow: bool,
     /// Configured shortcuts from the shortcut manager
     shortcuts: Vec<ShortcutEntry>,
     /// Configured leader key display string (e.g. `"ctrl+space"`)
@@ -151,6 +154,7 @@ impl MenuView {
             wallpaper: None,
             framebuffer_image_mode: false,
             marquee_tracker: MarqueeTracker::new(4),
+            has_marquee_overflow: false,
             shortcuts: Vec::new(),
             leader_key: "ctrl+space".to_string(),
             gutter_hover: HelpGutterHover::with_duration(hover_duration),
@@ -246,6 +250,17 @@ impl MenuView {
     /// Update status gutter template or value
     pub fn set_status_gutter(&mut self, gutter: String) {
         self.status_gutter = gutter;
+    }
+
+    /// Updates the status gutter only when `gutter` differs from the current
+    /// value. Returns `true` if changed and a redraw is needed.
+    pub fn update_status_gutter(&mut self, gutter: String) -> bool {
+        if self.status_gutter != gutter {
+            self.status_gutter = gutter;
+            true
+        } else {
+            false
+        }
     }
 
     /// Sets whether shortcut numbers/letters are displayed
@@ -607,6 +622,18 @@ impl MenuView {
     /// Advances the marquee ticker. Returns true if offset changed (redraw needed).
     pub fn tick_marquee(&mut self) -> bool {
         self.marquee_tracker.tick()
+    }
+
+    /// Returns `true` if the most recent render had any overflowing label,
+    /// title, or plugin row that requires marquee scrolling.
+    pub fn has_active_marquee(&self) -> bool {
+        self.has_marquee_overflow
+    }
+
+    /// Returns the remaining duration until a stationary help-gutter hover
+    /// expands, or `None` if no hover countdown is active.
+    pub fn hover_timeout_remaining(&self) -> Option<std::time::Duration> {
+        self.gutter_hover.remaining_timeout()
     }
 
     /// Resets the marquee ticker.
@@ -1217,6 +1244,8 @@ impl MenuView {
         macro_ctx.screen_width = w;
         macro_ctx.window_height = area.height as usize;
 
+        let mut marquee_overflow = false;
+
         let level = self.current_level();
         let title_raw = interpolate_placeholders(&level.title, &macro_ctx);
         let title_body = format!(" {} ", title_raw);
@@ -1224,6 +1253,7 @@ impl MenuView {
         let max_body_w = w.saturating_sub(6 + title_cap_len);
         let title_vis = visible_text_len(&title_body);
         let display_title_body: String = if title_vis > max_body_w && max_body_w > 0 {
+            marquee_overflow = true;
             get_marquee_slice(
                 &title_body,
                 max_body_w,
@@ -1431,6 +1461,7 @@ impl MenuView {
                 let left_vis = visible_text_len(left_label);
                 let text_to_parse = if is_active {
                     if left_vis > avail_for_content {
+                        marquee_overflow = true;
                         get_marquee_slice(
                             left_label,
                             avail_for_content,
@@ -1466,6 +1497,7 @@ impl MenuView {
 
                     let (left_str, right_str) = if is_active {
                         let l = if left_vis > max_left {
+                            marquee_overflow = true;
                             get_marquee_slice(
                                 left_label,
                                 max_left,
@@ -1477,6 +1509,7 @@ impl MenuView {
                             left_label.to_string()
                         };
                         let r = if right_vis > max_right {
+                            marquee_overflow = true;
                             get_marquee_slice(
                                 right_bracket,
                                 max_right,
@@ -1568,6 +1601,7 @@ impl MenuView {
                 } else {
                     let text_vis = visible_text_len(&prow.text);
                     let text_to_render = if text_vis > avail_w && avail_w > 0 {
+                        marquee_overflow = true;
                         get_marquee_slice(
                             &prow.text,
                             avail_w,
@@ -1583,6 +1617,8 @@ impl MenuView {
                 }
             }
         }
+
+        self.has_marquee_overflow = marquee_overflow;
 
         // 5. Render Gutter Borders and Content
         if help_rows > normal_rows {
@@ -2063,5 +2099,43 @@ mod tests {
         assert_eq!(view.active_title_chain(), vec!["Tools", "Sub Item 2"]);
         assert_eq!(view.selected_path(), vec![1, 1]);
         assert_eq!(view.selected_item().unwrap().label, "Sub Item 2");
+    }
+
+    #[test]
+    fn test_update_status_gutter_dedup_and_marquee_overflow_detection() {
+        let schema = MenuSchema {
+            title: "Main".to_string(),
+            items: vec![
+                MenuItem {
+                    label: "Short".to_string(),
+                    r#type: MenuItemType::Command,
+                    ..Default::default()
+                },
+                MenuItem {
+                    label: "A very long selected menu item label that overflows narrow viewports"
+                        .to_string(),
+                    r#type: MenuItemType::Command,
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        };
+        let mut view = MenuView::new(schema, ResolvedThemeStyles::default(), false, String::new());
+
+        // Status gutter deduplication
+        assert!(view.update_status_gutter("12:00".to_string()));
+        assert!(!view.update_status_gutter("12:00".to_string()));
+        assert!(view.update_status_gutter("12:01".to_string()));
+
+        // Short selected label fits in 40x12 -> no active marquee
+        let area = Rect::new(0, 0, 40, 12);
+        let mut buf = Buffer::empty(area);
+        view.render(area, &mut buf);
+        assert!(!view.has_active_marquee());
+
+        // Move to overflowing label -> active marquee becomes true
+        view.handle_key(KeyCode::Down);
+        view.render(area, &mut buf);
+        assert!(view.has_active_marquee());
     }
 }

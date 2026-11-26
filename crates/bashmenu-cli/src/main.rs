@@ -652,18 +652,20 @@ fn main() -> Result<()> {
                 ctx.window_height = size.height as usize;
                 ctx.screen_width = size.width as usize;
                 let gutter_str = interpolate_placeholders(gutter_tmpl, &ctx);
-                menu_view.set_status_gutter(gutter_str);
+                if menu_view.update_status_gutter(gutter_str) {
+                    need_redraw = true;
+                }
             }
             last_plugin_check = Instant::now();
         }
 
-        // Periodic check to advance marquee ticker (customizable via settings.marquee_speed)
+        // Periodic check to advance marquee ticker (only when a visible row overflows)
         let marquee_interval = config.settings.marquee_speed_duration();
-        if last_marquee_tick.elapsed() >= marquee_interval {
-            if matches!(active_modal, ActiveModal::None)
-                && !shortcut_dispatcher.is_leader_pending()
-                && menu_view.tick_marquee()
-            {
+        let marquee_active = matches!(active_modal, ActiveModal::None)
+            && !shortcut_dispatcher.is_leader_pending()
+            && menu_view.has_active_marquee();
+        if marquee_active && last_marquee_tick.elapsed() >= marquee_interval {
+            if menu_view.tick_marquee() {
                 need_redraw = true;
             }
             last_marquee_tick = Instant::now();
@@ -824,7 +826,48 @@ fn main() -> Result<()> {
             }
         }
 
-        if pending_action.is_some() || event::poll(Duration::from_millis(50))? {
+        let gutter_remaining = gutter_interval.saturating_sub(last_plugin_check.elapsed());
+        let marquee_remaining = if matches!(active_modal, ActiveModal::None)
+            && !shortcut_dispatcher.is_leader_pending()
+            && menu_view.has_active_marquee()
+        {
+            Some(marquee_interval.saturating_sub(last_marquee_tick.elapsed()))
+        } else {
+            None
+        };
+        let leader_remaining = shortcut_dispatcher.leader_timeout_remaining();
+        let hover_remaining = if matches!(active_modal, ActiveModal::None)
+            && !shortcut_dispatcher.is_leader_pending()
+        {
+            menu_view.hover_timeout_remaining()
+        } else {
+            None
+        };
+        let inactivity_remaining = config
+            .settings
+            .inactivity_timeout
+            .as_ref()
+            .and_then(|t| t.milliseconds.filter(|&ms| ms > 0))
+            .map(|ms| Duration::from_millis(ms).saturating_sub(last_interaction.elapsed()));
+        let has_fast_activity =
+            !toast_rack.is_empty() || matches!(active_modal, ActiveModal::StreamOutput(_));
+        let has_plugins = config.settings.plugins.as_ref().is_some_and(|v| match v {
+            serde_json::Value::Array(arr) => !arr.is_empty(),
+            serde_json::Value::Object(map) => !map.is_empty(),
+            serde_json::Value::Null => false,
+            _ => true,
+        });
+        let poll_timeout = compute_idle_poll_timeout(
+            gutter_remaining,
+            marquee_remaining,
+            leader_remaining,
+            hover_remaining,
+            inactivity_remaining,
+            has_fast_activity,
+            has_plugins,
+        );
+
+        if pending_action.is_some() || event::poll(poll_timeout)? {
             let ev = if pending_action.is_some() {
                 Event::FocusGained
             } else {
@@ -3115,4 +3158,97 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Computes the next `event::poll` timeout from all active timers so an idle
+/// menu sleeps until the earliest scheduled wakeup instead of polling at 20 Hz.
+fn compute_idle_poll_timeout(
+    gutter_remaining: Duration,
+    marquee_remaining: Option<Duration>,
+    leader_remaining: Option<Duration>,
+    hover_remaining: Option<Duration>,
+    inactivity_remaining: Option<Duration>,
+    has_fast_activity: bool,
+    has_plugins: bool,
+) -> Duration {
+    if has_fast_activity {
+        return Duration::from_millis(50);
+    }
+    let mut timeout = gutter_remaining;
+    if has_plugins {
+        timeout = timeout.min(Duration::from_millis(500));
+    }
+    if let Some(rem) = marquee_remaining {
+        timeout = timeout.min(rem);
+    }
+    if let Some(rem) = leader_remaining {
+        timeout = timeout.min(rem);
+    }
+    if let Some(rem) = hover_remaining {
+        timeout = timeout.min(rem);
+    }
+    if let Some(rem) = inactivity_remaining {
+        timeout = timeout.min(rem);
+    }
+    timeout.max(Duration::from_millis(10))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_compute_idle_poll_timeout_deadlines() {
+        // Completely idle with 5s gutter interval -> sleeps full 5s (<= 1/sec)
+        assert_eq!(
+            compute_idle_poll_timeout(Duration::from_secs(5), None, None, None, None, false, false,),
+            Duration::from_secs(5)
+        );
+
+        // Active toast / streaming modal -> snappy 50ms poll
+        assert_eq!(
+            compute_idle_poll_timeout(Duration::from_secs(5), None, None, None, None, true, false,),
+            Duration::from_millis(50)
+        );
+
+        // Active marquee overrides long gutter wait
+        assert_eq!(
+            compute_idle_poll_timeout(
+                Duration::from_secs(5),
+                Some(Duration::from_millis(250)),
+                None,
+                None,
+                None,
+                false,
+                false,
+            ),
+            Duration::from_millis(250)
+        );
+
+        // Pending leader or hover timer picks earliest deadline
+        assert_eq!(
+            compute_idle_poll_timeout(
+                Duration::from_secs(5),
+                Some(Duration::from_millis(250)),
+                Some(Duration::from_millis(120)),
+                Some(Duration::from_secs(3)),
+                None,
+                false,
+                false,
+            ),
+            Duration::from_millis(120)
+        );
+
+        // Background plugins bound idle sleep to 500ms
+        assert_eq!(
+            compute_idle_poll_timeout(Duration::from_secs(5), None, None, None, None, false, true,),
+            Duration::from_millis(500)
+        );
+
+        // Zero remaining duration is clamped to 10ms floor to avoid busy-spin
+        assert_eq!(
+            compute_idle_poll_timeout(Duration::ZERO, None, None, None, None, false, false,),
+            Duration::from_millis(10)
+        );
+    }
 }

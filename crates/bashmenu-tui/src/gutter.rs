@@ -490,6 +490,19 @@ impl HelpGutterHover {
         self.is_expanded
     }
 
+    /// Returns the remaining wait duration until hover expansion triggers,
+    /// or `None` if no hover timer is currently active.
+    pub fn remaining_timeout(&self) -> Option<Duration> {
+        if self.is_expanded {
+            return None;
+        }
+        if self.hover_duration.is_zero() {
+            return self.hover_pos.map(|_| Duration::ZERO);
+        }
+        self.hover_start
+            .map(|start| self.hover_duration.saturating_sub(start.elapsed()))
+    }
+
     /// Toggles the expanded state of the help gutter directly via keyboard.
     pub fn toggle_expanded(&mut self) -> bool {
         self.hover_pos = None;
