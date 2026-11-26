@@ -3275,3 +3275,55 @@ fn test_shortcuts_key_color_and_key_chord_accent() {
     assert!(acc_spans.iter().any(|s| s.0 == p_inner_y + 1));
     assert!(acc_spans.iter().any(|s| s.0 == p_inner_y + 3));
 }
+
+#[test]
+fn test_themeedit_mini_preview_composites_wallpaper() {
+    use bashmenu_core::WallpaperConfig;
+    use bashmenu_tui::{ResolvedThemeStyles, WallpaperCompositor};
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::style::Color;
+    use themeedit_cli::{render_preview_pane, PreviewMode};
+
+    let wp_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../assets/wallpapers/canopy.jpg");
+    assert!(wp_path.exists(), "Fixture wallpaper canopy.jpg must exist");
+
+    let wp_cfg = WallpaperConfig {
+        image: Some(wp_path.to_string_lossy().to_string()),
+        opacity: 0.5,
+        ..Default::default()
+    };
+    let mut comp = Some(WallpaperCompositor::new(wp_cfg));
+
+    let styles = ResolvedThemeStyles {
+        background: Color::Rgb(0, 0, 0),
+        ..Default::default()
+    };
+    let area = Rect::new(0, 0, 96, 24);
+    let mut buf = Buffer::empty(area);
+    render_preview_pane(area, &mut buf, PreviewMode::ThemeEditor, &styles, &mut comp);
+
+    let p_avail_w = area.width.saturating_sub(4);
+    let left_w = ((p_avail_w as usize * 48) / 100).max(16) as u16;
+    let right_w = p_avail_w.saturating_sub(left_w + 1);
+    let sample_x = area.x + 2 + left_w + 1;
+    let sample_y = area.y + 2;
+    let body_h = (area.y + area.height - 3).saturating_sub(sample_y);
+
+    // At least one cell inside the miniature Main Menu pane must have wallpaper color (not pure black)
+    let mut has_wp_cell = false;
+    for y in (sample_y + 1)..(sample_y + body_h - 1) {
+        for x in (sample_x + 1)..(sample_x + right_w - 1) {
+            let cell = &buf[(x, y)];
+            if cell.bg != Color::Rgb(0, 0, 0) && cell.bg != Color::Reset {
+                has_wp_cell = true;
+                break;
+            }
+        }
+    }
+    assert!(
+        has_wp_cell,
+        "Expected wallpaper to be composited inside the miniature Main Menu pane on 6:ThemeEdit"
+    );
+}

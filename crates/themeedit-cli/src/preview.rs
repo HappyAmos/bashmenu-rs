@@ -889,7 +889,7 @@ pub fn render_preview_pane_with_base(
             buf.set_string(p_inner_x, summary_y, summary_txt, summary_style);
         }
         PreviewMode::ThemeEditor => {
-            render_theme_editor_preview(right_area, buf, preview_styles);
+            render_theme_editor_preview(right_area, buf, preview_styles, wp_compositor);
         }
         PreviewMode::ShortcutEditor => {
             render_shortcut_editor_preview(right_area, buf, preview_styles);
@@ -902,6 +902,7 @@ fn render_theme_editor_preview(
     right_area: Rect,
     buf: &mut Buffer,
     preview_styles: &ResolvedThemeStyles,
+    wp_compositor: &mut Option<WallpaperCompositor>,
 ) {
     let p_inner_x = right_area.x + 2;
     let p_inner_y = right_area.y + 2;
@@ -1022,6 +1023,25 @@ fn render_theme_editor_preview(
                 Span::styled("│ 12:00", preview_styles.gutter),
             ]);
             buf.set_line(sx, sy + 4, &line, sw as u16);
+        }
+
+        // Composite background wallpaper scaled to fit inside the miniature Main Menu pane
+        if let Some(comp) = wp_compositor {
+            let inner_sample = Rect::new(
+                sample_rect.x + 1,
+                sample_rect.y + 1,
+                sample_rect.width.saturating_sub(2),
+                sample_rect.height.saturating_sub(2),
+            );
+            if inner_sample.width > 0 && inner_sample.height > 0 {
+                if let Some(grid) = comp.get_grid(
+                    inner_sample.width as usize,
+                    inner_sample.height as usize,
+                    preview_styles.background,
+                ) {
+                    composite_buffer(inner_sample, buf, grid, preview_styles.background);
+                }
+            }
         }
     }
 
