@@ -657,7 +657,11 @@ fn main() -> Result<()> {
                     Event::Key(k) => {
                         if let Some(res) = modal.handle_key(k.code) {
                             if let Some(color) = res {
-                                state.set_color_token_value(key, color);
+                                if modal.apply_to_base {
+                                    state.set_color_token_value_for_base(key, color);
+                                } else {
+                                    state.set_color_token_value(key, color);
+                                }
                             }
                             active_modal = ActiveModal::None;
                         }
@@ -665,7 +669,11 @@ fn main() -> Result<()> {
                     Event::Mouse(m) => {
                         if let Some(res) = modal.handle_mouse(m, area) {
                             if let Some(color) = res {
-                                state.set_color_token_value(key, color);
+                                if modal.apply_to_base {
+                                    state.set_color_token_value_for_base(key, color);
+                                } else {
+                                    state.set_color_token_value(key, color);
+                                }
                             }
                             active_modal = ActiveModal::None;
                         }
@@ -2064,8 +2072,12 @@ fn open_selected_token_picker(state: &mut ThemeEditorState, active_modal: &mut A
             } else {
                 "Pick Theme Color"
             };
-            *active_modal =
-                ActiveModal::ColorPicker(key, ColorPickerModal::new(title, initial_color));
+            let show_base_opt = state.preview_mode != PreviewMode::Menu;
+            *active_modal = ActiveModal::ColorPicker(
+                key,
+                ColorPickerModal::new(title, initial_color)
+                    .with_apply_to_base_option(show_base_opt),
+            );
         }
         TokenKind::WallpaperImage
         | TokenKind::WallpaperOpacity

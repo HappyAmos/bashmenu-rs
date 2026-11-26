@@ -3690,3 +3690,92 @@ fn test_preview_tab_bar_follows_live_chrome_theme_not_edited_theme() {
     assert_eq!(buf[(active_tab.x_start, area.y)].bg, Color::Indexed(196));
     assert_eq!(buf[(active_tab.x_start, area.y)].fg, Color::Indexed(226));
 }
+
+#[test]
+fn test_color_picker_apply_to_base_checkbox_and_base_write() {
+    use bashmenu_tui::{ColorPickerModal, ResolvedThemeStyles, ThemeActivity};
+    use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::style::Color;
+    use themeedit_cli::PreviewMode;
+
+    let area = Rect::new(0, 0, 100, 30);
+    let styles = ResolvedThemeStyles::default();
+
+    // 1. On 1:Menu (show_apply_to_base = false), checkbox is hidden and F2 does not toggle
+    let mut base_picker =
+        ColorPickerModal::new("Pick Color", Color::Indexed(24)).with_apply_to_base_option(false);
+    let mut bbuf = Buffer::empty(area);
+    let (binner, _) = base_picker.render(area, &styles, &mut bbuf);
+    let cb_row_base: String = (binner.x..binner.x + binner.width)
+        .map(|x| bbuf[(x, binner.y + binner.height - 2)].symbol())
+        .collect();
+    assert!(!cb_row_base.contains("Apply to Base"));
+    assert_eq!(base_picker.handle_key(KeyCode::F(2)), None);
+    assert!(!base_picker.apply_to_base);
+
+    // 2. On non-Menu tab (show_apply_to_base = true), checkbox renders and toggles via F2 & mouse
+    let mut modal_picker = ColorPickerModal::new("Pick Input Box Focused Bg", Color::Indexed(24))
+        .with_apply_to_base_option(true);
+    let mut mbuf = Buffer::empty(area);
+    let (minner, _) = modal_picker.render(area, &styles, &mut mbuf);
+    let cb_y = minner.y + minner.height - 2;
+    let cb_row: String = (minner.x..minner.x + minner.width)
+        .map(|x| mbuf[(x, cb_y)].symbol())
+        .collect();
+    assert!(cb_row.contains("[ ] Apply to Base (1:Menu)"));
+
+    // Toggle on via F2
+    assert_eq!(modal_picker.handle_key(KeyCode::F(2)), None);
+    assert!(modal_picker.apply_to_base);
+    let mut mbuf2 = Buffer::empty(area);
+    modal_picker.render(area, &styles, &mut mbuf2);
+    let cb_row2: String = (minner.x..minner.x + minner.width)
+        .map(|x| mbuf2[(x, cb_y)].symbol())
+        .collect();
+    assert!(cb_row2.contains("[x] Apply to Base (1:Menu)"));
+
+    // Toggle off via mouse click on checkbox
+    let click = MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: minner.x + 4,
+        row: cb_y,
+        modifiers: KeyModifiers::NONE,
+    };
+    assert_eq!(modal_picker.handle_mouse(click, area), None);
+    assert!(!modal_picker.apply_to_base);
+
+    // 3. set_color_token_value_for_base on 3:Modals writes to Base (1:Menu), clears local
+    //    modals override, and propagates to Modals + ThemeEdit + MenuEdit
+    let themes_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(themes_path, Some("dracula".to_string()));
+    state.preview_mode = PreviewMode::Modals;
+
+    // First set a local Modals override
+    state.set_color_token_value("input_box", Color::Indexed(52));
+    assert!(!state.is_color_token_inherited("input_box"));
+
+    // Now apply a new color to Base (1:Menu) from 3:Modals
+    state.set_color_token_value_for_base("input_box", Color::Indexed(25));
+    assert!(
+        state.is_color_token_inherited("input_box"),
+        "Local Modals override must be reset to Inherit so the new Base color is visible"
+    );
+
+    for act in [
+        ThemeActivity::MainMenu,
+        ThemeActivity::Modals,
+        ThemeActivity::ThemeEdit,
+        ThemeActivity::MenuEdit,
+    ] {
+        let resolved =
+            ResolvedThemeStyles::from_theme_for_activity(&state.current_theme, true, act);
+        assert_eq!(
+            resolved.input_box.bg,
+            Some(Color::Indexed(25)),
+            "Activity {:?} must inherit new Base input_box bg",
+            act
+        );
+    }
+}
