@@ -2975,3 +2975,99 @@ fn test_stream_output_modal_show_command_header() {
         row1_shown
     );
 }
+
+#[test]
+fn test_color_picker_derive_from_background_image_swatches() {
+    use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::style::Color;
+
+    let area = Rect::new(0, 0, 100, 30);
+    let styles = ResolvedThemeStyles::default();
+
+    // 1. Without a background palette, the Derive checkbox is hidden and F3 is a no-op
+    let mut no_bg = ColorPickerModal::new("Pick Color", Color::Indexed(42));
+    let mut buf0 = Buffer::empty(area);
+    let (inner0, _) = no_bg.render(area, &styles, &mut buf0);
+    let cb_y = inner0.y + inner0.height - 2;
+    let cb_row0: String = (inner0.x..inner0.x + inner0.width)
+        .map(|x| buf0[(x, cb_y)].symbol())
+        .collect();
+    assert!(!cb_row0.contains("Derive From Background Image"));
+    assert_eq!(no_bg.handle_key(KeyCode::F(3)), None);
+    assert!(!no_bg.derive_from_bg);
+
+    // 2. With a background palette attached, checkbox appears on 256 and TrueColor tabs, hidden on Hex
+    let bg_256 = vec![24u8, 196, 46];
+    let bg_rgb = vec![(10u8, 20, 30), (220, 40, 50), (30, 190, 90)];
+    let mut picker = ColorPickerModal::new("Pick Color", Color::Indexed(42))
+        .with_apply_to_base_option(true)
+        .with_background_palette(bg_256.clone(), bg_rgb.clone());
+
+    let mut buf1 = Buffer::empty(area);
+    let (inner1, _) = picker.render(area, &styles, &mut buf1);
+    let cb_row1: String = (inner1.x..inner1.x + inner1.width)
+        .map(|x| buf1[(x, cb_y)].symbol())
+        .collect();
+    assert!(
+        cb_row1.contains("[ ] Apply to Base (1:Menu)")
+            && cb_row1.contains("[ ] Derive From Background Image"),
+        "Both checkboxes must fit cleanly on the checkbox row (got: {:?})",
+        cb_row1
+    );
+
+    // Toggle Derive ON via F3 -> Palette256 now navigates derived 256 swatches
+    assert_eq!(picker.handle_key(KeyCode::F(3)), None);
+    assert!(picker.derive_from_bg);
+    picker.handle_key(KeyCode::Home);
+    assert_eq!(picker.current_color, Color::Indexed(24));
+    picker.handle_key(KeyCode::Right);
+    assert_eq!(picker.current_color, Color::Indexed(196));
+
+    // Switch to TrueColor tab -> navigates derived TrueColor RGB swatches
+    picker.handle_key(KeyCode::Tab);
+    assert_eq!(picker.tab, ColorPickerTab::TrueColorHsv);
+    picker.handle_key(KeyCode::Home);
+    assert_eq!(picker.current_color, Color::Rgb(10, 20, 30));
+    picker.handle_key(KeyCode::Right);
+    assert_eq!(picker.current_color, Color::Rgb(220, 40, 50));
+
+    // Clicking swatch #2 (col 2, row 0) in TrueColor derived grid picks (30, 190, 90)
+    let click_swatch = MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: inner1.x + 2 + (2 * 3),
+        row: inner1.y + 2,
+        modifiers: KeyModifiers::NONE,
+    };
+    assert_eq!(
+        picker.handle_mouse(click_swatch, area),
+        Some(Some(Color::Rgb(30, 190, 90)))
+    );
+
+    // Switch to Hex tab -> Derive checkbox must be hidden
+    picker.handle_key(KeyCode::Tab);
+    assert_eq!(picker.tab, ColorPickerTab::HexInput);
+    let mut buf_hex = Buffer::empty(area);
+    picker.render(area, &styles, &mut buf_hex);
+    let cb_row_hex: String = (inner1.x..inner1.x + inner1.width)
+        .map(|x| buf_hex[(x, cb_y)].symbol())
+        .collect();
+    assert!(
+        !cb_row_hex.contains("Derive From Background Image"),
+        "Derive checkbox must be hidden on Hex tab (got: {:?})",
+        cb_row_hex
+    );
+
+    // Switch back to 256 tab and toggle Derive OFF via mouse click on checkbox
+    picker.handle_key(KeyCode::Tab);
+    assert_eq!(picker.tab, ColorPickerTab::Palette256);
+    let click_derive_cb = MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: inner1.x + 36,
+        row: cb_y,
+        modifiers: KeyModifiers::NONE,
+    };
+    assert_eq!(picker.handle_mouse(click_derive_cb, area), None);
+    assert!(!picker.derive_from_bg);
+}

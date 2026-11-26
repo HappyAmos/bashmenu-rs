@@ -134,6 +134,16 @@ pub struct ColorPickerModal {
     pub show_apply_to_base: bool,
     /// Whether the user checked `[x] Apply to Base (1:Menu)`
     pub apply_to_base: bool,
+    /// Derived ANSI 256-color swatches extracted from the theme's background image
+    pub bg_palette_256: Vec<u8>,
+    /// Derived 24-bit TrueColor RGB swatches extracted from the theme's background image
+    pub bg_palette_rgb: Vec<(u8, u8, u8)>,
+    /// Whether the user checked `[x] Derive From Background Image`
+    pub derive_from_bg: bool,
+    /// Active selection index inside `bg_palette_256`
+    pub bg_selected_256_idx: usize,
+    /// Active selection index inside `bg_palette_rgb`
+    pub bg_selected_rgb_idx: usize,
 }
 
 impl ColorPickerModal {
@@ -163,6 +173,11 @@ impl ColorPickerModal {
             current_color: initial_color,
             show_apply_to_base: false,
             apply_to_base: false,
+            bg_palette_256: Vec::new(),
+            bg_palette_rgb: Vec::new(),
+            derive_from_bg: false,
+            bg_selected_256_idx: 0,
+            bg_selected_rgb_idx: 0,
         }
     }
 
@@ -171,6 +186,97 @@ impl ColorPickerModal {
         self.show_apply_to_base = enabled;
         self.apply_to_base = false;
         self
+    }
+
+    /// Attaches background-image derived swatches to enable the
+    /// `[ ] Derive From Background Image` checkbox on the 256 and TrueColor tabs.
+    pub fn with_background_palette(
+        mut self,
+        palette_256: Vec<u8>,
+        palette_rgb: Vec<(u8, u8, u8)>,
+    ) -> Self {
+        self.bg_palette_256 = palette_256.into_iter().take(256).collect();
+        self.bg_palette_rgb = palette_rgb.into_iter().take(256).collect();
+        self.derive_from_bg = false;
+        self.bg_selected_256_idx = 0;
+        self.bg_selected_rgb_idx = 0;
+        self
+    }
+
+    /// Returns true if a background-image swatch palette is available.
+    pub fn has_background_palette(&self) -> bool {
+        !self.bg_palette_256.is_empty() || !self.bg_palette_rgb.is_empty()
+    }
+
+    /// Returns true if `[ ] Derive From Background Image` should be displayed on the active tab.
+    fn shows_derive_checkbox(&self) -> bool {
+        self.has_background_palette()
+            && matches!(
+                self.tab,
+                ColorPickerTab::Palette256 | ColorPickerTab::TrueColorHsv
+            )
+    }
+
+    /// Toggles `[ ] Derive From Background Image` and aligns selection to the closest image swatch.
+    fn toggle_derive_from_bg(&mut self) {
+        self.derive_from_bg = !self.derive_from_bg;
+        if self.derive_from_bg {
+            self.align_bg_selection_to_current();
+        }
+    }
+
+    /// Selects the closest swatch in the active background-image palette to `self.current_color`.
+    fn align_bg_selection_to_current(&mut self) {
+        let (cr, cg, cb) = color_to_rgb(self.current_color);
+        if !self.bg_palette_256.is_empty() {
+            if let Some((best_idx, &code)) =
+                self.bg_palette_256
+                    .iter()
+                    .enumerate()
+                    .min_by_key(|&(_, &idx)| {
+                        let (r, g, b) = color_to_rgb(Color::Indexed(idx));
+                        let dr = r as i32 - cr as i32;
+                        let dg = g as i32 - cg as i32;
+                        let db = b as i32 - cb as i32;
+                        dr * dr + dg * dg + db * db
+                    })
+            {
+                self.bg_selected_256_idx = best_idx;
+                if self.tab == ColorPickerTab::Palette256 {
+                    self.sync_from_256(code);
+                }
+            }
+        }
+        if !self.bg_palette_rgb.is_empty() {
+            if let Some((best_idx, &(r, g, b))) =
+                self.bg_palette_rgb
+                    .iter()
+                    .enumerate()
+                    .min_by_key(|&(_, &(r, g, b))| {
+                        let dr = r as i32 - cr as i32;
+                        let dg = g as i32 - cg as i32;
+                        let db = b as i32 - cb as i32;
+                        dr * dr + dg * dg + db * db
+                    })
+            {
+                self.bg_selected_rgb_idx = best_idx;
+                if self.tab == ColorPickerTab::TrueColorHsv {
+                    self.sync_from_rgb(r, g, b);
+                }
+            }
+        }
+    }
+
+    /// Synchronizes current color from an explicit 24-bit RGB triplet.
+    fn sync_from_rgb(&mut self, r: u8, g: u8, b: u8) {
+        self.current_color = Color::Rgb(r, g, b);
+        let (h, s, v) = rgb_to_hsv(r, g, b);
+        self.hue = h;
+        self.sat = s;
+        self.val = v;
+        self.selected_256 = rgb_to_xterm256(r, g, b);
+        self.hex_input = format!("#{:02x}{:02x}{:02x}", r, g, b);
+        self.hex_cursor = self.hex_input.len();
     }
 
     /// Synchronizes current color from HSV components into RGB and hex representation.
@@ -242,6 +348,10 @@ impl ColorPickerModal {
                 self.apply_to_base = !self.apply_to_base;
                 None
             }
+            KeyCode::F(3) if self.shows_derive_checkbox() => {
+                self.toggle_derive_from_bg();
+                None
+            }
             KeyCode::Delete => {
                 if self.tab == ColorPickerTab::HexInput {
                     if self.hex_input == "#" {
@@ -289,6 +399,54 @@ impl ColorPickerModal {
     }
 
     fn handle_key_palette(&mut self, code: KeyCode) -> Option<Option<Color>> {
+        if self.derive_from_bg && !self.bg_palette_256.is_empty() {
+            let len = self.bg_palette_256.len();
+            let mut idx = self.bg_selected_256_idx.min(len - 1);
+            let moved = match code {
+                KeyCode::Left | KeyCode::Char('h') => {
+                    idx = idx.saturating_sub(1);
+                    true
+                }
+                KeyCode::Right | KeyCode::Char('l') => {
+                    idx = (idx + 1).min(len - 1);
+                    true
+                }
+                KeyCode::Up | KeyCode::Char('k') => {
+                    idx = idx.saturating_sub(16);
+                    true
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    if idx + 16 < len {
+                        idx += 16;
+                    }
+                    true
+                }
+                KeyCode::PageUp => {
+                    idx = idx.saturating_sub(64);
+                    true
+                }
+                KeyCode::PageDown => {
+                    idx = (idx + 64).min(len - 1);
+                    true
+                }
+                KeyCode::Home => {
+                    idx = 0;
+                    true
+                }
+                KeyCode::End => {
+                    idx = len - 1;
+                    true
+                }
+                _ => false,
+            };
+            if moved {
+                self.bg_selected_256_idx = idx;
+                let code_val = self.bg_palette_256[idx];
+                self.sync_from_256(code_val);
+                return None;
+            }
+        }
+
         match code {
             KeyCode::Left | KeyCode::Char('h') => {
                 let new_code = self.selected_256.saturating_sub(1);
@@ -350,6 +508,54 @@ impl ColorPickerModal {
     }
 
     fn handle_key_hsv(&mut self, code: KeyCode) -> Option<Option<Color>> {
+        if self.derive_from_bg && !self.bg_palette_rgb.is_empty() {
+            let len = self.bg_palette_rgb.len();
+            let mut idx = self.bg_selected_rgb_idx.min(len - 1);
+            let moved = match code {
+                KeyCode::Left | KeyCode::Char('h') => {
+                    idx = idx.saturating_sub(1);
+                    true
+                }
+                KeyCode::Right | KeyCode::Char('l') => {
+                    idx = (idx + 1).min(len - 1);
+                    true
+                }
+                KeyCode::Up | KeyCode::Char('k') => {
+                    idx = idx.saturating_sub(16);
+                    true
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    if idx + 16 < len {
+                        idx += 16;
+                    }
+                    true
+                }
+                KeyCode::PageUp => {
+                    idx = idx.saturating_sub(64);
+                    true
+                }
+                KeyCode::PageDown => {
+                    idx = (idx + 64).min(len - 1);
+                    true
+                }
+                KeyCode::Home => {
+                    idx = 0;
+                    true
+                }
+                KeyCode::End => {
+                    idx = len - 1;
+                    true
+                }
+                _ => false,
+            };
+            if moved {
+                self.bg_selected_rgb_idx = idx;
+                let (r, g, b) = self.bg_palette_rgb[idx];
+                self.sync_from_rgb(r, g, b);
+                return None;
+            }
+        }
+
         match code {
             KeyCode::Left | KeyCode::Char('h') => {
                 self.sat = (self.sat - 0.032).max(0.0);
@@ -533,14 +739,36 @@ impl ColorPickerModal {
             }
         }
 
-        // 1b. Optional "[ ] Apply to Base (1:Menu)  [F2]" checkbox on row inner.height - 2
-        if self.show_apply_to_base {
-            let cb_row = oy + inner_area.height.saturating_sub(2);
-            let cb_x = ox + 2;
-            let cb_w = 32_u16;
-            if row == cb_row && col >= cb_x && col < cb_x + cb_w {
-                self.apply_to_base = !self.apply_to_base;
-                return None;
+        // 1b. Optional checkboxes on row inner.height - 2
+        let cb_row = oy + inner_area.height.saturating_sub(2);
+        let shows_derive = self.shows_derive_checkbox();
+        if row == cb_row && (self.show_apply_to_base || shows_derive) {
+            if self.show_apply_to_base && shows_derive {
+                // Both checkboxes share the row:
+                // "[ ] Apply to Base (1:Menu) [F2]" at ox + 1..ox + 32
+                // "[ ] Derive From Background Image [F3]" at ox + 33..ox + 70
+                if col > ox && col < ox + 32 {
+                    self.apply_to_base = !self.apply_to_base;
+                    return None;
+                }
+                if col >= ox + 33 && col < ox + 70 {
+                    self.toggle_derive_from_bg();
+                    return None;
+                }
+            } else if self.show_apply_to_base {
+                let cb_x = ox + 2;
+                let cb_w = 32_u16;
+                if col >= cb_x && col < cb_x + cb_w {
+                    self.apply_to_base = !self.apply_to_base;
+                    return None;
+                }
+            } else if shows_derive {
+                let cb_x = ox + 2;
+                let cb_w = 38_u16;
+                if col >= cb_x && col < cb_x + cb_w {
+                    self.toggle_derive_from_bg();
+                    return None;
+                }
             }
         }
 
@@ -550,10 +778,18 @@ impl ColorPickerModal {
                 let gx = ox + 2;
                 let gy = oy + 2;
                 if col >= gx && col < gx + (16 * 3) && row >= gy && row < gy + 16 {
-                    let cell_x = ((col - gx) / 3) as u8;
-                    let cell_y = (row - gy) as u8;
-                    let code = cell_y * 16 + cell_x;
-                    self.sync_from_256(code);
+                    let cell_x = ((col - gx) / 3) as usize;
+                    let cell_y = (row - gy) as usize;
+                    let idx = cell_y * 16 + cell_x;
+                    if self.derive_from_bg && !self.bg_palette_256.is_empty() {
+                        if let Some(&code) = self.bg_palette_256.get(idx) {
+                            self.bg_selected_256_idx = idx;
+                            self.sync_from_256(code);
+                            return Some(Some(self.current_color));
+                        }
+                        return None;
+                    }
+                    self.sync_from_256(idx as u8);
                     return Some(Some(self.current_color));
                 }
                 let info_x = gx + 50;
@@ -564,6 +800,28 @@ impl ColorPickerModal {
                 }
             }
             ColorPickerTab::TrueColorHsv => {
+                if self.derive_from_bg && !self.bg_palette_rgb.is_empty() {
+                    let gx = ox + 2;
+                    let gy = oy + 2;
+                    if col >= gx && col < gx + (16 * 3) && row >= gy && row < gy + 16 {
+                        let cell_x = ((col - gx) / 3) as usize;
+                        let cell_y = (row - gy) as usize;
+                        let idx = cell_y * 16 + cell_x;
+                        if let Some(&(r, g, b)) = self.bg_palette_rgb.get(idx) {
+                            self.bg_selected_rgb_idx = idx;
+                            self.sync_from_rgb(r, g, b);
+                            return Some(Some(self.current_color));
+                        }
+                        return None;
+                    }
+                    let info_x = gx + 50;
+                    let info_y = gy + 2;
+                    if row == info_y + 8 && col >= info_x && col < info_x + 16 {
+                        self.current_color = Color::Reset;
+                        return Some(Some(Color::Reset));
+                    }
+                    return None;
+                }
                 let canvas_x = ox + 2;
                 let canvas_y = oy + 2;
                 let canvas_w = 32u16;
@@ -762,20 +1020,44 @@ impl ColorPickerModal {
             ColorPickerTab::HexInput => self.render_hex_view(inner, styles, buf),
         }
 
-        // 3. Render optional "[ ] Apply to Base (1:Menu)  [F2]" checkbox when editing non-base tab
-        if self.show_apply_to_base && inner.height >= 4 {
+        // 3. Render optional checkboxes on row inner.height - 2
+        let shows_derive = self.shows_derive_checkbox();
+        if (self.show_apply_to_base || shows_derive) && inner.height >= 4 {
             let cb_row = inner.y + inner.height.saturating_sub(2);
-            let cb_x = inner.x + 2;
-            let mark = if self.apply_to_base { "x" } else { " " };
-            let cb_text = format!("[{}] Apply to Base (1:Menu)  [F2]", mark);
-            let cb_style = if self.apply_to_base {
+            let base_mark = if self.apply_to_base { "x" } else { " " };
+            let derive_mark = if self.derive_from_bg { "x" } else { " " };
+            let base_style = if self.apply_to_base {
                 styles.accent.add_modifier(Modifier::BOLD)
             } else {
                 styles.text
             };
-            let max_w = inner.width.saturating_sub(4) as usize;
-            let clipped: String = cb_text.chars().take(max_w).collect();
-            buf.set_string(cb_x, cb_row, &clipped, cb_style);
+            let derive_style = if self.derive_from_bg {
+                styles.accent.add_modifier(Modifier::BOLD)
+            } else {
+                styles.text
+            };
+            let right_end = inner.x + inner.width;
+            if self.show_apply_to_base && shows_derive {
+                let base_text = format!("[{}] Apply to Base (1:Menu) [F2]", base_mark);
+                let derive_text = format!("[{}] Derive From Background Image [F3]", derive_mark);
+                buf.set_string(inner.x + 1, cb_row, &base_text, base_style);
+                let dx = inner.x + 33;
+                if dx < right_end {
+                    let max_w = (right_end - dx) as usize;
+                    let clipped: String = derive_text.chars().take(max_w).collect();
+                    buf.set_string(dx, cb_row, &clipped, derive_style);
+                }
+            } else if self.show_apply_to_base {
+                let cb_text = format!("[{}] Apply to Base (1:Menu)  [F2]", base_mark);
+                let max_w = inner.width.saturating_sub(4) as usize;
+                let clipped: String = cb_text.chars().take(max_w).collect();
+                buf.set_string(inner.x + 2, cb_row, &clipped, base_style);
+            } else if shows_derive {
+                let cb_text = format!("[{}] Derive From Background Image  [F3]", derive_mark);
+                let max_w = inner.width.saturating_sub(4) as usize;
+                let clipped: String = cb_text.chars().take(max_w).collect();
+                buf.set_string(inner.x + 2, cb_row, &clipped, derive_style);
+            }
         }
 
         (inner, (inner.x, inner.y))
@@ -784,14 +1066,24 @@ impl ColorPickerModal {
     fn render_palette_view(&self, inner: Rect, styles: &ResolvedThemeStyles, buf: &mut Buffer) {
         let grid_x = inner.x + 2;
         let grid_y = inner.y + 2;
+        let use_bg = self.derive_from_bg && !self.bg_palette_256.is_empty();
 
         for row in 0..16u8 {
             for col in 0..16u8 {
-                let code = row * 16 + col;
+                let slot = (row as usize) * 16 + (col as usize);
                 let px = grid_x + (col as u16 * 3);
                 let py = grid_y + row as u16;
 
-                let is_selected = code == self.selected_256;
+                let (code, is_selected) = if use_bg {
+                    let Some(&c) = self.bg_palette_256.get(slot) else {
+                        continue;
+                    };
+                    (c, slot == self.bg_selected_256_idx)
+                } else {
+                    let c = slot as u8;
+                    (c, c == self.selected_256)
+                };
+
                 let (cell_str, cell_style) = if is_selected {
                     let (r, g, b) = color_to_rgb(Color::Indexed(code));
                     let lum = (r as u32 * 299 + g as u32 * 587 + b as u32 * 114) / 1000;
@@ -823,7 +1115,12 @@ impl ColorPickerModal {
         let info_y = grid_y + 2;
         let (r, g, b) = color_to_rgb(Color::Indexed(self.selected_256));
 
-        buf.set_string(info_x, info_y, "Swatch:", styles.gutter);
+        buf.set_string(
+            info_x,
+            info_y,
+            if use_bg { "Swatch (Image):" } else { "Swatch:" },
+            styles.gutter,
+        );
         if self.current_color == Color::Reset {
             buf.set_string(
                 info_x,
@@ -919,7 +1216,127 @@ impl ColorPickerModal {
         );
     }
 
+    /// Renders the 16x16 TrueColor swatch grid derived from the background image.
+    fn render_rgb_swatch_grid(&self, inner: Rect, styles: &ResolvedThemeStyles, buf: &mut Buffer) {
+        let grid_x = inner.x + 2;
+        let grid_y = inner.y + 2;
+
+        for row in 0..16u8 {
+            for col in 0..16u8 {
+                let slot = (row as usize) * 16 + (col as usize);
+                let Some(&(r, g, b)) = self.bg_palette_rgb.get(slot) else {
+                    continue;
+                };
+                let px = grid_x + (col as u16 * 3);
+                let py = grid_y + row as u16;
+                let bg = Color::Rgb(r, g, b);
+                let is_selected = slot == self.bg_selected_rgb_idx;
+                let (cell_str, cell_style) = if is_selected {
+                    let lum = (r as u32 * 299 + g as u32 * 587 + b as u32 * 114) / 1000;
+                    let fg_color = if lum > 128 {
+                        Color::Black
+                    } else {
+                        Color::White
+                    };
+                    (
+                        " X",
+                        Style::default()
+                            .fg(fg_color)
+                            .bg(bg)
+                            .add_modifier(Modifier::BOLD),
+                    )
+                } else {
+                    ("  ", Style::default().bg(bg).fg(Color::Reset))
+                };
+                buf.set_string(px, py, cell_str, cell_style);
+            }
+        }
+
+        // Side preview & info panel
+        let info_x = grid_x + 50;
+        let info_y = grid_y + 2;
+        let (r, g, b) = color_to_rgb(self.current_color);
+
+        buf.set_string(info_x, info_y, "Swatch (Image):", styles.gutter);
+        if self.current_color == Color::Reset {
+            buf.set_string(
+                info_x,
+                info_y + 1,
+                "[Inherit]",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            );
+            buf.set_string(
+                info_x,
+                info_y + 3,
+                "Value: Inherit",
+                Style::default().fg(Color::White),
+            );
+        } else {
+            buf.set_string(
+                info_x,
+                info_y + 1,
+                "████████",
+                Style::default().fg(self.current_color),
+            );
+            buf.set_string(
+                info_x,
+                info_y + 3,
+                format!("Hex: #{r:02x}{g:02x}{b:02x}"),
+                styles.accent.add_modifier(Modifier::BOLD),
+            );
+            buf.set_string(
+                info_x,
+                info_y + 4,
+                format!("R:{:<3} G:{:<3}", r, g),
+                styles.gutter,
+            );
+            buf.set_string(info_x, info_y + 5, format!("B:{:<3}", b), styles.gutter);
+            buf.set_string(
+                info_x,
+                info_y + 6,
+                format!("ANSI: ~{:3}", self.selected_256),
+                styles.gutter,
+            );
+        }
+
+        buf.set_string(
+            info_x,
+            info_y + 8,
+            "[ Inherit (-1) ]",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        );
+
+        let badge_y = inner.y + inner.height.saturating_sub(1);
+        let hint_line = Line::from(vec![
+            Span::styled(" [", styles.border),
+            Span::styled("██", Style::default().fg(self.current_color)),
+            Span::styled("] ", styles.border),
+            Span::styled(
+                format!("#{r:02x}{g:02x}{b:02x}"),
+                styles.accent.add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                "  (Arrows: Swatch | Enter: Select | Del: Inherit | Tab: Modes) ",
+                styles.help_text,
+            ),
+        ]);
+        buf.set_line(
+            inner.x + 2,
+            badge_y,
+            &hint_line,
+            inner.width.saturating_sub(3),
+        );
+    }
+
     fn render_hsv_view(&self, inner: Rect, styles: &ResolvedThemeStyles, buf: &mut Buffer) {
+        if self.derive_from_bg && !self.bg_palette_rgb.is_empty() {
+            self.render_rgb_swatch_grid(inner, styles, buf);
+            return;
+        }
         let canvas_x = inner.x + 2;
         let canvas_y = inner.y + 2;
         let canvas_w = 32u16;
