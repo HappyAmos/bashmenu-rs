@@ -505,14 +505,13 @@ impl NoteViewerModal {
         );
 
         // Render wrapped footer help lines with equal spacing
+        let mut footer_style = styles.help_text;
+        if footer_style.bg.is_none() || footer_style.bg == Some(Color::Reset) {
+            footer_style = footer_style.bg(styles.background);
+        }
         for (idx, line) in footer_lines.iter().enumerate() {
             let footer_x = inner.x + (inner.width.saturating_sub(line.len() as u16) / 2);
-            buf.set_string(
-                footer_x,
-                footer_start_y + idx as u16,
-                line,
-                Style::default().fg(Color::DarkGray),
-            );
+            buf.set_string(footer_x, footer_start_y + idx as u16, line, footer_style);
         }
 
         inner

@@ -18,6 +18,8 @@ pub enum NoteEditorAction {
     Save(String),
     /// Editing was cancelled without saving
     Cancel,
+    /// Display the Markdown syntax reference modal
+    MarkdownReference,
 }
 
 /// A single visual row produced by soft-wrapping a logical line
@@ -465,6 +467,9 @@ impl NoteEditorModal {
         }
 
         match code {
+            KeyCode::F(8) => {
+                return NoteEditorAction::MarkdownReference;
+            }
             KeyCode::Left
             | KeyCode::Right
             | KeyCode::Up
@@ -656,6 +661,7 @@ impl NoteEditorModal {
                 let btn_save = format!("[Ctrl+S] {}", t!("common.buttons.save"));
                 let btn_copy = format!("[Ctrl+C] {}", t!("common.buttons.copy"));
                 let btn_paste = format!("[Ctrl+V] {}", t!("common.buttons.paste"));
+                let btn_md_ref = "[F8] MD Ref";
                 let btn_cancel = format!("[ESC] {}", t!("common.buttons.cancel"));
                 let footer_tokens = [
                     btn_save.as_str(),
@@ -663,6 +669,8 @@ impl NoteEditorModal {
                     btn_copy.as_str(),
                     "|",
                     btn_paste.as_str(),
+                    "|",
+                    btn_md_ref,
                     "|",
                     btn_cancel.as_str(),
                 ];
@@ -684,6 +692,11 @@ impl NoteEditorModal {
                             if let Some(pos) = line_str.find(&btn_save) {
                                 if rel_col >= pos && rel_col < pos + btn_save.len() {
                                     return NoteEditorAction::Save(self.lines.join("\n"));
+                                }
+                            }
+                            if let Some(pos) = line_str.find(btn_md_ref) {
+                                if rel_col >= pos && rel_col < pos + btn_md_ref.len() {
+                                    return NoteEditorAction::MarkdownReference;
                                 }
                             }
                             if let Some(pos) = line_str.find(&btn_cancel) {
@@ -907,6 +920,7 @@ impl NoteEditorModal {
         let btn_save = format!("[Ctrl+S] {}", t!("common.buttons.save"));
         let btn_copy = format!("[Ctrl+C] {}", t!("common.buttons.copy"));
         let btn_paste = format!("[Ctrl+V] {}", t!("common.buttons.paste"));
+        let btn_md_ref = "[F8] MD Ref";
         let btn_cancel = format!("[ESC] {}", t!("common.buttons.cancel"));
         let footer_tokens = [
             btn_save.as_str(),
@@ -914,6 +928,8 @@ impl NoteEditorModal {
             btn_copy.as_str(),
             "|",
             btn_paste.as_str(),
+            "|",
+            btn_md_ref,
             "|",
             btn_cancel.as_str(),
         ];
@@ -1030,14 +1046,13 @@ impl NoteEditorModal {
         );
 
         // Render wrapped footer help lines
+        let mut footer_style = styles.help_text;
+        if footer_style.bg.is_none() || footer_style.bg == Some(Color::Reset) {
+            footer_style = footer_style.bg(styles.background);
+        }
         for (idx, line) in footer_lines.iter().enumerate() {
             let footer_x = inner.x + (inner.width.saturating_sub(line.len() as u16) / 2);
-            buf.set_string(
-                footer_x,
-                footer_start_y + idx as u16,
-                line,
-                Style::default().fg(Color::DarkGray),
-            );
+            buf.set_string(footer_x, footer_start_y + idx as u16, line, footer_style);
         }
 
         // Render scrollbar if note has more lines than window height (content_h)
