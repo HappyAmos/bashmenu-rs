@@ -70,6 +70,8 @@ pub struct StreamOutputModal {
     uses_pty: bool,
     /// Embedded VT100 terminal screen parser when running in PTY mode
     vt_parser: Option<Box<vt100::Parser>>,
+    /// Carry-over bytes for terminal queries split across PTY read chunks
+    vt_query_tail: Vec<u8>,
     /// Scrollback line offset into VT100 history (`0` = live bottom view)
     vt_scrollback: usize,
     /// Duplicated PTY master file handle used for `TIOCSWINSZ` resizes
@@ -96,6 +98,7 @@ impl StreamOutputModal {
             pty_size: (80, 24),
             uses_pty: false,
             vt_parser: None,
+            vt_query_tail: Vec::new(),
             vt_scrollback: 0,
             #[cfg(unix)]
             pty_resize_handle: None,
@@ -157,6 +160,7 @@ impl StreamOutputModal {
         self.is_running = true;
         self.uses_pty = false;
         self.vt_parser = None;
+        self.vt_query_tail.clear();
         self.vt_scrollback = 0;
 
         let cmd_str = self.command.clone();
@@ -260,29 +264,33 @@ impl StreamOutputModal {
     pub fn poll_output(&mut self) -> bool {
         let mut updated = false;
         let mut vt_dirty = false;
+        let mut pending = Vec::new();
         if let Some(ref rx) = self.rx {
             while let Ok(msg) = rx.try_recv() {
-                updated = true;
-                match msg {
-                    StreamOutputMsg::RawBytes(bytes) => {
-                        if let Some(ref mut parser) = self.vt_parser {
-                            parser.process(&bytes);
-                            vt_dirty = true;
-                        } else {
-                            let text = String::from_utf8_lossy(&bytes);
-                            for line in text.lines() {
-                                self.lines.push(line.replace('\t', "    "));
-                            }
+                pending.push(msg);
+            }
+        }
+        for msg in pending {
+            updated = true;
+            match msg {
+                StreamOutputMsg::RawBytes(bytes) => {
+                    if self.vt_parser.is_some() {
+                        self.process_vt_bytes(&bytes);
+                        vt_dirty = true;
+                    } else {
+                        let text = String::from_utf8_lossy(&bytes);
+                        for line in text.lines() {
+                            self.lines.push(line.replace('\t', "    "));
                         }
                     }
-                    StreamOutputMsg::Line(line) => {
-                        self.lines.push(line.replace('\t', "    "));
-                    }
-                    StreamOutputMsg::Finished(code) => {
-                        self.is_running = false;
-                        self.exit_code = code;
-                        vt_dirty = self.vt_parser.is_some();
-                    }
+                }
+                StreamOutputMsg::Line(line) => {
+                    self.lines.push(line.replace('\t', "    "));
+                }
+                StreamOutputMsg::Finished(code) => {
+                    self.is_running = false;
+                    self.exit_code = code;
+                    vt_dirty = self.vt_parser.is_some();
                 }
             }
         }
@@ -301,6 +309,65 @@ impl StreamOutputModal {
             }
         }
         updated
+    }
+
+    /// Feeds PTY output into the embedded `vt100::Parser` while answering
+    /// standard terminal queries (DSR/CPR, DA1/DA2, OSC 10/11) at the exact
+    /// stream position so interactive CLIs (e.g. `gh`, `survey`, `lipgloss`)
+    /// never block waiting for terminal replies.
+    fn process_vt_bytes(&mut self, bytes: &[u8]) {
+        let mut data = if self.vt_query_tail.is_empty() {
+            bytes.to_vec()
+        } else {
+            let mut combined = std::mem::take(&mut self.vt_query_tail);
+            combined.extend_from_slice(bytes);
+            combined
+        };
+        // `vt100` 0.15 handles CSI `H` (CUP) but ignores its alias CSI `f` (HVP),
+        // which CLIs like Go's `survey` (`gh issue create`) emit as `\x1b[999;999f`
+        // right before `\x1b[6n` to probe terminal dimensions.
+        normalize_hvp_to_cup(&mut data);
+
+        let mut i = 0;
+        let mut flushed = 0;
+        while i < data.len() {
+            if data[i] == 0x1b {
+                match match_terminal_query(&data[i..]) {
+                    QueryMatch::Complete { len, kind } => {
+                        let end = i + len;
+                        let reply = if let Some(ref mut parser) = self.vt_parser {
+                            parser.process(&data[flushed..end]);
+                            build_terminal_query_reply(kind, parser.screen().cursor_position())
+                        } else {
+                            None
+                        };
+                        if let (Some(reply_bytes), Some(ref tx)) = (reply, &self.stdin_tx) {
+                            let _ = tx.send(reply_bytes);
+                        }
+                        i = end;
+                        flushed = end;
+                        continue;
+                    }
+                    QueryMatch::Incomplete => {
+                        if flushed < i {
+                            if let Some(ref mut parser) = self.vt_parser {
+                                parser.process(&data[flushed..i]);
+                            }
+                        }
+                        self.vt_query_tail = data[i..].to_vec();
+                        return;
+                    }
+                    QueryMatch::NoMatch => {}
+                }
+            }
+            i += 1;
+        }
+
+        if flushed < data.len() {
+            if let Some(ref mut parser) = self.vt_parser {
+                parser.process(&data[flushed..]);
+            }
+        }
     }
 
     /// Resets VT100 scrollback to live bottom view when the user sends input.
@@ -613,6 +680,119 @@ impl Drop for StreamOutputModal {
     /// Terminates the child streaming process and reader thread upon dropping the modal.
     fn drop(&mut self) {
         self.terminate();
+    }
+}
+
+/// Recognized VT100/xterm terminal queries emitted by interactive CLIs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TerminalQuery {
+    /// CSI `6n` or CSI `?6n` — Cursor Position Report (DSR / CPR)
+    CursorPosition { private: bool },
+    /// CSI `5n` — Device Status Report (Operating Status)
+    DeviceStatus,
+    /// CSI `c` / `0c` — Primary Device Attributes (DA1)
+    PrimaryDeviceAttrs,
+    /// CSI `>c` / `>0c` — Secondary Device Attributes (DA2)
+    SecondaryDeviceAttrs,
+    /// OSC `10;?` — Default foreground color query
+    OscForeground { bel: bool },
+    /// OSC `11;?` — Default background color query
+    OscBackground { bel: bool },
+}
+
+/// Result of matching a slice starting at `0x1b` against known terminal queries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum QueryMatch {
+    Complete { len: usize, kind: TerminalQuery },
+    Incomplete,
+    NoMatch,
+}
+
+/// Static table of terminal query escape sequences and their semantic kinds.
+const TERMINAL_QUERIES: &[(&[u8], TerminalQuery)] = &[
+    (b"\x1b[6n", TerminalQuery::CursorPosition { private: false }),
+    (b"\x1b[?6n", TerminalQuery::CursorPosition { private: true }),
+    (b"\x1b[5n", TerminalQuery::DeviceStatus),
+    (b"\x1b[c", TerminalQuery::PrimaryDeviceAttrs),
+    (b"\x1b[0c", TerminalQuery::PrimaryDeviceAttrs),
+    (b"\x1b[>c", TerminalQuery::SecondaryDeviceAttrs),
+    (b"\x1b[>0c", TerminalQuery::SecondaryDeviceAttrs),
+    (b"\x1b]10;?\x07", TerminalQuery::OscForeground { bel: true }),
+    (
+        b"\x1b]10;?\x1b\\",
+        TerminalQuery::OscForeground { bel: false },
+    ),
+    (b"\x1b]11;?\x07", TerminalQuery::OscBackground { bel: true }),
+    (
+        b"\x1b]11;?\x1b\\",
+        TerminalQuery::OscBackground { bel: false },
+    ),
+];
+
+/// Matches the start of `slice` (which begins with `0x1b`) against known
+/// terminal queries, distinguishing complete matches from truncated prefixes.
+fn match_terminal_query(slice: &[u8]) -> QueryMatch {
+    for &(seq, kind) in TERMINAL_QUERIES {
+        if slice.starts_with(seq) {
+            return QueryMatch::Complete {
+                len: seq.len(),
+                kind,
+            };
+        }
+    }
+    for &(seq, _) in TERMINAL_QUERIES {
+        if seq.starts_with(slice) {
+            return QueryMatch::Incomplete;
+        }
+    }
+    QueryMatch::NoMatch
+}
+
+/// Builds the VT100/xterm reply bytes for a recognized terminal query.
+fn build_terminal_query_reply(kind: TerminalQuery, cursor_pos: (u16, u16)) -> Option<Vec<u8>> {
+    let (row, col) = cursor_pos;
+    match kind {
+        TerminalQuery::CursorPosition { private: false } => {
+            Some(format!("\x1b[{};{}R", row + 1, col + 1).into_bytes())
+        }
+        TerminalQuery::CursorPosition { private: true } => {
+            Some(format!("\x1b[?{};{}R", row + 1, col + 1).into_bytes())
+        }
+        TerminalQuery::DeviceStatus => Some(b"\x1b[0n".to_vec()),
+        TerminalQuery::PrimaryDeviceAttrs => Some(b"\x1b[?62;22c".to_vec()),
+        TerminalQuery::SecondaryDeviceAttrs => Some(b"\x1b[>0;276;0c".to_vec()),
+        TerminalQuery::OscForeground { bel: true } => {
+            Some(b"\x1b]10;rgb:ffff/ffff/ffff\x07".to_vec())
+        }
+        TerminalQuery::OscForeground { bel: false } => {
+            Some(b"\x1b]10;rgb:ffff/ffff/ffff\x1b\\".to_vec())
+        }
+        TerminalQuery::OscBackground { bel: true } => {
+            Some(b"\x1b]11;rgb:0000/0000/0000\x07".to_vec())
+        }
+        TerminalQuery::OscBackground { bel: false } => {
+            Some(b"\x1b]11;rgb:0000/0000/0000\x1b\\".to_vec())
+        }
+    }
+}
+
+/// Rewrites ECMA-48 HVP (`CSI <digits/;> f`) in-place to its exact alias CUP
+/// (`CSI <digits/;> H`) so `vt100::Parser` moves the cursor accurately.
+fn normalize_hvp_to_cup(data: &mut [u8]) {
+    let mut i = 0;
+    while i + 2 < data.len() {
+        if data[i] == 0x1b && data[i + 1] == b'[' {
+            let mut j = i + 2;
+            while j < data.len() && (data[j].is_ascii_digit() || data[j] == b';') {
+                j += 1;
+            }
+            if j < data.len() && data[j] == b'f' {
+                data[j] = b'H';
+                i = j + 1;
+                continue;
+            }
+        }
+        i += 1;
     }
 }
 

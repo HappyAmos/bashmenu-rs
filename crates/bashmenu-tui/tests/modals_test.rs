@@ -2831,3 +2831,88 @@ fn test_stream_output_modal_vt100_interactive_input_and_cursor() {
         modal.lines
     );
 }
+
+#[cfg(unix)]
+#[test]
+fn test_stream_output_modal_answers_dsr_and_osc_queries() {
+    use bashmenu_tui::StreamOutputModal;
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::style::Modifier;
+    use std::time::{Duration, Instant};
+
+    // Simulate `gh issue create` / Go `survey` + `termenv` startup handshake:
+    // 1. Query OSC 11 background color, wait for ST reply
+    // 2. Hide cursor, save cursor, move to bottom-right (999;999), query DSR 6n
+    // 3. Restore cursor, show cursor, print prompt, and read interactive input
+    let script = concat!(
+        "stty -echo -icanon; ",
+        "printf '\\033]11;?\\033\\\\'; ",
+        "IFS= read -r -d '\\\\' osc_reply; ",
+        "printf 'Prompt: \\033[?25l\\0337\\033[999;999f\\033[6n'; ",
+        "IFS= read -r -d 'R' cpr_reply; ",
+        "printf '\\0338\\033[?25h'; ",
+        "stty echo icanon; ",
+        "read -r title; ",
+        "echo \"SIZE=${cpr_reply#*[} TITLE=${title}\""
+    );
+
+    let mut modal =
+        StreamOutputModal::new("Survey Handshake".to_string(), script.to_string(), 65, true);
+    let area = Rect::new(0, 0, 100, 30);
+    modal.resize_for_area(area);
+    modal.start();
+
+    // Wait for the prompt to appear AND cursor to be restored/visible after DSR reply
+    let prompt_deadline = Instant::now() + Duration::from_secs(5);
+    let styles = ResolvedThemeStyles::default();
+    let (dw, dh) = modal.calculate_dialog_dimensions(area);
+    let inner = bashmenu_tui::compute_modal_inner(area, dw, dh);
+    let mut cursor_visible = false;
+    while Instant::now() < prompt_deadline {
+        modal.poll_output();
+        if modal.lines.iter().any(|l| l.contains("Prompt:")) {
+            let mut buf = Buffer::empty(area);
+            modal.render(area, &styles, &mut buf);
+            cursor_visible = (inner.x + 1..inner.x + inner.width - 2)
+                .any(|x| buf[(x, inner.y)].modifier.contains(Modifier::REVERSED));
+            if cursor_visible {
+                break;
+            }
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    assert!(
+        cursor_visible,
+        "After answering OSC 11 and DSR 6n queries, cursor must be visible at prompt (lines: {:?})",
+        modal.lines
+    );
+
+    // Send title input and Enter
+    for ch in "bugfix".chars() {
+        modal.handle_key(KeyEvent::new(KeyCode::Char(ch), KeyModifiers::NONE));
+    }
+    modal.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+
+    let finish_deadline = Instant::now() + Duration::from_secs(5);
+    while modal.is_running && Instant::now() < finish_deadline {
+        modal.poll_output();
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    modal.poll_output();
+
+    assert!(!modal.is_running, "Script must finish after input");
+    assert_eq!(modal.exit_code, Some(0));
+    let joined = modal.lines.join("\n");
+    assert!(
+        joined.contains("TITLE=bugfix"),
+        "Interactive input after DSR handshake must be received (got: {:?})",
+        modal.lines
+    );
+    assert!(
+        joined.contains("SIZE=16;60"),
+        "DSR 6n cursor position reply must report exact VT100 dimensions 16;60 (got: {:?})",
+        modal.lines
+    );
+}
