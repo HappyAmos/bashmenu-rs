@@ -1121,6 +1121,26 @@ impl ThemeEditorState {
     /// Updates a color token entry with a specified Ratatui Color (Indexed, RGB, or named).
     pub fn set_color_token_value(&mut self, key: &str, color: Color) {
         let activity = self.active_activity();
+        self.set_color_token_value_for_activity(key, color, activity);
+    }
+
+    /// Writes `color` to the Base (`1:Menu`) palette instead of the active tab,
+    /// and resets any local override on the current tab to `Inherit` (`-1`) so
+    /// the new base color is immediately visible in the current preview pane.
+    pub fn set_color_token_value_for_base(&mut self, key: &str, color: Color) {
+        self.set_color_token_value_for_activity(key, color, ThemeActivity::MainMenu);
+        if self.active_activity() != ThemeActivity::MainMenu {
+            self.reset_color_token_to_inherit(key);
+        }
+    }
+
+    /// Internal helper to write a color token to a specific `ThemeActivity`.
+    fn set_color_token_value_for_activity(
+        &mut self,
+        key: &str,
+        color: Color,
+        activity: ThemeActivity,
+    ) {
         if self.current_theme.colors_256.is_none() {
             self.current_theme.colors_256 = Some(HashMap::new());
         }

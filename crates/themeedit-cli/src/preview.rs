@@ -265,9 +265,10 @@ pub fn render_preview_pane_with_chrome(
             // Active item: shortcut text adopts highlight text color matching bashmenu
             let ind = &preview_styles.indicator_symbol;
             let active_sc_style = preview_styles.highlight.add_modifier(Modifier::BOLD);
+            let item1_icon = bashmenu_core::format_icon_slot(Some("\u{f135}"), true);
             let mut active_spans = vec![
                 Span::styled(ind, preview_styles.highlight),
-                Span::styled("🚀  ", preview_styles.highlight),
+                Span::styled(item1_icon, preview_styles.highlight),
                 Span::styled("1. ", active_sc_style),
                 Span::styled("Launch Application", preview_styles.highlight),
             ];
@@ -297,9 +298,10 @@ pub fn render_preview_pane_with_chrome(
             }
 
             // Inactive item 2
+            let item2_icon = bashmenu_core::format_icon_slot(Some("\u{f07b}"), true);
             let normal_line = Line::from(vec![
                 Span::raw("  "),
-                Span::styled("📁  ", preview_styles.text),
+                Span::styled(item2_icon, preview_styles.text),
                 Span::styled("2. ", preview_styles.shortcut_key),
                 Span::styled("Browse Directory", preview_styles.text),
                 Span::styled("  »", preview_styles.accent),
@@ -346,9 +348,10 @@ pub fn render_preview_pane_with_chrome(
             }
 
             // Exit item
+            let exit_icon = bashmenu_core::format_icon_slot(Some("\u{f08b}"), true);
             let exit_line = Line::from(vec![
                 Span::raw("  "),
-                Span::styled("❌  ", preview_styles.text),
+                Span::styled(exit_icon, preview_styles.text),
                 Span::styled("4. ", preview_styles.shortcut_key),
                 Span::styled("Exit to Terminal", preview_styles.text),
             ]);
@@ -392,7 +395,7 @@ pub fn render_preview_pane_with_chrome(
                 buf.set_line(p_inner_x, plugin_start_y + 1, &plugin_row1, p_avail_w);
 
                 let plugin_row2 = Line::from(vec![
-                    Span::styled(" 🖥️  CPU: ", preview_styles.plugin),
+                    Span::styled(" \u{f108}  CPU: ", preview_styles.plugin),
                     Span::styled("12%", preview_styles.plugin),
                     Span::styled("  │  Mem: ", preview_styles.plugin),
                     Span::styled("3.8G/16G", preview_styles.plugin),
@@ -769,7 +772,7 @@ pub fn render_preview_pane_with_chrome(
                     r_y += 1;
                 }
                 if r_y < max_y {
-                    buf.set_string(r_x, r_y, "Icon:   [ 💻 ]", preview_styles.text);
+                    buf.set_string(r_x, r_y, "Icon:   [ \u{f120} ]", preview_styles.text);
                     r_y += 1;
                 }
                 if r_y < max_y {

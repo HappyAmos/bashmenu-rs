@@ -130,6 +130,10 @@ pub struct ColorPickerModal {
     pub hex_cursor: usize,
     /// Currently resolved color value
     pub current_color: Color,
+    /// Whether to display the `[ ] Apply to Base (1:Menu)` checkbox
+    pub show_apply_to_base: bool,
+    /// Whether the user checked `[x] Apply to Base (1:Menu)`
+    pub apply_to_base: bool,
 }
 
 impl ColorPickerModal {
@@ -157,7 +161,16 @@ impl ColorPickerModal {
             hex_selected: false,
             hex_cursor: hex_len,
             current_color: initial_color,
+            show_apply_to_base: false,
+            apply_to_base: false,
         }
+    }
+
+    /// Enables or disables the `[ ] Apply to Base (1:Menu)` checkbox option.
+    pub fn with_apply_to_base_option(mut self, enabled: bool) -> Self {
+        self.show_apply_to_base = enabled;
+        self.apply_to_base = false;
+        self
     }
 
     /// Synchronizes current color from HSV components into RGB and hex representation.
@@ -225,6 +238,10 @@ impl ColorPickerModal {
     pub fn handle_key(&mut self, code: KeyCode) -> Option<Option<Color>> {
         match code {
             KeyCode::Esc => Some(None),
+            KeyCode::F(2) if self.show_apply_to_base => {
+                self.apply_to_base = !self.apply_to_base;
+                None
+            }
             KeyCode::Delete => {
                 if self.tab == ColorPickerTab::HexInput {
                     if self.hex_input == "#" {
@@ -516,6 +533,17 @@ impl ColorPickerModal {
             }
         }
 
+        // 1b. Optional "[ ] Apply to Base (1:Menu)  [F2]" checkbox on row inner.height - 2
+        if self.show_apply_to_base {
+            let cb_row = oy + inner_area.height.saturating_sub(2);
+            let cb_x = ox + 2;
+            let cb_w = 32_u16;
+            if row == cb_row && col >= cb_x && col < cb_x + cb_w {
+                self.apply_to_base = !self.apply_to_base;
+                return None;
+            }
+        }
+
         // 2. Mode-specific mouse handlers
         match self.tab {
             ColorPickerTab::Palette256 => {
@@ -732,6 +760,22 @@ impl ColorPickerModal {
             ColorPickerTab::Palette256 => self.render_palette_view(inner, styles, buf),
             ColorPickerTab::TrueColorHsv => self.render_hsv_view(inner, styles, buf),
             ColorPickerTab::HexInput => self.render_hex_view(inner, styles, buf),
+        }
+
+        // 3. Render optional "[ ] Apply to Base (1:Menu)  [F2]" checkbox when editing non-base tab
+        if self.show_apply_to_base && inner.height >= 4 {
+            let cb_row = inner.y + inner.height.saturating_sub(2);
+            let cb_x = inner.x + 2;
+            let mark = if self.apply_to_base { "x" } else { " " };
+            let cb_text = format!("[{}] Apply to Base (1:Menu)  [F2]", mark);
+            let cb_style = if self.apply_to_base {
+                styles.accent.add_modifier(Modifier::BOLD)
+            } else {
+                styles.text
+            };
+            let max_w = inner.width.saturating_sub(4) as usize;
+            let clipped: String = cb_text.chars().take(max_w).collect();
+            buf.set_string(cb_x, cb_row, &clipped, cb_style);
         }
 
         (inner, (inner.x, inner.y))
