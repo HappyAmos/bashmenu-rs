@@ -75,6 +75,7 @@ impl ThemeActivity {
                 "accent",
                 "selection",
                 "selected_tab",
+                "selected_tab_text",
                 "unselected_tab",
                 "line_numbers",
                 "whitespace",
@@ -749,6 +750,13 @@ impl ResolvedThemeStyles {
             .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
         {
             self.selected_tab = merge_style_pair(self.selected_tab, st, Some(Modifier::BOLD));
+        }
+        if let Some(fg) = p
+            .get("selected_tab_text")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_color_value_with_tier(v, tier))
+        {
+            self.selected_tab = self.selected_tab.fg(fg);
         }
         if let Some(st) = p
             .get("unselected_tab")

@@ -473,8 +473,12 @@ impl ThemeEditorState {
                 kind: TokenKind::Color("selection".to_string()),
             },
             TokenItem {
-                label: "Selected Tab Color".to_string(),
+                label: "Selected Tab Background".to_string(),
                 kind: TokenKind::Color("selected_tab".to_string()),
+            },
+            TokenItem {
+                label: "Selected Tab Text".to_string(),
+                kind: TokenKind::Color("selected_tab_text".to_string()),
             },
             TokenItem {
                 label: "Unselected Tab Color".to_string(),
@@ -801,6 +805,10 @@ impl ThemeEditorState {
                 serde_json::Value::Number(255.into()),
                 serde_json::Value::Number(201.into()),
             ]),
+        );
+        colors.insert(
+            "selected_tab_text".to_string(),
+            serde_json::Value::Number(255.into()),
         );
         colors.insert(
             "unselected_tab".to_string(),
@@ -1761,7 +1769,14 @@ impl ThemeEditorState {
                             || (k == "selection"
                                 && (key == "sel" || key == "selection_color" || key == "select"))
                             || (k == "selected_tab"
-                                && (key == "active_tab" || key == "selected_tab_color"))
+                                && (key == "active_tab"
+                                    || key == "selected_tab_color"
+                                    || key == "selected_tab_bg"
+                                    || key == "selected_tab_background"))
+                            || (k == "selected_tab_text"
+                                && (key == "selected_tab_fg"
+                                    || key == "selected_tab_foreground"
+                                    || key == "active_tab_text"))
                             || (k == "unselected_tab"
                                 && (key == "inactive_tab" || key == "unselected_tab_color"))
                             || (k == "line_numbers"
@@ -1935,9 +1950,14 @@ fn format_yaml_token_display(
             return Some(s);
         }
     }
-    if key == "highlight_text" {
-        if let Some(hl_val) = find_tier_token_value(c_map, activity, "highlight") {
-            if let Some(fg_val) = hl_val.as_array().and_then(|s| s.first()) {
+    if key == "highlight_text" || key == "selected_tab_text" {
+        let pair_key = if key == "highlight_text" {
+            "highlight"
+        } else {
+            "selected_tab"
+        };
+        if let Some(pair_val) = find_tier_token_value(c_map, activity, pair_key) {
+            if let Some(fg_val) = pair_val.as_array().and_then(|s| s.first()) {
                 if let Some(s) = format_yaml_scalar_value(fg_val) {
                     return Some(s);
                 }
@@ -1972,7 +1992,12 @@ fn resolve_activity_color(theme: &Theme, activity: ThemeActivity, key: &str) -> 
     let styles = ResolvedThemeStyles::from_theme_for_activity(theme, true, activity);
     if let Some(c_map) = &theme.colors_256 {
         let check_act = |act: ThemeActivity| -> Option<Color> {
-            if key == "highlight_text" {
+            if key == "highlight_text" || key == "selected_tab_text" {
+                let pair_key = if key == "highlight_text" {
+                    "highlight"
+                } else {
+                    "selected_tab"
+                };
                 if let Some(val) = find_tier_token_value(c_map, act, key) {
                     if !is_inherited_color_value(val) {
                         if let Some(c) = bashmenu_tui::parse_color_value(val) {
@@ -1982,7 +2007,7 @@ fn resolve_activity_color(theme: &Theme, activity: ThemeActivity, key: &str) -> 
                         }
                     }
                 }
-                if let Some(val) = find_tier_token_value(c_map, act, "highlight") {
+                if let Some(val) = find_tier_token_value(c_map, act, pair_key) {
                     if let Some(fg) = val.as_array().and_then(|s| s.first()) {
                         if !is_inherited_color_value(fg) {
                             if let Some(c) = bashmenu_tui::parse_color_value(fg) {
@@ -2060,6 +2085,7 @@ fn resolve_activity_color(theme: &Theme, activity: ThemeActivity, key: &str) -> 
             .bg
             .or(styles.selected_tab.fg)
             .unwrap_or(Color::Cyan),
+        "selected_tab_text" => styles.selected_tab.fg.unwrap_or(Color::Black),
         "unselected_tab" => styles.unselected_tab.fg.unwrap_or(Color::DarkGray),
         "line_numbers" => styles.line_numbers.fg.unwrap_or(Color::DarkGray),
         "whitespace" => styles.whitespace.fg.unwrap_or(Color::DarkGray),
@@ -2170,14 +2196,19 @@ fn write_color_token_to_tier(
 
     if key == "background" {
         target.insert(key, val);
-    } else if key == "highlight" {
+    } else if key == "highlight" || key == "selected_tab" {
+        let text_key = if key == "highlight" {
+            "highlight_text"
+        } else {
+            "selected_tab_text"
+        };
         let existing_fg = target
-            .get("highlight_text")
+            .get(text_key)
             .filter(|v| !is_inherited_color_value(v))
             .cloned()
             .or_else(|| {
                 target
-                    .get("highlight")
+                    .get(key)
                     .and_then(|v| v.as_array())
                     .and_then(|seq| seq.first())
                     .filter(|v| !is_inherited_color_value(v))
@@ -2197,15 +2228,20 @@ fn write_color_token_to_tier(
             contrast_fg_value(color, tier)
         };
         target.insert(key, serde_json::Value::Array(vec![fg_val, val]));
-    } else if key == "selection" || key == "selected_tab" {
+    } else if key == "selection" {
         let fg_val = contrast_fg_value(color, tier);
         target.insert(key, serde_json::Value::Array(vec![fg_val, val]));
-    } else if key == "highlight_text" {
+    } else if key == "highlight_text" || key == "selected_tab_text" {
+        let pair_key = if key == "highlight_text" {
+            "highlight"
+        } else {
+            "selected_tab"
+        };
         if is_override {
             target.insert(key, val);
         } else {
             let existing_bg = target
-                .get("highlight")
+                .get(pair_key)
                 .and_then(|v| v.as_array())
                 .and_then(|seq| seq.get(1))
                 .cloned()
@@ -2216,7 +2252,7 @@ fn write_color_token_to_tier(
                     }
                 });
             target.insert(
-                "highlight",
+                pair_key,
                 serde_json::Value::Array(vec![val.clone(), existing_bg]),
             );
             target.insert(key, val);
@@ -2240,8 +2276,13 @@ fn reset_tier_token_entry(
         return;
     };
     sub.insert(key.to_string(), inherit_val.clone());
-    if key == "highlight_text" {
-        if let Some(serde_json::Value::Array(seq)) = sub.get_mut("highlight") {
+    if key == "highlight_text" || key == "selected_tab_text" {
+        let pair_key = if key == "highlight_text" {
+            "highlight"
+        } else {
+            "selected_tab"
+        };
+        if let Some(serde_json::Value::Array(seq)) = sub.get_mut(pair_key) {
             if !seq.is_empty() {
                 seq[0] = serde_json::Value::Number((-1).into());
             }
@@ -2517,7 +2558,7 @@ pub fn get_token_preview_spans(
                 spans.push((content_start_y, p_inner_x, p_inner_x + p_avail_w));
             }
         }
-        TokenKind::Color(key) if key == "selected_tab" => {
+        TokenKind::Color(key) if key == "selected_tab" || key == "selected_tab_text" => {
             if let Some(active_tab) = preview_tab_bar_layout(right_area, mode)
                 .into_iter()
                 .find(|t| t.mode == mode)

@@ -2040,7 +2040,9 @@ fn open_selected_token_picker(state: &mut ThemeEditorState, active_modal: &mut A
             } else if key == "modal_cancel_button" {
                 "Pick Modal Cancel Button Color"
             } else if key == "selected_tab" {
-                "Pick Selected Tab Color"
+                "Pick Selected Tab Background Color"
+            } else if key == "selected_tab_text" {
+                "Pick Selected Tab Text Color"
             } else if key == "unselected_tab" {
                 "Pick Unselected Tab Color"
             } else if key == "line_numbers" {

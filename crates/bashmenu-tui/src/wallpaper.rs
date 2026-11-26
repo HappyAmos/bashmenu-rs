@@ -988,6 +988,10 @@ pub fn derive_palette_from_image(
         make_pair(selection_fg as i64, primary_accent as i64),
     );
     colors.insert(
+        "selected_tab_text".to_string(),
+        serde_json::Value::Number((selection_fg as i64).into()),
+    );
+    colors.insert(
         "unselected_tab".to_string(),
         make_pair(gutter_color as i64, -1),
     );
