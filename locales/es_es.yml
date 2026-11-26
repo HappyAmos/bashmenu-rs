@@ -232,6 +232,7 @@ menuedit:
   prop_tabstop: "Tabulación (Tabstop):"
   prop_exec_mode: "Modo de ejecución:"
   prop_window_pct: "% de tamaño de ventana (20-100):"
+  chk_show_command: "Mostrar comando"
   chk_alt_buffer: "Ejecutar en búfer de pantalla alternativo (alt_buffer=true)"
   chk_quiet: "Modo silencioso - Suprimir 'Presione [ENTER] para volver al menú...' (quiet=true)"
   chk_no_formatting: "Deshabilitar formato (no_formatting=true)"

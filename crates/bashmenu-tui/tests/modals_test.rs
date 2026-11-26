@@ -2916,3 +2916,62 @@ fn test_stream_output_modal_answers_dsr_and_osc_queries() {
         modal.lines
     );
 }
+
+#[test]
+fn test_stream_output_modal_show_command_header() {
+    use bashmenu_tui::StreamOutputModal;
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+
+    let area = Rect::new(0, 0, 100, 30);
+    let styles = ResolvedThemeStyles::default();
+
+    // 1. Default (show_command = false): first row inside modal shows output directly
+    let mut hidden = StreamOutputModal::new(
+        "GitHub Issues".to_string(),
+        "gh issue list".to_string(),
+        65,
+        false,
+    );
+    hidden.lines.push("no open issues".to_string());
+    let mut buf_hidden = Buffer::empty(area);
+    hidden.render(area, &styles, &mut buf_hidden);
+    let (dw, dh) = hidden.calculate_dialog_dimensions(area);
+    let inner = bashmenu_tui::compute_modal_inner(area, dw, dh);
+    let row0_hidden: String = (inner.x..inner.x + inner.width)
+        .map(|x| buf_hidden[(x, inner.y)].symbol())
+        .collect();
+    assert!(
+        row0_hidden.contains("no open issues") && !row0_hidden.contains("$ gh issue list"),
+        "When show_command is false, command header must not render (row0: {:?})",
+        row0_hidden
+    );
+
+    // 2. Enabled (show_command = true): top row shows `$ gh issue list`, output moves to row 1
+    let mut shown = StreamOutputModal::new(
+        "GitHub Issues".to_string(),
+        "gh issue list".to_string(),
+        65,
+        true,
+    );
+    shown.set_show_command(true);
+    shown.lines.push("no open issues".to_string());
+    let mut buf_shown = Buffer::empty(area);
+    shown.render(area, &styles, &mut buf_shown);
+    let row0_shown: String = (inner.x..inner.x + inner.width)
+        .map(|x| buf_shown[(x, inner.y)].symbol())
+        .collect();
+    let row1_shown: String = (inner.x..inner.x + inner.width)
+        .map(|x| buf_shown[(x, inner.y + 1)].symbol())
+        .collect();
+    assert!(
+        row0_shown.contains("$ gh issue list"),
+        "When show_command is true, top row must display `$ <command>` (row0: {:?})",
+        row0_shown
+    );
+    assert!(
+        row1_shown.contains("no open issues"),
+        "Output must render immediately below the command header (row1: {:?})",
+        row1_shown
+    );
+}

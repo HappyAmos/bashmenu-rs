@@ -653,6 +653,8 @@ pub enum FocusControl {
     ExecModeSelector,
     /// Input for streaming output window height percentage
     WindowPercentInput,
+    /// Checkbox to display the executed command in floating Streaming/Interactive consoles
+    ShowCommandChk,
     /// Checkbox for alternate screen buffer usage
     AltBufferChk,
     /// Checkbox for quiet/silent execution
@@ -717,6 +719,8 @@ pub struct ItemEditModal {
     pub exec_mode: usize,
     /// Input for streaming window height percentage
     pub window_percent_input: TextInput,
+    /// Checkbox to display the executed command in floating Streaming/Interactive consoles
+    pub show_command: bool,
 
     /// Checkbox for alternate screen buffer
     pub alt_buffer: bool,
@@ -857,6 +861,7 @@ impl ItemEditModal {
             })
             .unwrap_or_else(|| "65".to_string());
 
+        let show_command = item.show_command();
         let alt_buffer = item.alt_buffer.unwrap_or(true);
         let quiet = item.quiet.unwrap_or(false);
         let no_formatting = item
@@ -905,6 +910,7 @@ impl ItemEditModal {
             tabstop_input: TextInput::new(&tabstop_val),
             exec_mode,
             window_percent_input: TextInput::new(&window_percent_val),
+            show_command,
             alt_buffer,
             quiet,
             no_formatting,
@@ -1074,6 +1080,7 @@ impl ItemEditModal {
                 controls.push(FocusControl::ExecModeSelector);
                 if self.exec_mode == 0 || self.exec_mode == 1 {
                     controls.push(FocusControl::WindowPercentInput);
+                    controls.push(FocusControl::ShowCommandChk);
                 }
                 if self.exec_mode == 2 {
                     controls.push(FocusControl::AltBufferChk);
@@ -1371,7 +1378,8 @@ impl ItemEditModal {
                 }
                 _ => {}
             },
-            FocusControl::AltBufferChk
+            FocusControl::ShowCommandChk
+            | FocusControl::AltBufferChk
             | FocusControl::QuietChk
             | FocusControl::NoFormattingChk
             | FocusControl::MaskedChk
@@ -1517,6 +1525,7 @@ impl ItemEditModal {
     /// Toggles the boolean state of the checkbox control corresponding to `ctrl`.
     pub fn toggle_checkbox(&mut self, ctrl: FocusControl) {
         match ctrl {
+            FocusControl::ShowCommandChk => self.show_command = !self.show_command,
             FocusControl::AltBufferChk => self.alt_buffer = !self.alt_buffer,
             FocusControl::QuietChk => self.quiet = !self.quiet,
             FocusControl::NoFormattingChk => self.no_formatting = !self.no_formatting,
@@ -1985,6 +1994,10 @@ impl ItemEditModal {
                     "window_percent".to_string(),
                     serde_json::Value::Number(pct.into()),
                 );
+                item.extra.insert(
+                    "show_command".to_string(),
+                    serde_json::Value::Bool(self.show_command),
+                );
             }
             1 => {
                 item.extra
@@ -2009,6 +2022,10 @@ impl ItemEditModal {
                     "window_percent".to_string(),
                     serde_json::Value::Number(pct.into()),
                 );
+                item.extra.insert(
+                    "show_command".to_string(),
+                    serde_json::Value::Bool(self.show_command),
+                );
             }
             _ => {
                 item.extra
@@ -2018,6 +2035,7 @@ impl ItemEditModal {
                     serde_json::Value::String("console".to_string()),
                 );
                 item.extra.remove("floating");
+                item.extra.remove("show_command");
                 item.interactive = Some(true);
                 item.quiet = Some(self.quiet);
                 item.alt_buffer = Some(self.alt_buffer);
@@ -2307,6 +2325,11 @@ impl ItemEditModal {
                         cursor: self.window_percent_input.cursor,
                         selection: self.window_percent_input.selection_range(),
                         scroll_offset: self.window_percent_input.scroll_offset,
+                    });
+                    form_lines.push(FormRow::Checkbox {
+                        ctrl: FocusControl::ShowCommandChk,
+                        label: t!("menuedit.chk_show_command"),
+                        checked: self.show_command,
                     });
                 }
 
