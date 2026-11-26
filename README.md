@@ -117,7 +117,7 @@ crates/
 └── cheat-cli/        # Interactive 'cheat' cheatsheet lookup binary
 ```
 
-For full architectural details, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).  
+For full architectural details, see [ARCHITECTURE.md](ARCHITECTURE.md).  
 For the complete user manual and specification, see [assets/bashmenu.md](assets/bashmenu.md).
 
 ---
