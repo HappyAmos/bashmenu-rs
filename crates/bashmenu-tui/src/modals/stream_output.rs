@@ -4,19 +4,21 @@ use super::frame::{is_close_button_clicked, render_modal_frame};
 use crate::ansi::ansi_to_line;
 use crate::style::ResolvedThemeStyles;
 use bashmenu_core::t;
-use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::process::{Command, Stdio};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 
 /// Messages emitted by the background streaming process
 pub enum StreamOutputMsg {
-    /// A line of standard output or error received from child process
+    /// A completed line of standard output or error received from child process
     Line(String),
+    /// An in-progress line without a trailing newline (e.g., interactive prompt)
+    PartialLine(String),
     /// Child process has exited with optional status code
     Finished(Option<i32>),
 }
@@ -56,6 +58,12 @@ pub struct StreamOutputModal {
     rx: Option<Receiver<StreamOutputMsg>>,
     /// Sender channel for delivering interactive keyboard input to child stdin
     stdin_tx: Option<Sender<Vec<u8>>>,
+    /// Target PTY dimensions `(cols, rows)` used when allocating an interactive PTY
+    pty_size: (u16, u16),
+    /// Whether the running child process is attached to a PTY
+    uses_pty: bool,
+    /// Whether the last entry in `lines` is an in-progress partial line (no trailing newline yet)
+    has_partial_line: bool,
 }
 
 impl StreamOutputModal {
@@ -74,10 +82,23 @@ impl StreamOutputModal {
             child_pid: None,
             rx: None,
             stdin_tx: None,
+            pty_size: (80, 24),
+            uses_pty: false,
+            has_partial_line: false,
         }
     }
 
-    /// Spawns the background command process and begins streaming stdout/stderr
+    /// Sets the target PTY dimensions `(cols, rows)` before [`Self::start`] is called.
+    pub fn set_pty_size(&mut self, cols: u16, rows: u16) {
+        self.pty_size = (cols.max(20), rows.max(4));
+    }
+
+    /// Spawns the background command process and begins streaming stdout/stderr.
+    ///
+    /// When `self.interactive` is `true` on Unix, allocates a real POSIX PTY so
+    /// TTY-aware CLIs (such as `gh`, `git`, `cargo`, and interactive prompts)
+    /// behave naturally; falls back to standard pipes if PTY allocation fails
+    /// or when `self.interactive` is `false`.
     pub fn start(&mut self) {
         if self.is_running {
             return;
@@ -88,8 +109,54 @@ impl StreamOutputModal {
         self.rx = Some(msg_rx);
         self.stdin_tx = Some(in_tx);
         self.is_running = true;
+        self.uses_pty = false;
+        self.has_partial_line = false;
 
         let cmd_str = self.command.clone();
+
+        #[cfg(unix)]
+        if self.interactive {
+            let (cols, rows) = self.pty_size;
+            if let Ok((mut child, master_file)) = spawn_unix_pty(&cmd_str, cols, rows) {
+                self.child_pid = Some(child.id());
+                self.uses_pty = true;
+
+                if let Ok(mut writer) = master_file.try_clone() {
+                    thread::spawn(move || {
+                        while let Ok(bytes) = in_rx.recv() {
+                            if writer.write_all(&bytes).is_err() || writer.flush().is_err() {
+                                break;
+                            }
+                        }
+                    });
+                }
+
+                let msg_sender = msg_tx.clone();
+                thread::spawn(move || {
+                    let mut reader = master_file;
+                    let mut buf = [0u8; 4096];
+                    let mut pending = String::new();
+                    loop {
+                        match reader.read(&mut buf) {
+                            Ok(0) => break,
+                            Ok(n) => {
+                                let chunk = String::from_utf8_lossy(&buf[..n]);
+                                emit_pty_chunk(&mut pending, &chunk, &msg_sender);
+                            }
+                            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                            Err(_) => break, // EIO is standard EOF when slave PTY closes on Linux
+                        }
+                    }
+                    if !pending.is_empty() {
+                        let _ = msg_sender.send(StreamOutputMsg::Line(pending));
+                    }
+                    let status = child.wait().ok();
+                    let code = status.and_then(|s| s.code());
+                    let _ = msg_sender.send(StreamOutputMsg::Finished(code));
+                });
+                return;
+            }
+        }
 
         let spawn_res = Command::new("/bin/bash")
             .arg("-c")
@@ -148,11 +215,35 @@ impl StreamOutputModal {
                 updated = true;
                 match msg {
                     StreamOutputMsg::Line(line) => {
-                        self.lines.push(line.replace('\t', "    "));
+                        let clean = line.replace('\t', "    ");
+                        if self.has_partial_line {
+                            if let Some(last) = self.lines.last_mut() {
+                                *last = clean;
+                            } else {
+                                self.lines.push(clean);
+                            }
+                            self.has_partial_line = false;
+                        } else {
+                            self.lines.push(clean);
+                        }
+                    }
+                    StreamOutputMsg::PartialLine(line) => {
+                        let clean = line.replace('\t', "    ");
+                        if self.has_partial_line {
+                            if let Some(last) = self.lines.last_mut() {
+                                *last = clean;
+                            } else {
+                                self.lines.push(clean);
+                            }
+                        } else {
+                            self.lines.push(clean);
+                            self.has_partial_line = true;
+                        }
                     }
                     StreamOutputMsg::Finished(code) => {
                         self.is_running = false;
                         self.exit_code = code;
+                        self.has_partial_line = false;
                     }
                 }
             }
@@ -181,6 +272,8 @@ impl StreamOutputModal {
 
     /// Handles keyboard events
     pub fn handle_key(&mut self, key: KeyEvent) -> StreamOutputAction {
+        let is_live_interactive = self.is_running && self.interactive;
+
         match key.code {
             KeyCode::Esc => {
                 self.terminate();
@@ -191,19 +284,37 @@ impl StreamOutputModal {
                     StreamOutputAction::Close
                 } else {
                     if let Some(ref tx) = self.stdin_tx {
-                        let _ = tx.send(b"\n".to_vec());
+                        let nl: &[u8] = if self.uses_pty { b"\r" } else { b"\n" };
+                        let _ = tx.send(nl.to_vec());
                     }
                     StreamOutputAction::None
                 }
             }
-            KeyCode::Up | KeyCode::Char('k') => {
+            KeyCode::Backspace if is_live_interactive => {
+                if let Some(ref tx) = self.stdin_tx {
+                    let _ = tx.send(vec![0x7f]);
+                }
+                StreamOutputAction::None
+            }
+            KeyCode::Up => {
                 self.auto_scroll = false;
                 if self.scroll_offset > 0 {
                     self.scroll_offset = self.scroll_offset.saturating_sub(1);
                 }
                 StreamOutputAction::None
             }
-            KeyCode::Down | KeyCode::Char('j') => {
+            KeyCode::Down => {
+                self.scroll_offset = self.scroll_offset.saturating_add(1);
+                StreamOutputAction::None
+            }
+            KeyCode::Char('k') if !is_live_interactive => {
+                self.auto_scroll = false;
+                if self.scroll_offset > 0 {
+                    self.scroll_offset = self.scroll_offset.saturating_sub(1);
+                }
+                StreamOutputAction::None
+            }
+            KeyCode::Char('j') if !is_live_interactive => {
                 self.scroll_offset = self.scroll_offset.saturating_add(1);
                 StreamOutputAction::None
             }
@@ -225,9 +336,19 @@ impl StreamOutputModal {
                 self.auto_scroll = true;
                 StreamOutputAction::None
             }
-            KeyCode::Char(c) => {
-                if self.is_running && self.interactive {
-                    if let Some(ref tx) = self.stdin_tx {
+            KeyCode::Char(c) if is_live_interactive => {
+                if let Some(ref tx) = self.stdin_tx {
+                    if key.modifiers.contains(KeyModifiers::CONTROL) {
+                        match c.to_ascii_lowercase() {
+                            'c' => {
+                                let _ = tx.send(vec![0x03]);
+                            }
+                            'd' => {
+                                let _ = tx.send(vec![0x04]);
+                            }
+                            _ => {}
+                        }
+                    } else {
                         let mut b = [0u8; 4];
                         let s = c.encode_utf8(&mut b);
                         let _ = tx.send(s.as_bytes().to_vec());
@@ -366,4 +487,107 @@ impl Drop for StreamOutputModal {
     fn drop(&mut self) {
         self.terminate();
     }
+}
+
+/// Splits a raw PTY text chunk into completed lines and in-progress partial lines,
+/// normalizing `\r\n` newlines and standalone `\r` carriage-return overwrites.
+#[cfg(unix)]
+fn emit_pty_chunk(pending: &mut String, chunk: &str, sender: &Sender<StreamOutputMsg>) {
+    let mut chars = chunk.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '\n' => {
+                let line = std::mem::take(pending);
+                let _ = sender.send(StreamOutputMsg::Line(line));
+            }
+            '\r' => {
+                if chars.peek() == Some(&'\n') {
+                    chars.next();
+                    let line = std::mem::take(pending);
+                    let _ = sender.send(StreamOutputMsg::Line(line));
+                } else {
+                    pending.clear();
+                }
+            }
+            '\x08' => {
+                pending.pop();
+            }
+            other => {
+                pending.push(other);
+            }
+        }
+    }
+    if !pending.is_empty() {
+        let _ = sender.send(StreamOutputMsg::PartialLine(pending.clone()));
+    }
+}
+
+/// Allocates a POSIX pseudo-terminal and spawns `/bin/bash -c <cmd_str>` attached to it.
+#[cfg(unix)]
+fn spawn_unix_pty(
+    cmd_str: &str,
+    cols: u16,
+    rows: u16,
+) -> std::io::Result<(std::process::Child, std::fs::File)> {
+    use std::ffi::{CStr, CString};
+    use std::os::unix::io::FromRawFd;
+    use std::os::unix::process::CommandExt;
+
+    let master_fd = unsafe { libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY) };
+    if master_fd < 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    // Wrap immediately so any early error closes master_fd cleanly
+    let master_file = unsafe { std::fs::File::from_raw_fd(master_fd) };
+
+    if unsafe { libc::grantpt(master_fd) } != 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    if unsafe { libc::unlockpt(master_fd) } != 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+
+    let slave_path_ptr = unsafe { libc::ptsname(master_fd) };
+    if slave_path_ptr.is_null() {
+        return Err(std::io::Error::last_os_error());
+    }
+    let slave_path = unsafe { CStr::from_ptr(slave_path_ptr) }.to_owned();
+    let slave_cstr = CString::new(slave_path.as_bytes())
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
+
+    let ws = libc::winsize {
+        ws_row: rows.max(4),
+        ws_col: cols.max(20),
+        ws_xpixel: 0,
+        ws_ypixel: 0,
+    };
+    let _ = unsafe { libc::ioctl(master_fd, libc::TIOCSWINSZ as _, &ws) };
+
+    let slave_fd = unsafe { libc::open(slave_cstr.as_ptr(), libc::O_RDWR | libc::O_NOCTTY) };
+    if slave_fd < 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    let slave_stdin = unsafe { std::fs::File::from_raw_fd(slave_fd) };
+    let slave_stdout = slave_stdin.try_clone()?;
+    let slave_stderr = slave_stdin.try_clone()?;
+
+    let mut cmd = Command::new("/bin/bash");
+    cmd.arg("-c")
+        .arg(cmd_str)
+        .env("TERM", "xterm-256color")
+        .stdin(Stdio::from(slave_stdin))
+        .stdout(Stdio::from(slave_stdout))
+        .stderr(Stdio::from(slave_stderr));
+
+    // Safety: setsid + TIOCSCTTY are async-signal-safe syscalls executed in the child before exec.
+    unsafe {
+        cmd.pre_exec(|| {
+            libc::setsid();
+            let _ = libc::ioctl(0, libc::TIOCSCTTY as _, 0);
+            Ok(())
+        });
+    }
+
+    let child = cmd.spawn()?;
+    Ok((child, master_file))
 }

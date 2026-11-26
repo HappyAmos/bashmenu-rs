@@ -2699,3 +2699,62 @@ fn test_notes_modals_footer_uses_theme_help_text_and_f8_markdown_ref() {
         "HelpModal help gutter must use styles.help_text foreground color"
     );
 }
+
+#[cfg(unix)]
+#[test]
+fn test_stream_output_modal_interactive_allocates_pty_and_handles_tty() {
+    use bashmenu_tui::StreamOutputModal;
+    use std::time::{Duration, Instant};
+
+    // Interactive mode allocates a real PTY so `[ -t 1 ]` evaluates to true
+    let mut interactive = StreamOutputModal::new(
+        "PTY Check".to_string(),
+        "if [ -t 1 ]; then echo IS_A_TTY; else echo NOT_A_TTY; fi".to_string(),
+        65,
+        true,
+    );
+    interactive.set_pty_size(80, 24);
+    interactive.start();
+
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while interactive.is_running && Instant::now() < deadline {
+        interactive.poll_output();
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    interactive.poll_output();
+
+    assert!(!interactive.is_running, "PTY command must finish cleanly");
+    assert_eq!(interactive.exit_code, Some(0));
+    assert!(
+        interactive.lines.iter().any(|l| l.contains("IS_A_TTY")),
+        "Interactive StreamOutputModal must allocate a PTY (got: {:?})",
+        interactive.lines
+    );
+
+    // Non-interactive stream mode continues using pipes (`[ -t 1 ]` is false)
+    let mut non_interactive = StreamOutputModal::new(
+        "Pipe Check".to_string(),
+        "if [ -t 1 ]; then echo IS_A_TTY; else echo NOT_A_TTY; fi".to_string(),
+        65,
+        false,
+    );
+    non_interactive.start();
+
+    let deadline2 = Instant::now() + Duration::from_secs(5);
+    while non_interactive.is_running && Instant::now() < deadline2 {
+        non_interactive.poll_output();
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    non_interactive.poll_output();
+
+    assert!(!non_interactive.is_running);
+    assert_eq!(non_interactive.exit_code, Some(0));
+    assert!(
+        non_interactive
+            .lines
+            .iter()
+            .any(|l| l.contains("NOT_A_TTY")),
+        "Non-interactive StreamOutputModal must remain piped (got: {:?})",
+        non_interactive.lines
+    );
+}
