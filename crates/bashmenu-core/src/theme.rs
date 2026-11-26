@@ -20,7 +20,11 @@ pub const ACTIVITY_OVERRIDE_KEYS: [&str; 6] = [
 pub fn is_scalar_color_token(token: &str) -> bool {
     matches!(
         token,
-        "background" | "highlight_text" | "selected_tab_text" | "input_box_text"
+        "background"
+            | "highlight_text"
+            | "selected_tab_text"
+            | "input_box_text"
+            | "input_box_unfocused_text"
     )
 }
 
@@ -68,6 +72,8 @@ pub fn activity_override_tokens(activity_key: &str) -> &'static [&'static str] {
             "modal_cancel_button",
             "input_box",
             "input_box_text",
+            "input_box_unfocused",
+            "input_box_unfocused_text",
             "window_close_button",
         ],
         "menuedit" => &[
@@ -120,6 +126,8 @@ pub fn activity_override_tokens(activity_key: &str) -> &'static [&'static str] {
             "unselected_tab",
             "input_box",
             "input_box_text",
+            "input_box_unfocused",
+            "input_box_unfocused_text",
             "shortcut_key",
             "help_text",
             "gutter",
@@ -590,6 +598,11 @@ impl Theme {
         colors.insert(
             "input_box_text".to_string(),
             serde_json::Value::Number(255.into()),
+        );
+        colors.insert("input_box_unfocused".to_string(), make_pair(248, 234));
+        colors.insert(
+            "input_box_unfocused_text".to_string(),
+            serde_json::Value::Number(248.into()),
         );
         colors.insert("modal_no_button".to_string(), make_pair(203, -1));
         colors.insert("modal_cancel_button".to_string(), make_pair(245, -1));

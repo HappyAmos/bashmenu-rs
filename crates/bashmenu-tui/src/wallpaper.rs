@@ -997,6 +997,14 @@ pub fn derive_palette_from_image(
         serde_json::Value::Number((text_fg as i64).into()),
     );
     colors.insert(
+        "input_box_unfocused".to_string(),
+        make_pair(gutter_color as i64, 234),
+    );
+    colors.insert(
+        "input_box_unfocused_text".to_string(),
+        serde_json::Value::Number((gutter_color as i64).into()),
+    );
+    colors.insert(
         "unselected_tab".to_string(),
         make_pair(gutter_color as i64, -1),
     );

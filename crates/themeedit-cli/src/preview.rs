@@ -108,6 +108,28 @@ pub fn render_preview_pane_with_base(
     base_styles: &ResolvedThemeStyles,
     wp_compositor: &mut Option<WallpaperCompositor>,
 ) {
+    render_preview_pane_with_chrome(
+        right_area,
+        buf,
+        mode,
+        preview_styles,
+        base_styles,
+        preview_styles,
+        wp_compositor,
+    );
+}
+
+/// Renders the preview pane with `chrome_styles` styling the navigable tab bar
+/// header while `preview_styles` / `base_styles` render the faux preview body.
+pub fn render_preview_pane_with_chrome(
+    right_area: Rect,
+    buf: &mut Buffer,
+    mode: PreviewMode,
+    preview_styles: &ResolvedThemeStyles,
+    base_styles: &ResolvedThemeStyles,
+    chrome_styles: &ResolvedThemeStyles,
+    wp_compositor: &mut Option<WallpaperCompositor>,
+) {
     if right_area.width < 10 || right_area.height < 6 {
         return;
     }
@@ -121,19 +143,19 @@ pub fn render_preview_pane_with_base(
 
     let mut title_spans = Vec::with_capacity(tabs.len() * 2 + 3);
     title_spans.push(Span::styled("─", Style::default().fg(canvas_styles.border)));
-    title_spans.push(Span::styled("[ ", canvas_styles.title));
+    title_spans.push(Span::styled("[ ", chrome_styles.title));
     for (idx, tab) in tabs.iter().enumerate() {
         if idx > 0 {
-            title_spans.push(Span::styled(" | ", canvas_styles.title));
+            title_spans.push(Span::styled(" | ", chrome_styles.title));
         }
         let tab_style = if tab.mode == mode {
-            canvas_styles.selected_tab.add_modifier(Modifier::BOLD)
+            chrome_styles.selected_tab.add_modifier(Modifier::BOLD)
         } else {
-            canvas_styles.unselected_tab
+            chrome_styles.unselected_tab
         };
         title_spans.push(Span::styled(tab.label.clone(), tab_style));
     }
-    title_spans.push(Span::styled(" ]", canvas_styles.title));
+    title_spans.push(Span::styled(" ]", chrome_styles.title));
 
     let preview_block = Block::default()
         .borders(Borders::ALL)
@@ -582,19 +604,36 @@ pub fn render_preview_pane_with_base(
                 preview_styles.help_text,
             );
 
-            // Faux text input box ("Example text field" + trailing empty input background)
+            // Focused faux text input box ("Example text field" + trailing empty input background)
             let inp_x = mod_x + 2;
             let inp_w = mod_w.saturating_sub(4) as usize;
-            let demo_text = "Example text field";
-            let padded_input = format!(
+            let focused_demo = "Example text field";
+            let padded_focused = format!(
                 " {:<width$}",
-                demo_text
+                focused_demo
                     .chars()
                     .take(inp_w.saturating_sub(1))
                     .collect::<String>(),
                 width = inp_w.saturating_sub(1)
             );
-            buf.set_string(inp_x, mod_y + 5, &padded_input, preview_styles.input_box);
+            buf.set_string(inp_x, mod_y + 4, &padded_focused, preview_styles.input_box);
+
+            // Unfocused faux text input box ("Unfocused field" + trailing empty input background)
+            let unfocused_demo = "Unfocused field";
+            let padded_unfocused = format!(
+                " {:<width$}",
+                unfocused_demo
+                    .chars()
+                    .take(inp_w.saturating_sub(1))
+                    .collect::<String>(),
+                width = inp_w.saturating_sub(1)
+            );
+            buf.set_string(
+                inp_x,
+                mod_y + 5,
+                &padded_unfocused,
+                preview_styles.input_box_unfocused,
+            );
 
             // Action Buttons: [ Yes ]  [ No ]  [ Cancel ]
             let yes_btn = "[ Yes ]";
