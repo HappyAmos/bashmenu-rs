@@ -1,10 +1,13 @@
 use bashmenu_tui::{
     compute_modal_rect, dim_color, format_pixel_16, format_pixel_32, interpolate_zoom_rect,
-    is_framebuffer_available, ModalAnimation, TransitionEffect, TransitionSpeed,
+    ModalAnimation, TransitionEffect, TransitionSpeed,
 };
 use image::RgbImage;
 use ratatui::layout::Rect;
 use ratatui::style::Color;
+use std::sync::Mutex;
+
+static ENV_LOCK: Mutex<()> = Mutex::new(());
 
 #[test]
 fn test_transition_effect_all_modes() {
@@ -79,6 +82,7 @@ fn test_transition_speed_profiles() {
 
 #[test]
 fn test_transition_dim_color_levels() {
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     std::env::set_var("BASHMENU_COLOR_TIER", "truecolor");
     let base = Color::Rgb(100, 200, 50);
     let dimmed_half = dim_color(base, 0.5);
@@ -133,11 +137,19 @@ fn test_framebuffer_blit_rgb_buffer() {
 
     let mut buf32 = vec![0u8; 4 * 4 * 4];
     bashmenu_tui::framebuffer::blit_rgb_to_buffer(&img, &mut buf32, 4, 4, 16, 32, 16, 8, 0);
-    assert_eq!(buf32.len(), 64);
+    let px0_32 = u32::from_ne_bytes(buf32[0..4].try_into().unwrap());
+    assert_eq!(px0_32, format_pixel_32(0, 0, 50, 16, 8, 0));
+    let last_off_32 = (3 * 4 + 3) * 4;
+    let px_last_32 = u32::from_ne_bytes(buf32[last_off_32..last_off_32 + 4].try_into().unwrap());
+    assert_eq!(px_last_32, format_pixel_32(30, 60, 50, 16, 8, 0));
 
     let mut buf16 = vec![0u8; 4 * 4 * 2];
     bashmenu_tui::framebuffer::blit_rgb_to_buffer(&img, &mut buf16, 4, 4, 8, 16, 11, 5, 0);
-    assert_eq!(buf16.len(), 32);
+    let px0_16 = u16::from_ne_bytes(buf16[0..2].try_into().unwrap());
+    assert_eq!(px0_16, format_pixel_16(0, 0, 50));
+    let last_off_16 = (3 * 4 + 3) * 2;
+    let px_last_16 = u16::from_ne_bytes(buf16[last_off_16..last_off_16 + 2].try_into().unwrap());
+    assert_eq!(px_last_16, format_pixel_16(30, 60, 50));
 }
 
 #[test]
@@ -185,13 +197,8 @@ fn test_compute_modal_rect() {
 }
 
 #[test]
-fn test_is_framebuffer_available_safe_call() {
-    // Should execute safely without panicking in any environment
-    let _ = is_framebuffer_available();
-}
-
-#[test]
 fn test_framebuffer_default_character_and_image_mode_rendering() {
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     use bashmenu_core::{load_menu, WallpaperConfig};
     use bashmenu_tui::framebuffer::render_ratatui_buffer_to_slice;
     use bashmenu_tui::{MenuView, ResolvedThemeStyles};

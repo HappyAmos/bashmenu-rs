@@ -14,8 +14,8 @@ fn test_stress_bmpager_markdown_deep_formatting() {
         md.push_str("- Item with `inline code` and **bold** and *italic*\n\n");
     }
 
-    let mut child = Command::new("cargo")
-        .args(["run", "-p", "bmpager-cli", "--bin", "bmpager", "--", "-m"])
+    let mut child = Command::new(env!("CARGO_BIN_EXE_bmpager"))
+        .arg("-m")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
@@ -34,8 +34,7 @@ fn test_stress_bmpager_markdown_deep_formatting() {
 
 #[test]
 fn test_stress_bmpager_huge_stream_non_tty() {
-    let mut child = Command::new("cargo")
-        .args(["run", "-p", "bmpager-cli", "--bin", "bmpager"])
+    let mut child = Command::new(env!("CARGO_BIN_EXE_bmpager"))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()

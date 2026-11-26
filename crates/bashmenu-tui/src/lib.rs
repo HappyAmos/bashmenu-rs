@@ -88,13 +88,3 @@ pub fn install_panic_hook() {
         default_hook(info);
     }));
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_panic_hook_registration() {
-        install_panic_hook();
-    }
-}

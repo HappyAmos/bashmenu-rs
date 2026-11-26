@@ -209,36 +209,19 @@ fn test_search_nerd_font_and_emoji_menu_item_streaming() {
 }
 
 #[test]
-fn test_inactivity_timeout_timer_reset_contract() {
-    use std::time::{Duration, Instant};
-
+fn test_inactivity_timeout_configured_in_default_config() {
     let repo_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
     let yml_path = repo_root.join("defaults/bashmenu.yml");
     let config = bashmenu_core::load_config(&yml_path).expect("bashmenu.yml must load");
 
-    // Inactivity timeout should be defined in settings
     let timeout = config
         .settings
         .inactivity_timeout
         .as_ref()
         .expect("inactivity_timeout must be configured in bashmenu.yml");
-    let ms = timeout.milliseconds.unwrap_or(0);
-    assert!(ms > 0, "Inactivity timeout ms must be greater than 0");
-
-    // Simulate returning from an external command that ran longer than the timeout
-    let mut last_interaction = Instant::now() - Duration::from_millis(ms + 1000);
     assert!(
-        last_interaction.elapsed().as_millis() >= ms as u128,
-        "Simulated command run exceeds timeout threshold"
-    );
-
-    // Contract: Upon returning from an external command or sub-tool,
-    // last_interaction MUST be reset to Instant::now().
-    last_interaction = Instant::now();
-
-    assert!(
-        last_interaction.elapsed().as_millis() < ms as u128,
-        "Resetting last_interaction prevents immediate screensaver trigger upon return"
+        timeout.milliseconds.unwrap_or(0) > 0,
+        "Inactivity timeout ms must be greater than 0"
     );
 }
 
