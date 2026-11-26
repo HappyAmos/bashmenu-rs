@@ -11,6 +11,14 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Color;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+/// Maximum proxy width (pixels) retained in memory for character-cell
+/// wallpaper compositing (640x360 RGB8 is ~0.69 MiB vs ~25 MiB for 4K).
+pub const WALLPAPER_PROXY_MAX_WIDTH: u32 = 640;
+/// Maximum proxy height (pixels) retained in memory for character-cell
+/// wallpaper compositing.
+pub const WALLPAPER_PROXY_MAX_HEIGHT: u32 = 360;
 
 /// Converts a Ratatui `Color` to an approximate RGB triplet `(r, g, b)`.
 pub fn color_to_rgb(color: Color) -> (u8, u8, u8) {
@@ -243,10 +251,10 @@ pub struct WallpaperCompositor {
     pub config: WallpaperConfig,
     /// Cached filesystem path of the loaded wallpaper image
     cached_path: Option<PathBuf>,
-    /// Decoded source RGB image texture
-    raw_image: Option<RgbImage>,
-    /// Cached pre-rendered wallpaper cell grid
-    cached_grid: Option<WallpaperGrid>,
+    /// Shared proxy RGB image texture capped at `WALLPAPER_PROXY_MAX_WIDTH`x`HEIGHT`
+    raw_image: Option<Arc<RgbImage>>,
+    /// Shared pre-rendered wallpaper cell grid
+    cached_grid: Option<Arc<WallpaperGrid>>,
     /// Cache validation key matching current dimensions, opacity, and theme background
     cached_key: Option<CompositorCacheKey>,
     /// Optional terminal color tier override. Defaults to auto-detection.
@@ -275,6 +283,25 @@ impl WallpaperCompositor {
         }
     }
 
+    /// Returns the dimensions of the cached proxy image, if loaded.
+    pub fn cached_image_dimensions(&self) -> Option<(u32, u32)> {
+        self.raw_image.as_ref().map(|img| img.dimensions())
+    }
+
+    /// Downsamples oversized source images into a compact aspect-preserving
+    /// proxy buffer so steady-state wallpaper RAM stays under ~0.7 MiB.
+    fn downsample_to_proxy(dyn_img: image::DynamicImage) -> RgbImage {
+        if dyn_img.width() > WALLPAPER_PROXY_MAX_WIDTH
+            || dyn_img.height() > WALLPAPER_PROXY_MAX_HEIGHT
+        {
+            dyn_img
+                .thumbnail(WALLPAPER_PROXY_MAX_WIDTH, WALLPAPER_PROXY_MAX_HEIGHT)
+                .to_rgb8()
+        } else {
+            dyn_img.to_rgb8()
+        }
+    }
+
     /// Ensures the source image is loaded from disk into memory.
     fn ensure_image_loaded(&mut self) -> bool {
         let Some(img_str) = &self.config.image else {
@@ -295,17 +322,9 @@ impl WallpaperCompositor {
 
         match image::open(&resolved) {
             Ok(dyn_img) => {
-                let rgb = dyn_img.to_rgb8();
-                // Downsample excessively large 4K/8K images for performance
-                let max_w = 1920;
-                let max_h = 1080;
-                let final_img = if rgb.width() > max_w || rgb.height() > max_h {
-                    imageops::thumbnail(&rgb, max_w, max_h)
-                } else {
-                    rgb
-                };
+                let final_img = Self::downsample_to_proxy(dyn_img);
                 self.cached_path = Some(resolved);
-                self.raw_image = Some(final_img);
+                self.raw_image = Some(Arc::new(final_img));
                 true
             }
             Err(_) => {
@@ -331,7 +350,7 @@ impl WallpaperCompositor {
             return None;
         }
 
-        let raw = self.raw_image.as_ref()?;
+        let raw = self.raw_image.as_deref()?;
         let theme_bg_rgb = color_to_rgb(theme_bg);
         let op = self.config.opacity.clamp(0.0, 1.0);
         let op_int = (op * 1000.0) as u32;
@@ -371,7 +390,7 @@ impl WallpaperCompositor {
         };
 
         if self.cached_key.as_ref() == Some(&key) && self.cached_grid.is_some() {
-            return self.cached_grid.as_ref();
+            return self.cached_grid.as_deref();
         }
 
         let pixel_w = if is_quarterblock {
@@ -568,14 +587,14 @@ impl WallpaperCompositor {
             }
         }
 
-        self.cached_grid = Some(WallpaperGrid {
+        self.cached_grid = Some(Arc::new(WallpaperGrid {
             width,
             height,
             cells,
-        });
+        }));
         self.cached_key = Some(key);
 
-        self.cached_grid.as_ref()
+        self.cached_grid.as_deref()
     }
 }
 
@@ -1338,4 +1357,53 @@ pub fn downsample_palette_to_8(
         out.insert(k.clone(), downsample_color_value_to_8(v));
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_downsample_to_proxy_caps_large_images_and_preserves_aspect() {
+        let large = image::DynamicImage::ImageRgb8(RgbImage::new(1920, 1080));
+        let proxy = WallpaperCompositor::downsample_to_proxy(large);
+        assert!(proxy.width() <= WALLPAPER_PROXY_MAX_WIDTH);
+        assert!(proxy.height() <= WALLPAPER_PROXY_MAX_HEIGHT);
+        assert_eq!(proxy.dimensions(), (640, 360));
+
+        // Portrait image preserves aspect ratio within cap
+        let portrait = image::DynamicImage::ImageRgb8(RgbImage::new(1080, 1920));
+        let portrait_proxy = WallpaperCompositor::downsample_to_proxy(portrait);
+        assert!(portrait_proxy.width() <= WALLPAPER_PROXY_MAX_WIDTH);
+        assert!(portrait_proxy.height() <= WALLPAPER_PROXY_MAX_HEIGHT);
+        assert_eq!(portrait_proxy.height(), 360);
+        assert!(portrait_proxy.width() <= 203 && portrait_proxy.width() >= 202);
+
+        // Smaller image is kept at native resolution
+        let small = image::DynamicImage::ImageRgb8(RgbImage::new(320, 200));
+        let small_proxy = WallpaperCompositor::downsample_to_proxy(small);
+        assert_eq!(small_proxy.dimensions(), (320, 200));
+    }
+
+    #[test]
+    fn test_wallpaper_compositor_clone_shares_arc_buffers() {
+        let mut comp = WallpaperCompositor::new(WallpaperConfig::default());
+        comp.raw_image = Some(Arc::new(RgbImage::new(32, 16)));
+        comp.cached_grid = Some(Arc::new(WallpaperGrid {
+            width: 4,
+            height: 2,
+            cells: Vec::new(),
+        }));
+
+        let cloned = comp.clone();
+        assert!(Arc::ptr_eq(
+            comp.raw_image.as_ref().unwrap(),
+            cloned.raw_image.as_ref().unwrap()
+        ));
+        assert!(Arc::ptr_eq(
+            comp.cached_grid.as_ref().unwrap(),
+            cloned.cached_grid.as_ref().unwrap()
+        ));
+        assert_eq!(cloned.cached_image_dimensions(), Some((32, 16)));
+    }
 }
