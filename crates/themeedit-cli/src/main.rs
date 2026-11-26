@@ -9,8 +9,8 @@ use bashmenu_core::{run_glyphs_search, t, ToastNotification, ToastSeverity, Toas
 use bashmenu_tui::{
     get_marquee_slice, install_panic_hook, AsciiGridModal, BackgroundConfigAction,
     BackgroundConfigModal, BackgroundFocus, ColorPickerModal, ConfirmModal, FilePickerModal,
-    HelpModal, InputModal, MarqueeTracker, ResolvedThemeStyles, TerminalGuard, ThemePickerModal,
-    ToastRack, WallpaperCompositor,
+    HelpModal, InputModal, MarqueeTracker, ResolvedThemeStyles, TerminalGuard, ThemeActivity,
+    ThemePickerModal, ToastRack, WallpaperCompositor,
 };
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers, MouseButton, MouseEventKind};
@@ -23,7 +23,7 @@ use std::time::Duration;
 use themeedit_cli::{
     default_wallpaper_dir, extract_preview_cell_color, extract_preview_color_at, format_color_code,
     get_token_preview_spans, preview_tab_bar_layout, relativize_wallpaper_path,
-    render_preview_pane_with_base, render_root_frame, toast_preview_boxes, EditorChromeTheme,
+    render_preview_pane_with_chrome, render_root_frame, toast_preview_boxes, EditorChromeTheme,
     PreviewMode, ThemeEditorState, TokenKind, TreeRow,
 };
 
@@ -271,6 +271,8 @@ fn main() -> Result<()> {
             state.active_activity(),
         );
         let themeedit_styles = chrome_theme.resolve_styles(true);
+        let toast_styles = chrome_theme.resolve_activity_styles(true, ThemeActivity::Toasts);
+        let modal_styles = chrome_theme.resolve_activity_styles(true, ThemeActivity::Modals);
 
         if need_redraw {
             let wp_cfg = state.current_theme.wallpaper_config();
@@ -339,7 +341,7 @@ fn main() -> Result<()> {
                 let box_style = if is_editing_name {
                     themeedit_styles.input_box
                 } else {
-                    Style::default().fg(Color::Cyan)
+                    themeedit_styles.input_box_unfocused
                 };
                 let inner_w = (input_box_w.saturating_sub(4)) as usize;
                 let chars: Vec<char> = name_str.chars().collect();
@@ -467,12 +469,14 @@ fn main() -> Result<()> {
                 }
 
                 // 2. Render Right Panel: Live Multi-View Preview Block
-                render_preview_pane_with_base(
+                //    (navigable tab bar styled with live configured theme)
+                render_preview_pane_with_chrome(
                     right_area,
                     buf,
                     state.preview_mode,
                     &preview_styles,
                     &base_styles,
+                    &themeedit_styles,
                     &mut wp_compositor,
                 );
 
@@ -538,54 +542,54 @@ fn main() -> Result<()> {
                     );
                 }
 
-                // 4. Render Active Toasts
-                toast_rack.render(area, &themeedit_styles, buf);
+                // 4. Render Active Toasts (using configured theme's Toasts activity)
+                toast_rack.render(area, &toast_styles, buf);
 
-                // 4. Render Active Modal if present
+                // 4. Render Active Modal if present (using configured theme's Modals activity)
                 match &mut active_modal {
                     ActiveModal::ColorPicker(_, modal) => {
-                        let (_, origin) = modal.render(area, &themeedit_styles, buf);
+                        let (_, origin) = modal.render(area, &modal_styles, buf);
                         last_grid_origin = origin;
                     }
                     ActiveModal::AsciiPicker(_, modal) => {
-                        let (_, origin) = modal.render(area, &themeedit_styles, buf);
+                        let (_, origin) = modal.render(area, &modal_styles, buf);
                         last_grid_origin = origin;
                     }
                     ActiveModal::IndicatorInput(modal) => {
-                        modal.render(area, &themeedit_styles, buf);
+                        modal.render(area, &modal_styles, buf);
                     }
                     ActiveModal::DefaultIconInput(modal) => {
-                        modal.render(area, &themeedit_styles, buf);
+                        modal.render(area, &modal_styles, buf);
                     }
                     ActiveModal::SaveAs(modal) => {
-                        modal.render(area, &themeedit_styles, buf);
+                        modal.render(area, &modal_styles, buf);
                     }
                     ActiveModal::NewTheme(modal) => {
-                        modal.render(area, &themeedit_styles, buf);
+                        modal.render(area, &modal_styles, buf);
                     }
                     ActiveModal::ConfirmDelete(modal) => {
-                        modal.render(area, &themeedit_styles, buf);
+                        modal.render(area, &modal_styles, buf);
                     }
                     ActiveModal::ConfirmDerive(modal) => {
-                        modal.render(area, &themeedit_styles, buf);
+                        modal.render(area, &modal_styles, buf);
                     }
                     ActiveModal::ConfirmExit(modal) => {
-                        modal.render(area, &themeedit_styles, buf);
+                        modal.render(area, &modal_styles, buf);
                     }
                     ActiveModal::BackgroundConfig(modal) => {
-                        modal.render(area, &themeedit_styles, buf);
+                        modal.render(area, &modal_styles, buf);
                     }
                     ActiveModal::BackgroundBrowse(_, modal) => {
-                        modal.render(area, &themeedit_styles, buf);
+                        modal.render(area, &modal_styles, buf);
                     }
                     ActiveModal::GlyphSearch(modal) => {
-                        modal.render(area, &themeedit_styles, buf);
+                        modal.render(area, &modal_styles, buf);
                     }
                     ActiveModal::ThemePicker(modal) => {
-                        modal.render(area, &themeedit_styles, buf);
+                        modal.render(area, &modal_styles, buf);
                     }
                     ActiveModal::Help(modal) => {
-                        modal.render(area, &themeedit_styles, buf);
+                        modal.render(area, &modal_styles, buf);
                     }
                     ActiveModal::None => {}
                 }
@@ -2040,9 +2044,13 @@ fn open_selected_token_picker(state: &mut ThemeEditorState, active_modal: &mut A
             } else if key == "modal_cancel_button" {
                 "Pick Modal Cancel Button Color"
             } else if key == "input_box" {
-                "Pick Input Box Background Color"
+                "Pick Input Box Focused Background Color"
             } else if key == "input_box_text" {
-                "Pick Input Box Text Color"
+                "Pick Input Box Focused Text Color"
+            } else if key == "input_box_unfocused" {
+                "Pick Input Box Unfocused Background Color"
+            } else if key == "input_box_unfocused_text" {
+                "Pick Input Box Unfocused Text Color"
             } else if key == "selected_tab" {
                 "Pick Selected Tab Background Color"
             } else if key == "selected_tab_text" {
@@ -2413,7 +2421,7 @@ fn hit_test_preview_with_style(
                     }
                     return Some(("background", row, mod_x + 1, mod_x + mod_w - 1));
                 }
-                if row == mod_y + 5 {
+                if row == mod_y + 4 {
                     let inp_x = mod_x + 2;
                     let inp_end = mod_x + mod_w.saturating_sub(2);
                     if col >= inp_x && col < inp_end {
@@ -2424,6 +2432,20 @@ fn hit_test_preview_with_style(
                             return Some(("input_box_text", row, text_start, text_end));
                         }
                         return Some(("input_box", row, inp_x, inp_end));
+                    }
+                    return Some(("background", row, mod_x + 1, mod_x + mod_w - 1));
+                }
+                if row == mod_y + 5 {
+                    let inp_x = mod_x + 2;
+                    let inp_end = mod_x + mod_w.saturating_sub(2);
+                    if col >= inp_x && col < inp_end {
+                        const UNFOCUSED_TEXT_W: u16 = 15; // "Unfocused field"
+                        let text_start = inp_x + 1;
+                        let text_end = (text_start + UNFOCUSED_TEXT_W).min(inp_end);
+                        if col >= text_start && col < text_end {
+                            return Some(("input_box_unfocused_text", row, text_start, text_end));
+                        }
+                        return Some(("input_box_unfocused", row, inp_x, inp_end));
                     }
                     return Some(("background", row, mod_x + 1, mod_x + mod_w - 1));
                 }
@@ -3223,13 +3245,29 @@ mod tests {
 
         let inp_x = mod_x + 2;
         let inp_end = mod_x + mod_w.saturating_sub(2);
-        // Clicking on "Example text field" -> input_box_text
+        // Row mod_y + 4: focused input box ("Example text field" -> input_box_text, right -> input_box)
         assert_eq!(
-            hit_test_preview(inp_x + 3, mod_y + 5, right_area, PreviewMode::Modals, false)
+            hit_test_preview(inp_x + 3, mod_y + 4, right_area, PreviewMode::Modals, false)
                 .map(|r| r.0),
             Some("input_box_text")
         );
-        // Clicking on trailing empty space to the right -> input_box
+        assert_eq!(
+            hit_test_preview(
+                inp_end - 2,
+                mod_y + 4,
+                right_area,
+                PreviewMode::Modals,
+                false
+            )
+            .map(|r| r.0),
+            Some("input_box")
+        );
+        // Row mod_y + 5: unfocused input box ("Unfocused field" -> input_box_unfocused_text, right -> input_box_unfocused)
+        assert_eq!(
+            hit_test_preview(inp_x + 3, mod_y + 5, right_area, PreviewMode::Modals, false)
+                .map(|r| r.0),
+            Some("input_box_unfocused_text")
+        );
         assert_eq!(
             hit_test_preview(
                 inp_end - 2,
@@ -3239,7 +3277,7 @@ mod tests {
                 false
             )
             .map(|r| r.0),
-            Some("input_box")
+            Some("input_box_unfocused")
         );
     }
 
@@ -3391,7 +3429,7 @@ mod tests {
             Some("background")
         );
         assert_eq!(
-            hit_test_preview(mod_x + 5, mod_y + 4, right_area, PreviewMode::Modals, false)
+            hit_test_preview(mod_x + 5, mod_y + 6, right_area, PreviewMode::Modals, false)
                 .map(|r| r.0),
             Some("background")
         );

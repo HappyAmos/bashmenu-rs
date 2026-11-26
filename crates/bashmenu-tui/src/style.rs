@@ -93,6 +93,8 @@ impl ThemeActivity {
                 "modal_cancel_button",
                 "input_box",
                 "input_box_text",
+                "input_box_unfocused",
+                "input_box_unfocused_text",
                 "toast_info",
                 "toast_warning",
                 "toast_error",
@@ -386,8 +388,10 @@ pub struct ResolvedThemeStyles {
     pub modal_no_button: Style,
     /// Cancel button style in modal dialogs
     pub modal_cancel_button: Style,
-    /// Text input box style (foreground = input_box_text, background = input_box)
+    /// Focused text input box style (fg = input_box_text, bg = input_box)
     pub input_box: Style,
+    /// Unfocused text input box style (fg = input_box_unfocused_text, bg = input_box_unfocused)
+    pub input_box_unfocused: Style,
     /// Active / selected tab style in tabbed interfaces
     pub selected_tab: Style,
     /// Inactive / unselected tab style in tabbed interfaces
@@ -449,6 +453,7 @@ impl Default for ResolvedThemeStyles {
             modal_no_button: Style::default().fg(Color::LightRed),
             modal_cancel_button: Style::default().fg(Color::DarkGray),
             input_box: Style::default().fg(Color::White).bg(Color::Indexed(236)),
+            input_box_unfocused: Style::default().fg(Color::Gray).bg(Color::Indexed(234)),
             selected_tab: Style::default()
                 .fg(Color::Black)
                 .bg(Color::Cyan)
@@ -768,7 +773,11 @@ impl ResolvedThemeStyles {
             .filter(|v| !is_inherited_color_value(v))
             .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
         {
-            self.input_box = merge_style_pair(self.input_box, st, None);
+            let merged = merge_style_pair(self.input_box, st, None);
+            self.input_box = merged;
+            if !is_override && !p.contains_key("input_box_unfocused") {
+                self.input_box_unfocused = merged.add_modifier(Modifier::DIM);
+            }
         }
         if let Some(fg) = p
             .get("input_box_text")
@@ -776,6 +785,24 @@ impl ResolvedThemeStyles {
             .and_then(|v| parse_color_value_with_tier(v, tier))
         {
             self.input_box = self.input_box.fg(fg);
+            if !is_override && !p.contains_key("input_box_unfocused_text") {
+                self.input_box_unfocused =
+                    self.input_box_unfocused.fg(fg).add_modifier(Modifier::DIM);
+            }
+        }
+        if let Some(st) = p
+            .get("input_box_unfocused")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
+        {
+            self.input_box_unfocused = merge_style_pair(self.input_box_unfocused, st, None);
+        }
+        if let Some(fg) = p
+            .get("input_box_unfocused_text")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_color_value_with_tier(v, tier))
+        {
+            self.input_box_unfocused = self.input_box_unfocused.fg(fg);
         }
         if let Some(st) = p
             .get("unselected_tab")

@@ -4,7 +4,7 @@ pub mod preview;
 pub use preview::{
     extract_preview_cell_color, extract_preview_color_at, format_color_code,
     preview_tab_bar_layout, render_preview_pane, render_preview_pane_with_base,
-    toast_preview_boxes, PreviewTabSpan,
+    render_preview_pane_with_chrome, toast_preview_boxes, PreviewTabSpan,
 };
 
 use anyhow::Result;
@@ -545,12 +545,20 @@ impl ThemeEditorState {
                 kind: TokenKind::Color("modal_cancel_button".to_string()),
             },
             TokenItem {
-                label: "Input Box Background".to_string(),
+                label: "Input Box Focused Bg".to_string(),
                 kind: TokenKind::Color("input_box".to_string()),
             },
             TokenItem {
-                label: "Input Box Text".to_string(),
+                label: "Input Box Focused Text".to_string(),
                 kind: TokenKind::Color("input_box_text".to_string()),
+            },
+            TokenItem {
+                label: "Input Box Unfocused Bg".to_string(),
+                kind: TokenKind::Color("input_box_unfocused".to_string()),
+            },
+            TokenItem {
+                label: "Input Box Unfocused Text".to_string(),
+                kind: TokenKind::Color("input_box_unfocused_text".to_string()),
             },
             TokenItem {
                 label: "Line Numbers Color".to_string(),
@@ -828,6 +836,17 @@ impl ThemeEditorState {
         colors.insert(
             "input_box_text".to_string(),
             serde_json::Value::Number(255.into()),
+        );
+        colors.insert(
+            "input_box_unfocused".to_string(),
+            serde_json::Value::Array(vec![
+                serde_json::Value::Number(248.into()),
+                serde_json::Value::Number(234.into()),
+            ]),
+        );
+        colors.insert(
+            "input_box_unfocused_text".to_string(),
+            serde_json::Value::Number(248.into()),
         );
         colors.insert(
             "unselected_tab".to_string(),
@@ -1820,6 +1839,11 @@ impl ThemeEditorState {
                                 && (key == "input_box_fg"
                                     || key == "input_box_foreground"
                                     || key == "input_text"))
+                            || (k == "input_box_unfocused"
+                                && (key == "input_box_unfocused_bg" || key == "unfocused_input_bg"))
+                            || (k == "input_box_unfocused_text"
+                                && (key == "input_box_unfocused_fg"
+                                    || key == "unfocused_input_text"))
                     }
                     TokenKind::Border(k) => {
                         (k == "top_tee" && key == "gutter_top_tee")
@@ -1977,11 +2001,16 @@ fn format_yaml_token_display(
             return Some(s);
         }
     }
-    if key == "highlight_text" || key == "selected_tab_text" || key == "input_box_text" {
+    if key == "highlight_text"
+        || key == "selected_tab_text"
+        || key == "input_box_text"
+        || key == "input_box_unfocused_text"
+    {
         let pair_key = match key {
             "highlight_text" => "highlight",
             "selected_tab_text" => "selected_tab",
-            _ => "input_box",
+            "input_box_text" => "input_box",
+            _ => "input_box_unfocused",
         };
         if let Some(pair_val) = find_tier_token_value(c_map, activity, pair_key) {
             if let Some(fg_val) = pair_val.as_array().and_then(|s| s.first()) {
@@ -2019,11 +2048,16 @@ fn resolve_activity_color(theme: &Theme, activity: ThemeActivity, key: &str) -> 
     let styles = ResolvedThemeStyles::from_theme_for_activity(theme, true, activity);
     if let Some(c_map) = &theme.colors_256 {
         let check_act = |act: ThemeActivity| -> Option<Color> {
-            if key == "highlight_text" || key == "selected_tab_text" || key == "input_box_text" {
+            if key == "highlight_text"
+                || key == "selected_tab_text"
+                || key == "input_box_text"
+                || key == "input_box_unfocused_text"
+            {
                 let pair_key = match key {
                     "highlight_text" => "highlight",
                     "selected_tab_text" => "selected_tab",
-                    _ => "input_box",
+                    "input_box_text" => "input_box",
+                    _ => "input_box_unfocused",
                 };
                 if let Some(val) = find_tier_token_value(c_map, act, key) {
                     if !is_inherited_color_value(val) {
@@ -2051,6 +2085,7 @@ fn resolve_activity_color(theme: &Theme, activity: ThemeActivity, key: &str) -> 
                 || key == "selection"
                 || key == "selected_tab"
                 || key == "input_box"
+                || key == "input_box_unfocused"
             {
                 if let Some(val) = find_tier_token_value(c_map, act, key) {
                     if let Some(seq) = val.as_array() {
@@ -2119,6 +2154,8 @@ fn resolve_activity_color(theme: &Theme, activity: ThemeActivity, key: &str) -> 
         "selected_tab_text" => styles.selected_tab.fg.unwrap_or(Color::Black),
         "input_box" => styles.input_box.bg.unwrap_or(Color::Indexed(236)),
         "input_box_text" => styles.input_box.fg.unwrap_or(Color::White),
+        "input_box_unfocused" => styles.input_box_unfocused.bg.unwrap_or(Color::Indexed(234)),
+        "input_box_unfocused_text" => styles.input_box_unfocused.fg.unwrap_or(Color::Gray),
         "unselected_tab" => styles.unselected_tab.fg.unwrap_or(Color::DarkGray),
         "line_numbers" => styles.line_numbers.fg.unwrap_or(Color::DarkGray),
         "whitespace" => styles.whitespace.fg.unwrap_or(Color::DarkGray),
@@ -2229,11 +2266,16 @@ fn write_color_token_to_tier(
 
     if key == "background" {
         target.insert(key, val);
-    } else if key == "highlight" || key == "selected_tab" || key == "input_box" {
+    } else if key == "highlight"
+        || key == "selected_tab"
+        || key == "input_box"
+        || key == "input_box_unfocused"
+    {
         let text_key = match key {
             "highlight" => "highlight_text",
             "selected_tab" => "selected_tab_text",
-            _ => "input_box_text",
+            "input_box" => "input_box_text",
+            _ => "input_box_unfocused_text",
         };
         let existing_fg = target
             .get(text_key)
@@ -2264,11 +2306,16 @@ fn write_color_token_to_tier(
     } else if key == "selection" {
         let fg_val = contrast_fg_value(color, tier);
         target.insert(key, serde_json::Value::Array(vec![fg_val, val]));
-    } else if key == "highlight_text" || key == "selected_tab_text" || key == "input_box_text" {
+    } else if key == "highlight_text"
+        || key == "selected_tab_text"
+        || key == "input_box_text"
+        || key == "input_box_unfocused_text"
+    {
         let pair_key = match key {
             "highlight_text" => "highlight",
             "selected_tab_text" => "selected_tab",
-            _ => "input_box",
+            "input_box_text" => "input_box",
+            _ => "input_box_unfocused",
         };
         if is_override {
             target.insert(key, val);
@@ -2309,11 +2356,16 @@ fn reset_tier_token_entry(
         return;
     };
     sub.insert(key.to_string(), inherit_val.clone());
-    if key == "highlight_text" || key == "selected_tab_text" || key == "input_box_text" {
+    if key == "highlight_text"
+        || key == "selected_tab_text"
+        || key == "input_box_text"
+        || key == "input_box_unfocused_text"
+    {
         let pair_key = match key {
             "highlight_text" => "highlight",
             "selected_tab_text" => "selected_tab",
-            _ => "input_box",
+            "input_box_text" => "input_box",
+            _ => "input_box_unfocused",
         };
         if let Some(serde_json::Value::Array(seq)) = sub.get_mut(pair_key) {
             if !seq.is_empty() {
@@ -2591,7 +2643,12 @@ pub fn get_token_preview_spans(
                 spans.push((content_start_y, p_inner_x, p_inner_x + p_avail_w));
             }
         }
-        TokenKind::Color(key) if key == "input_box" || key == "input_box_text" => {
+        TokenKind::Color(key)
+            if key == "input_box"
+                || key == "input_box_text"
+                || key == "input_box_unfocused"
+                || key == "input_box_unfocused_text" =>
+        {
             if mode == PreviewMode::Modals {
                 let p_avail_h = right_area.height.saturating_sub(4);
                 let mod_w = (p_avail_w.saturating_sub(4)).clamp(32, 50);
@@ -2600,12 +2657,23 @@ pub fn get_token_preview_spans(
                 let mod_y = content_start_y + (p_avail_h.saturating_sub(mod_h)) / 2;
                 let inp_x = mod_x + 2;
                 let inp_end = mod_x + mod_w.saturating_sub(2);
-                if key == "input_box_text" {
-                    let text_start = inp_x + 1;
-                    let text_end = (text_start + 18).min(inp_end);
-                    spans.push((mod_y + 5, text_start, text_end));
-                } else {
-                    spans.push((mod_y + 5, inp_x, inp_end));
+                match key.as_str() {
+                    "input_box_text" => {
+                        let text_start = inp_x + 1;
+                        let text_end = (text_start + 18).min(inp_end);
+                        spans.push((mod_y + 4, text_start, text_end));
+                    }
+                    "input_box" => {
+                        spans.push((mod_y + 4, inp_x, inp_end));
+                    }
+                    "input_box_unfocused_text" => {
+                        let text_start = inp_x + 1;
+                        let text_end = (text_start + 15).min(inp_end);
+                        spans.push((mod_y + 5, text_start, text_end));
+                    }
+                    _ => {
+                        spans.push((mod_y + 5, inp_x, inp_end));
+                    }
                 }
             }
         }
@@ -3195,11 +3263,16 @@ impl EditorChromeTheme {
 
     /// Resolves `ThemeEdit` activity styles from the isolated chrome theme.
     pub fn resolve_styles(&self, truecolor: bool) -> ResolvedThemeStyles {
-        ResolvedThemeStyles::from_theme_for_activity(
-            &self.theme,
-            truecolor,
-            ThemeActivity::ThemeEdit,
-        )
+        self.resolve_activity_styles(truecolor, ThemeActivity::ThemeEdit)
+    }
+
+    /// Resolves styles for a specific `activity` from the isolated chrome theme.
+    pub fn resolve_activity_styles(
+        &self,
+        truecolor: bool,
+        activity: ThemeActivity,
+    ) -> ResolvedThemeStyles {
+        ResolvedThemeStyles::from_theme_for_activity(&self.theme, truecolor, activity)
     }
 }
 

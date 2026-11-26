@@ -508,11 +508,8 @@ impl BackgroundConfigModal {
         let label_style = Style::default()
             .fg(styles.accent.fg.unwrap_or(Color::Cyan))
             .add_modifier(Modifier::BOLD);
-        let normal_input_style = styles.input_box;
-        let focused_input_style = Style::default()
-            .fg(Color::Black)
-            .bg(styles.highlight.bg.unwrap_or(Color::Yellow))
-            .add_modifier(Modifier::BOLD);
+        let normal_input_style = styles.input_box_unfocused;
+        let focused_input_style = styles.input_box.add_modifier(Modifier::BOLD);
         let btn_normal = Style::default()
             .fg(styles.text.fg.unwrap_or(Color::White))
             .bg(Color::Rgb(45, 48, 58));

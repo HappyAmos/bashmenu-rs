@@ -3499,17 +3499,34 @@ fn test_input_box_tokens_and_modals_preview() {
     let mut state = ThemeEditorState::new(themes_path, Some("dracula".to_string()));
     state.preview_mode = PreviewMode::Modals;
 
-    // Select and customize Input Box Background and Input Box Text independently
+    // Select and customize focused & unfocused Input Box tokens independently
     assert!(state.select_token_by_key("input_box"));
     assert_eq!(
         state.tokens[state.selected_idx].label,
-        "Input Box Background"
+        "Input Box Focused Bg"
     );
     state.set_color_token_value("input_box", Color::Indexed(24));
 
     assert!(state.select_token_by_key("input_box_text"));
-    assert_eq!(state.tokens[state.selected_idx].label, "Input Box Text");
+    assert_eq!(
+        state.tokens[state.selected_idx].label,
+        "Input Box Focused Text"
+    );
     state.set_color_token_value("input_box_text", Color::Indexed(226));
+
+    assert!(state.select_token_by_key("input_box_unfocused"));
+    assert_eq!(
+        state.tokens[state.selected_idx].label,
+        "Input Box Unfocused Bg"
+    );
+    state.set_color_token_value("input_box_unfocused", Color::Indexed(235));
+
+    assert!(state.select_token_by_key("input_box_unfocused_text"));
+    assert_eq!(
+        state.tokens[state.selected_idx].label,
+        "Input Box Unfocused Text"
+    );
+    state.set_color_token_value("input_box_unfocused_text", Color::Indexed(250));
 
     let resolved = ResolvedThemeStyles::from_theme_for_activity(
         &state.current_theme,
@@ -3518,9 +3535,10 @@ fn test_input_box_tokens_and_modals_preview() {
     );
     assert_eq!(resolved.input_box.bg, Some(Color::Indexed(24)));
     assert_eq!(resolved.input_box.fg, Some(Color::Indexed(226)));
+    assert_eq!(resolved.input_box_unfocused.bg, Some(Color::Indexed(235)));
+    assert_eq!(resolved.input_box_unfocused.fg, Some(Color::Indexed(250)));
 
-    // Render 3:Modals preview and verify faux input box displays "Example text field"
-    // with Input Box Text (fg) and Input Box Background (bg), plus trailing empty space
+    // Render 3:Modals preview and verify both focused and unfocused faux input boxes
     let area = Rect::new(0, 0, 96, 24);
     let mut buf = Buffer::empty(area);
     let mut wp = None;
@@ -3537,24 +3555,35 @@ fn test_input_box_tokens_and_modals_preview() {
 
     let inp_x = mod_x + 2;
     let inp_w = mod_w.saturating_sub(4);
-    let inp_row: String = (inp_x..inp_x + inp_w)
+    let focused_row: String = (inp_x..inp_x + inp_w)
+        .map(|x| buf[(x, mod_y + 4)].symbol())
+        .collect();
+    assert!(
+        focused_row.contains("Example text field"),
+        "3:Modals focused faux input box must contain 'Example text field', got: {:?}",
+        focused_row
+    );
+    let unfocused_row: String = (inp_x..inp_x + inp_w)
         .map(|x| buf[(x, mod_y + 5)].symbol())
         .collect();
     assert!(
-        inp_row.contains("Example text field"),
-        "3:Modals faux input box must contain 'Example text field', got: {:?}",
-        inp_row
+        unfocused_row.contains("Unfocused field"),
+        "3:Modals unfocused faux input box must contain 'Unfocused field', got: {:?}",
+        unfocused_row
     );
     assert!(
         inp_w > "Example text field".len() as u16 + 4,
         "Faux input box must leave empty clickable space on the right"
     );
-    // Text cell and trailing empty cell both use input_box fg/bg
-    assert_eq!(buf[(inp_x + 1, mod_y + 5)].fg, Color::Indexed(226));
-    assert_eq!(buf[(inp_x + 1, mod_y + 5)].bg, Color::Indexed(24));
-    assert_eq!(buf[(inp_x + inp_w - 2, mod_y + 5)].bg, Color::Indexed(24));
+    // Focused row uses input_box fg/bg; unfocused row uses input_box_unfocused fg/bg
+    assert_eq!(buf[(inp_x + 1, mod_y + 4)].fg, Color::Indexed(226));
+    assert_eq!(buf[(inp_x + 1, mod_y + 4)].bg, Color::Indexed(24));
+    assert_eq!(buf[(inp_x + inp_w - 2, mod_y + 4)].bg, Color::Indexed(24));
+    assert_eq!(buf[(inp_x + 1, mod_y + 5)].fg, Color::Indexed(250));
+    assert_eq!(buf[(inp_x + 1, mod_y + 5)].bg, Color::Indexed(235));
+    assert_eq!(buf[(inp_x + inp_w - 2, mod_y + 5)].bg, Color::Indexed(235));
 
-    // Flash spans for input_box_text cover text only; input_box covers full box
+    // Flash spans cover the exact rows and text/box widths for all 4 tokens
     assert!(state.select_token_by_key("input_box_text"));
     let txt_spans = get_token_preview_spans(
         &state.tokens[state.selected_idx],
@@ -3562,7 +3591,7 @@ fn test_input_box_tokens_and_modals_preview() {
         PreviewMode::Modals,
         &resolved,
     );
-    assert_eq!(txt_spans, vec![(mod_y + 5, inp_x + 1, inp_x + 1 + 18)]);
+    assert_eq!(txt_spans, vec![(mod_y + 4, inp_x + 1, inp_x + 1 + 18)]);
 
     assert!(state.select_token_by_key("input_box"));
     let bg_spans = get_token_preview_spans(
@@ -3571,7 +3600,25 @@ fn test_input_box_tokens_and_modals_preview() {
         PreviewMode::Modals,
         &resolved,
     );
-    assert_eq!(bg_spans, vec![(mod_y + 5, inp_x, inp_x + inp_w)]);
+    assert_eq!(bg_spans, vec![(mod_y + 4, inp_x, inp_x + inp_w)]);
+
+    assert!(state.select_token_by_key("input_box_unfocused_text"));
+    let u_txt_spans = get_token_preview_spans(
+        &state.tokens[state.selected_idx],
+        area,
+        PreviewMode::Modals,
+        &resolved,
+    );
+    assert_eq!(u_txt_spans, vec![(mod_y + 5, inp_x + 1, inp_x + 1 + 15)]);
+
+    assert!(state.select_token_by_key("input_box_unfocused"));
+    let u_bg_spans = get_token_preview_spans(
+        &state.tokens[state.selected_idx],
+        area,
+        PreviewMode::Modals,
+        &resolved,
+    );
+    assert_eq!(u_bg_spans, vec![(mod_y + 5, inp_x, inp_x + inp_w)]);
 
     // Actual InputModal uses resolved.input_box
     let modal = InputModal::new("Prompt", "Enter value:", "abc");
@@ -3580,4 +3627,66 @@ fn test_input_box_tokens_and_modals_preview() {
     let field_y = iinner.y + 2;
     assert_eq!(ibuf[(iinner.x + 2, field_y)].fg, Color::Indexed(226));
     assert_eq!(ibuf[(iinner.x + 2, field_y)].bg, Color::Indexed(24));
+}
+
+#[test]
+fn test_preview_tab_bar_follows_live_chrome_theme_not_edited_theme() {
+    use bashmenu_tui::{ResolvedThemeStyles, ThemeActivity};
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::style::Color;
+    use themeedit_cli::{
+        preview_tab_bar_layout, render_preview_pane_with_chrome, EditorChromeTheme, PreviewMode,
+    };
+
+    let themes_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(themes_path, Some("dracula".to_string()));
+
+    // Customize dracula's ThemeEdit selected_tab + selected_tab_text and save to chrome snapshot
+    state.preview_mode = PreviewMode::ThemeEditor;
+    state.set_color_token_value("selected_tab", Color::Indexed(196));
+    state.set_color_token_value("selected_tab_text", Color::Indexed(226));
+    let mut chrome = EditorChromeTheme::from_state(&state, Some("dracula"));
+    assert!(chrome.sync_on_save(&state.current_name, &state.current_theme));
+
+    // Switch to another theme and give it totally different tab colors
+    let other_name = state
+        .themes
+        .keys()
+        .find(|n| n.as_str() != "dracula")
+        .expect("Fixture must contain at least two themes")
+        .clone();
+    assert!(state.switch_theme(&other_name));
+    state.set_color_token_value("selected_tab", Color::Indexed(46));
+    state.set_color_token_value("selected_tab_text", Color::Indexed(16));
+
+    let chrome_styles = chrome.resolve_styles(true);
+    let base_styles = ResolvedThemeStyles::from_theme(&state.current_theme, true);
+    let preview_styles = ResolvedThemeStyles::from_theme_for_activity(
+        &state.current_theme,
+        true,
+        ThemeActivity::MainMenu,
+    );
+
+    let area = Rect::new(0, 0, 96, 24);
+    let mut buf = Buffer::empty(area);
+    let mut wp = None;
+    render_preview_pane_with_chrome(
+        area,
+        &mut buf,
+        PreviewMode::Menu,
+        &preview_styles,
+        &base_styles,
+        &chrome_styles,
+        &mut wp,
+    );
+
+    let tabs = preview_tab_bar_layout(area, PreviewMode::Menu);
+    let active_tab = tabs
+        .iter()
+        .find(|t| t.mode == PreviewMode::Menu)
+        .expect("Menu tab must exist");
+    // Active tab bar uses live chrome theme (196 bg / 226 fg), NOT edited theme (46 bg / 16 fg)
+    assert_eq!(buf[(active_tab.x_start, area.y)].bg, Color::Indexed(196));
+    assert_eq!(buf[(active_tab.x_start, area.y)].fg, Color::Indexed(226));
 }

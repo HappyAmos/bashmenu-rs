@@ -66,6 +66,8 @@ const VALID_BASE_COLOR_TOKENS: &[&str] = &[
     "unselected_tab",
     "input_box",
     "input_box_text",
+    "input_box_unfocused",
+    "input_box_unfocused_text",
     "line_numbers",
     "whitespace",
     "shortcut_key",
