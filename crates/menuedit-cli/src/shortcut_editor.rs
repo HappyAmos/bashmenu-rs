@@ -2078,7 +2078,7 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                             let ph_ctx = MacroContext::new(&app_config);
                             let ph_text = render_placeholder_help_text(&ph_ctx);
                             *child_help = Some(
-                                HelpModal::new("BashMenu Placeholders & Macros", &ph_text)
+                                HelpModal::new(t!("bashedit.placeholders_title"), &ph_text)
                                     .with_value_marquee(true),
                             );
                         }
@@ -2347,7 +2347,7 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                                 let ph_ctx = MacroContext::new(&app_config);
                                 let ph_text = render_placeholder_help_text(&ph_ctx);
                                 active_modal = ActiveShortcutModal::Help(
-                                    HelpModal::new("BashMenu Placeholders & Macros", &ph_text)
+                                    HelpModal::new(t!("bashedit.placeholders_title"), &ph_text)
                                         .with_value_marquee(true),
                                 );
                                 continue;
@@ -2467,7 +2467,7 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                             let ph_ctx = MacroContext::new(&app_config);
                             let ph_text = render_placeholder_help_text(&ph_ctx);
                             active_modal = ActiveShortcutModal::Help(
-                                HelpModal::new("BashMenu Placeholders & Macros", &ph_text)
+                                HelpModal::new(t!("bashedit.placeholders_title"), &ph_text)
                                     .with_value_marquee(true),
                             );
                         }

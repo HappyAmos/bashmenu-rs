@@ -338,3 +338,204 @@ ymlcheck:
   valid_shortcuts: "La configuración de atajos es válida."
   valid_locale: "La tabla de cadenas de idioma es válida."
   error_prefix: "Error de validación:"
+
+help:
+  placeholders_body: |-
+    ## Directivas de entrada interactiva
+    | Macro / Marcador | Descripción |
+    | :--- | :--- |
+    | {{param}} | Solicita entrada de texto modal (admite masked=true) |
+    | {{file_picker}} | Abre el selector visual de archivos |
+    | {{file_picker:path:<dir>}} | Selector de archivos en el directorio especificado |
+    | {{file_picker:stem}} | Ruta sin extensión de archivo (/ruta/a/img) |
+    | {{file_picker:name}} | Nombre de archivo con extensión (img.png) |
+    | {{file_picker:base}} | Nombre de archivo sin extensión (img) |
+    | {{file_picker:dir}} | Ruta del directorio padre (/ruta/a) |
+    | {{file_picker:ext}} | Extensión del archivo con punto inicial (.png) |
+    | {{file_picker_new}} | Selector de archivos que permite crear archivos nuevos ('n') |
+    | {{dir_picker}} | Abre el selector visual de directorios |
+    | {{dir_picker:path:<dir>}} | Selector de directorios en la ruta especificada |
+    | {{dir_picker:name}} | Nombre de la carpeta sin ruta padre |
+    | {{dir_picker:dir}} | Ruta del directorio padre de la carpeta elegida |
+    | {{dir_picker_new}} | Selector de directorios que permite crear carpetas nuevas ('n') |
+
+    ## Marcadores de sistema y rutas
+    | Macro | Descripción | Valor |
+    | :--- | :--- | :--- |
+    | {{user}} | Nombre del usuario conectado actual | {user} |
+    | {{username}} | Alias de {{user}} | {username} |
+    | {{host}} | Nombre del equipo (hostname) | {host} |
+    | {{hostname}} | Alias de {{host}} | {hostname} |
+    | {{home}} | Ruta del directorio personal del usuario | {home} |
+    | {{dev_dir}} | Directorio raíz del repositorio | {dev_dir} |
+    | {{dev}} | Alias de {{dev_dir}} | {dev} |
+    | {{defaults_dir}} | Directorio de valores predeterminados | {defaults_dir} |
+    | {{defaults}} | Alias de {{defaults_dir}} | {defaults} |
+    | {{bashmenu_dir}} | Directorio raíz de la aplicación | {bashmenu_dir} |
+    | {{config_dir}} | Alias de {{bashmenu_dir}} | {config_dir} |
+    | {{scripts_dir}} | Ruta del directorio de scripts | {scripts_dir} |
+    | {{scripts}} | Alias de {{scripts_dir}} | {scripts} |
+    | {{templates_dir}} | Ruta del directorio de plantillas | {templates_dir} |
+    | {{templates}} | Alias de {{templates_dir}} | {templates} |
+    | {{cache_dir}} | Ruta del directorio de caché | {cache_dir} |
+    | {{cache}} | Alias de {{cache_dir}} | {cache} |
+    | {{notebooks_dir}} | Ruta del directorio de cuadernos | {notebooks_dir} |
+    | {{notebooks}} | Alias de {{notebooks_dir}} | {notebooks} |
+    | {{shortcuts_file}} | Ruta del archivo de atajos personalizados | {shortcuts_file} |
+    | {{shortcuts}} | Alias de {{shortcuts_file}} | {shortcuts} |
+    | {{bashmenu_yml}} | Archivo bashmenu.yml cargado actualmente | {bashmenu_yml} |
+    | {{bashmenu_mnu}} | Archivo bashmenu.mnu cargado actualmente | {bashmenu_mnu} |
+    | {{bashmenu_themes}} | Archivo bashmenu.themes cargado actualmente | {bashmenu_themes} |
+    | {{shortcuts_yml}} | Archivo shortcuts.yml cargado actualmente | {shortcuts_yml} |
+    | {{cheat_yml}} | Archivo cheat.yml cargado actualmente | {cheat_yml} |
+    | {{bashrc}} | Ruta al archivo ~/.bashrc | {bashrc} |
+    | {{bash_aliases}} | Ruta al archivo ~/.bash_aliases | {bash_aliases} |
+    | {{zshrc}} | Ruta al archivo ~/.zshrc | {zshrc} |
+    | {{profile}} | Ruta al archivo ~/.profile | {profile} |
+    | {{bash_profile}} | Ruta al archivo ~/.bash_profile | {bash_profile} |
+    | {{zprofile}} | Ruta al archivo ~/.zprofile | {zprofile} |
+    | {{shell_profile}} | Perfil de inicio de sesión del shell activo | {shell_profile} |
+    | {{vimrc}} | Ruta al archivo ~/.vimrc | {vimrc} |
+    | {{nanorc}} | Ruta al archivo ~/.nanorc | {nanorc} |
+
+    ## Entorno multiplataforma
+    | Macro | Descripción | Valor |
+    | :--- | :--- | :--- |
+    | {{prefix}} | Ruta de prefijo de Termux / sistema | {prefix} |
+    | {{termux_properties}} | Ruta al archivo de propiedades de Termux | {termux_properties} |
+    | {{termux_storage}} | Directorio de almacenamiento de Termux Android | {termux_storage} |
+    | {{powershell_profile}} | Ruta del script de perfil de PowerShell | {powershell_profile} |
+    | {{appdata}} | Directorio AppData roaming de Windows | {appdata} |
+    | {{userprofile}} | Directorio de perfil de usuario de Windows | {userprofile} |
+
+    ## Estado del sistema y red
+    | Macro | Descripción | Valor |
+    | :--- | :--- | :--- |
+    | {{battery}} | Capacidad actual de la batería | {battery} |
+    | {{battery_stat}} | Estado actual de carga de la batería | {battery_stat} |
+    | {{battery_status}} | Alias de {{battery_stat}} | {battery_status} |
+    | {{localip}} | Dirección IPv4 saliente principal | {localip} |
+    | {{user-mode}} | Nivel de privilegios (User o Root) | {user-mode} |
+    | {{version}} | Versión de lanzamiento de la aplicación | {version} |
+    | {{theme}} | Nombre del tema de color activo | {theme} |
+    | {{locale}} | Idioma activo de la interfaz | {locale} |
+    | {{color_mode}} | Modo de color actual de la terminal | {color_mode} |
+    | {{tty_mode}} | Modo TTY actual | {tty_mode} |
+
+    ## Marcadores de fecha y hora
+    | Macro | Descripción | Valor |
+    | :--- | :--- | :--- |
+    | {{date_time_12}} | Marca de tiempo en formato de 12 h | {date_time_12} |
+    | {{date_time_12_short}} | Marca de tiempo corta en formato de 12 h | {date_time_12_short} |
+    | {{date_time_24}} | Marca de tiempo en formato de 24 h | {date_time_24} |
+    | {{date_time_24_short}} | Marca de tiempo corta en formato de 24 h | {date_time_24_short} |
+    | {{date}} | Fecha actual (AAAA-MM-DD) | {date} |
+    | {{time_12}} | Hora actual en formato de 12 h | {time_12} |
+    | {{time_12_short}} | Hora actual corta en formato de 12 h | {time_12_short} |
+    | {{time_24}} | Hora actual en formato de 24 h | {time_24} |
+    | {{time_24_short}} | Hora actual corta en formato de 24 h | {time_24_short} |
+    | {{utc_seconds}} | Marca de tiempo Unix UTC en segundos | {utc_seconds} |
+
+    ## Directivas de diseño de terminal
+    | Macro / Marcador | Descripción |
+    | :--- | :--- |
+    | {{window_width}} | Ancho en columnas de la ventana interior |
+    | {{window_height}} | Alto en líneas de la ventana interior |
+    | {{screen_width}} | Ancho total en columnas de la terminal |
+    | {{divider}} | Barra divisoria horizontal con tema ({{ascii:196}}) |
+
+    ## Codificaciones especiales y macros dinámicas
+    | Macro / Marcador | Descripción |
+    | :--- | :--- |
+    | {{ascii:<code_num>}} | Carácter ASCII CP437 (ej. {{ascii:196}} -> ─) |
+    | {{command:<cmd>}} / {{cmd:<cmd>}} | Ejecuta un comando shell (caché 30s) e inserta su salida |
+    | {{toast:SECONDS:"MESSAGE"}} | Muestra una notificación emergente no bloqueante |
+    | {{nf:<char>:<hex>:<emoji>}} | Glifo adaptable Nerd Font / Unicode / Emoji |
+    | {{app.<key.path>}} | Clave de configuración en bashmenu.yml (ej. {{app.theme}}) |
+    | {{env:<var_name>}} | Valor de variable de entorno (ej. {{env:USER}}) |
+    | {{env}} / {{environment}} | Modal / tabla de inspección de variables de entorno |
+    | {{info:<path>}} | Muestra archivo Markdown con frontmatter YAML (title, width, height) |
+    | {{help}} | Acción integrada: abre el manual de documentación de BashMenu |
+    | {{theme_picker}} | Acción integrada: abre el selector interactivo de temas |
+    | {{text_editor}} | Acción integrada: inicia el editor de texto bashedit |
+    | {{menu_editor}} | Acción integrada: inicia menuedit en el elemento activo |
+    | {{refresh}} | Acción integrada: recarga configuración, menú, temas y plugins |
+    | {{keys_toggle}} | Acción integrada: alterna la visibilidad de atajos en el menú |
+    | {{user_gutter}} | Acción integrada: abre el editor de la barra de estado |
+    | {{theme_editor}} | Acción integrada: inicia themeedit con el tema activo |
+    | {{shortcut_editor}} | Acción integrada: inicia shortcutedit en shortcuts.yml |
+    | {{back}} | Acción integrada: vuelve al menú padre o sale |
+    | {{select}} | Acción integrada: activa el elemento de menú seleccionado |
+    | {{toggle_gutter}} | Acción integrada: alterna la expansión de la barra de ayuda |
+    | {{<key.path>}} | Referencia a clave anidada en bashmenu.yml (ej. {{user.postal_code}}) |
+
+    ## Escapar llaves literales
+    | Sintaxis | Salida / Comportamiento |
+    | :--- | :--- |
+    | {{{{user}}}} | Muestra {{user}} literal sin expandir su valor |
+    | {{{{{{user}}}}}} | Muestra {{{user}}} (llaves literales alrededor del valor expandido) |
+
+    ## Frontmatter YAML para modales Markdown ({{info:<path>}})
+    | Clave Frontmatter | Descripción |
+    | :--- | :--- |
+    | --- ... --- | Bloque YAML frontmatter opcional al inicio de un archivo Markdown |
+    | title: <text> | Título de la ventana emergente (admite marcadores; por defecto el archivo) |
+    | width: <1..100>[%] | Ancho en % de la terminal (acepta 80, "80" o "80%") |
+    | height: <1..100>[%] | Alto en % de la terminal (acepta 70, "70" o "70%") |
+  markdown_reference: |-
+    # Referencia de sintaxis Markdown
+
+    | Sintaxis | Salida / Acción |
+    | :--- | :--- |
+    | `# Heading 1` | Encabezado de sección principal |
+    | `## Heading 2` | Encabezado de sección secundaria |
+    | `### Heading 3` | Encabezado de subsección |
+    | `**Bold**` or `__Bold__` | Texto en negrita |
+    | `*Italic*` or `_Italic_` | Texto en cursiva |
+    | `~~Strikethrough~~` | Texto tachado |
+    | `` `code` `` | Fragmento de código en línea |
+    | `> Blockquote` | Bloque de cita |
+    | `- Item` or `* Item` | Elemento de lista sin ordenar |
+    | `1. Item` | Elemento de lista numerada |
+    | `- [ ] Todo` / `- [x] Done` | Casillas de lista de tareas |
+    | `[Title](url)` | Enlace de hipervínculo |
+    | `![Alt](path/to/img)` | Referencia de imagen incrustada |
+    | `---` or `***` | Línea divisoria horizontal |
+    | ```` ```bash ```` | Bloque de código delimitado con resaltado de sintaxis |
+    | `{{placeholder}}` | Literal escapado `{placeholder}` (sin expansión de macro) |
+
+    ## Frontmatter YAML para modales personalizados (`{info:<path>}`)
+
+    | Clave Frontmatter | Descripción |
+    | :--- | :--- |
+    | `--- ... ---` | Bloque YAML frontmatter opcional al inicio de un archivo `.md` |
+    | `title: <text>` | Título de ventana (admite marcadores; por defecto el archivo) |
+    | `width: <1..100>[%]` | Ancho en % de la terminal (ej. `80`, `"80"`, `"80%"`) |
+    | `height: <1..100>[%]` | Alto en % de la terminal (ej. `70`, `"70"`, `"70%"`) |
+  bashedit_controls: |-
+    # Atajos y controles de BashEdit
+
+    | Atajo / Tecla | Descripción / Acción |
+    | :--- | :--- |
+    | `F1` | Manual de ayuda |
+    | `F2` | Alternar visualización de espacios y tabulaciones |
+    | `F3` | Ver tabla de caracteres ASCII |
+    | `F4` | Ver colores de terminal |
+    | `F5` | Mostrar marcadores y macros disponibles |
+    | `F6` | Vista previa Markdown (vía bmpager --markdown) |
+    | `F7` / `Alt+N` | Alternar números de línea |
+    | `F8` | Mostrar referencia rápida de sintaxis Markdown |
+    | `F9` / `Alt+W` | Alternar ajuste de línea (Soft-Wrap) |
+    | `^O` / `^R` | Abrir selector de archivos |
+    | `^S` | Guardar archivo |
+    | `^A` | Guardar archivo como (nuevo nombre) |
+    | `^N` / `^E` / `[ + ]` | Nueva pestaña / Nuevo archivo |
+    | `Alt+Left/Right` / `Alt+[/]` / `Ctrl+Tab` / `Ctrl+Shift+Tab` | Cambiar pestaña (Anterior / Siguiente) |
+    | `Ctrl+Left` / `Ctrl+Right` | Mover palabra izquierda / derecha |
+    | `Ctrl+Up` / `Ctrl+Down` | Mover párrafo arriba / abajo |
+    | `^W` | Buscar texto |
+    | `^X` | Cortar selección o línea actual |
+    | `^C` | Copiar selección o línea actual |
+    | `^V` | Pegar portapapeles |
+    | `^Z` / `^Y` | Deshacer / Rehacer |
+    | `^Q` / `ESC` | Salir del editor |

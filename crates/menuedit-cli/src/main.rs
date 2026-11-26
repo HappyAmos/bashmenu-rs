@@ -983,7 +983,7 @@ fn main() -> Result<()> {
                                 let ph_ctx = MacroContext::new(&ph_cfg);
                                 let ph_text = render_placeholder_help_text(&ph_ctx);
                                 *child_opt = Some(Box::new(ChildModal::Help(
-                                    HelpModal::new("Placeholders & Macros", &ph_text)
+                                    HelpModal::new(t!("bashedit.placeholders_title"), &ph_text)
                                         .with_value_marquee(true),
                                 )));
                             }
@@ -1190,8 +1190,11 @@ fn main() -> Result<()> {
                                             let ph_ctx = MacroContext::new(&ph_cfg);
                                             let ph_text = render_placeholder_help_text(&ph_ctx);
                                             active_modal = ActiveModal::Help(
-                                                HelpModal::new("Placeholders & Macros", &ph_text)
-                                                    .with_value_marquee(true),
+                                                HelpModal::new(
+                                                    t!("bashedit.placeholders_title"),
+                                                    &ph_text,
+                                                )
+                                                .with_value_marquee(true),
                                             );
                                         }
                                         MenuEditFooterAction::Add => {
@@ -1473,8 +1476,11 @@ fn main() -> Result<()> {
                                         let ph_ctx = MacroContext::new(&ph_cfg);
                                         let ph_text = render_placeholder_help_text(&ph_ctx);
                                         active_modal = ActiveModal::Help(
-                                            HelpModal::new("Placeholders & Macros", &ph_text)
-                                                .with_value_marquee(true),
+                                            HelpModal::new(
+                                                t!("bashedit.placeholders_title"),
+                                                &ph_text,
+                                            )
+                                            .with_value_marquee(true),
                                         );
                                         continue;
                                     }
@@ -1564,7 +1570,7 @@ fn main() -> Result<()> {
                                     let ph_ctx = MacroContext::new(&ph_cfg);
                                     let ph_text = render_placeholder_help_text(&ph_ctx);
                                     active_modal = ActiveModal::Help(
-                                        HelpModal::new("Placeholders & Macros", &ph_text)
+                                        HelpModal::new(t!("bashedit.placeholders_title"), &ph_text)
                                             .with_value_marquee(true),
                                     );
                                 }

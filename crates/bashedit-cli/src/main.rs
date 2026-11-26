@@ -8,8 +8,8 @@ use bashedit_cli::{
     read_swap_file, remove_swap_file, EditorBuffer, SwapHeader, VisualLine,
 };
 use bashmenu_core::{
-    load_config, load_themes, render_placeholder_help_text, t, MacroContext, ToastNotification,
-    ToastSeverity, BASHEDIT_HELP_TEXT, MARKDOWN_REFERENCE_TEXT,
+    bashedit_help_text, load_config, load_themes, markdown_reference_text,
+    render_placeholder_help_text, t, MacroContext, ToastNotification, ToastSeverity,
 };
 use bashmenu_tui::{
     color_to_rgb, install_panic_hook, AsciiGridModal, ColorGridModal, ConfirmModal,
@@ -810,7 +810,7 @@ fn main() -> Result<()> {
                         KeyCode::F(1) => {
                             active_modal = ActiveModal::HelpManual(HelpModal::new(
                                 "BashEdit Manual",
-                                BASHEDIT_HELP_TEXT,
+                                &bashedit_help_text(),
                             ));
                             continue;
                         }
@@ -868,7 +868,7 @@ fn main() -> Result<()> {
                         KeyCode::F(8) => {
                             active_modal = ActiveModal::MarkdownReference(HelpModal::new(
                                 t!("bashedit.markdown_ref_title"),
-                                MARKDOWN_REFERENCE_TEXT,
+                                &markdown_reference_text(),
                             ));
                             continue;
                         }
@@ -1357,7 +1357,7 @@ fn main() -> Result<()> {
                                     FooterAction::HelpManual => {
                                         active_modal = ActiveModal::HelpManual(HelpModal::new(
                                             t!("bashedit.help_manual_title"),
-                                            BASHEDIT_HELP_TEXT,
+                                            &bashedit_help_text(),
                                         ));
                                     }
                                     FooterAction::ToggleWhitespace => {
@@ -1425,7 +1425,7 @@ fn main() -> Result<()> {
                                         active_modal =
                                             ActiveModal::MarkdownReference(HelpModal::new(
                                                 t!("bashedit.markdown_ref_title"),
-                                                MARKDOWN_REFERENCE_TEXT,
+                                                &markdown_reference_text(),
                                             ));
                                     }
                                     FooterAction::NewTab => {
