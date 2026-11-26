@@ -1,4 +1,5 @@
-//! Modal window displaying real-time streaming output of a running command.
+//! Modal window displaying real-time streaming output or an embedded VT100
+//! interactive terminal for a running command.
 
 use super::frame::{is_close_button_clicked, render_modal_frame};
 use crate::ansi::ansi_to_line;
@@ -15,12 +16,15 @@ use std::process::{Command, Stdio};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 
+/// Default scrollback history depth (in lines) for the embedded VT100 screen.
+const VT100_SCROLLBACK_LINES: usize = 2000;
+
 /// Messages emitted by the background streaming process
 pub enum StreamOutputMsg {
-    /// A completed line of standard output or error received from child process
+    /// Raw byte chunk received from a PTY child process (fed into `vt100::Parser`)
+    RawBytes(Vec<u8>),
+    /// A completed line of standard output or error received from a piped child process
     Line(String),
-    /// An in-progress line without a trailing newline (e.g., interactive prompt)
-    PartialLine(String),
     /// Child process has exited with optional status code
     Finished(Option<i32>),
 }
@@ -34,7 +38,7 @@ pub enum StreamOutputAction {
     Close,
 }
 
-/// Modal window displaying live streaming command output
+/// Modal window displaying live streaming command output or an interactive VT100 terminal.
 pub struct StreamOutputModal {
     /// Dialog title header
     pub title: String,
@@ -44,9 +48,9 @@ pub struct StreamOutputModal {
     pub window_percent: u16,
     /// Whether stdin remains connected for interactive user inputs
     pub interactive: bool,
-    /// Buffered output lines collected from process stdout/stderr
+    /// Buffered output lines collected from process stdout/stderr (or synced from VT100 screen)
     pub lines: Vec<String>,
-    /// Vertical scroll offset in lines
+    /// Vertical scroll offset in lines (non-VT100 mode)
     pub scroll_offset: usize,
     /// Whether viewport automatically follows the latest output line
     pub auto_scroll: bool,
@@ -56,7 +60,7 @@ pub struct StreamOutputModal {
     pub exit_code: Option<i32>,
     /// Operating system process ID of child command
     pub child_pid: Option<u32>,
-    /// Receiver channel for stdout/stderr lines and termination messages from worker thread
+    /// Receiver channel for stdout/stderr output and termination messages from worker thread
     rx: Option<Receiver<StreamOutputMsg>>,
     /// Sender channel for delivering interactive keyboard input to child stdin
     stdin_tx: Option<Sender<Vec<u8>>>,
@@ -64,8 +68,13 @@ pub struct StreamOutputModal {
     pty_size: (u16, u16),
     /// Whether the running child process is attached to a PTY
     uses_pty: bool,
-    /// Whether the last entry in `lines` is an in-progress partial line (no trailing newline yet)
-    has_partial_line: bool,
+    /// Embedded VT100 terminal screen parser when running in PTY mode
+    vt_parser: Option<Box<vt100::Parser>>,
+    /// Scrollback line offset into VT100 history (`0` = live bottom view)
+    vt_scrollback: usize,
+    /// Duplicated PTY master file handle used for `TIOCSWINSZ` resizes
+    #[cfg(unix)]
+    pty_resize_handle: Option<std::fs::File>,
 }
 
 impl StreamOutputModal {
@@ -86,7 +95,10 @@ impl StreamOutputModal {
             stdin_tx: None,
             pty_size: (80, 24),
             uses_pty: false,
-            has_partial_line: false,
+            vt_parser: None,
+            vt_scrollback: 0,
+            #[cfg(unix)]
+            pty_resize_handle: None,
         }
     }
 
@@ -95,12 +107,44 @@ impl StreamOutputModal {
         self.pty_size = (cols.max(20), rows.max(4));
     }
 
+    /// Resizes the embedded VT100 screen and PTY when the outer terminal resizes.
+    pub fn resize_for_area(&mut self, area: Rect) {
+        let (dw, dh) = self.calculate_dialog_dimensions(area);
+        let cols = dw.saturating_sub(5).max(20);
+        let rows = dh.saturating_sub(3).max(4);
+        self.pty_size = (cols, rows);
+        if let Some(ref mut parser) = self.vt_parser {
+            parser.set_size(rows, cols);
+        }
+        #[cfg(unix)]
+        if let Some(ref handle) = self.pty_resize_handle {
+            use std::os::unix::io::AsRawFd;
+            let ws = libc::winsize {
+                ws_row: rows,
+                ws_col: cols,
+                ws_xpixel: 0,
+                ws_ypixel: 0,
+            };
+            let _ = unsafe { libc::ioctl(handle.as_raw_fd(), libc::TIOCSWINSZ as _, &ws) };
+        }
+    }
+
+    /// Forwards pasted text directly to the running interactive child process.
+    pub fn handle_paste(&mut self, text: &str) {
+        if self.is_running && self.interactive && !text.is_empty() {
+            self.reset_vt_scrollback();
+            if let Some(ref tx) = self.stdin_tx {
+                let _ = tx.send(text.as_bytes().to_vec());
+            }
+        }
+    }
+
     /// Spawns the background command process and begins streaming stdout/stderr.
     ///
-    /// When `self.interactive` is `true` on Unix, allocates a real POSIX PTY so
-    /// TTY-aware CLIs (such as `gh`, `git`, `cargo`, and interactive prompts)
-    /// behave naturally; falls back to standard pipes if PTY allocation fails
-    /// or when `self.interactive` is `false`.
+    /// When `self.interactive` is `true` on Unix, allocates a real POSIX PTY and
+    /// an embedded `vt100::Parser` terminal screen so TTY-aware CLIs and
+    /// interactive prompts work natively; falls back to standard pipes if PTY
+    /// allocation fails or when `self.interactive` is `false`.
     pub fn start(&mut self) {
         if self.is_running {
             return;
@@ -112,7 +156,8 @@ impl StreamOutputModal {
         self.stdin_tx = Some(in_tx);
         self.is_running = true;
         self.uses_pty = false;
-        self.has_partial_line = false;
+        self.vt_parser = None;
+        self.vt_scrollback = 0;
 
         let cmd_str = self.command.clone();
 
@@ -122,6 +167,12 @@ impl StreamOutputModal {
             if let Ok((mut child, master_file)) = spawn_unix_pty(&cmd_str, cols, rows) {
                 self.child_pid = Some(child.id());
                 self.uses_pty = true;
+                self.vt_parser = Some(Box::new(vt100::Parser::new(
+                    rows,
+                    cols,
+                    VT100_SCROLLBACK_LINES,
+                )));
+                self.pty_resize_handle = master_file.try_clone().ok();
 
                 if let Ok(mut writer) = master_file.try_clone() {
                     thread::spawn(move || {
@@ -137,20 +188,16 @@ impl StreamOutputModal {
                 thread::spawn(move || {
                     let mut reader = master_file;
                     let mut buf = [0u8; 4096];
-                    let mut pending = String::new();
                     loop {
                         match reader.read(&mut buf) {
                             Ok(0) => break,
                             Ok(n) => {
-                                let chunk = String::from_utf8_lossy(&buf[..n]);
-                                emit_pty_chunk(&mut pending, &chunk, &msg_sender);
+                                let _ =
+                                    msg_sender.send(StreamOutputMsg::RawBytes(buf[..n].to_vec()));
                             }
                             Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
                             Err(_) => break, // EIO is standard EOF when slave PTY closes on Linux
                         }
-                    }
-                    if !pending.is_empty() {
-                        let _ = msg_sender.send(StreamOutputMsg::Line(pending));
                     }
                     let status = child.wait().ok();
                     let code = status.and_then(|s| s.code());
@@ -208,49 +255,89 @@ impl StreamOutputModal {
         }
     }
 
-    /// Polls available incoming lines from the child process without blocking.
+    /// Polls available incoming output from the child process without blocking.
     /// Returns true if any updates were processed.
     pub fn poll_output(&mut self) -> bool {
         let mut updated = false;
+        let mut vt_dirty = false;
         if let Some(ref rx) = self.rx {
             while let Ok(msg) = rx.try_recv() {
                 updated = true;
                 match msg {
-                    StreamOutputMsg::Line(line) => {
-                        let clean = line.replace('\t', "    ");
-                        if self.has_partial_line {
-                            if let Some(last) = self.lines.last_mut() {
-                                *last = clean;
-                            } else {
-                                self.lines.push(clean);
-                            }
-                            self.has_partial_line = false;
+                    StreamOutputMsg::RawBytes(bytes) => {
+                        if let Some(ref mut parser) = self.vt_parser {
+                            parser.process(&bytes);
+                            vt_dirty = true;
                         } else {
-                            self.lines.push(clean);
+                            let text = String::from_utf8_lossy(&bytes);
+                            for line in text.lines() {
+                                self.lines.push(line.replace('\t', "    "));
+                            }
                         }
                     }
-                    StreamOutputMsg::PartialLine(line) => {
-                        let clean = line.replace('\t', "    ");
-                        if self.has_partial_line {
-                            if let Some(last) = self.lines.last_mut() {
-                                *last = clean;
-                            } else {
-                                self.lines.push(clean);
-                            }
-                        } else {
-                            self.lines.push(clean);
-                            self.has_partial_line = true;
-                        }
+                    StreamOutputMsg::Line(line) => {
+                        self.lines.push(line.replace('\t', "    "));
                     }
                     StreamOutputMsg::Finished(code) => {
                         self.is_running = false;
                         self.exit_code = code;
-                        self.has_partial_line = false;
+                        vt_dirty = self.vt_parser.is_some();
                     }
                 }
             }
         }
+        if vt_dirty {
+            if let Some(ref mut parser) = self.vt_parser {
+                if self.auto_scroll {
+                    self.vt_scrollback = 0;
+                }
+                parser.set_scrollback(self.vt_scrollback);
+                self.lines = parser
+                    .screen()
+                    .contents()
+                    .lines()
+                    .map(|l| l.to_string())
+                    .collect();
+            }
+        }
         updated
+    }
+
+    /// Resets VT100 scrollback to live bottom view when the user sends input.
+    fn reset_vt_scrollback(&mut self) {
+        self.auto_scroll = true;
+        if self.vt_scrollback != 0 {
+            self.vt_scrollback = 0;
+            if let Some(ref mut parser) = self.vt_parser {
+                parser.set_scrollback(0);
+            }
+        }
+    }
+
+    /// Adjusts VT100 scrollback (or line-mode `scroll_offset`) up by `delta` lines.
+    fn scroll_up(&mut self, delta: usize) {
+        self.auto_scroll = false;
+        if let Some(ref mut parser) = self.vt_parser {
+            self.vt_scrollback = self.vt_scrollback.saturating_add(delta);
+            parser.set_scrollback(self.vt_scrollback);
+            self.vt_scrollback = parser.screen().scrollback();
+        } else {
+            self.scroll_offset = self.scroll_offset.saturating_sub(delta);
+        }
+    }
+
+    /// Adjusts VT100 scrollback (or line-mode `scroll_offset`) down by `delta` lines.
+    fn scroll_down(&mut self, delta: usize) {
+        if let Some(ref mut parser) = self.vt_parser {
+            self.vt_scrollback = self.vt_scrollback.saturating_sub(delta);
+            parser.set_scrollback(self.vt_scrollback);
+            self.vt_scrollback = parser.screen().scrollback();
+            if self.vt_scrollback == 0 {
+                self.auto_scroll = true;
+            }
+        } else {
+            self.scroll_offset = self.scroll_offset.saturating_add(delta);
+        }
     }
 
     /// Terminates the child process if it is currently running
@@ -270,11 +357,27 @@ impl StreamOutputModal {
             }
             self.is_running = false;
         }
+        #[cfg(unix)]
+        {
+            self.pty_resize_handle = None;
+        }
+    }
+
+    /// Sends raw bytes to the running child's stdin channel.
+    fn send_input_bytes(&mut self, bytes: Vec<u8>) {
+        self.reset_vt_scrollback();
+        if let Some(ref tx) = self.stdin_tx {
+            let _ = tx.send(bytes);
+        }
     }
 
     /// Handles keyboard events
     pub fn handle_key(&mut self, key: KeyEvent) -> StreamOutputAction {
         let is_live_interactive = self.is_running && self.interactive;
+        let app_cursor = self
+            .vt_parser
+            .as_ref()
+            .is_some_and(|p| p.screen().application_cursor());
 
         match key.code {
             KeyCode::Esc => {
@@ -285,77 +388,47 @@ impl StreamOutputModal {
                 if !self.is_running {
                     StreamOutputAction::Close
                 } else {
-                    if let Some(ref tx) = self.stdin_tx {
-                        let nl: &[u8] = if self.uses_pty { b"\r" } else { b"\n" };
-                        let _ = tx.send(nl.to_vec());
-                    }
+                    let nl: &[u8] = if self.uses_pty { b"\r" } else { b"\n" };
+                    self.send_input_bytes(nl.to_vec());
                     StreamOutputAction::None
                 }
             }
-            KeyCode::Backspace if is_live_interactive => {
-                if let Some(ref tx) = self.stdin_tx {
-                    let _ = tx.send(vec![0x7f]);
+            KeyCode::PageUp if key.modifiers.contains(KeyModifiers::SHIFT) => {
+                self.scroll_up(10);
+                StreamOutputAction::None
+            }
+            KeyCode::PageDown if key.modifiers.contains(KeyModifiers::SHIFT) => {
+                self.scroll_down(10);
+                StreamOutputAction::None
+            }
+            _ if is_live_interactive => {
+                if let Some(bytes) = encode_terminal_key(key, app_cursor) {
+                    self.send_input_bytes(bytes);
                 }
                 StreamOutputAction::None
             }
-            KeyCode::Up => {
-                self.auto_scroll = false;
-                if self.scroll_offset > 0 {
-                    self.scroll_offset = self.scroll_offset.saturating_sub(1);
-                }
+            KeyCode::Up | KeyCode::Char('k') => {
+                self.scroll_up(1);
                 StreamOutputAction::None
             }
-            KeyCode::Down => {
-                self.scroll_offset = self.scroll_offset.saturating_add(1);
-                StreamOutputAction::None
-            }
-            KeyCode::Char('k') if !is_live_interactive => {
-                self.auto_scroll = false;
-                if self.scroll_offset > 0 {
-                    self.scroll_offset = self.scroll_offset.saturating_sub(1);
-                }
-                StreamOutputAction::None
-            }
-            KeyCode::Char('j') if !is_live_interactive => {
-                self.scroll_offset = self.scroll_offset.saturating_add(1);
+            KeyCode::Down | KeyCode::Char('j') => {
+                self.scroll_down(1);
                 StreamOutputAction::None
             }
             KeyCode::PageUp => {
-                self.auto_scroll = false;
-                self.scroll_offset = self.scroll_offset.saturating_sub(10);
+                self.scroll_up(10);
                 StreamOutputAction::None
             }
             KeyCode::PageDown => {
-                self.scroll_offset = self.scroll_offset.saturating_add(10);
+                self.scroll_down(10);
                 StreamOutputAction::None
             }
             KeyCode::Home => {
-                self.auto_scroll = false;
-                self.scroll_offset = 0;
+                self.scroll_up(VT100_SCROLLBACK_LINES);
                 StreamOutputAction::None
             }
             KeyCode::End => {
-                self.auto_scroll = true;
-                StreamOutputAction::None
-            }
-            KeyCode::Char(c) if is_live_interactive => {
-                if let Some(ref tx) = self.stdin_tx {
-                    if key.modifiers.contains(KeyModifiers::CONTROL) {
-                        match c.to_ascii_lowercase() {
-                            'c' => {
-                                let _ = tx.send(vec![0x03]);
-                            }
-                            'd' => {
-                                let _ = tx.send(vec![0x04]);
-                            }
-                            _ => {}
-                        }
-                    } else {
-                        let mut b = [0u8; 4];
-                        let s = c.encode_utf8(&mut b);
-                        let _ = tx.send(s.as_bytes().to_vec());
-                    }
-                }
+                self.reset_vt_scrollback();
                 StreamOutputAction::None
             }
             _ => StreamOutputAction::None,
@@ -369,12 +442,11 @@ impl StreamOutputModal {
 
         match mouse.kind {
             MouseEventKind::ScrollUp => {
-                self.auto_scroll = false;
-                self.scroll_offset = self.scroll_offset.saturating_sub(3);
+                self.scroll_up(3);
                 StreamOutputAction::None
             }
             MouseEventKind::ScrollDown => {
-                self.scroll_offset = self.scroll_offset.saturating_add(3);
+                self.scroll_down(3);
                 StreamOutputAction::None
             }
             MouseEventKind::Down(MouseButton::Left) => {
@@ -411,7 +483,7 @@ impl StreamOutputModal {
         self.calculate_dialog_dimensions(area)
     }
 
-    /// Renders the streaming modal output dialog into `buf`
+    /// Renders the streaming modal output or embedded VT100 screen into `buf`
     pub fn render(&self, area: Rect, styles: &ResolvedThemeStyles, buf: &mut Buffer) {
         let (dialog_w, dialog_h) = self.calculate_dialog_dimensions(area);
         let inner = render_modal_frame(area, dialog_w, dialog_h, &self.title, styles, buf);
@@ -422,41 +494,94 @@ impl StreamOutputModal {
 
         let content_h = inner.height.saturating_sub(1) as usize;
         let avail_w = inner.width.saturating_sub(3) as usize; // reserve margin and scrollbar
-
-        let total_lines = self.lines.len();
-        let max_scroll = total_lines.saturating_sub(content_h);
-
-        let eff_scroll = if self.auto_scroll {
-            max_scroll
-        } else {
-            self.scroll_offset.min(max_scroll)
-        };
-
         let default_text_style = styles.text.bg(styles.background);
 
-        // 1. Render Output Lines
-        for row_idx in 0..content_h {
-            let line_idx = eff_scroll + row_idx;
-            let y = inner.y + row_idx as u16;
+        if let Some(ref parser) = self.vt_parser {
+            // 1a. Render embedded VT100 terminal screen with full cell styling & cursor
+            let screen = parser.screen();
+            let (screen_rows, screen_cols) = screen.size();
+            let render_rows = content_h.min(screen_rows as usize);
+            let render_cols = avail_w.min(screen_cols as usize);
 
-            if line_idx < total_lines {
-                let raw_line = &self.lines[line_idx];
-                let styled_line = ansi_to_line(raw_line, default_text_style);
-                buf.set_line(inner.x + 1, y, &styled_line, avail_w as u16);
+            for r in 0..render_rows {
+                let y = inner.y + r as u16;
+                for c in 0..render_cols {
+                    let Some(cell) = screen.cell(r as u16, c as u16) else {
+                        continue;
+                    };
+                    if cell.is_wide_continuation() {
+                        continue;
+                    }
+                    let fg = vt100_color_to_ratatui(cell.fgcolor())
+                        .or(default_text_style.fg)
+                        .unwrap_or(Color::White);
+                    let bg = vt100_color_to_ratatui(cell.bgcolor()).unwrap_or(styles.background);
+                    let mut st = Style::default().fg(fg).bg(bg);
+                    if cell.bold() {
+                        st = st.add_modifier(Modifier::BOLD);
+                    }
+                    if cell.italic() {
+                        st = st.add_modifier(Modifier::ITALIC);
+                    }
+                    if cell.underline() {
+                        st = st.add_modifier(Modifier::UNDERLINED);
+                    }
+                    if cell.inverse() {
+                        st = st.add_modifier(Modifier::REVERSED);
+                    }
+                    let sym = cell.contents();
+                    let target = &mut buf[(inner.x + 1 + c as u16, y)];
+                    if sym.is_empty() {
+                        target.set_char(' ');
+                    } else {
+                        target.set_symbol(&sym);
+                    }
+                    target.set_style(st);
+                }
             }
-        }
 
-        // 2. Render Scrollbar if total lines exceed window height
-        if content_h >= 3 {
-            super::frame::render_modal_scrollbar(
-                inner.x + inner.width.saturating_sub(1),
-                inner.y,
-                content_h,
-                total_lines,
-                eff_scroll,
-                styles,
-                buf,
-            );
+            // Render visible block cursor at the exact VT100 cursor position when live
+            if self.is_running && self.vt_scrollback == 0 && !screen.hide_cursor() {
+                let (cur_r, cur_c) = screen.cursor_position();
+                if (cur_r as usize) < content_h && (cur_c as usize) < avail_w {
+                    let cur_cell = &mut buf[(inner.x + 1 + cur_c, inner.y + cur_r)];
+                    cur_cell.modifier.toggle(Modifier::REVERSED);
+                }
+            }
+        } else {
+            // 1b. Render line-buffered streaming output
+            let total_lines = self.lines.len();
+            let max_scroll = total_lines.saturating_sub(content_h);
+
+            let eff_scroll = if self.auto_scroll {
+                max_scroll
+            } else {
+                self.scroll_offset.min(max_scroll)
+            };
+
+            for row_idx in 0..content_h {
+                let line_idx = eff_scroll + row_idx;
+                let y = inner.y + row_idx as u16;
+
+                if line_idx < total_lines {
+                    let raw_line = &self.lines[line_idx];
+                    let styled_line = ansi_to_line(raw_line, default_text_style);
+                    buf.set_line(inner.x + 1, y, &styled_line, avail_w as u16);
+                }
+            }
+
+            // 2. Render Scrollbar if total lines exceed window height
+            if content_h >= 3 {
+                super::frame::render_modal_scrollbar(
+                    inner.x + inner.width.saturating_sub(1),
+                    inner.y,
+                    content_h,
+                    total_lines,
+                    eff_scroll,
+                    styles,
+                    buf,
+                );
+            }
         }
 
         // 3. Render Status Footer
@@ -491,36 +616,56 @@ impl Drop for StreamOutputModal {
     }
 }
 
-/// Splits a raw PTY text chunk into completed lines and in-progress partial lines,
-/// normalizing `\r\n` newlines and standalone `\r` carriage-return overwrites.
-#[cfg(unix)]
-fn emit_pty_chunk(pending: &mut String, chunk: &str, sender: &Sender<StreamOutputMsg>) {
-    let mut chars = chunk.chars().peekable();
-    while let Some(c) = chars.next() {
-        match c {
-            '\n' => {
-                let line = std::mem::take(pending);
-                let _ = sender.send(StreamOutputMsg::Line(line));
-            }
-            '\r' => {
-                if chars.peek() == Some(&'\n') {
-                    chars.next();
-                    let line = std::mem::take(pending);
-                    let _ = sender.send(StreamOutputMsg::Line(line));
-                } else {
-                    pending.clear();
+/// Converts a `vt100::Color` to an optional Ratatui `Color` (`None` = inherit default).
+fn vt100_color_to_ratatui(c: vt100::Color) -> Option<Color> {
+    match c {
+        vt100::Color::Default => None,
+        vt100::Color::Idx(i) => Some(Color::Indexed(i)),
+        vt100::Color::Rgb(r, g, b) => Some(Color::Rgb(r, g, b)),
+    }
+}
+
+/// Encodes a Crossterm `KeyEvent` into VT100/xterm bytes for forwarding to a PTY.
+fn encode_terminal_key(key: KeyEvent, app_cursor: bool) -> Option<Vec<u8>> {
+    match key.code {
+        KeyCode::Backspace => Some(vec![0x7f]),
+        KeyCode::Tab => Some(vec![b'\t']),
+        KeyCode::BackTab => Some(b"\x1b[Z".to_vec()),
+        KeyCode::Delete => Some(b"\x1b[3~".to_vec()),
+        KeyCode::Up => Some(if app_cursor { b"\x1bOA" } else { b"\x1b[A" }.to_vec()),
+        KeyCode::Down => Some(if app_cursor { b"\x1bOB" } else { b"\x1b[B" }.to_vec()),
+        KeyCode::Right => Some(if app_cursor { b"\x1bOC" } else { b"\x1b[C" }.to_vec()),
+        KeyCode::Left => Some(if app_cursor { b"\x1bOD" } else { b"\x1b[D" }.to_vec()),
+        KeyCode::Home => Some(if app_cursor { b"\x1bOH" } else { b"\x1b[H" }.to_vec()),
+        KeyCode::End => Some(if app_cursor { b"\x1bOF" } else { b"\x1b[F" }.to_vec()),
+        KeyCode::PageUp => Some(b"\x1b[5~".to_vec()),
+        KeyCode::PageDown => Some(b"\x1b[6~".to_vec()),
+        KeyCode::Char(c) => {
+            if key.modifiers.contains(KeyModifiers::CONTROL) {
+                let lower = c.to_ascii_lowercase();
+                if lower.is_ascii_lowercase() {
+                    return Some(vec![(lower as u8) - b'a' + 1]);
                 }
-            }
-            '\x08' => {
-                pending.pop();
-            }
-            other => {
-                pending.push(other);
+                match c {
+                    ' ' | '@' => Some(vec![0x00]),
+                    '[' => Some(vec![0x1b]),
+                    '\\' => Some(vec![0x1c]),
+                    ']' => Some(vec![0x1d]),
+                    '^' => Some(vec![0x1e]),
+                    '_' => Some(vec![0x1f]),
+                    _ => None,
+                }
+            } else if key.modifiers.contains(KeyModifiers::ALT) {
+                let mut out = vec![0x1b];
+                let mut b = [0u8; 4];
+                out.extend_from_slice(c.encode_utf8(&mut b).as_bytes());
+                Some(out)
+            } else {
+                let mut b = [0u8; 4];
+                Some(c.encode_utf8(&mut b).as_bytes().to_vec())
             }
         }
-    }
-    if !pending.is_empty() {
-        let _ = sender.send(StreamOutputMsg::PartialLine(pending.clone()));
+        _ => None,
     }
 }
 

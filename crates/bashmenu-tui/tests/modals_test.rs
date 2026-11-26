@@ -2758,3 +2758,76 @@ fn test_stream_output_modal_interactive_allocates_pty_and_handles_tty() {
         non_interactive.lines
     );
 }
+
+#[cfg(unix)]
+#[test]
+fn test_stream_output_modal_vt100_interactive_input_and_cursor() {
+    use bashmenu_tui::StreamOutputModal;
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::style::Modifier;
+    use std::time::{Duration, Instant};
+
+    let mut modal = StreamOutputModal::new(
+        "Interactive Prompt".to_string(),
+        "printf 'Name: '; read -r name; echo \"HELLO_${name}\"".to_string(),
+        65,
+        true,
+    );
+    let area = Rect::new(0, 0, 100, 30);
+    modal.resize_for_area(area);
+    modal.start();
+
+    // Wait for prompt "Name: " to appear on the VT100 screen
+    let prompt_deadline = Instant::now() + Duration::from_secs(5);
+    while Instant::now() < prompt_deadline {
+        modal.poll_output();
+        if modal.lines.iter().any(|l| l.contains("Name:")) {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    assert!(
+        modal.lines.iter().any(|l| l.contains("Name:")),
+        "Prompt must appear before user hits Enter (got: {:?})",
+        modal.lines
+    );
+
+    // Render while running and verify a visible REVERSED cursor cell is drawn
+    let styles = ResolvedThemeStyles::default();
+    let mut buf = Buffer::empty(area);
+    modal.render(area, &styles, &mut buf);
+    let (dw, dh) = modal.calculate_dialog_dimensions(area);
+    let inner = bashmenu_tui::compute_modal_inner(area, dw, dh);
+    let has_cursor = (inner.x + 1..inner.x + inner.width - 2)
+        .any(|x| buf[(x, inner.y)].modifier.contains(Modifier::REVERSED));
+    assert!(
+        has_cursor,
+        "Interactive VT100 modal must render a visible block cursor at the prompt"
+    );
+
+    // Type "jack" (including 'j' and 'k' to verify they aren't hijacked by scroll!) + Enter
+    for ch in ['j', 'a', 'c', 'k'] {
+        modal.handle_key(KeyEvent::new(KeyCode::Char(ch), KeyModifiers::NONE));
+    }
+    modal.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+
+    let finish_deadline = Instant::now() + Duration::from_secs(5);
+    while modal.is_running && Instant::now() < finish_deadline {
+        modal.poll_output();
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    modal.poll_output();
+
+    assert!(
+        !modal.is_running,
+        "Interactive command must exit after Enter"
+    );
+    assert_eq!(modal.exit_code, Some(0));
+    assert!(
+        modal.lines.iter().any(|l| l.contains("HELLO_jack")),
+        "Typed interactive input must reach PTY child and echo result (got: {:?})",
+        modal.lines
+    );
+}

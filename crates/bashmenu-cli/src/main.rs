@@ -1792,6 +1792,14 @@ fn main() -> Result<()> {
                     let action = match ev {
                         Event::Key(key) => modal.handle_key(key),
                         Event::Mouse(mouse) => modal.handle_mouse(mouse, area),
+                        Event::Paste(text) => {
+                            modal.handle_paste(&text);
+                            StreamOutputAction::None
+                        }
+                        Event::Resize(w, h) => {
+                            modal.resize_for_area(ratatui::layout::Rect::new(0, 0, w, h));
+                            StreamOutputAction::None
+                        }
                         _ => StreamOutputAction::None,
                     };
                     if action == StreamOutputAction::Close {
