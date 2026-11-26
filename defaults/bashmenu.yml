@@ -38,19 +38,19 @@ settings:
     divider: true
     weather:
       script: curl -s 'wttr.in/{user.postal_code}?format=4'
-      sleep: 10000
+      sleep: 300
     server1:
-      sleep: 15000
+      sleep: 60
       script: '{scripts_dir}/serverup.sh 192.168.1.10 [b]Server1[/b]'
     server2:
-      sleep: 20000
+      sleep: 60
       script: '{scripts_dir}/serverup.sh 192.168.1.11 [b]Server2[/b]'
     server3:
-      sleep: 25000
+      sleep: 60
       script: '{scripts_dir}/serverup.sh 192.168.1.12 [b]Server3[/b]'
     otd:
       script: otd.sh
-      sleep: 40000
+      sleep: 3600
       standalone: true
       pretext: '{divider}'
       posttext: '{divider}'

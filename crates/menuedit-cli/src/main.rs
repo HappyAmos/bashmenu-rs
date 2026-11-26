@@ -1041,41 +1041,37 @@ fn main() -> Result<()> {
                     }
                     _ => {}
                 },
-                ActiveModal::ConfirmExit(modal) => match ev {
-                    Event::Key(k) => {
-                        if let Some(choice) = modal.handle_key(k.code) {
-                            match choice {
-                                bashmenu_tui::ConfirmChoice::Yes => {
-                                    let _ = save_menu(&menu_path, &menu);
-                                    break;
+                ActiveModal::ConfirmExit(modal) => {
+                    let choice = match ev {
+                        Event::Key(k) => modal.handle_key(k.code),
+                        Event::Mouse(m) => modal.handle_mouse(m, area),
+                        _ => None,
+                    };
+                    if let Some(choice) = choice {
+                        match choice {
+                            bashmenu_tui::ConfirmChoice::Yes => {
+                                match save_menu(&menu_path, &menu) {
+                                    Ok(()) => break,
+                                    Err(e) => {
+                                        toast_rack.add(ToastNotification {
+                                            title: Some("Error".to_string()),
+                                            message: format!("Failed to save menu: {}", e),
+                                            severity: ToastSeverity::Error,
+                                            timeout_secs: 4.0,
+                                        });
+                                        active_modal = ActiveModal::None;
+                                    }
                                 }
-                                bashmenu_tui::ConfirmChoice::No => {
-                                    break;
-                                }
-                                bashmenu_tui::ConfirmChoice::Cancel => {
-                                    active_modal = ActiveModal::None;
-                                }
+                            }
+                            bashmenu_tui::ConfirmChoice::No => {
+                                break;
+                            }
+                            bashmenu_tui::ConfirmChoice::Cancel => {
+                                active_modal = ActiveModal::None;
                             }
                         }
                     }
-                    Event::Mouse(m) => {
-                        if let Some(choice) = modal.handle_mouse(m, area) {
-                            match choice {
-                                bashmenu_tui::ConfirmChoice::Yes => {
-                                    let _ = save_menu(&menu_path, &menu);
-                                    break;
-                                }
-                                bashmenu_tui::ConfirmChoice::No => {
-                                    break;
-                                }
-                                bashmenu_tui::ConfirmChoice::Cancel => {
-                                    active_modal = ActiveModal::None;
-                                }
-                            }
-                        }
-                    }
-                    _ => {}
-                },
+                }
                 ActiveModal::Help(modal) => match ev {
                     Event::Key(k) if modal.handle_key(k.code) => {
                         active_modal = ActiveModal::None;

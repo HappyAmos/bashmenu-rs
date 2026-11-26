@@ -1,18 +1,14 @@
 use std::io::Write;
 use std::process::{Command, Stdio};
 
+fn bmpager_cmd() -> Command {
+    Command::new(env!("CARGO_BIN_EXE_bmpager"))
+}
+
 #[test]
 fn test_bmpager_help_and_version() {
-    let output = Command::new("cargo")
-        .args([
-            "run",
-            "-p",
-            "bmpager-cli",
-            "--bin",
-            "bmpager",
-            "--",
-            "--help",
-        ])
+    let output = bmpager_cmd()
+        .arg("--help")
         .output()
         .expect("failed to execute bmpager --help");
 
@@ -24,16 +20,8 @@ fn test_bmpager_help_and_version() {
     assert!(stdout.contains("+N"));
     assert!(stdout.contains("+/PATTERN"));
 
-    let ver_output = Command::new("cargo")
-        .args([
-            "run",
-            "-p",
-            "bmpager-cli",
-            "--bin",
-            "bmpager",
-            "--",
-            "--version",
-        ])
+    let ver_output = bmpager_cmd()
+        .arg("--version")
         .output()
         .expect("failed to execute bmpager --version");
     assert!(ver_output.status.success());
@@ -43,8 +31,7 @@ fn test_bmpager_help_and_version() {
 
 #[test]
 fn test_bmpager_passthrough_non_tty() {
-    let mut child = Command::new("cargo")
-        .args(["run", "-p", "bmpager-cli", "--bin", "bmpager"])
+    let mut child = bmpager_cmd()
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
@@ -66,16 +53,8 @@ fn test_bmpager_passthrough_non_tty() {
 
 #[test]
 fn test_bmpager_markdown_flag_passthrough() {
-    let mut child = Command::new("cargo")
-        .args([
-            "run",
-            "-p",
-            "bmpager-cli",
-            "--bin",
-            "bmpager",
-            "--",
-            "--markdown",
-        ])
+    let mut child = bmpager_cmd()
+        .arg("--markdown")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
@@ -101,22 +80,14 @@ fn test_bmpager_markdown_flag_passthrough() {
 
 #[test]
 fn test_bmpager_table_rendering_and_wrapping() {
-    let mut child = Command::new("cargo")
-        .args([
-            "run",
-            "-p",
-            "bmpager-cli",
-            "--bin",
-            "bmpager",
-            "--",
-            "--markdown",
-        ])
+    let mut child = bmpager_cmd()
+        .arg("--markdown")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
         .expect("failed to spawn bmpager");
 
-    let table_input = "| Script | Description |\n| :--- | :--- |\n| `scripts/ascii.sh` | Standard and Extended ASCII viewing utility with comprehensive character maps. |\n";
+    let table_input = "| Script | Description |\n| :--- | :--- |\n| `scripts/ascii.sh` | Standard and Extended ASCII viewing utility with character maps. |\n";
     {
         let stdin = child.stdin.as_mut().expect("failed to open stdin");
         stdin.write_all(table_input.as_bytes()).unwrap();
@@ -134,16 +105,8 @@ fn test_bmpager_table_rendering_and_wrapping() {
 
 #[test]
 fn test_bmpager_file_argument() {
-    let output = Command::new("cargo")
-        .args([
-            "run",
-            "-p",
-            "bmpager-cli",
-            "--bin",
-            "bmpager",
-            "--",
-            "Cargo.toml",
-        ])
+    let output = bmpager_cmd()
+        .arg("Cargo.toml")
         .stdout(Stdio::piped())
         .output()
         .expect("failed to run bmpager with Cargo.toml");
@@ -155,16 +118,8 @@ fn test_bmpager_file_argument() {
 
 #[test]
 fn test_bmpager_link_extraction_and_anchor_resolution() {
-    let mut child = Command::new("cargo")
-        .args([
-            "run",
-            "-p",
-            "bmpager-cli",
-            "--bin",
-            "bmpager",
-            "--",
-            "--markdown",
-        ])
+    let mut child = bmpager_cmd()
+        .arg("--markdown")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
@@ -192,17 +147,8 @@ Here is section 3.1 content.
 fn test_bmpager_code_block_frame_exact_border_alignment() {
     use unicode_width::UnicodeWidthStr;
 
-    let mut child = Command::new("cargo")
-        .args([
-            "run",
-            "-p",
-            "bmpager-cli",
-            "--bin",
-            "bmpager",
-            "--",
-            "--markdown",
-            "--no-color",
-        ])
+    let mut child = bmpager_cmd()
+        .args(["--markdown", "--no-color"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
@@ -241,16 +187,8 @@ settings:
 
 #[test]
 fn test_bmpager_wrap_flag_plain_text() {
-    let mut child = Command::new("cargo")
-        .args([
-            "run",
-            "-p",
-            "bmpager-cli",
-            "--bin",
-            "bmpager",
-            "--",
-            "--wrap",
-        ])
+    let mut child = bmpager_cmd()
+        .arg("--wrap")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()

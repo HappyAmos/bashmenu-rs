@@ -7,22 +7,10 @@ use std::process::{exit, Command};
 
 /// Locates `bmpager` binary in executable directory, user bin, or PATH.
 pub fn find_bmpager() -> Option<PathBuf> {
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(parent) = exe.parent() {
-            let candidate = parent.join("bmpager");
-            if candidate.is_file() {
-                return Some(candidate);
-            }
-        }
+    let companion = bashmenu_core::locate_companion_tool("bmpager");
+    if companion.is_file() {
+        return Some(companion);
     }
-
-    if let Ok(home) = std::env::var("HOME") {
-        let candidate = PathBuf::from(&home).join(".local/bin/bmpager");
-        if candidate.is_file() {
-            return Some(candidate);
-        }
-    }
-
     find_in_path("bmpager")
 }
 

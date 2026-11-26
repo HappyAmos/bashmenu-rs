@@ -112,8 +112,10 @@ case "${1:-}" in
         echo "Direct BashMenu Options:"
         echo "  -m, --menu <FILE>   Path to menu definition (default: bashmenu.mnu)"
         echo "  -c, --config <FILE> Path to config file (default: bashmenu.yml)"
-        echo "  -t, --theme <NAME>  Override active theme"
-        echo "  -r, --repo          Load configs from repository root"
+        echo "  -t, --theme <NAME>      Override active theme"
+        echo "  -l, --locale <LOCALE>   Override UI locale (code or YAML path)"
+        echo "  -s, --shortcuts <FILE>  Path to shortcuts file (default: shortcuts.yml)"
+        echo "  -r, --repo              Load configs from repository root"
         echo "  -i, --image         Render full-resolution TrueColor background images via framebuffer"
         echo "  --local             Load configs from current working directory"
         exit 0

@@ -399,23 +399,24 @@ mod tests {
 
     #[test]
     fn test_dim_color() {
-        std::env::set_var("BASHMENU_COLOR_TIER", "truecolor");
-        let white_dim = dim_color(Color::White, 0.0);
+        let tc = crate::style::ColorTier::TrueColor;
+        let white_dim = dim_color_for_tier(Color::White, 0.0, tc);
         assert_eq!(white_dim, Color::Rgb(0, 0, 0));
 
-        let rgb = dim_color(Color::Rgb(100, 200, 50), 0.5);
+        let rgb = dim_color_for_tier(Color::Rgb(100, 200, 50), 0.5, tc);
         assert_eq!(rgb, Color::Rgb(50, 100, 25));
 
-        let full = dim_color(Color::Rgb(100, 200, 50), 1.0);
+        let full = dim_color_for_tier(Color::Rgb(100, 200, 50), 1.0, tc);
         assert_eq!(full, Color::Rgb(100, 200, 50));
 
         // 256-color tier should downsample to Color::Indexed
-        std::env::set_var("BASHMENU_COLOR_TIER", "256");
-        let rgb_256 = dim_color(Color::Rgb(100, 200, 50), 0.5);
+        let rgb_256 = dim_color_for_tier(
+            Color::Rgb(100, 200, 50),
+            0.5,
+            crate::style::ColorTier::Color256,
+        );
         let expected_idx = crate::wallpaper::rgb_to_xterm256(50, 100, 25);
         assert_eq!(rgb_256, Color::Indexed(expected_idx));
-
-        std::env::remove_var("BASHMENU_COLOR_TIER");
     }
 
     #[test]
