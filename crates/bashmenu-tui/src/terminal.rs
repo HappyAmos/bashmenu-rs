@@ -8,21 +8,27 @@ use crossterm::execute;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
-use ratatui::backend::CrosstermBackend;
+use ratatui::backend::{CrosstermBackend, TestBackend};
+use ratatui::buffer::{Buffer, Cell};
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier};
 use ratatui::{Frame, Terminal};
 use std::io::{self, BufWriter, Stdout, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::framebuffer::FramebufferDevice;
 use crate::modals::render_animated_modal_frame;
-use crate::style::ResolvedThemeStyles;
+use crate::style::{ColorTier, ResolvedThemeStyles};
 use crate::transition::{
-    dim_color, interpolate_zoom_rect, TransitionEffect, TransitionSpeed, BAYER_4X4,
+    dim_color_for_tier, interpolate_zoom_rect, TransitionEffect, TransitionPacer, TransitionSpeed,
+    BAYER_4X4,
 };
+
+/// Capacity (64 KiB) for buffered stdout writes so full TrueColor frames flush
+/// inside DEC Mode 2026 synchronized output in minimal `write()` syscalls.
+const STDOUT_BUF_CAPACITY: usize = 64 * 1024;
 
 /// Buffered terminal stdout wrapper that can suppress ANSI cell writes when
 /// direct Linux framebuffer (`/dev/fb0`) rendering is active.
@@ -97,7 +103,7 @@ impl TerminalGuard {
     pub fn init_with_framebuffer(fb_device: Option<FramebufferDevice>) -> io::Result<Self> {
         let keep_alt_on_drop = std::env::var("BASHMENU_CHILD_ALT").as_deref() == Ok("1");
         enable_raw_mode()?;
-        let mut stdout = BufWriter::new(io::stdout());
+        let mut stdout = BufWriter::with_capacity(STDOUT_BUF_CAPACITY, io::stdout());
         if keep_alt_on_drop {
             execute!(stdout, EnableBracketedPaste, EnableMouseCapture, Hide)?;
         } else {
@@ -212,6 +218,10 @@ impl TerminalGuard {
 
     /// Executes a screen transition effect when restoring the menu after an
     /// external command.
+    ///
+    /// Renders `render_callback` once into an offscreen snapshot buffer and
+    /// paces intermediate frames against wall-clock deadlines with an adaptive
+    /// circuit-breaker that snaps to the final frame under heavy system load.
     pub fn draw_with_transition<F>(
         &mut self,
         effect: TransitionEffect,
@@ -229,352 +239,52 @@ impl TerminalGuard {
             return self.draw(|f| render_callback(f));
         }
 
-        match effect {
-            TransitionEffect::None | TransitionEffect::Instant => self.draw(|f| render_callback(f)),
-            TransitionEffect::Fade => {
-                let tier = if self.fb_device.is_some() {
-                    crate::style::ColorTier::TrueColor
-                } else {
-                    crate::style::ColorTier::detect()
-                };
-                if tier == crate::style::ColorTier::Color8
-                    || tier == crate::style::ColorTier::Color16
-                {
-                    let size = self.terminal.size()?;
-                    let delay = speed.step_delay_in();
-                    let steps = 6;
-                    for step in 1..=steps {
-                        let fraction = step as f32 / steps as f32;
-                        let threshold = (fraction * 16.0).round() as u8;
-                        let _ = self.draw(|f| {
-                            render_callback(f);
-                            if step < steps {
-                                let buf = f.buffer_mut();
-                                for y in 0..size.height {
-                                    for x in 0..size.width {
-                                        let dither = BAYER_4X4[(y % 4) as usize][(x % 4) as usize];
-                                        if dither >= threshold {
-                                            let cell = &mut buf[(x, y)];
-                                            cell.set_char(' ');
-                                            cell.set_fg(Color::Black);
-                                            cell.set_bg(Color::Black);
-                                            cell.modifier = Modifier::empty();
-                                        }
-                                    }
-                                }
-                            }
-                        });
-                        if step < steps {
-                            std::thread::sleep(delay);
-                        }
-                    }
-                    return Ok(());
-                }
+        let snapshot = capture_snapshot(size.width, size.height, |f| render_callback(f));
+        let tier = if self.fb_device.is_some() {
+            ColorTier::TrueColor
+        } else {
+            ColorTier::detect()
+        };
+        let steps = if effect == TransitionEffect::Fade
+            && tier != ColorTier::Color8
+            && tier != ColorTier::Color16
+        {
+            5
+        } else {
+            6
+        };
 
-                let size = self.terminal.size()?;
-                let delay = speed.step_delay_in();
-                let steps = 5;
-                for step in 1..=steps {
-                    let factor = (step as f32) / (steps as f32);
-                    let _ = self.draw(|f| {
-                        render_callback(f);
-                        if step < steps {
-                            let buf = f.buffer_mut();
-                            for y in 0..size.height {
-                                for x in 0..size.width {
-                                    let cell = &mut buf[(x, y)];
-                                    cell.fg = dim_color(cell.fg, factor);
-                                    if cell.bg != Color::Reset {
-                                        cell.bg = dim_color(cell.bg, factor);
-                                    }
-                                }
-                            }
-                        }
-                    });
-                    if step < steps {
-                        std::thread::sleep(delay);
-                    }
-                }
-                Ok(())
+        let mut pacer = TransitionPacer::new(speed.total_duration_in(), steps);
+        while let Some((fraction, frame_idx, is_final)) = pacer.next_frame(Instant::now()) {
+            let draw_start = Instant::now();
+            let _ = self.draw(|f| {
+                apply_transition_in_frame(
+                    effect,
+                    tier,
+                    &snapshot,
+                    f.buffer_mut(),
+                    fraction,
+                    frame_idx,
+                    is_final,
+                );
+            });
+            if is_final {
+                break;
             }
-            TransitionEffect::Curtain => {
-                let size = self.terminal.size()?;
-                let delay = speed.step_delay_in();
-                let steps = 6;
-                for step in 1..=steps {
-                    let fraction = (step as f32) / (steps as f32);
-                    let visible_width = ((size.width as f32) * fraction).round() as u16;
-                    let left_bound = (size.width.saturating_sub(visible_width)) / 2;
-                    let right_bound = left_bound + visible_width;
-                    let _ = self.draw(|f| {
-                        render_callback(f);
-                        if step < steps {
-                            let buf = f.buffer_mut();
-                            for y in 0..size.height {
-                                for x in 0..size.width {
-                                    if x < left_bound || x >= right_bound {
-                                        let cell = &mut buf[(x, y)];
-                                        cell.set_char(' ');
-                                        cell.set_fg(Color::Black);
-                                        cell.set_bg(Color::Black);
-                                        cell.modifier = Modifier::empty();
-                                    }
-                                }
-                            }
-                        }
-                    });
-                    if step < steps {
-                        std::thread::sleep(delay);
-                    }
-                }
-                Ok(())
-            }
-            TransitionEffect::Dissolve => {
-                let size = self.terminal.size()?;
-                let delay = speed.step_delay_in();
-                let steps = 6;
-                for step in 1..=steps {
-                    let fraction = step as f32 / steps as f32;
-                    let threshold = (fraction * 16.0).round() as u8;
-                    let _ = self.draw(|f| {
-                        render_callback(f);
-                        if step < steps {
-                            let buf = f.buffer_mut();
-                            for y in 0..size.height {
-                                for x in 0..size.width {
-                                    let dither = BAYER_4X4[(y % 4) as usize][(x % 4) as usize];
-                                    if dither >= threshold {
-                                        let cell = &mut buf[(x, y)];
-                                        cell.set_char(' ');
-                                        cell.set_fg(Color::Black);
-                                        cell.set_bg(Color::Black);
-                                        cell.modifier = Modifier::empty();
-                                    }
-                                }
-                            }
-                        }
-                    });
-                    if step < steps {
-                        std::thread::sleep(delay);
-                    }
-                }
-                Ok(())
-            }
-            TransitionEffect::Matrix => {
-                let size = self.terminal.size()?;
-                let delay = speed.step_delay_in();
-                let steps = 6;
-                for step in 1..=steps {
-                    let _ = self.draw(|f| {
-                        render_callback(f);
-                        if step < steps {
-                            let buf = f.buffer_mut();
-                            let fraction = step as f32 / steps as f32;
-                            for x in 0..size.width {
-                                let col_offset =
-                                    ((x as u32).wrapping_mul(37).wrapping_add(11) % 5) as i32;
-                                let lead_y =
-                                    ((size.height as f32 + 4.0) * fraction) as i32 - col_offset;
-                                for y in 0..size.height {
-                                    let yi = y as i32;
-                                    if yi > lead_y {
-                                        let cell = &mut buf[(x, y)];
-                                        cell.set_char(' ');
-                                        cell.set_fg(Color::Black);
-                                        cell.set_bg(Color::Black);
-                                        cell.modifier = Modifier::empty();
-                                    } else if yi == lead_y || yi == lead_y - 1 {
-                                        let cell = &mut buf[(x, y)];
-                                        let seed = (x as u32)
-                                            .wrapping_mul(1103515245)
-                                            .wrapping_add((y as u32).wrapping_mul(12345))
-                                            .wrapping_add(step as u32);
-                                        let glyph =
-                                            b"0123456789ABCDEF@#$%&*"[(seed % 22) as usize] as char;
-                                        cell.set_char(glyph);
-                                        if yi == lead_y {
-                                            cell.set_fg(Color::LightGreen);
-                                        } else {
-                                            cell.set_fg(Color::Green);
-                                        }
-                                        cell.set_bg(Color::Black);
-                                        cell.modifier = Modifier::BOLD;
-                                    }
-                                }
-                            }
-                        }
-                    });
-                    if step < steps {
-                        std::thread::sleep(delay);
-                    }
-                }
-                Ok(())
-            }
-            TransitionEffect::SlideLeft => {
-                let size = self.terminal.size()?;
-                let delay = speed.step_delay_in();
-                let steps = 6;
-                for step in 1..=steps {
-                    let fraction = step as f32 / steps as f32;
-                    let offset = ((1.0 - fraction) * size.width as f32).round() as u16;
-                    let _ = self.draw(|f| {
-                        render_callback(f);
-                        if step < steps && offset > 0 {
-                            let buf = f.buffer_mut();
-                            for y in 0..size.height {
-                                for x in (0..size.width).rev() {
-                                    if x >= offset {
-                                        let src = buf[(x - offset, y)].clone();
-                                        buf[(x, y)] = src;
-                                    } else {
-                                        let cell = &mut buf[(x, y)];
-                                        cell.set_char(' ');
-                                        cell.set_fg(Color::Black);
-                                        cell.set_bg(Color::Black);
-                                        cell.modifier = Modifier::empty();
-                                    }
-                                }
-                            }
-                        }
-                    });
-                    if step < steps {
-                        std::thread::sleep(delay);
-                    }
-                }
-                Ok(())
-            }
-            TransitionEffect::SlideRight => {
-                let size = self.terminal.size()?;
-                let delay = speed.step_delay_in();
-                let steps = 6;
-                for step in 1..=steps {
-                    let fraction = step as f32 / steps as f32;
-                    let offset = ((1.0 - fraction) * size.width as f32).round() as u16;
-                    let _ = self.draw(|f| {
-                        render_callback(f);
-                        if step < steps && offset > 0 {
-                            let buf = f.buffer_mut();
-                            for y in 0..size.height {
-                                for x in 0..size.width {
-                                    if x + offset < size.width {
-                                        let src = buf[(x + offset, y)].clone();
-                                        buf[(x, y)] = src;
-                                    } else {
-                                        let cell = &mut buf[(x, y)];
-                                        cell.set_char(' ');
-                                        cell.set_fg(Color::Black);
-                                        cell.set_bg(Color::Black);
-                                        cell.modifier = Modifier::empty();
-                                    }
-                                }
-                            }
-                        }
-                    });
-                    if step < steps {
-                        std::thread::sleep(delay);
-                    }
-                }
-                Ok(())
-            }
-            TransitionEffect::Blinds => {
-                let size = self.terminal.size()?;
-                let delay = speed.step_delay_in();
-                let steps = 6;
-                let slat_size = 4u16;
-                for step in 1..=steps {
-                    let fraction = step as f32 / steps as f32;
-                    let visible_per_slat = (slat_size as f32 * fraction).ceil() as u16;
-                    let _ = self.draw(|f| {
-                        render_callback(f);
-                        if step < steps {
-                            let buf = f.buffer_mut();
-                            for y in 0..size.height {
-                                if (y % slat_size) >= visible_per_slat {
-                                    for x in 0..size.width {
-                                        let cell = &mut buf[(x, y)];
-                                        cell.set_char(' ');
-                                        cell.set_fg(Color::Black);
-                                        cell.set_bg(Color::Black);
-                                        cell.modifier = Modifier::empty();
-                                    }
-                                }
-                            }
-                        }
-                    });
-                    if step < steps {
-                        std::thread::sleep(delay);
-                    }
-                }
-                Ok(())
-            }
-            TransitionEffect::Iris => {
-                let size = self.terminal.size()?;
-                let delay = speed.step_delay_in();
-                let steps = 6;
-                let cx = size.width / 2;
-                let cy = size.height / 2;
-                for step in 1..=steps {
-                    let fraction = step as f32 / steps as f32;
-                    let rx = ((size.width as f32 / 2.0) * fraction).round() as u16;
-                    let ry = ((size.height as f32 / 2.0) * fraction).round() as u16;
-                    let _ = self.draw(|f| {
-                        render_callback(f);
-                        if step < steps {
-                            let buf = f.buffer_mut();
-                            for y in 0..size.height {
-                                let dy = y.abs_diff(cy);
-                                for x in 0..size.width {
-                                    let dx = x.abs_diff(cx);
-                                    if dx > rx || dy > ry {
-                                        let cell = &mut buf[(x, y)];
-                                        cell.set_char(' ');
-                                        cell.set_fg(Color::Black);
-                                        cell.set_bg(Color::Black);
-                                        cell.modifier = Modifier::empty();
-                                    }
-                                }
-                            }
-                        }
-                    });
-                    if step < steps {
-                        std::thread::sleep(delay);
-                    }
-                }
-                Ok(())
-            }
-            TransitionEffect::WipeDown => {
-                let size = self.terminal.size()?;
-                let delay = speed.step_delay_in();
-                let steps = 6;
-                for step in 1..=steps {
-                    let fraction = step as f32 / steps as f32;
-                    let visible_height = ((size.height as f32) * fraction).round() as u16;
-                    let _ = self.draw(|f| {
-                        render_callback(f);
-                        if step < steps {
-                            let buf = f.buffer_mut();
-                            for y in visible_height..size.height {
-                                for x in 0..size.width {
-                                    let cell = &mut buf[(x, y)];
-                                    cell.set_char(' ');
-                                    cell.set_fg(Color::Black);
-                                    cell.set_bg(Color::Black);
-                                    cell.modifier = Modifier::empty();
-                                }
-                            }
-                        }
-                    });
-                    if step < steps {
-                        std::thread::sleep(delay);
-                    }
-                }
-                Ok(())
+            let sleep_dur = pacer.sleep_after_frame(draw_start.elapsed(), Instant::now());
+            if !sleep_dur.is_zero() {
+                std::thread::sleep(sleep_dur);
             }
         }
+        Ok(())
     }
 
     /// Draws a transition-out sequence (ramp-down/curtain close) before
     /// switching to an external application or process.
+    ///
+    /// Renders `render_callback` once into an offscreen snapshot buffer and
+    /// paces intermediate frames against wall-clock deadlines with an adaptive
+    /// circuit-breaker.
     pub fn draw_with_transition_out<F>(
         &mut self,
         effect: TransitionEffect,
@@ -592,325 +302,45 @@ impl TerminalGuard {
             return Ok(());
         }
 
-        match effect {
-            TransitionEffect::None | TransitionEffect::Instant => Ok(()),
-            TransitionEffect::Fade => {
-                let tier = if self.fb_device.is_some() {
-                    crate::style::ColorTier::TrueColor
-                } else {
-                    crate::style::ColorTier::detect()
-                };
-                if tier == crate::style::ColorTier::Color8
-                    || tier == crate::style::ColorTier::Color16
-                {
-                    let size = self.terminal.size()?;
-                    let delay = speed.step_delay_out();
-                    let steps = 6;
-                    for step in (0..steps).rev() {
-                        let fraction = step as f32 / steps as f32;
-                        let threshold = (fraction * 16.0).round() as u8;
-                        let _ = self.draw(|f| {
-                            render_callback(f);
-                            let buf = f.buffer_mut();
-                            for y in 0..size.height {
-                                for x in 0..size.width {
-                                    let dither = BAYER_4X4[(y % 4) as usize][(x % 4) as usize];
-                                    if step == 0 || dither >= threshold {
-                                        let cell = &mut buf[(x, y)];
-                                        cell.set_char(' ');
-                                        cell.set_fg(Color::Black);
-                                        cell.set_bg(Color::Black);
-                                        cell.modifier = Modifier::empty();
-                                    }
-                                }
-                            }
-                        });
-                        std::thread::sleep(delay);
-                    }
-                    return Ok(());
-                }
+        let snapshot = capture_snapshot(size.width, size.height, |f| render_callback(f));
+        let tier = if self.fb_device.is_some() {
+            ColorTier::TrueColor
+        } else {
+            ColorTier::detect()
+        };
+        let steps = if effect == TransitionEffect::Fade
+            && tier != ColorTier::Color8
+            && tier != ColorTier::Color16
+        {
+            5
+        } else {
+            6
+        };
 
-                let size = self.terminal.size()?;
-                let delay = speed.step_delay_out();
-                let steps = 5;
-                for step in (0..steps).rev() {
-                    let factor = (step as f32) / (steps as f32);
-                    let _ = self.draw(|f| {
-                        render_callback(f);
-                        let buf = f.buffer_mut();
-                        for y in 0..size.height {
-                            for x in 0..size.width {
-                                let cell = &mut buf[(x, y)];
-                                if step == 0 {
-                                    cell.set_char(' ');
-                                    cell.set_fg(Color::Black);
-                                    cell.set_bg(Color::Black);
-                                    cell.modifier = Modifier::empty();
-                                } else {
-                                    cell.fg = dim_color(cell.fg, factor);
-                                    if cell.bg != Color::Reset {
-                                        cell.bg = dim_color(cell.bg, factor);
-                                    }
-                                }
-                            }
-                        }
-                    });
-                    std::thread::sleep(delay);
-                }
-                Ok(())
+        let mut pacer = TransitionPacer::new(speed.total_duration_out(), steps);
+        while let Some((progress, frame_idx, is_final)) = pacer.next_frame(Instant::now()) {
+            let visible_fraction = (1.0 - progress).clamp(0.0, 1.0);
+            let draw_start = Instant::now();
+            let _ = self.draw(|f| {
+                apply_transition_out_frame(
+                    effect,
+                    tier,
+                    &snapshot,
+                    f.buffer_mut(),
+                    visible_fraction,
+                    frame_idx,
+                    is_final,
+                );
+            });
+            if is_final {
+                break;
             }
-            TransitionEffect::Curtain => {
-                let size = self.terminal.size()?;
-                let delay = speed.step_delay_out();
-                let steps = 6;
-                for step in (0..steps).rev() {
-                    let fraction = (step as f32) / (steps as f32);
-                    let visible_width = ((size.width as f32) * fraction).round() as u16;
-                    let left_bound = (size.width.saturating_sub(visible_width)) / 2;
-                    let right_bound = left_bound + visible_width;
-                    let _ = self.draw(|f| {
-                        render_callback(f);
-                        let buf = f.buffer_mut();
-                        for y in 0..size.height {
-                            for x in 0..size.width {
-                                if step == 0 || x < left_bound || x >= right_bound {
-                                    let cell = &mut buf[(x, y)];
-                                    cell.set_char(' ');
-                                    cell.set_fg(Color::Black);
-                                    cell.set_bg(Color::Black);
-                                    cell.modifier = Modifier::empty();
-                                }
-                            }
-                        }
-                    });
-                    std::thread::sleep(delay);
-                }
-                Ok(())
-            }
-            TransitionEffect::Dissolve => {
-                let size = self.terminal.size()?;
-                let delay = speed.step_delay_out();
-                let steps = 6;
-                for step in (0..steps).rev() {
-                    let fraction = step as f32 / steps as f32;
-                    let threshold = (fraction * 16.0).round() as u8;
-                    let _ = self.draw(|f| {
-                        render_callback(f);
-                        let buf = f.buffer_mut();
-                        for y in 0..size.height {
-                            for x in 0..size.width {
-                                let dither = BAYER_4X4[(y % 4) as usize][(x % 4) as usize];
-                                if step == 0 || dither >= threshold {
-                                    let cell = &mut buf[(x, y)];
-                                    cell.set_char(' ');
-                                    cell.set_fg(Color::Black);
-                                    cell.set_bg(Color::Black);
-                                    cell.modifier = Modifier::empty();
-                                }
-                            }
-                        }
-                    });
-                    std::thread::sleep(delay);
-                }
-                Ok(())
-            }
-            TransitionEffect::Matrix => {
-                let size = self.terminal.size()?;
-                let delay = speed.step_delay_out();
-                let steps = 6;
-                for step in (0..steps).rev() {
-                    let _ = self.draw(|f| {
-                        render_callback(f);
-                        let buf = f.buffer_mut();
-                        if step == 0 {
-                            for y in 0..size.height {
-                                for x in 0..size.width {
-                                    let cell = &mut buf[(x, y)];
-                                    cell.set_char(' ');
-                                    cell.set_fg(Color::Black);
-                                    cell.set_bg(Color::Black);
-                                    cell.modifier = Modifier::empty();
-                                }
-                            }
-                        } else {
-                            let fraction = (steps - step) as f32 / steps as f32;
-                            for x in 0..size.width {
-                                let col_offset =
-                                    ((x as u32).wrapping_mul(37).wrapping_add(11) % 5) as i32;
-                                let lead_y =
-                                    ((size.height as f32 + 4.0) * fraction) as i32 - col_offset;
-                                for y in 0..size.height {
-                                    let yi = y as i32;
-                                    if yi < lead_y - 1 {
-                                        let cell = &mut buf[(x, y)];
-                                        cell.set_char(' ');
-                                        cell.set_fg(Color::Black);
-                                        cell.set_bg(Color::Black);
-                                        cell.modifier = Modifier::empty();
-                                    } else if yi == lead_y || yi == lead_y - 1 {
-                                        let cell = &mut buf[(x, y)];
-                                        let seed = (x as u32)
-                                            .wrapping_mul(1103515245)
-                                            .wrapping_add((y as u32).wrapping_mul(12345))
-                                            .wrapping_add(step as u32);
-                                        let glyph =
-                                            b"0123456789ABCDEF@#$%&*"[(seed % 22) as usize] as char;
-                                        cell.set_char(glyph);
-                                        cell.set_fg(Color::LightGreen);
-                                        cell.set_bg(Color::Black);
-                                        cell.modifier = Modifier::BOLD;
-                                    }
-                                }
-                            }
-                        }
-                    });
-                    std::thread::sleep(delay);
-                }
-                Ok(())
-            }
-            TransitionEffect::SlideLeft => {
-                let size = self.terminal.size()?;
-                let delay = speed.step_delay_out();
-                let steps = 6;
-                for step in (0..steps).rev() {
-                    let shift =
-                        (((steps - step) as f32 / steps as f32) * size.width as f32).round() as u16;
-                    let _ = self.draw(|f| {
-                        render_callback(f);
-                        let buf = f.buffer_mut();
-                        for y in 0..size.height {
-                            for x in 0..size.width {
-                                if step == 0 || x + shift >= size.width {
-                                    let cell = &mut buf[(x, y)];
-                                    cell.set_char(' ');
-                                    cell.set_fg(Color::Black);
-                                    cell.set_bg(Color::Black);
-                                    cell.modifier = Modifier::empty();
-                                } else {
-                                    let src = buf[(x + shift, y)].clone();
-                                    buf[(x, y)] = src;
-                                }
-                            }
-                        }
-                    });
-                    std::thread::sleep(delay);
-                }
-                Ok(())
-            }
-            TransitionEffect::SlideRight => {
-                let size = self.terminal.size()?;
-                let delay = speed.step_delay_out();
-                let steps = 6;
-                for step in (0..steps).rev() {
-                    let shift =
-                        (((steps - step) as f32 / steps as f32) * size.width as f32).round() as u16;
-                    let _ = self.draw(|f| {
-                        render_callback(f);
-                        let buf = f.buffer_mut();
-                        for y in 0..size.height {
-                            for x in (0..size.width).rev() {
-                                if step == 0 || x < shift {
-                                    let cell = &mut buf[(x, y)];
-                                    cell.set_char(' ');
-                                    cell.set_fg(Color::Black);
-                                    cell.set_bg(Color::Black);
-                                    cell.modifier = Modifier::empty();
-                                } else {
-                                    let src = buf[(x - shift, y)].clone();
-                                    buf[(x, y)] = src;
-                                }
-                            }
-                        }
-                    });
-                    std::thread::sleep(delay);
-                }
-                Ok(())
-            }
-            TransitionEffect::Blinds => {
-                let size = self.terminal.size()?;
-                let delay = speed.step_delay_out();
-                let steps = 6;
-                let slat_size = 4u16;
-                for step in (0..steps).rev() {
-                    let fraction = step as f32 / steps as f32;
-                    let visible_per_slat = (slat_size as f32 * fraction).floor() as u16;
-                    let _ = self.draw(|f| {
-                        render_callback(f);
-                        let buf = f.buffer_mut();
-                        for y in 0..size.height {
-                            if step == 0 || (y % slat_size) >= visible_per_slat {
-                                for x in 0..size.width {
-                                    let cell = &mut buf[(x, y)];
-                                    cell.set_char(' ');
-                                    cell.set_fg(Color::Black);
-                                    cell.set_bg(Color::Black);
-                                    cell.modifier = Modifier::empty();
-                                }
-                            }
-                        }
-                    });
-                    std::thread::sleep(delay);
-                }
-                Ok(())
-            }
-            TransitionEffect::Iris => {
-                let size = self.terminal.size()?;
-                let delay = speed.step_delay_out();
-                let steps = 6;
-                let cx = size.width / 2;
-                let cy = size.height / 2;
-                for step in (0..steps).rev() {
-                    let fraction = step as f32 / steps as f32;
-                    let rx = ((size.width as f32 / 2.0) * fraction).round() as u16;
-                    let ry = ((size.height as f32 / 2.0) * fraction).round() as u16;
-                    let _ = self.draw(|f| {
-                        render_callback(f);
-                        let buf = f.buffer_mut();
-                        for y in 0..size.height {
-                            let dy = y.abs_diff(cy);
-                            for x in 0..size.width {
-                                let dx = x.abs_diff(cx);
-                                if step == 0 || dx > rx || dy > ry {
-                                    let cell = &mut buf[(x, y)];
-                                    cell.set_char(' ');
-                                    cell.set_fg(Color::Black);
-                                    cell.set_bg(Color::Black);
-                                    cell.modifier = Modifier::empty();
-                                }
-                            }
-                        }
-                    });
-                    std::thread::sleep(delay);
-                }
-                Ok(())
-            }
-            TransitionEffect::WipeDown => {
-                let size = self.terminal.size()?;
-                let delay = speed.step_delay_out();
-                let steps = 6;
-                for step in (0..steps).rev() {
-                    let fraction = step as f32 / steps as f32;
-                    let visible_height = ((size.height as f32) * fraction).round() as u16;
-                    let _ = self.draw(|f| {
-                        render_callback(f);
-                        let buf = f.buffer_mut();
-                        for y in 0..size.height {
-                            if step == 0 || y >= visible_height {
-                                for x in 0..size.width {
-                                    let cell = &mut buf[(x, y)];
-                                    cell.set_char(' ');
-                                    cell.set_fg(Color::Black);
-                                    cell.set_bg(Color::Black);
-                                    cell.modifier = Modifier::empty();
-                                }
-                            }
-                        }
-                    });
-                    std::thread::sleep(delay);
-                }
-                Ok(())
+            let sleep_dur = pacer.sleep_after_frame(draw_start.elapsed(), Instant::now());
+            if !sleep_dur.is_zero() {
+                std::thread::sleep(sleep_dur);
             }
         }
+        Ok(())
     }
 
     /// Discards any buffered or stale terminal input events from queue.
@@ -1036,6 +466,8 @@ impl TerminalGuard {
 
     /// Executes a snappy modal zoom grow animation expanding from `anchor`
     /// to `target_rect` over the provided background.
+    ///
+    /// Snapshots `render_background` once and paces frames via [`TransitionPacer`].
     pub fn animate_modal_grow<F>(
         &mut self,
         anchor: (u16, u16),
@@ -1054,16 +486,26 @@ impl TerminalGuard {
         }
 
         let viewport = Rect::new(0, 0, size.width, size.height);
-        let delay = speed.step_delay_out();
-        let factors = [0.25_f32, 0.50_f32, 0.75_f32];
+        let bg_snapshot = capture_snapshot(size.width, size.height, |f| render_background(f));
+        let mut pacer = TransitionPacer::new(speed.total_duration_out(), 4);
 
-        for factor in factors {
+        while let Some((factor, _idx, is_final)) = pacer.next_frame(Instant::now()) {
+            if is_final {
+                break;
+            }
             let intermediate_rect = interpolate_zoom_rect(anchor, target_rect, factor, viewport);
+            let draw_start = Instant::now();
             let _ = self.draw(|f| {
-                render_background(f);
+                copy_snapshot_to_buffer(&bg_snapshot, f.buffer_mut());
                 render_animated_modal_frame(viewport, intermediate_rect, styles, f.buffer_mut());
             });
-            std::thread::sleep(delay);
+            let sleep_dur = pacer.sleep_after_frame(draw_start.elapsed(), Instant::now());
+            if pacer.circuit_breaker_tripped() {
+                break;
+            }
+            if !sleep_dur.is_zero() {
+                std::thread::sleep(sleep_dur);
+            }
         }
 
         Ok(())
@@ -1071,6 +513,8 @@ impl TerminalGuard {
 
     /// Executes a snappy modal zoom shrink animation collapsing from
     /// `source_rect` back to `anchor` over the provided background.
+    ///
+    /// Snapshots `render_background` once and paces frames via [`TransitionPacer`].
     pub fn animate_modal_shrink<F>(
         &mut self,
         anchor: (u16, u16),
@@ -1089,19 +533,380 @@ impl TerminalGuard {
         }
 
         let viewport = Rect::new(0, 0, size.width, size.height);
-        let delay = speed.step_delay_out();
-        let factors = [0.70_f32, 0.40_f32, 0.15_f32];
+        let bg_snapshot = capture_snapshot(size.width, size.height, |f| render_background(f));
+        let mut pacer = TransitionPacer::new(speed.total_duration_out(), 4);
 
-        for factor in factors {
+        while let Some((progress, _idx, is_final)) = pacer.next_frame(Instant::now()) {
+            if is_final {
+                break;
+            }
+            let factor = (1.0 - progress).clamp(0.0, 1.0);
             let intermediate_rect = interpolate_zoom_rect(anchor, source_rect, factor, viewport);
+            let draw_start = Instant::now();
             let _ = self.draw(|f| {
-                render_background(f);
+                copy_snapshot_to_buffer(&bg_snapshot, f.buffer_mut());
                 render_animated_modal_frame(viewport, intermediate_rect, styles, f.buffer_mut());
             });
-            std::thread::sleep(delay);
+            let sleep_dur = pacer.sleep_after_frame(draw_start.elapsed(), Instant::now());
+            if pacer.circuit_breaker_tripped() {
+                break;
+            }
+            if !sleep_dur.is_zero() {
+                std::thread::sleep(sleep_dur);
+            }
         }
 
         Ok(())
+    }
+}
+
+/// Captures a single offscreen frame into a [`Buffer`] via [`TestBackend`].
+pub(crate) fn capture_snapshot<F>(width: u16, height: u16, render_callback: F) -> Buffer
+where
+    F: FnOnce(&mut Frame<'_>),
+{
+    let backend = TestBackend::new(width, height);
+    let Ok(mut scratch) = Terminal::new(backend);
+    let Ok(_) = scratch.draw(render_callback);
+    scratch.backend().buffer().clone()
+}
+
+/// Copies a snapshot buffer into `dst`, handling rare mid-transition resizes
+/// safely without panicking.
+fn copy_snapshot_to_buffer(snapshot: &Buffer, dst: &mut Buffer) {
+    if dst.area == snapshot.area {
+        dst.content.clone_from_slice(&snapshot.content);
+    } else {
+        let max_w = dst.area.width.min(snapshot.area.width);
+        let max_h = dst.area.height.min(snapshot.area.height);
+        for y in 0..max_h {
+            for x in 0..max_w {
+                dst[(x, y)] = snapshot[(x, y)].clone();
+            }
+        }
+    }
+}
+
+/// Blanks a single terminal cell to a black space with empty modifiers.
+#[inline]
+fn clear_cell(cell: &mut Cell) {
+    cell.set_char(' ');
+    cell.set_fg(Color::Black);
+    cell.set_bg(Color::Black);
+    cell.modifier = Modifier::empty();
+}
+
+/// Applies one transition-in frame from `snapshot` into `dst`.
+pub(crate) fn apply_transition_in_frame(
+    effect: TransitionEffect,
+    tier: ColorTier,
+    snapshot: &Buffer,
+    dst: &mut Buffer,
+    fraction: f32,
+    frame_idx: usize,
+    is_final: bool,
+) {
+    copy_snapshot_to_buffer(snapshot, dst);
+    if is_final || effect == TransitionEffect::None || effect == TransitionEffect::Instant {
+        return;
+    }
+
+    let w = dst.area.width;
+    let h = dst.area.height;
+    match effect {
+        TransitionEffect::None | TransitionEffect::Instant => {}
+        TransitionEffect::Fade => {
+            if tier == ColorTier::Color8 || tier == ColorTier::Color16 {
+                let threshold = (fraction * 16.0).round() as u8;
+                for y in 0..h {
+                    for x in 0..w {
+                        let dither = BAYER_4X4[(y % 4) as usize][(x % 4) as usize];
+                        if dither >= threshold {
+                            clear_cell(&mut dst[(x, y)]);
+                        }
+                    }
+                }
+            } else {
+                for cell in dst.content.iter_mut() {
+                    cell.fg = dim_color_for_tier(cell.fg, fraction, tier);
+                    if cell.bg != Color::Reset {
+                        cell.bg = dim_color_for_tier(cell.bg, fraction, tier);
+                    }
+                }
+            }
+        }
+        TransitionEffect::Curtain => {
+            let visible_width = ((w as f32) * fraction).round() as u16;
+            let left_bound = (w.saturating_sub(visible_width)) / 2;
+            let right_bound = left_bound + visible_width;
+            for y in 0..h {
+                for x in 0..w {
+                    if x < left_bound || x >= right_bound {
+                        clear_cell(&mut dst[(x, y)]);
+                    }
+                }
+            }
+        }
+        TransitionEffect::Dissolve => {
+            let threshold = (fraction * 16.0).round() as u8;
+            for y in 0..h {
+                for x in 0..w {
+                    let dither = BAYER_4X4[(y % 4) as usize][(x % 4) as usize];
+                    if dither >= threshold {
+                        clear_cell(&mut dst[(x, y)]);
+                    }
+                }
+            }
+        }
+        TransitionEffect::Matrix => {
+            let step_seed = (frame_idx + 1) as u32;
+            for x in 0..w {
+                let col_offset = ((x as u32).wrapping_mul(37).wrapping_add(11) % 5) as i32;
+                let lead_y = ((h as f32 + 4.0) * fraction) as i32 - col_offset;
+                for y in 0..h {
+                    let yi = y as i32;
+                    if yi > lead_y {
+                        clear_cell(&mut dst[(x, y)]);
+                    } else if yi == lead_y || yi == lead_y - 1 {
+                        let cell = &mut dst[(x, y)];
+                        let seed = (x as u32)
+                            .wrapping_mul(1103515245)
+                            .wrapping_add((y as u32).wrapping_mul(12345))
+                            .wrapping_add(step_seed);
+                        let glyph = b"0123456789ABCDEF@#$%&*"[(seed % 22) as usize] as char;
+                        cell.set_char(glyph);
+                        cell.set_fg(if yi == lead_y {
+                            Color::LightGreen
+                        } else {
+                            Color::Green
+                        });
+                        cell.set_bg(Color::Black);
+                        cell.modifier = Modifier::BOLD;
+                    }
+                }
+            }
+        }
+        TransitionEffect::SlideLeft => {
+            let offset = ((1.0 - fraction) * w as f32).round() as u16;
+            if offset > 0 {
+                let snap_w = snapshot.area.width;
+                let snap_h = snapshot.area.height;
+                for y in 0..h {
+                    for x in 0..w {
+                        if x >= offset && (x - offset) < snap_w && y < snap_h {
+                            dst[(x, y)] = snapshot[(x - offset, y)].clone();
+                        } else {
+                            clear_cell(&mut dst[(x, y)]);
+                        }
+                    }
+                }
+            }
+        }
+        TransitionEffect::SlideRight => {
+            let offset = ((1.0 - fraction) * w as f32).round() as u16;
+            if offset > 0 {
+                let snap_w = snapshot.area.width;
+                let snap_h = snapshot.area.height;
+                for y in 0..h {
+                    for x in 0..w {
+                        if x + offset < snap_w && y < snap_h {
+                            dst[(x, y)] = snapshot[(x + offset, y)].clone();
+                        } else {
+                            clear_cell(&mut dst[(x, y)]);
+                        }
+                    }
+                }
+            }
+        }
+        TransitionEffect::Blinds => {
+            let slat_size = 4u16;
+            let visible_per_slat = (slat_size as f32 * fraction).ceil() as u16;
+            for y in 0..h {
+                if (y % slat_size) >= visible_per_slat {
+                    for x in 0..w {
+                        clear_cell(&mut dst[(x, y)]);
+                    }
+                }
+            }
+        }
+        TransitionEffect::Iris => {
+            let cx = w / 2;
+            let cy = h / 2;
+            let rx = ((w as f32 / 2.0) * fraction).round() as u16;
+            let ry = ((h as f32 / 2.0) * fraction).round() as u16;
+            for y in 0..h {
+                let dy = y.abs_diff(cy);
+                for x in 0..w {
+                    let dx = x.abs_diff(cx);
+                    if dx > rx || dy > ry {
+                        clear_cell(&mut dst[(x, y)]);
+                    }
+                }
+            }
+        }
+        TransitionEffect::WipeDown => {
+            let visible_height = ((h as f32) * fraction).round() as u16;
+            for y in visible_height..h {
+                for x in 0..w {
+                    clear_cell(&mut dst[(x, y)]);
+                }
+            }
+        }
+    }
+}
+
+/// Applies one transition-out frame from `snapshot` into `dst`.
+pub(crate) fn apply_transition_out_frame(
+    effect: TransitionEffect,
+    tier: ColorTier,
+    snapshot: &Buffer,
+    dst: &mut Buffer,
+    visible_fraction: f32,
+    frame_idx: usize,
+    is_final: bool,
+) {
+    if is_final {
+        for cell in dst.content.iter_mut() {
+            clear_cell(cell);
+        }
+        return;
+    }
+
+    copy_snapshot_to_buffer(snapshot, dst);
+    let w = dst.area.width;
+    let h = dst.area.height;
+    match effect {
+        TransitionEffect::None | TransitionEffect::Instant => {}
+        TransitionEffect::Fade => {
+            if tier == ColorTier::Color8 || tier == ColorTier::Color16 {
+                let threshold = (visible_fraction * 16.0).round() as u8;
+                for y in 0..h {
+                    for x in 0..w {
+                        let dither = BAYER_4X4[(y % 4) as usize][(x % 4) as usize];
+                        if dither >= threshold {
+                            clear_cell(&mut dst[(x, y)]);
+                        }
+                    }
+                }
+            } else {
+                for cell in dst.content.iter_mut() {
+                    cell.fg = dim_color_for_tier(cell.fg, visible_fraction, tier);
+                    if cell.bg != Color::Reset {
+                        cell.bg = dim_color_for_tier(cell.bg, visible_fraction, tier);
+                    }
+                }
+            }
+        }
+        TransitionEffect::Curtain => {
+            let visible_width = ((w as f32) * visible_fraction).round() as u16;
+            let left_bound = (w.saturating_sub(visible_width)) / 2;
+            let right_bound = left_bound + visible_width;
+            for y in 0..h {
+                for x in 0..w {
+                    if x < left_bound || x >= right_bound {
+                        clear_cell(&mut dst[(x, y)]);
+                    }
+                }
+            }
+        }
+        TransitionEffect::Dissolve => {
+            let threshold = (visible_fraction * 16.0).round() as u8;
+            for y in 0..h {
+                for x in 0..w {
+                    let dither = BAYER_4X4[(y % 4) as usize][(x % 4) as usize];
+                    if dither >= threshold {
+                        clear_cell(&mut dst[(x, y)]);
+                    }
+                }
+            }
+        }
+        TransitionEffect::Matrix => {
+            let progress = 1.0 - visible_fraction;
+            let step_seed = (frame_idx + 1) as u32;
+            for x in 0..w {
+                let col_offset = ((x as u32).wrapping_mul(37).wrapping_add(11) % 5) as i32;
+                let lead_y = ((h as f32 + 4.0) * progress) as i32 - col_offset;
+                for y in 0..h {
+                    let yi = y as i32;
+                    if yi < lead_y - 1 {
+                        clear_cell(&mut dst[(x, y)]);
+                    } else if yi == lead_y || yi == lead_y - 1 {
+                        let cell = &mut dst[(x, y)];
+                        let seed = (x as u32)
+                            .wrapping_mul(1103515245)
+                            .wrapping_add((y as u32).wrapping_mul(12345))
+                            .wrapping_add(step_seed);
+                        let glyph = b"0123456789ABCDEF@#$%&*"[(seed % 22) as usize] as char;
+                        cell.set_char(glyph);
+                        cell.set_fg(Color::LightGreen);
+                        cell.set_bg(Color::Black);
+                        cell.modifier = Modifier::BOLD;
+                    }
+                }
+            }
+        }
+        TransitionEffect::SlideLeft => {
+            let shift = ((1.0 - visible_fraction) * w as f32).round() as u16;
+            let snap_w = snapshot.area.width;
+            let snap_h = snapshot.area.height;
+            for y in 0..h {
+                for x in 0..w {
+                    if x + shift < snap_w && y < snap_h {
+                        dst[(x, y)] = snapshot[(x + shift, y)].clone();
+                    } else {
+                        clear_cell(&mut dst[(x, y)]);
+                    }
+                }
+            }
+        }
+        TransitionEffect::SlideRight => {
+            let shift = ((1.0 - visible_fraction) * w as f32).round() as u16;
+            let snap_w = snapshot.area.width;
+            let snap_h = snapshot.area.height;
+            for y in 0..h {
+                for x in 0..w {
+                    if x >= shift && (x - shift) < snap_w && y < snap_h {
+                        dst[(x, y)] = snapshot[(x - shift, y)].clone();
+                    } else {
+                        clear_cell(&mut dst[(x, y)]);
+                    }
+                }
+            }
+        }
+        TransitionEffect::Blinds => {
+            let slat_size = 4u16;
+            let visible_per_slat = (slat_size as f32 * visible_fraction).floor() as u16;
+            for y in 0..h {
+                if (y % slat_size) >= visible_per_slat {
+                    for x in 0..w {
+                        clear_cell(&mut dst[(x, y)]);
+                    }
+                }
+            }
+        }
+        TransitionEffect::Iris => {
+            let cx = w / 2;
+            let cy = h / 2;
+            let rx = ((w as f32 / 2.0) * visible_fraction).round() as u16;
+            let ry = ((h as f32 / 2.0) * visible_fraction).round() as u16;
+            for y in 0..h {
+                let dy = y.abs_diff(cy);
+                for x in 0..w {
+                    let dx = x.abs_diff(cx);
+                    if dx > rx || dy > ry {
+                        clear_cell(&mut dst[(x, y)]);
+                    }
+                }
+            }
+        }
+        TransitionEffect::WipeDown => {
+            let visible_height = ((h as f32) * visible_fraction).round() as u16;
+            for y in visible_height..h {
+                for x in 0..w {
+                    clear_cell(&mut dst[(x, y)]);
+                }
+            }
+        }
     }
 }
 
@@ -1195,5 +1000,115 @@ mod tests {
     #[test]
     fn test_ensure_terminal_sane_callable() {
         ensure_terminal_sane();
+    }
+
+    #[test]
+    fn test_capture_snapshot_invokes_callback_once_and_preserves_cells() {
+        let mut calls = 0usize;
+        let snapshot = capture_snapshot(20, 6, |f| {
+            calls += 1;
+            let buf = f.buffer_mut();
+            buf[(2, 1)].set_char('X').set_fg(Color::Rgb(120, 180, 240));
+        });
+
+        assert_eq!(calls, 1);
+        assert_eq!(snapshot.area, Rect::new(0, 0, 20, 6));
+        assert_eq!(snapshot[(2, 1)].symbol(), "X");
+        assert_eq!(snapshot[(2, 1)].fg, Color::Rgb(120, 180, 240));
+    }
+
+    #[test]
+    fn test_apply_transition_in_and_out_frames_all_effects() {
+        let snapshot = capture_snapshot(16, 8, |f| {
+            let buf = f.buffer_mut();
+            for y in 0..8 {
+                for x in 0..16 {
+                    buf[(x, y)]
+                        .set_char('#')
+                        .set_fg(Color::Rgb(200, 100, 50))
+                        .set_bg(Color::Rgb(20, 30, 40));
+                }
+            }
+        });
+
+        let effects = [
+            TransitionEffect::Fade,
+            TransitionEffect::Curtain,
+            TransitionEffect::Dissolve,
+            TransitionEffect::Matrix,
+            TransitionEffect::SlideLeft,
+            TransitionEffect::SlideRight,
+            TransitionEffect::Blinds,
+            TransitionEffect::Iris,
+            TransitionEffect::WipeDown,
+        ];
+
+        for effect in effects {
+            let mut dst = Buffer::empty(snapshot.area);
+            // Mid-frame transition-in
+            apply_transition_in_frame(
+                effect,
+                ColorTier::TrueColor,
+                &snapshot,
+                &mut dst,
+                0.5,
+                2,
+                false,
+            );
+            // Final transition-in must match snapshot identically
+            apply_transition_in_frame(
+                effect,
+                ColorTier::TrueColor,
+                &snapshot,
+                &mut dst,
+                1.0,
+                5,
+                true,
+            );
+            assert_eq!(
+                dst.content, snapshot.content,
+                "final in-frame mismatch for {effect:?}"
+            );
+
+            // Mid-frame transition-out
+            apply_transition_out_frame(
+                effect,
+                ColorTier::TrueColor,
+                &snapshot,
+                &mut dst,
+                0.5,
+                2,
+                false,
+            );
+            // Final transition-out must blank all cells to black space
+            apply_transition_out_frame(
+                effect,
+                ColorTier::TrueColor,
+                &snapshot,
+                &mut dst,
+                0.0,
+                5,
+                true,
+            );
+            assert!(
+                dst.content
+                    .iter()
+                    .all(|c| c.symbol() == " " && c.fg == Color::Black && c.bg == Color::Black),
+                "final out-frame must be black for {effect:?}"
+            );
+        }
+
+        // Mid-transition resize safety (different destination dimensions must not panic)
+        let mut resized = Buffer::empty(Rect::new(0, 0, 10, 4));
+        apply_transition_in_frame(
+            TransitionEffect::SlideLeft,
+            ColorTier::TrueColor,
+            &snapshot,
+            &mut resized,
+            0.5,
+            1,
+            false,
+        );
+        assert_eq!(resized.area, Rect::new(0, 0, 10, 4));
     }
 }
