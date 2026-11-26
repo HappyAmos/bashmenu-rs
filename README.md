@@ -5,7 +5,7 @@
 [![ShellCheck](https://github.com/HappyAmos/bashmenu-rs/actions/workflows/shellcheck-app.yml/badge.svg)](https://github.com/HappyAmos/bashmenu-rs/actions/workflows/shellcheck-app.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> Modern, lightning-fast terminal menu system and companion developer tools in **Rust + Bash scripting** using **Ratatui** and **Crossterm**.
+> Modern, fast terminal menu system, cheat sheet and markdown pager in **Rust + Bash scripting** using **Ratatui** and **Crossterm**.
 
 ---
 ![Bashmenu Preview](assets/bashmenu.gif)
