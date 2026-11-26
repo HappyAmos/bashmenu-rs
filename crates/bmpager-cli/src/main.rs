@@ -28,19 +28,7 @@ fn main() {
         }
     };
 
-    // Initialize active locale (CLI flag > LC_ALL > LC_MESSAGES > LANG)
-    let locale_target = args
-        .locale
-        .as_ref()
-        .cloned()
-        .or_else(|| std::env::var("LC_ALL").ok())
-        .or_else(|| std::env::var("LC_MESSAGES").ok())
-        .or_else(|| std::env::var("LANG").ok());
-
-    if let Some(ref loc) = locale_target {
-        let clean_loc = loc.split('.').next().unwrap_or(loc);
-        let _ = bashmenu_core::set_locale(clean_loc);
-    }
+    bashmenu_core::init_locale_from_env(args.locale.as_deref(), None);
 
     // 3. Collect Raw Input
     let mut raw_content = String::new();

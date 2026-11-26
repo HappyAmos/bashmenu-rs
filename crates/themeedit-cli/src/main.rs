@@ -53,18 +53,8 @@ struct Cli {
     locale: Option<String>,
 }
 
-/// Resolves the file path for `bashmenu.themes`.
-/// If `local` is true, resolves relative to current working directory; otherwise uses user config path.
 fn resolve_themes_path(target: &Path, local: bool) -> PathBuf {
-    if local {
-        if target.is_absolute() {
-            target.to_path_buf()
-        } else {
-            PathBuf::from(".").join(target)
-        }
-    } else {
-        bashmenu_core::resolve_app_path(target)
-    }
+    bashmenu_core::resolve_path_with_local(target, local)
 }
 
 /// Active popup modal dialog in the theme editor.
@@ -218,18 +208,10 @@ fn main() -> Result<()> {
         bashmenu_core::resolve_app_path(Path::new("bashmenu.yml"))
     };
     let cfg = bashmenu_core::load_config(&cfg_path).ok();
-    let locale_target = cli
-        .locale
-        .clone()
-        .or_else(|| cfg.as_ref().and_then(|c| c.settings.locale.clone()))
-        .or_else(|| std::env::var("LC_ALL").ok())
-        .or_else(|| std::env::var("LC_MESSAGES").ok())
-        .or_else(|| std::env::var("LANG").ok());
-
-    if let Some(ref loc) = locale_target {
-        let clean_loc = loc.split('.').next().unwrap_or(loc);
-        let _ = bashmenu_core::set_locale(clean_loc);
-    }
+    bashmenu_core::init_locale_from_env(
+        cli.locale.as_deref(),
+        cfg.as_ref().and_then(|c| c.settings.locale.as_deref()),
+    );
 
     let themes_path = if let Some(ref f) = cli.file {
         resolve_themes_path(f, cli.local)

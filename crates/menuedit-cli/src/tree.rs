@@ -373,14 +373,10 @@ pub fn indent_item(
 
     let item_to_move = items.remove(last_idx);
     let prev_item = &mut items[prev_idx];
-    if prev_item.submenu.is_none() {
-        prev_item.submenu = Some(Submenu {
-            title: prev_item.label.clone(),
-            items: Vec::new(),
-        });
-    }
-
-    let sub = prev_item.submenu.as_mut().unwrap();
+    let sub = prev_item.submenu.get_or_insert_with(|| Submenu {
+        title: prev_item.label.clone(),
+        items: Vec::new(),
+    });
     sub.items.push(item_to_move);
     let new_child_idx = sub.items.len() - 1;
 
@@ -440,12 +436,10 @@ pub fn delete_item(menu: &mut MenuSchema, path: &[usize]) -> Option<MenuItem> {
 
 /// Inserts a new item directly after the current node
 pub fn insert_item_after(menu: &mut MenuSchema, path: &[usize], new_item: MenuItem) -> Vec<usize> {
-    if path.is_empty() {
+    let Some(&last_idx) = path.last() else {
         menu.items.push(new_item);
         return vec![menu.items.len() - 1];
-    }
-
-    let last_idx = *path.last().unwrap();
+    };
     let parent_path = &path[..path.len() - 1];
     if let Some(items) = get_container_items_mut(menu, parent_path) {
         let insert_idx = (last_idx + 1).min(items.len());

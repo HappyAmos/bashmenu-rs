@@ -1,4 +1,4 @@
-//! Comprehensive modal editor for menu item properties and flags.
+//! Modal editor for menu item properties and flags.
 //!
 //! Provides 1:1 parity with the Python Textual `ItemEditModal`, featuring
 //! dynamic divider / standard field layouts, 3-way execution mode selection,
@@ -279,7 +279,8 @@ impl MultiLineInput {
 
             let last_clean: Vec<char> = paste_lines
                 .last()
-                .unwrap()
+                .copied()
+                .unwrap_or("")
                 .chars()
                 .filter(|c| *c != '\r')
                 .collect();

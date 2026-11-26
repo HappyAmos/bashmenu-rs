@@ -20,7 +20,7 @@
 //!    notifications.
 
 use anyhow::Result;
-use bashmenu_core::theme::Theme;
+use bashmenu_core::pick_random_theme;
 use bashmenu_core::{
     add_or_update_note, build_notebook_submenu, clear_command_cache, delete_note, extract_toasts,
     get_note_by_title, interpolate_placeholders, load_config, load_menu, load_notebook,
@@ -39,7 +39,6 @@ use bashmenu_tui::{
 };
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode};
-use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -241,28 +240,15 @@ impl ActiveModal {
 /// Resolves a configuration or asset file path, choosing between local
 /// directory or `~/.config/bashmenu/`.
 fn resolve_file_path(target: &Path, local: bool) -> PathBuf {
-    if local {
-        if target.is_absolute() {
-            target.to_path_buf()
-        } else {
-            PathBuf::from(".").join(target)
-        }
-    } else {
-        bashmenu_core::resolve_app_path(target)
-    }
+    bashmenu_core::resolve_path_with_local(target, local)
 }
 
 /// Discovers the path to companion tools (`menuedit`, `themeedit`, `bashedit`,
-/// `bmpager`) by inspecting target directories, `BASHMENU_DIR`, and
-/// `~/.local/bin`.
+/// `bmpager`) across executable directory, `BASHMENU_DIR`, and `~/.local/bin`.
 fn locate_tool(name: &str) -> PathBuf {
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            let candidate = dir.join(name);
-            if candidate.is_file() {
-                return candidate;
-            }
-        }
+    let found = bashmenu_core::locate_companion_tool(name);
+    if found.is_file() {
+        return found;
     }
     if let Ok(dir) = std::env::var("BASHMENU_DIR") {
         let candidate = PathBuf::from(&dir).join("target/release").join(name);
@@ -276,18 +262,7 @@ fn locate_tool(name: &str) -> PathBuf {
             return script_cand;
         }
     }
-    if let Ok(home) = std::env::var("HOME") {
-        let candidate = PathBuf::from(home).join(".local/bin").join(name);
-        if candidate.is_file() {
-            return candidate;
-        }
-    }
-    PathBuf::from(name)
-}
-
-/// Selects a pseudo-random theme from available themes, skipping random specs.
-fn pick_random_theme(themes: &HashMap<String, Theme>) -> Option<(&str, &Theme)> {
-    bashmenu_core::pick_random_theme(themes)
+    found
 }
 
 /// Main application entrypoint for `bashmenu`.
@@ -352,18 +327,7 @@ fn main() -> Result<()> {
         }
     };
 
-    // Initialize active locale (CLI flag > config.settings.locale > LC_ALL > LC_MESSAGES > LANG)
-    let locale_target = cli
-        .locale
-        .or_else(|| config.settings.locale.clone())
-        .or_else(|| std::env::var("LC_ALL").ok())
-        .or_else(|| std::env::var("LC_MESSAGES").ok())
-        .or_else(|| std::env::var("LANG").ok());
-
-    if let Some(ref loc) = locale_target {
-        let clean_loc = loc.split('.').next().unwrap_or(loc);
-        let _ = bashmenu_core::set_locale(clean_loc);
-    }
+    bashmenu_core::init_locale_from_env(cli.locale.as_deref(), config.settings.locale.as_deref());
 
     if let Some(t) = cli.theme {
         config.theme = t;

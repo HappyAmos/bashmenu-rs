@@ -142,19 +142,8 @@ struct Cli {
     locale: Option<String>,
 }
 
-/// Resolves the filesystem path for the target menu file.
-/// If `local` is true, interprets non-absolute paths relative to the current working directory;
-/// otherwise delegates to [`bashmenu_core::resolve_app_path`] to locate user/system configuration.
 fn resolve_menu_path(target: &Path, local: bool) -> PathBuf {
-    if local {
-        if target.is_absolute() {
-            target.to_path_buf()
-        } else {
-            PathBuf::from(".").join(target)
-        }
-    } else {
-        bashmenu_core::resolve_app_path(target)
-    }
+    bashmenu_core::resolve_path_with_local(target, local)
 }
 
 /// Represents the active child modal spawned within an item editor modal.
@@ -272,18 +261,10 @@ fn main() -> Result<()> {
     let cfg_path = resolve_menu_path(Path::new("bashmenu.yml"), cli.local);
     let cfg = load_config(&cfg_path).ok();
 
-    let locale_target = cli
-        .locale
-        .clone()
-        .or_else(|| cfg.as_ref().and_then(|c| c.settings.locale.clone()))
-        .or_else(|| std::env::var("LC_ALL").ok())
-        .or_else(|| std::env::var("LC_MESSAGES").ok())
-        .or_else(|| std::env::var("LANG").ok());
-
-    if let Some(ref loc) = locale_target {
-        let clean_loc = loc.split('.').next().unwrap_or(loc);
-        let _ = bashmenu_core::set_locale(clean_loc);
-    }
+    bashmenu_core::init_locale_from_env(
+        cli.locale.as_deref(),
+        cfg.as_ref().and_then(|c| c.settings.locale.as_deref()),
+    );
 
     if cli.merge {
         let user_menu = if let Some(ref u) = cli.user_menu {

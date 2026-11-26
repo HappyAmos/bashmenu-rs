@@ -506,12 +506,14 @@ impl MarkdownRenderer {
                 if let Some(c) = widest_idx {
                     col_widths[c] -= 1;
                 } else {
-                    let widest = col_widths
+                    let Some(widest) = col_widths
                         .iter()
                         .enumerate()
                         .max_by_key(|(_, &w)| w)
                         .map(|(c, _)| c)
-                        .unwrap();
+                    else {
+                        break;
+                    };
                     if col_widths[widest] <= 3 {
                         break;
                     }
