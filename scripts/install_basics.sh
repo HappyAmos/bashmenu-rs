@@ -122,8 +122,8 @@ get_solution_for_pkg() {
         glow)
             echo "  - Issue: 'glow' is not in default repositories for many Linux distributions."
             echo "  - Solutions:"
-            echo "      1. Run custom script: scripts/install_glow.sh"
-            echo "      2. Use built-in markdown viewer: bmpager --markdown <file>"
+            echo "      1. Use built-in markdown viewer: bmpager --markdown <file>"
+            echo "      2. Install using Go: go install github.com/charmbracelet/glow@latest"
             echo "      3. Install using Homebrew: brew install glow"
             ;;
         gum)
@@ -372,7 +372,7 @@ for pkg in "${PACKAGES[@]}"; do
         continue
     fi
 
-    # Fallback: check for package-specific script in scripts/ (e.g. install_glow.sh)
+    # Fallback: check for package-specific script in scripts/ (e.g. install_node.sh)
     FALLBACK_SCRIPT="$SCRIPT_DIR/install_${pkg}.sh"
     if [ -f "$FALLBACK_SCRIPT" ]; then
         echo "  [!] Package manager failed for $pkg. Trying fallback installer: install_${pkg}.sh..."

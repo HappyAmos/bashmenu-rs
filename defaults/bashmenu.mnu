@@ -61,7 +61,7 @@ items:
     interactive: true
     quiet: false
     submenu:
-      title: New submenu
+      title: Experiments
       items:
       - '{divider}': null
       - Discover New proot Containers:
@@ -172,24 +172,15 @@ items:
           template: '{templates_dir}/bash_aliases.tmpl'
           target: ~/.bash_aliases
       - Install Basics [vim mc htop glow gum curl wget git shellcheck shfmt jq yq sc cmatrix]:
-          type: submenu
+          type: script
           icon: '{nf::#ed5b}'
           action: '{scripts_dir}/install_basics.sh'
           interactive: false
           quiet: true
-          tabstop: 4
-          submenu:
-            title: Install Basics [vim mc htop glow gum curl wget git shellcheck shfmt jq yq]
-            items: []
-          external: false
           window_percent: 65
-          no_formatting: false
-          masked: false
-          refresh: false
           stream: true
-          show_whitespace: false
           exec_mode: streaming
-      - Install Cheatsheets From Private Repo [https://github.com/HappyAmos/cheat.git]:
+      - Install Cheatsheets [{scripts_dir}/install_cheat.sh]:
           type: script
           icon: '{nf::#f02aa}'
           action: '{scripts_dir}/install_cheat.sh'
@@ -241,7 +232,7 @@ items:
           quiet: false
           alt_buffer: true
           submenu:
-            title: New submenu
+            title: Bookmarks
             items:
             - '{divider}': null
             - Rust Book:
@@ -325,7 +316,7 @@ items:
     alt_buffer: true
     tabstop: 4
     submenu:
-      title: New submenu
+      title: Media
       items:
       - '{divider}': null
       - Play VT Animation File [{curl -s [URL] | pv -q -L 2000}]:

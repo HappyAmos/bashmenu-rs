@@ -2,7 +2,7 @@
 # Makefile for BashMenu-RS
 # ==============================================================================
 
-.PHONY: all help check test fmt clippy shellcheck verify build install clean locale-check
+.PHONY: all help check test fmt fmt-fix clippy shellcheck verify build release install clean locale-check
 
 all: help
 

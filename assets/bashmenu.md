@@ -1,4 +1,4 @@
-# HA Bash Menu Specification & User Manual (v0.1.6)
+# HA Bash Menu Specification & User Manual (v0.1.7)
 
 Welcome to the specification and user manual for HA Bash Menu, a lightweight,
 data-driven Ratatui Text User Interface (TUI) menu engine and configuration
@@ -52,7 +52,7 @@ HA Bash Menu is comprised of modular scripts and configuration files:
 | `install.sh` | Universal POSIX /bin/sh installer for workspace binaries and user config. |
 | `uninstall.sh` | Pure POSIX /bin/sh uninstaller removing files, symlinks, and cache. |
 | `bashmenu.sh` | Launcher shell script with auto-setup and self-healing. |
-| `bashmenu` | Core high-performance Ratatui TUI application engine and main rendering window. |
+| `bashmenu` | Core Ratatui TUI application engine and main rendering window. |
 | `bashedit` | Built-in text editor engine with swap file recovery. |
 | `menuedit` | Interactive TUI visual editor for `bashmenu.mnu` (run via `F4`). |
 | `themeedit` | Interactive TUI visual theme creator and palette editor (run via `F8`). |
@@ -77,6 +77,7 @@ HA Bash Menu is comprised of modular scripts and configuration files:
 | `--config <FILE>` | `-c` | Explicit path to configuration file (default: `~/.config/bashmenu/bashmenu.yml`). |
 | `--menu <FILE>` | `-m` | Explicit path to menu definition file (default: `~/.config/bashmenu/bashmenu.mnu`). |
 | `--theme <NAME>` | `-t` | Override active theme name. |
+| `--locale <FILE\|CODE>` | `-L` | Override UI locale (e.g. `es_es` or path to a locale YAML file). |
 | `--shortcuts <FILE>` | `-s` | Explicit path to keyboard shortcuts file (default: `~/.config/bashmenu/shortcuts.yml`). |
 | `--repo` | `-r` | Load configuration files (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `cheat.yml`, `notes.yml`) from repository `defaults/` directory. |
 | `--image` | `-i` | Render full-resolution TrueColor background images directly via the Linux framebuffer (`/dev/fb0`) instead of character-block translation. |
@@ -101,7 +102,7 @@ These scripts are stored in the `/scripts` directory and can be used directly or
 | `scripts/glyphs.sh` | Curses search and preview dialog box utility for selecting Unicode emojis and Nerd Font icons. |
 | `scripts/hostname.sh` | Hostname and system identity discovery utility reporting hostname, FQDN, kernel, architecture, and OS distribution. |
 | `scripts/install_basics.sh` | Cross-platform basic tools installer wrapper. |
-| `scripts/install_cheat.sh` | Setup script that installs interactive cheat sheet terminal tools into the local environment. |
+| `scripts/install_cheat.sh` | Helper script to clone a cheatsheet Git repository into the local environment. |
 | `scripts/install_games.sh` | Cross-platform installer for terminal games (ninvaders, nsnake, greed, moon-buggy, nethack, etc.). |
 | `scripts/install_node.sh` | Installer script for Node.js via nvm or system package manager. |
 | `scripts/ip_info.sh` | Displays current network interface IP addresses and connection status. |
@@ -111,6 +112,7 @@ These scripts are stored in the `/scripts` directory and can be used directly or
 | `scripts/sso-ssh.sh` | Automates Ed25519 SSH key generation, authorization, and configuration for passwordless remote server connections. |
 | `scripts/system_update.sh` | Cross-platform system update wrapper supporting apt, dnf, pacman, pkg, and brew. |
 | `scripts/temp.sh` | Native server and CPU temperature reporting script supporting Celsius and Fahrenheit (`--fahrenheit` / `-f`). |
+| `scripts/terminal_radar.sh` | Terminal weather radar viewer script. |
 | `scripts/unicode.sh` | Interactive Unicode Block Explorer script. |
 | `scripts/webopen.sh` | Cross-platform web browser launcher wrapper script that opens a specified URL, file, or default browser (supporting Linux, macOS, WSL, and Termux). Supports `--gui` / `-g` for graphical browsers and `--tty` / `tty` for terminal browsers (lynx, links, brow6el). |
 
@@ -350,6 +352,7 @@ The `ymlcheck` CLI utility validates YAML syntax and enforces schema constraints
 | `-t`, `--themes`, `--theme` | Validate `bashmenu.themes` palette definitions (256-color `[fg, bg]` pairs, 16-color `COLOR_*` constants, window border keys). |
 | `-m`, `--menu` | Recursively validate `bashmenu.mnu` menu schema (`items` non-empty, valid option `type` values, `radio` `key` presence). |
 | `-s`, `--shortcuts`, `--shortcut` | Validate `shortcuts.yml` schema (`leader_key` spec, non-empty descriptions, duplicate active key detection, `window_percent` in `20..=100`). |
+| `-l`, `--locale` | Validate locale YAML translation files for 100% key parity and placeholder consistency against `locales/en_us.yml`. |
 | `-y`, `--yaml` | Explicitly validate general YAML syntax only. |
 
 ---
@@ -451,8 +454,8 @@ settings:
 - **Alternate Buffer Isolation**: The command executes inside an alternate
   screen buffer (`\x1b[?1049h`), ensuring neither the underlying terminal
   command line nor the menu layout is disturbed.
-- **Seamless Return**: When the screensaver command exits (e.g. via `q` or
-  `Ctrl+C`), the menu interface repaints cleanly and the inactivity countdown is
+- **Clean Return**: When the screensaver command exits (e.g. via `q` or
+  `Ctrl+C`), the menu interface repaints and the inactivity countdown is
   re-armed automatically.
 
 Dividers can be defined under `user.divider` (or `settings.divider`) with full specifications including `char` (e.g., `{ascii:196}` or `-`) and `length` (e.g., `{window_width}` or `40`). Using `{user.divider}` or `{divider}` in `pretext` or `posttext` expands to a styled divider line matching the active theme's configured divider color.
@@ -520,7 +523,7 @@ You can configure animation playback speed using preset profiles or explicit mil
 | Speed Profile | Animation Duration | Step Interval | Recommended Use Case |
 | :--- | :--- | :--- | :--- |
 | `fast` | ~60–75ms | 15ms in / 12ms out | High-speed navigation and power users desiring rapid response with subtle visual motion. |
-| **`normal`** (Default) | ~100–125ms | 25ms in / 20ms out | Balanced, buttery-smooth cinematic pacing across modern terminals and netbook displays. |
+| **`normal`** (Default) | ~100–140ms | 25ms in / 20ms out | Balanced default pacing across desktop terminals and low-power displays. |
 | `slow` | ~200–250ms | 50ms in / 40ms out | Deliberate, relaxed pacing ideal for presentations, high-contrast themes, or low-power screens. |
 | `<integer>` (e.g. `30`) | Custom | User-specified ms | Explicit custom step interval in milliseconds (clamped between 5ms and 500ms). |
 
@@ -658,6 +661,13 @@ Color themes configure the visual palette for the main menu, text editor (`bashe
 | `shadow` | Modal dialog and popup window drop-shadow color (`[fg, -1]` syncs cell background to foreground). |
 | `whitespace` | Non-visible whitespace characters (spaces, tabs, newlines) display color in the text editor. |
 | `window_close_button` | Close 'x' button in window title bars and modal dialogs. |
+| `selected_tab` | Active tab foreground and background color in `bashedit` and `themeedit`. |
+| `unselected_tab` | Inactive tab foreground and background color in `bashedit` and `themeedit`. |
+| `line_numbers` | Line-number gutter color in `bashedit`. |
+| `modal_yes_button` | `[ Yes ]` button foreground and background color in confirmation modals. |
+| `modal_no_button` | `[ No ]` button foreground and background color in confirmation modals. |
+| `modal_cancel_button` | `[ Cancel ]` button foreground and background color in confirmation modals. |
+| `key_color` | Shortcut key badge color in `shortcutedit` and the `7:Shortcuts` preview. |
 
 #### Per-Activity Color Overrides & `-1` Inheritance
 Each color tier (`256`, `16`, `8`) may include optional nested override sections for `bashedit`, `modals`, `menuedit`, `toasts`, `themeedit`, and `shortcutedit`. Within any activity override section, setting a scalar color (`background`, `highlight_text`) to `-1` or a `[fg, bg]` pair element to `-1` (`[-1, -1]` when fully inherited) inherits that color directly from the top-level main menu palette. TrueColor values (`#rrggbb`, such as colors sampled with the Color Dropper or HSV/Hex picker) are stored inside the `256` tier (including nested activity override maps) and automatically downsampled into the `16` and `8` tiers; at runtime, `#rrggbb` renders verbatim on TrueColor terminals and quantizes to xterm-256 on `256`-color terminals.
@@ -795,10 +805,10 @@ twilight:
 | :--- | :--- | :--- | :--- |
 | `enabled` | Boolean | `true` | Master switch to enable or disable wallpaper background compositing. |
 | `image` | String | (theme) | Path to wallpaper image (PNG/JPG). Supports `{bashmenu_dir}` and placeholders. |
-| `opacity` | Float | `0.35` | Blending factor ($0.0$ to $1.0$). Lower values blend more theme background tint. |
+| `opacity` | Float | `0.35` | Blending factor (`0.0` to `1.0`). Lower values blend more theme background tint. |
 | `scaling` | String | `"cover"` | Scaling mode: `"cover"` (proportional fill with auto-crop), `"stretch"` (exact fit), `"fit"` (proportional inside window), `"center"` (1:1 original size), or `"tile"` (repeat pattern). |
-| `clustering` | Integer | `0` | Horizontal delta threshold ($0$ to $128$). Default $0$ preserves true photographic detail without horizontal streaking. |
-| `quantization` | Integer | `1` | Color channel quantization ($1$ to $32$). Default $1$ retains full 24-bit TrueColor depth without color banding. |
+| `clustering` | Integer | `0` | Horizontal delta threshold (`0` to `128`). Default `0` preserves full photographic detail without horizontal streaking. |
+| `quantization` | Integer | `1` | Color channel quantization (`1` to `32`). Default `1` retains full 24-bit TrueColor depth without color banding. |
 
 ---
 
@@ -819,7 +829,7 @@ wallpaper. Try setting opacity to 0.5, clustering to 32, and quantization to 16 
 ##### Recommended Image Types
 
 1. **Flat Vector & Minimalist Art (Fastest — < 3 ms redraws)**
-   - Artworks featuring broad horizontal color bands, vector silhouettes, flat-color anime/landscape art, or clean skies (such as `twilight.png`) yield the fewest color escape transitions and cell modifications, providing instantaneous keyboard response.
+   - Artworks featuring broad horizontal color bands, vector silhouettes, flat-color anime/landscape art, or clean skies (such as `twilight.png`) yield the fewest color escape transitions and cell modifications, keeping keyboard response fast.
 
 2. **Photographs & Complex Artwork**
    - Natural photos containing fine grain or dithering stippling should be pre-processed to remove high-frequency noise and prevent Floyd-Steinberg dither stippling.
@@ -862,7 +872,7 @@ Before using photographs as wallpapers, optimize them using ImageMagick (`conver
     -scale 480x360\! \
     assets/wallpapers/wallpaper.png
   ```
-  - Directly matches the terminal's native half-block character resolution (80×48), yielding minimal ANSI escape sequences and instantaneous rendering with a distinctive retro aesthetic.
+  - Directly matches the terminal's native half-block character resolution (80×48), yielding minimal ANSI escape sequences and fast rendering with a retro aesthetic.
 
 ##### `pngquant` Recommendations
 
@@ -962,7 +972,7 @@ To prevent data loss from terminal crashes, system reboots, or concurrent edits,
 Each swap file records the editing process PID, timestamp, the base snapshot of the note when editing began, and the modified buffer.
 
 When opening a note that has an existing swap file, or when external changes to the notebook YAML file are detected, the system presents an interactive conflict resolution modal:
-* **`[Merge]` (3-Way Non-Conflicting Merge):** Automatically performs a line-level 3-way merge (`merge_lines_3way`) between the original base snapshot, external on-disk changes, and uncommitted swap buffer modifications, preserving non-conflicting edits from both sources.
+* **`[Merge]` (3-Way Non-Conflicting Merge):** Automatically performs a line-level 3-way merge (`merge_note_content`) between the original base snapshot, external on-disk changes, and uncommitted swap buffer modifications, preserving non-conflicting edits from both sources.
 * **`[Overwrite]`:** Forces saving the local swap buffer to disk, superseding external changes.
 * **`[Reload]`:** Discards the uncommitted swap file and reloads the current on-disk version.
 * **`[Save As]`:** Prompts for a distinct path to save the recovered swap buffer safely without altering the notebook file.
@@ -1009,7 +1019,7 @@ You can specify the default starting folder for file and directory pickers in tw
 1. **Inline starting path syntax**: Embed `:path:<dir>` (or simply `:<dir>`) directly into the picker directive, such as `{file_picker:path:{bashmenu_dir}/assets/wallpapers}` or `{dir_picker:~/Projects}`. This inline option takes highest precedence over the item's generic `start_dir` property.
 2. **Preceding path syntax**: Precede `{file_picker}` or `{dir_picker}` with a valid folder path in the action string (e.g., `"{templates_dir}/{file_picker}"` or `"/var/log/{file_picker}"`). The engine automatically parses the prefix, validates it, and launches the visual chooser inside that directory, completely avoiding double-prefixing.
 
-Both starting path styles function seamlessly when combined with path decomposition modifiers and file/folder creation modes (e.g. `{file_picker:path:~/Pictures:stem}` or `{file_picker_new:path:~/notes}`).
+Both starting path styles work when combined with path decomposition modifiers and file/folder creation modes (e.g. `{file_picker:path:~/Pictures:stem}` or `{file_picker_new:path:~/notes}`).
 
 #### 6.1.1 Path Decomposition Modifiers for Pickers
 
@@ -1028,7 +1038,7 @@ When passing selected files or folders to commands, you often need to alter the 
 | **`{dir_picker:name}`** | Dir | Folder name only without parent path (`Pictures`) |
 | **`{dir_picker:dir}`** | Dir | Parent directory of the chosen folder (`/home/user`) |
 
-*(Note: Modifiers also function seamlessly with creation mode, e.g. `{file_picker_new:stem}` or `{file_picker:new:stem}`).*
+*(Note: Modifiers also work with creation mode, e.g. `{file_picker_new:stem}` or `{file_picker:new:stem}`).*
 
 ##### Practical Example: Converting Wallpapers & Changing Extensions
 ```yaml
@@ -1037,7 +1047,7 @@ When passing selected files or folders to commands, you often need to alter the 
     start_dir: '~/Pictures'
     command: 'convert "{file_picker:path:{bashmenu_dir}/assets/wallpapers}" -resize 80x48\! -blur 0x0.5 +dither -colors 16 -scale 480x360\! "{file_picker:stem}.pixel.png"'
 ```
-If the user selects `/home/user/Pictures/twilight.jpg`, `{file_picker:stem}.pixel.png` seamlessly resolves to `/home/user/Pictures/twilight.pixel.png`.
+If the user selects `/home/user/Pictures/twilight.jpg`, `{file_picker:stem}.pixel.png` resolves to `/home/user/Pictures/twilight.pixel.png`.
 
 ### 6.2 System & Path Placeholders
 These variables are dynamically resolved using active configuration and environment values:
@@ -1096,7 +1106,7 @@ These variables are dynamically resolved using active configuration and environm
 | `{toast:SECONDS:"Message"}` / `{toast:"Message"}` | Configurable non-blocking toast notification directive. Displays a brief floating toast notification on the bottom-right corner for specified seconds (defaults to 1-2 seconds if omitted) and resolves to an empty string. Supports double quotes, single quotes, or unquoted strings (e.g. `{toast: 2: "Saved"}` or `{toast: "Done"}`). |
 | `{env}` / `{environment}` | Displays an environment overview table modal showing active file locations for `bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `cheat.yml`, and application version. Can also be interpolated inline as a Markdown table. |
 | `{info:<path>}` | Loads a user-defined Markdown file (supporting nested placeholders such as `{info:{bashmenu_dir}/info.md}` or tilde paths `{info:~/.config/bashmenu/info.md}`), parses optional YAML frontmatter (`title`, `width` %, `height` %), expands all placeholders in the body, and displays it in a popup modal. Automatically renders a vertical scrollbar when content exceeds the modal height, supporting keyboard (`Up`/`Down`/`PgUp`/`PgDn`/`Home`/`End`) and mouse (scroll wheel and scrollbar clicks/drags) scrolling. |
-| `{{<placeholder>}}` | Double-brace escaping: renders literal `{<placeholder>}` without expanding its value (e.g., `{{user}}` → `{user}`, `{{{user}}}` → `{andrew}`). Works across `{info:<path>}` Markdown files, `about.md`, labels, titles, and messages. |
+| `{{<placeholder>}}` | Double-brace escaping: renders literal `{<placeholder>}` without expanding its value (e.g., `{{user}}` → `{user}`, `{{{user}}}` → `{alice}`). Works across `{info:<path>}` Markdown files, `about.md`, labels, titles, and messages. |
 | `{help}` | Built-in action macro: opens BashMenu documentation (`assets/bashmenu.md`) via `bmpager --markdown` (with built-in Help modal fallback). |
 | `{theme_picker}` | Built-in action macro: opens the interactive theme selector modal. |
 | `{text_editor}` | Built-in action macro: launches `bashedit` text editor. |
@@ -1192,7 +1202,7 @@ The application includes a rich formatting parser allowing developers to use inl
    - Compact 3-digit `#RGB` (e.g. `[color=#f55]red[/color]`, `[#bd9]mint[/]`)
 
 #### Key Features:
-* **Nesting Support:** Style and color tags can be nested seamlessly (e.g., `[b]bold text [color=cyan]with cyan[/color] highlight[/b]`).
+* **Nesting Support:** Style and color tags can be nested (e.g., `[b]bold text [color=cyan]with cyan[/color] highlight[/b]`).
 * **Visible Width Safety:** Centering, padding, and alignment routines strip BBCode tags via `strip_bbcode()` before measuring terminal column widths.
 * **Backslash Tag Escaping:** Preceding a tag bracket with a backslash (`\[b]`, `\[red]`) escapes the formatting parser, rendering the literal bracketed text.
 * **`no_formatting` Directive / Flag:** Menu items and dialog displays accept an optional `no_formatting: true` attribute to disable tag processing entirely when displaying literal bracketed text.
@@ -1234,9 +1244,9 @@ HA Bash Menu supports three distinct subprocess execution modes for commands and
    Launches an interactive child terminal session with piped standard input, allowing live user interaction within the streaming modal view.
 
 ### 7.3 Multi-Platform Support & Environment Detection
-HA Bash Menu incorporates an environment detection engine in `bashmenu.sh` enabling graceful degradation and multi-platform compatibility without manual configuration.
+HA Bash Menu detects terminal capabilities, color depth, and host platform at runtime so menus and companion scripts adapt without manual configuration.
 
-- **Universal Shebangs:** All shell scripts and extension utilities leverage `#!/usr/bin/env bash` for maximum portability.
+- **Portable Shebangs:** Root installer/launcher scripts use POSIX `#!/bin/sh` (auto-elevating to Bash where needed) and companion scripts in `scripts/` use `#!/usr/bin/env bash`.
 - **Cross-Platform Package Wrappers:** By routing operations through wrappers like `scripts/system_update.sh`, the engine automatically translates dependency installs to the correct local package manager (`apt`, `dnf`, `pacman`, `pkg`, or `brew`), and smartly adds or omits `sudo` depending on whether it is running in standard Linux, macOS, WSL, or containerized user-spaces like Termux.
 - **Graceful Degradation:** Features dependent on low-level system daemon frameworks (e.g., `systemd-resolved` DNS modification) check for Termux/WSL and fail gracefully, rather than crashing with environment errors.
 - **Direct Linux Framebuffer Support (`/dev/fb0`):** When executed on raw Linux Virtual Consoles (`/dev/tty1`-`/dev/tty6`, `TERM=linux`, or `console`), HA Bash Menu can directly access the Linux framebuffer device without external emulators (such as `fbterm` or `kmscon`). By directly querying variable and fixed screen info (`FBIOGET_VSCREENINFO`, `FBIOGET_FSCREENINFO` ioctls) and memory mapping (`mmap`) the video buffer, the engine renders TrueColor 32-bit (ARGB/XRGB/BGRA) and 16-bit (RGB565) background graphics directly on minimal netbooks and embedded Linux devices. In accordance with project architecture invariants, direct framebuffer rendering is completely self-contained within native Rust crate modules and requires zero external tool installations.

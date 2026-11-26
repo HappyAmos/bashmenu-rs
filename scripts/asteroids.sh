@@ -82,43 +82,43 @@ if ! command -v git &> /dev/null; then
     exit 1
 fi
 
-# Install if not present
-if [ ! -x "$ASTEROIDS_BIN" ] && ! command -v asteroids >/dev/null 2>&1; then
-    echo "Installing asteroids to $BIN_DIR..."
-    rm -rf "$CACHE_DIR/asteroids"
+# Build and install asteroids (not found in PATH or BIN_DIR above)
+echo "Installing asteroids to $BIN_DIR..."
+rm -rf "$CACHE_DIR/asteroids"
 
-    # Get the latest version of asteroids from github
-    git clone https://github.com/tsotchke/asteroids "$CACHE_DIR/asteroids"
+# Get the latest version of asteroids from github
+git clone https://github.com/tsotchke/asteroids "$CACHE_DIR/asteroids"
 
-    # Build asteroids
-    pushd "$CACHE_DIR/asteroids" >/dev/null || exit 1
-    "$CC" -o asteroids asteroids.c -lm
-    chmod +x asteroids
-    if [ -w "$BIN_DIR" ]; then
-        mv asteroids "$ASTEROIDS_BIN"
-    elif command -v sudo >/dev/null 2>&1; then
-        sudo mv asteroids "$ASTEROIDS_BIN"
-    else
-        mkdir -p "$HOME/.local/bin"
-        mv asteroids "$HOME/.local/bin/asteroids"
-        ASTEROIDS_BIN="$HOME/.local/bin/asteroids"
-    fi
-    popd >/dev/null || exit 1
+# Build asteroids
+pushd "$CACHE_DIR/asteroids" >/dev/null || exit 1
+"$CC" -o asteroids asteroids.c -lm
+chmod +x asteroids
+if [ -w "$BIN_DIR" ]; then
+    mv asteroids "$ASTEROIDS_BIN"
+elif command -v sudo >/dev/null 2>&1; then
+    sudo mv asteroids "$ASTEROIDS_BIN"
+else
+    mkdir -p "$HOME/.local/bin"
+    mv asteroids "$HOME/.local/bin/asteroids"
+    ASTEROIDS_BIN="$HOME/.local/bin/asteroids"
+fi
+popd >/dev/null || exit 1
 
-    # Cleanup
-    rm -rf "$CACHE_DIR/asteroids"
+# Cleanup
+rm -rf "$CACHE_DIR/asteroids"
+
+# Launch newly installed asteroids binary
+RUN_BIN=""
+if [ -x "$ASTEROIDS_BIN" ]; then
+    RUN_BIN="$ASTEROIDS_BIN"
+elif command -v asteroids >/dev/null 2>&1; then
+    RUN_BIN="$(command -v asteroids)"
 fi
 
-# Check if asteroids is installed and run
-if [ -x "$ASTEROIDS_BIN" ]; then
+if [ -n "$RUN_BIN" ]; then
     echo "(q) to quit, (r) to restart"
     sleep 1
-    "$ASTEROIDS_BIN"
-    exit 0
-elif command -v asteroids >/dev/null 2>&1; then
-    echo "(q) to quit, (r) to restart"
-    sleep 1
-    asteroids
+    "$RUN_BIN"
     exit 0
 else
     echo "Asteroids is not installed, installation failed."

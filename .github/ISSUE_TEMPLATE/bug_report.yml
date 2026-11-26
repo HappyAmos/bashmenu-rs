@@ -33,7 +33,7 @@ body:
     id: binary
     attributes:
       label: Affected Tool / Binary
-      description: Which binary or crate is affected (e.g., bashmenu, bashedit, themeedit, menuedit, bmpager, cheat, ymlcheck)?
+      description: Which binary or crate is affected (e.g., bashmenu, bashedit, themeedit, menuedit, shortcutedit, bmpager, cheat, ymlcheck)?
       placeholder: e.g. bashmenu, themeedit
     validations:
       required: false

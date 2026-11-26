@@ -100,7 +100,6 @@ try_launch() {
 
 # Known Terminal / Console browser candidates in priority order
 KNOWN_TTY_BROWSERS=(
-    "$HOME/github/brow6el/build/brow6el"
     "$HOME/.local/bin/brow6el"
     brow6el
     links
@@ -111,6 +110,16 @@ KNOWN_TTY_BROWSERS=(
     carbonyl
     edbrowse
 )
+
+# Check configured browser overrides once
+try_user_browser_overrides() {
+    if [ -n "$CFG_BROWSER" ] && [ "$CFG_BROWSER" != "auto" ]; then
+        try_launch "$CFG_BROWSER" || true
+    fi
+    if [ -n "${BROWSER:-}" ] && [ "$BROWSER" != "auto" ]; then
+        try_launch "$BROWSER" || true
+    fi
+}
 
 # Known GUI browser candidates in priority order
 KNOWN_GUI_BROWSERS=(
@@ -131,14 +140,6 @@ KNOWN_GUI_BROWSERS=(
 
 # Function: Launch in TTY / Console mode
 launch_tty_mode() {
-    # Check user overrides if they point to a terminal browser
-    if [ -n "$CFG_BROWSER" ] && [ "$CFG_BROWSER" != "auto" ]; then
-        try_launch "$CFG_BROWSER" || true
-    fi
-    if [ -n "${BROWSER:-}" ] && [ "$BROWSER" != "auto" ]; then
-        try_launch "$BROWSER" || true
-    fi
-
     # Check system default CLI alternative (Debian/Ubuntu/etc.)
     if command -v www-browser >/dev/null 2>&1; then
         try_launch www-browser || true
@@ -156,14 +157,6 @@ launch_tty_mode() {
 
 # Function: Launch in GUI mode
 launch_gui_mode() {
-    # Check user overrides
-    if [ -n "$CFG_BROWSER" ] && [ "$CFG_BROWSER" != "auto" ]; then
-        try_launch "$CFG_BROWSER" || true
-    fi
-    if [ -n "${BROWSER:-}" ] && [ "$BROWSER" != "auto" ]; then
-        try_launch "$BROWSER" || true
-    fi
-
     # Check macOS
     if [ "$(uname -s)" = "Darwin" ]; then
         if [ -n "$TARGET" ]; then
@@ -265,6 +258,9 @@ launch_gui_mode() {
     exit 1
 }
 
+# Check user overrides once before mode dispatch
+try_user_browser_overrides
+
 # Dispatch based on selected mode
 case "$MODE" in
     gui)
@@ -274,21 +270,13 @@ case "$MODE" in
         launch_tty_mode
         ;;
     auto)
-        # 1. Check user overrides first
-        if [ -n "$CFG_BROWSER" ] && [ "$CFG_BROWSER" != "auto" ]; then
-            try_launch "$CFG_BROWSER" || true
-        fi
-        if [ -n "${BROWSER:-}" ] && [ "$BROWSER" != "auto" ]; then
-            try_launch "$BROWSER" || true
-        fi
-
-        # 2. Check if a graphical display is available
+        # Check if a graphical display is available
         if [ -n "${DISPLAY:-}" ] || [ -n "${WAYLAND_DISPLAY:-}" ] || [ "$(uname -s)" = "Darwin" ] || grep -qi microsoft /proc/version 2>/dev/null; then
             # Attempt GUI launch without exiting on failure (to permit TTY fallback)
             ( launch_gui_mode ) 2>/dev/null && exit 0 || true
         fi
 
-        # 3. Fallback to terminal/console mode
+        # Fallback to terminal/console mode
         launch_tty_mode
         ;;
 esac
