@@ -3232,9 +3232,9 @@ fn test_flash_spans_mode_aware_across_preview_tabs() {
     assert!(ed_hl.iter().any(|s| s.0 == area.y + 6)); // alt_buffer: true
     assert!(ed_hl.iter().any(|s| s.0 == area.y + area.height - 3)); // status bar
 
-    // 3:Modals: text flashes modal body & input box (inside modal rect)
+    // 3:Modals: text flashes modal body text (inside modal rect)
     let mod_text = get_token_preview_spans(&text_tok, area, PreviewMode::Modals, &styles);
-    assert_eq!(mod_text.len(), 2);
+    assert_eq!(mod_text.len(), 1);
     assert!(mod_text[0].1 > area.x + 2);
 
     // 4:MenuEdit, 5:Toasts, 6:ThemeEdit, 7:Shortcuts all produce non-empty mode-specific text spans
@@ -3485,4 +3485,99 @@ fn test_editor_chrome_theme_updates_only_when_configured_theme_saved() {
     state.set_color_token_value("border", new_border);
     assert!(chrome.sync_on_save(&state.current_name, &state.current_theme));
     assert_eq!(chrome.resolve_styles(true).border, new_border);
+}
+
+#[test]
+fn test_input_box_tokens_and_modals_preview() {
+    use bashmenu_tui::{InputModal, ResolvedThemeStyles, ThemeActivity};
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::style::Color;
+    use themeedit_cli::{get_token_preview_spans, render_preview_pane, PreviewMode};
+
+    let themes_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(themes_path, Some("dracula".to_string()));
+    state.preview_mode = PreviewMode::Modals;
+
+    // Select and customize Input Box Background and Input Box Text independently
+    assert!(state.select_token_by_key("input_box"));
+    assert_eq!(
+        state.tokens[state.selected_idx].label,
+        "Input Box Background"
+    );
+    state.set_color_token_value("input_box", Color::Indexed(24));
+
+    assert!(state.select_token_by_key("input_box_text"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Input Box Text");
+    state.set_color_token_value("input_box_text", Color::Indexed(226));
+
+    let resolved = ResolvedThemeStyles::from_theme_for_activity(
+        &state.current_theme,
+        true,
+        ThemeActivity::Modals,
+    );
+    assert_eq!(resolved.input_box.bg, Some(Color::Indexed(24)));
+    assert_eq!(resolved.input_box.fg, Some(Color::Indexed(226)));
+
+    // Render 3:Modals preview and verify faux input box displays "Example text field"
+    // with Input Box Text (fg) and Input Box Background (bg), plus trailing empty space
+    let area = Rect::new(0, 0, 96, 24);
+    let mut buf = Buffer::empty(area);
+    let mut wp = None;
+    render_preview_pane(area, &mut buf, PreviewMode::Modals, &resolved, &mut wp);
+
+    let p_inner_x = area.x + 2;
+    let p_inner_y = area.y + 2;
+    let p_avail_w = area.width.saturating_sub(4);
+    let p_avail_h = area.height.saturating_sub(4);
+    let mod_w = (p_avail_w.saturating_sub(4)).clamp(32, 50);
+    let mod_h = 12_u16.min(p_avail_h);
+    let mod_x = p_inner_x + (p_avail_w.saturating_sub(mod_w)) / 2;
+    let mod_y = p_inner_y + (p_avail_h.saturating_sub(mod_h)) / 2;
+
+    let inp_x = mod_x + 2;
+    let inp_w = mod_w.saturating_sub(4);
+    let inp_row: String = (inp_x..inp_x + inp_w)
+        .map(|x| buf[(x, mod_y + 5)].symbol())
+        .collect();
+    assert!(
+        inp_row.contains("Example text field"),
+        "3:Modals faux input box must contain 'Example text field', got: {:?}",
+        inp_row
+    );
+    assert!(
+        inp_w > "Example text field".len() as u16 + 4,
+        "Faux input box must leave empty clickable space on the right"
+    );
+    // Text cell and trailing empty cell both use input_box fg/bg
+    assert_eq!(buf[(inp_x + 1, mod_y + 5)].fg, Color::Indexed(226));
+    assert_eq!(buf[(inp_x + 1, mod_y + 5)].bg, Color::Indexed(24));
+    assert_eq!(buf[(inp_x + inp_w - 2, mod_y + 5)].bg, Color::Indexed(24));
+
+    // Flash spans for input_box_text cover text only; input_box covers full box
+    assert!(state.select_token_by_key("input_box_text"));
+    let txt_spans = get_token_preview_spans(
+        &state.tokens[state.selected_idx],
+        area,
+        PreviewMode::Modals,
+        &resolved,
+    );
+    assert_eq!(txt_spans, vec![(mod_y + 5, inp_x + 1, inp_x + 1 + 18)]);
+
+    assert!(state.select_token_by_key("input_box"));
+    let bg_spans = get_token_preview_spans(
+        &state.tokens[state.selected_idx],
+        area,
+        PreviewMode::Modals,
+        &resolved,
+    );
+    assert_eq!(bg_spans, vec![(mod_y + 5, inp_x, inp_x + inp_w)]);
+
+    // Actual InputModal uses resolved.input_box
+    let modal = InputModal::new("Prompt", "Enter value:", "abc");
+    let mut ibuf = Buffer::empty(area);
+    let iinner = modal.render(area, &resolved, &mut ibuf);
+    let field_y = iinner.y + 2;
+    assert_eq!(ibuf[(iinner.x + 2, field_y)].fg, Color::Indexed(226));
+    assert_eq!(ibuf[(iinner.x + 2, field_y)].bg, Color::Indexed(24));
 }

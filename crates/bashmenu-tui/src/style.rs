@@ -91,6 +91,8 @@ impl ThemeActivity {
                 "modal_yes_button",
                 "modal_no_button",
                 "modal_cancel_button",
+                "input_box",
+                "input_box_text",
                 "toast_info",
                 "toast_warning",
                 "toast_error",
@@ -384,6 +386,8 @@ pub struct ResolvedThemeStyles {
     pub modal_no_button: Style,
     /// Cancel button style in modal dialogs
     pub modal_cancel_button: Style,
+    /// Text input box style (foreground = input_box_text, background = input_box)
+    pub input_box: Style,
     /// Active / selected tab style in tabbed interfaces
     pub selected_tab: Style,
     /// Inactive / unselected tab style in tabbed interfaces
@@ -444,6 +448,7 @@ impl Default for ResolvedThemeStyles {
                 .add_modifier(Modifier::BOLD),
             modal_no_button: Style::default().fg(Color::LightRed),
             modal_cancel_button: Style::default().fg(Color::DarkGray),
+            input_box: Style::default().fg(Color::White).bg(Color::Indexed(236)),
             selected_tab: Style::default()
                 .fg(Color::Black)
                 .bg(Color::Cyan)
@@ -757,6 +762,20 @@ impl ResolvedThemeStyles {
             .and_then(|v| parse_color_value_with_tier(v, tier))
         {
             self.selected_tab = self.selected_tab.fg(fg);
+        }
+        if let Some(st) = p
+            .get("input_box")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_style_pair_with_tier(Some(v), tier))
+        {
+            self.input_box = merge_style_pair(self.input_box, st, None);
+        }
+        if let Some(fg) = p
+            .get("input_box_text")
+            .filter(|v| !is_inherited_color_value(v))
+            .and_then(|v| parse_color_value_with_tier(v, tier))
+        {
+            self.input_box = self.input_box.fg(fg);
         }
         if let Some(st) = p
             .get("unselected_tab")

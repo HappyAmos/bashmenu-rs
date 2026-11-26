@@ -582,14 +582,19 @@ pub fn render_preview_pane_with_base(
                 preview_styles.help_text,
             );
 
-            // Sample input box
-            let inp_w = mod_w.saturating_sub(6) as usize;
-            let inp_str = format!(
-                " [ {:<width$} ]",
-                "cluster_production_01",
-                width = inp_w.saturating_sub(4)
+            // Faux text input box ("Example text field" + trailing empty input background)
+            let inp_x = mod_x + 2;
+            let inp_w = mod_w.saturating_sub(4) as usize;
+            let demo_text = "Example text field";
+            let padded_input = format!(
+                " {:<width$}",
+                demo_text
+                    .chars()
+                    .take(inp_w.saturating_sub(1))
+                    .collect::<String>(),
+                width = inp_w.saturating_sub(1)
             );
-            buf.set_string(mod_x + 2, mod_y + 5, &inp_str, preview_styles.text);
+            buf.set_string(inp_x, mod_y + 5, &padded_input, preview_styles.input_box);
 
             // Action Buttons: [ Yes ]  [ No ]  [ Cancel ]
             let yes_btn = "[ Yes ]";

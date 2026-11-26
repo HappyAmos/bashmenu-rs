@@ -1061,22 +1061,18 @@ impl ColorPickerModal {
 
             let style = if self.hex_selected {
                 if slot < chars.len() {
-                    Style::default()
-                        .fg(Color::Black)
-                        .bg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD)
+                    styles
+                        .input_box
+                        .add_modifier(Modifier::REVERSED | Modifier::BOLD)
                 } else {
-                    Style::default().fg(Color::Yellow)
+                    styles.input_box
                 }
             } else if slot == self.hex_cursor {
-                Style::default()
-                    .fg(Color::Black)
-                    .bg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD)
+                styles
+                    .input_box
+                    .add_modifier(Modifier::REVERSED | Modifier::BOLD)
             } else {
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD)
+                styles.input_box.add_modifier(Modifier::BOLD)
             };
 
             buf.set_string(col, start_y + 2, ch.to_string(), style);

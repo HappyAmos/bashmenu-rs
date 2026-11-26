@@ -18,7 +18,10 @@ pub const ACTIVITY_OVERRIDE_KEYS: [&str; 6] = [
 
 /// Returns `true` if `token` stores a single scalar color rather than a `[fg, bg]` pair.
 pub fn is_scalar_color_token(token: &str) -> bool {
-    matches!(token, "background" | "highlight_text" | "selected_tab_text")
+    matches!(
+        token,
+        "background" | "highlight_text" | "selected_tab_text" | "input_box_text"
+    )
 }
 
 /// Returns the supported color override token keys for a given activity section name.
@@ -63,6 +66,8 @@ pub fn activity_override_tokens(activity_key: &str) -> &'static [&'static str] {
             "modal_yes_button",
             "modal_no_button",
             "modal_cancel_button",
+            "input_box",
+            "input_box_text",
             "window_close_button",
         ],
         "menuedit" => &[
@@ -113,6 +118,8 @@ pub fn activity_override_tokens(activity_key: &str) -> &'static [&'static str] {
             "selected_tab",
             "selected_tab_text",
             "unselected_tab",
+            "input_box",
+            "input_box_text",
             "shortcut_key",
             "help_text",
             "gutter",
@@ -579,6 +586,11 @@ impl Theme {
         colors.insert("scrollbar".to_string(), make_pair(245, -1));
         colors.insert("shadow".to_string(), make_pair(236, -1));
         colors.insert("modal_yes_button".to_string(), make_pair(255, -1));
+        colors.insert("input_box".to_string(), make_pair(255, 236));
+        colors.insert(
+            "input_box_text".to_string(),
+            serde_json::Value::Number(255.into()),
+        );
         colors.insert("modal_no_button".to_string(), make_pair(203, -1));
         colors.insert("modal_cancel_button".to_string(), make_pair(245, -1));
         colors.insert("toast_info".to_string(), make_pair(255, -1));

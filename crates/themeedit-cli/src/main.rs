@@ -337,7 +337,7 @@ fn main() -> Result<()> {
 
                 let name_str = state.name_input.as_string();
                 let box_style = if is_editing_name {
-                    Style::default().fg(Color::White).bg(Color::Indexed(236))
+                    themeedit_styles.input_box
                 } else {
                     Style::default().fg(Color::Cyan)
                 };
@@ -2039,6 +2039,10 @@ fn open_selected_token_picker(state: &mut ThemeEditorState, active_modal: &mut A
                 "Pick Modal No Button Color"
             } else if key == "modal_cancel_button" {
                 "Pick Modal Cancel Button Color"
+            } else if key == "input_box" {
+                "Pick Input Box Background Color"
+            } else if key == "input_box_text" {
+                "Pick Input Box Text Color"
             } else if key == "selected_tab" {
                 "Pick Selected Tab Background Color"
             } else if key == "selected_tab_text" {
@@ -2410,9 +2414,16 @@ fn hit_test_preview_with_style(
                     return Some(("background", row, mod_x + 1, mod_x + mod_w - 1));
                 }
                 if row == mod_y + 5 {
-                    let end = mod_x + mod_w.saturating_sub(3);
-                    if col >= mod_x + 3 && col < end {
-                        return Some(("text", row, mod_x + 3, end));
+                    let inp_x = mod_x + 2;
+                    let inp_end = mod_x + mod_w.saturating_sub(2);
+                    if col >= inp_x && col < inp_end {
+                        const DEMO_TEXT_W: u16 = 18; // "Example text field"
+                        let text_start = inp_x + 1;
+                        let text_end = (text_start + DEMO_TEXT_W).min(inp_end);
+                        if col >= text_start && col < text_end {
+                            return Some(("input_box_text", row, text_start, text_end));
+                        }
+                        return Some(("input_box", row, inp_x, inp_end));
                     }
                     return Some(("background", row, mod_x + 1, mod_x + mod_w - 1));
                 }
@@ -3195,6 +3206,40 @@ mod tests {
                 PreviewMode::Menu
             ),
             None
+        );
+    }
+
+    #[test]
+    fn test_modals_faux_input_box_hit_testing() {
+        let right_area = Rect::new(43, 2, 100, 24);
+        let p_inner_x = right_area.x + 2;
+        let p_inner_y = right_area.y + 2;
+        let p_avail_w = right_area.width.saturating_sub(4);
+        let p_avail_h = right_area.height.saturating_sub(4);
+        let mod_w = (p_avail_w.saturating_sub(4)).clamp(32, 50);
+        let mod_h = 12_u16.min(p_avail_h);
+        let mod_x = p_inner_x + (p_avail_w.saturating_sub(mod_w)) / 2;
+        let mod_y = p_inner_y + (p_avail_h.saturating_sub(mod_h)) / 2;
+
+        let inp_x = mod_x + 2;
+        let inp_end = mod_x + mod_w.saturating_sub(2);
+        // Clicking on "Example text field" -> input_box_text
+        assert_eq!(
+            hit_test_preview(inp_x + 3, mod_y + 5, right_area, PreviewMode::Modals, false)
+                .map(|r| r.0),
+            Some("input_box_text")
+        );
+        // Clicking on trailing empty space to the right -> input_box
+        assert_eq!(
+            hit_test_preview(
+                inp_end - 2,
+                mod_y + 5,
+                right_area,
+                PreviewMode::Modals,
+                false
+            )
+            .map(|r| r.0),
+            Some("input_box")
         );
     }
 
