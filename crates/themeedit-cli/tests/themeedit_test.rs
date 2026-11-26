@@ -3326,4 +3326,22 @@ fn test_themeedit_mini_preview_composites_wallpaper() {
         has_wp_cell,
         "Expected wallpaper to be composited inside the miniature Main Menu pane on 6:ThemeEdit"
     );
+
+    // Faux help gutter ("F1 Help") must be at bottom-left and status ("12:00") at bottom-right of sample_rect
+    let s_gutter_y = sample_y + body_h - 2;
+    let gutter_row: String = ((sample_x + 1)..(sample_x + right_w - 1))
+        .map(|x| buf[(x, s_gutter_y)].symbol())
+        .collect();
+    let help_pos = gutter_row
+        .find("F1 Help")
+        .expect("Expected 'F1 Help' on bottom gutter row of miniature Main Menu");
+    let status_pos = gutter_row
+        .find("12:00")
+        .expect("Expected '12:00' on bottom gutter row of miniature Main Menu");
+    assert_eq!(help_pos, 0, "F1 Help must be aligned to bottom-left");
+    assert_eq!(
+        status_pos + "12:00".len(),
+        gutter_row.len(),
+        "12:00 must be aligned to bottom-right"
+    );
 }

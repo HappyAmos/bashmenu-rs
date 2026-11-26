@@ -989,7 +989,12 @@ fn render_theme_editor_preview(
         let sw = sample_rect.width.saturating_sub(2) as usize;
         let sy = sample_rect.y + 1;
         let smax = sample_rect.bottom().saturating_sub(1);
-        if sy < smax && sw > 0 {
+        let has_bottom_gutter = smax >= sy + 3 && sw >= 6;
+        let s_gutter_y = smax.saturating_sub(1);
+        let s_div_y = s_gutter_y.saturating_sub(1);
+        let menu_max_y = if has_bottom_gutter { s_div_y } else { smax };
+
+        if sy < menu_max_y && sw > 0 {
             let active_row = format!(
                 "{:<w$}",
                 "► 1. Terminal".chars().take(sw).collect::<String>(),
@@ -997,7 +1002,7 @@ fn render_theme_editor_preview(
             );
             buf.set_string(sx, sy, &active_row, preview_styles.highlight);
         }
-        if sy + 1 < smax && sw > 0 {
+        if sy + 1 < menu_max_y && sw > 0 {
             let line = Line::from(vec![
                 Span::styled("  ", preview_styles.text),
                 Span::styled("2.", preview_styles.shortcut_key),
@@ -1006,10 +1011,10 @@ fn render_theme_editor_preview(
             ]);
             buf.set_line(sx, sy + 1, &line, sw as u16);
         }
-        if sy + 2 < smax && sw > 0 {
+        if sy + 2 < menu_max_y && sw > 0 {
             buf.set_string(sx, sy + 2, "─".repeat(sw), preview_styles.divider);
         }
-        if sy + 3 < smax && sw > 0 {
+        if sy + 3 < menu_max_y && sw > 0 {
             let line = Line::from(vec![
                 Span::styled("  ", preview_styles.text),
                 Span::styled("3.", preview_styles.shortcut_key),
@@ -1017,12 +1022,48 @@ fn render_theme_editor_preview(
             ]);
             buf.set_line(sx, sy + 3, &line, sw as u16);
         }
-        if sy + 4 < smax && sw > 0 {
-            let line = Line::from(vec![
-                Span::styled("F1 Help ", preview_styles.help_text),
-                Span::styled("│ 12:00", preview_styles.gutter),
-            ]);
-            buf.set_line(sx, sy + 4, &line, sw as u16);
+        if has_bottom_gutter {
+            let sep_offset = sw / 2;
+            let sep_col = sx + sep_offset as u16;
+            buf.set_string(
+                sample_rect.x,
+                s_div_y,
+                &b.gutter_left_tee,
+                sample_border_style,
+            );
+            buf.set_string(
+                sample_rect.right() - 1,
+                s_div_y,
+                &b.gutter_right_tee,
+                sample_border_style,
+            );
+            buf.set_string(sx, s_div_y, "─".repeat(sw), sample_border_style);
+            buf.set_string(sep_col, s_div_y, &b.gutter_top_tee, sample_border_style);
+            buf.set_string(
+                sep_col,
+                s_gutter_y,
+                &b.gutter_separator,
+                sample_border_style,
+            );
+            buf.set_string(
+                sep_col,
+                sample_rect.bottom() - 1,
+                &b.gutter_bottom_tee,
+                sample_border_style,
+            );
+
+            // Bottom-left help gutter
+            let left_clip: String = "F1 Help".chars().take(sep_offset).collect();
+            buf.set_string(sx, s_gutter_y, &left_clip, preview_styles.help_text);
+
+            // Bottom-right status gutter (right-aligned)
+            let right_w_avail = sw.saturating_sub(sep_offset + 1);
+            if right_w_avail > 0 {
+                let status_str = "12:00";
+                let right_clip: String = status_str.chars().take(right_w_avail).collect();
+                let right_x = sep_col + 1 + right_w_avail.saturating_sub(right_clip.len()) as u16;
+                buf.set_string(right_x, s_gutter_y, &right_clip, preview_styles.gutter);
+            }
         }
 
         // Composite background wallpaper scaled to fit inside the miniature Main Menu pane
