@@ -210,7 +210,10 @@ impl NoteEditorModal {
                 insert_row += 1;
             }
 
-            let last_line = paste_lines.last().unwrap().trim_end_matches('\r');
+            let last_line = paste_lines
+                .last()
+                .map(|s| s.trim_end_matches('\r'))
+                .unwrap_or("");
             self.lines
                 .insert(insert_row, format!("{}{}", last_line, suffix));
             self.cursor_row = insert_row;
@@ -1038,63 +1041,15 @@ impl NoteEditorModal {
         }
 
         // Render scrollbar if note has more lines than window height (content_h)
-        if visual_lines.len() > content_h && content_h > 0 {
-            let sb_x = inner.x + inner.width.saturating_sub(1);
-            let content_start_y = inner.y + 1;
-            let sb_fg = styles
-                .scrollbar
-                .fg
-                .unwrap_or(styles.accent.fg.unwrap_or(Color::Cyan));
-            let sb_bg = styles.background;
-            let arrow_style = Style::default()
-                .fg(sb_fg)
-                .bg(sb_bg)
-                .add_modifier(Modifier::BOLD);
-            let thumb_style = Style::default().fg(sb_fg).bg(sb_bg);
-            let track_style = Style::default().fg(Color::DarkGray).bg(sb_bg);
-
-            let max_scroll = visual_lines.len().saturating_sub(content_h);
-            let eff_scroll = self.scroll_offset.min(max_scroll);
-
-            if content_h >= 3 {
-                // Top arrow
-                buf.set_string(sb_x, content_start_y, "▲", arrow_style);
-                // Bottom arrow
-                buf.set_string(
-                    sb_x,
-                    content_start_y + content_h as u16 - 1,
-                    "▼",
-                    arrow_style,
-                );
-
-                let track_len = content_h - 2;
-                let total_lines = visual_lines.len();
-                let thumb_size = ((track_len as f64 * content_h as f64) / total_lines as f64)
-                    .round()
-                    .clamp(1.0, track_len as f64) as usize;
-                let available_track = track_len.saturating_sub(thumb_size);
-                let scroll_ratio = if max_scroll > 0 {
-                    eff_scroll as f64 / max_scroll as f64
-                } else {
-                    0.0
-                };
-                let thumb_start = (scroll_ratio * available_track as f64).round() as usize;
-
-                for t_idx in 0..track_len {
-                    let y = content_start_y + 1 + t_idx as u16;
-                    if t_idx >= thumb_start && t_idx < thumb_start + thumb_size {
-                        buf.set_string(sb_x, y, "█", thumb_style);
-                    } else {
-                        buf.set_string(sb_x, y, "░", track_style);
-                    }
-                }
-            } else if content_h == 2 {
-                buf.set_string(sb_x, content_start_y, "▲", arrow_style);
-                buf.set_string(sb_x, content_start_y + 1, "▼", arrow_style);
-            } else if content_h == 1 {
-                buf.set_string(sb_x, content_start_y, "█", thumb_style);
-            }
-        }
+        super::frame::render_modal_scrollbar(
+            inner.x + inner.width.saturating_sub(1),
+            inner.y + 1,
+            content_h,
+            visual_lines.len(),
+            self.scroll_offset,
+            styles,
+            buf,
+        );
 
         inner
     }

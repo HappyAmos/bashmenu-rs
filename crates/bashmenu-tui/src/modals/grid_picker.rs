@@ -19,6 +19,88 @@ pub struct ColorGridModal {
     pub selected_code: u8,
 }
 
+/// Shared keyboard handler for 16x16 code grid pickers.
+fn handle_grid_key(selected_code: &mut u8, code: KeyCode) -> Option<Option<u8>> {
+    match code {
+        KeyCode::Left | KeyCode::Char('h') => {
+            *selected_code = selected_code.saturating_sub(1);
+            None
+        }
+        KeyCode::Right | KeyCode::Char('l') => {
+            *selected_code = selected_code.saturating_add(1);
+            None
+        }
+        KeyCode::Up | KeyCode::Char('k') => {
+            *selected_code = selected_code.saturating_sub(16);
+            None
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            if *selected_code <= 239 {
+                *selected_code += 16;
+            }
+            None
+        }
+        KeyCode::PageUp => {
+            *selected_code = selected_code.saturating_sub(64);
+            None
+        }
+        KeyCode::PageDown => {
+            if *selected_code <= 191 {
+                *selected_code += 64;
+            }
+            None
+        }
+        KeyCode::Home => {
+            *selected_code = 0;
+            None
+        }
+        KeyCode::End => {
+            *selected_code = 255;
+            None
+        }
+        KeyCode::Enter => Some(Some(*selected_code)),
+        KeyCode::Esc => Some(None),
+        _ => None,
+    }
+}
+
+/// Shared mouse click handler for 16x16 code grid pickers.
+fn handle_grid_mouse(
+    selected_code: &mut u8,
+    mouse: MouseEvent,
+    grid_start: (u16, u16),
+) -> Option<Option<u8>> {
+    if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
+        let (gx, gy) = grid_start;
+        let inner = Rect::new(gx.saturating_sub(2), gy.saturating_sub(1), 54, 20);
+        if is_close_button_clicked(inner, mouse.row, mouse.column) {
+            return Some(None);
+        }
+
+        let col = mouse.column;
+        let row = mouse.row;
+
+        if col >= gx && col < gx + (16 * 3) && row >= gy && row < gy + 16 {
+            let cell_x = ((col - gx) / 3) as u8;
+            let cell_y = (row - gy) as u8;
+            let code = cell_y * 16 + cell_x;
+            *selected_code = code;
+            return Some(Some(code));
+        }
+
+        let badge_y = inner.y + inner.height.saturating_sub(1);
+        if row == badge_y && col >= inner.x && col < inner.x + inner.width {
+            let rel_x = (col - inner.x) as usize;
+            if rel_x >= 36 {
+                return Some(None);
+            } else if rel_x >= 18 {
+                return Some(Some(*selected_code));
+            }
+        }
+    }
+    None
+}
+
 impl ColorGridModal {
     /// Constructs a color picker modal initialized with the specified palette index.
     pub fn new(title: impl Into<String>, initial_code: u8) -> Self {
@@ -30,47 +112,7 @@ impl ColorGridModal {
 
     /// Handles keyboard navigation across the 16x16 grid (±1, ±16, ±64)
     pub fn handle_key(&mut self, code: KeyCode) -> Option<Option<u8>> {
-        match code {
-            KeyCode::Left | KeyCode::Char('h') => {
-                self.selected_code = self.selected_code.saturating_sub(1);
-                None
-            }
-            KeyCode::Right | KeyCode::Char('l') => {
-                self.selected_code = self.selected_code.saturating_add(1);
-                None
-            }
-            KeyCode::Up | KeyCode::Char('k') => {
-                self.selected_code = self.selected_code.saturating_sub(16);
-                None
-            }
-            KeyCode::Down | KeyCode::Char('j') => {
-                if self.selected_code <= 239 {
-                    self.selected_code += 16;
-                }
-                None
-            }
-            KeyCode::PageUp => {
-                self.selected_code = self.selected_code.saturating_sub(64);
-                None
-            }
-            KeyCode::PageDown => {
-                if self.selected_code <= 191 {
-                    self.selected_code += 64;
-                }
-                None
-            }
-            KeyCode::Home => {
-                self.selected_code = 0;
-                None
-            }
-            KeyCode::End => {
-                self.selected_code = 255;
-                None
-            }
-            KeyCode::Enter => Some(Some(self.selected_code)),
-            KeyCode::Esc => Some(None),
-            _ => None,
-        }
+        handle_grid_key(&mut self.selected_code, code)
     }
 
     /// Handles immediate mouse click on the 16x16 grid
@@ -79,35 +121,7 @@ impl ColorGridModal {
         mouse: MouseEvent,
         grid_start: (u16, u16),
     ) -> Option<Option<u8>> {
-        if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
-            let (gx, gy) = grid_start;
-            let inner = Rect::new(gx.saturating_sub(2), gy.saturating_sub(1), 54, 20);
-            if is_close_button_clicked(inner, mouse.row, mouse.column) {
-                return Some(None);
-            }
-
-            let col = mouse.column;
-            let row = mouse.row;
-
-            if col >= gx && col < gx + (16 * 3) && row >= gy && row < gy + 16 {
-                let cell_x = ((col - gx) / 3) as u8;
-                let cell_y = (row - gy) as u8;
-                let code = cell_y * 16 + cell_x;
-                self.selected_code = code;
-                return Some(Some(code));
-            }
-
-            let badge_y = inner.y + inner.height.saturating_sub(1);
-            if row == badge_y && col >= inner.x && col < inner.x + inner.width {
-                let rel_x = (col - inner.x) as usize;
-                if rel_x >= 36 {
-                    return Some(None);
-                } else if rel_x >= 18 {
-                    return Some(Some(self.selected_code));
-                }
-            }
-        }
-        None
+        handle_grid_mouse(&mut self.selected_code, mouse, grid_start)
     }
 
     /// Renders the 16x16 color grid modal
@@ -210,47 +224,7 @@ impl AsciiGridModal {
 
     /// Handles keyboard navigation across CP437 ASCII grid
     pub fn handle_key(&mut self, code: KeyCode) -> Option<Option<char>> {
-        match code {
-            KeyCode::Left | KeyCode::Char('h') => {
-                self.selected_code = self.selected_code.saturating_sub(1);
-                None
-            }
-            KeyCode::Right | KeyCode::Char('l') => {
-                self.selected_code = self.selected_code.saturating_add(1);
-                None
-            }
-            KeyCode::Up | KeyCode::Char('k') => {
-                self.selected_code = self.selected_code.saturating_sub(16);
-                None
-            }
-            KeyCode::Down | KeyCode::Char('j') => {
-                if self.selected_code <= 239 {
-                    self.selected_code += 16;
-                }
-                None
-            }
-            KeyCode::PageUp => {
-                self.selected_code = self.selected_code.saturating_sub(64);
-                None
-            }
-            KeyCode::PageDown => {
-                if self.selected_code <= 191 {
-                    self.selected_code += 64;
-                }
-                None
-            }
-            KeyCode::Home => {
-                self.selected_code = 0;
-                None
-            }
-            KeyCode::End => {
-                self.selected_code = 255;
-                None
-            }
-            KeyCode::Enter => Some(Some(cp437_to_char(self.selected_code))),
-            KeyCode::Esc => Some(None),
-            _ => None,
-        }
+        handle_grid_key(&mut self.selected_code, code).map(|opt| opt.map(cp437_to_char))
     }
 
     /// Handles immediate mouse click on the 16x16 CP437 grid
@@ -259,35 +233,8 @@ impl AsciiGridModal {
         mouse: MouseEvent,
         grid_start: (u16, u16),
     ) -> Option<Option<char>> {
-        if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
-            let (gx, gy) = grid_start;
-            let inner = Rect::new(gx.saturating_sub(2), gy.saturating_sub(1), 54, 20);
-            if is_close_button_clicked(inner, mouse.row, mouse.column) {
-                return Some(None);
-            }
-
-            let col = mouse.column;
-            let row = mouse.row;
-
-            if col >= gx && col < gx + (16 * 3) && row >= gy && row < gy + 16 {
-                let cell_x = ((col - gx) / 3) as u8;
-                let cell_y = (row - gy) as u8;
-                let code = cell_y * 16 + cell_x;
-                self.selected_code = code;
-                return Some(Some(cp437_to_char(code)));
-            }
-
-            let badge_y = inner.y + inner.height.saturating_sub(1);
-            if row == badge_y && col >= inner.x && col < inner.x + inner.width {
-                let rel_x = (col - inner.x) as usize;
-                if rel_x >= 36 {
-                    return Some(None);
-                } else if rel_x >= 18 {
-                    return Some(Some(cp437_to_char(self.selected_code)));
-                }
-            }
-        }
-        None
+        handle_grid_mouse(&mut self.selected_code, mouse, grid_start)
+            .map(|opt| opt.map(cp437_to_char))
     }
 
     /// Renders CP437 ASCII grid modal

@@ -328,41 +328,10 @@ fn wrap_help_text(text: &str, max_w: usize) -> Vec<String> {
     result
 }
 
-/// Checks whether a text line starts and ends with pipes, forming a candidate markdown table row.
-fn is_table_row(line: &str) -> bool {
-    let trimmed = line.trim();
-    trimmed.starts_with('|') && trimmed.ends_with('|') && trimmed.matches('|').count() >= 2
-}
-
-/// Checks whether a markdown table row is a delimiter separator line (e.g., `|---|---|`).
-fn is_table_delimiter(line: &str) -> bool {
-    let trimmed = line.trim();
-    if !trimmed.starts_with('|') || !trimmed.ends_with('|') {
-        return false;
-    }
-    let parts: Vec<&str> = trimmed.split('|').collect();
-    if parts.len() < 3 {
-        return false;
-    }
-    parts[1..parts.len() - 1].iter().all(|c| {
-        let s = c.trim();
-        !s.is_empty() && s.chars().all(|ch| ch == '-' || ch == ':') && s.contains('-')
-    })
-}
-
-/// Extracts trimmed text cells from between pipe delimiters of a table row line.
-fn parse_cells(line: &str) -> Vec<String> {
-    let trimmed = line.trim();
-    let parts: Vec<&str> = trimmed.split('|').collect();
-    if parts.len() >= 2 {
-        parts[1..parts.len() - 1]
-            .iter()
-            .map(|s| s.trim().to_string())
-            .collect()
-    } else {
-        Vec::new()
-    }
-}
+use super::frame::{
+    is_markdown_table_delimiter as is_table_delimiter, is_markdown_table_row as is_table_row,
+    parse_markdown_table_cells as parse_cells, shrink_table_columns,
+};
 
 /// Computes table column widths and converts parsed table rows into styled Ratatui Lines.
 fn render_table(
@@ -392,22 +361,7 @@ fn render_table(
         }
     }
 
-    // Shrink columns if table exceeds available width
-    let overhead = cols * 3 + 1;
-    let max_text_w = avail_w.saturating_sub(overhead);
-    if cols > 0 && max_text_w >= cols * 4 {
-        while col_widths.iter().sum::<usize>() > max_text_w {
-            let (max_c, &max_val) = col_widths
-                .iter()
-                .enumerate()
-                .max_by_key(|(_, &w)| w)
-                .unwrap();
-            if max_val <= 4 {
-                break;
-            }
-            col_widths[max_c] -= 1;
-        }
-    }
+    shrink_table_columns(&mut col_widths, avail_w);
 
     let use_last_col_marquee = marquee_last_col && cols >= 3;
 

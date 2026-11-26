@@ -14,8 +14,8 @@ pub mod shortcuts;
 pub mod theme;
 
 pub use config::{
-    get_user_config_dir, load_config, resolve_app_path, save_config, BashMenuConfig, Settings,
-    CONFIG_HEADER,
+    get_user_config_dir, load_config, locate_companion_tool, resolve_app_path,
+    resolve_path_with_local, save_config, BashMenuConfig, Settings, CONFIG_HEADER,
 };
 pub use constants::*;
 pub use error::{BashMenuError, Result};
@@ -24,9 +24,9 @@ pub use glyph::{
     resolve_script_path, run_glyphs_search, CP437_TABLE,
 };
 pub use i18n::{
-    current_locale, discover_locales, interpolate_string, parse_and_flatten_yaml,
-    resolve_locale_path, set_locale, translate, translate_with, LocaleCatalog, LocaleInfo,
-    DEFAULT_EN_US_YAML,
+    current_locale, discover_locales, init_locale_from_env, interpolate_string,
+    parse_and_flatten_yaml, resolve_locale_path, set_locale, translate, translate_with,
+    LocaleCatalog, LocaleInfo, DEFAULT_EN_US_YAML,
 };
 pub use macro_engine::{
     apply_dir_picker_macros, apply_file_picker_macros, clear_command_cache, detect_color_mode,

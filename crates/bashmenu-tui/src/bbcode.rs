@@ -177,7 +177,9 @@ pub fn parse_bbcode_spans(text: &str, base_style: Style) -> Vec<Span<'static>> {
                     {
                         if style_stack.len() > 1 {
                             style_stack.pop();
-                            current_style = *style_stack.last().unwrap();
+                            if let Some(&prev) = style_stack.last() {
+                                current_style = prev;
+                            }
                         }
                     } else {
                         let mut new_style = current_style;

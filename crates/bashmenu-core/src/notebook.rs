@@ -463,11 +463,12 @@ pub fn rename_note(nb: &mut NotebookSchema, old_title: &str, new_title: &str) ->
             if map.len() == 1 {
                 if let Some(first_key) = map.keys().next().cloned() {
                     if first_key == old_title {
-                        let val = map.values().next().cloned().unwrap();
-                        let mut new_map = serde_json::Map::new();
-                        new_map.insert(new_title.to_string(), val);
-                        *item = serde_json::Value::Object(new_map);
-                        return true;
+                        if let Some(val) = map.values().next().cloned() {
+                            let mut new_map = serde_json::Map::new();
+                            new_map.insert(new_title.to_string(), val);
+                            *item = serde_json::Value::Object(new_map);
+                            return true;
+                        }
                     }
                 }
             } else if get_str_field(map, "title") == Some(old_title) {

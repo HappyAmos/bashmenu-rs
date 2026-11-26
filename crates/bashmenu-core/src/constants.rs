@@ -2,7 +2,7 @@
 
 use crate::macro_engine::{interpolate_placeholders, MacroContext};
 
-/// Comprehensive help text and reference guide for macro placeholders supported by BashMenu.
+/// Help text and reference guide for macro placeholders supported by BashMenu.
 ///
 /// Uses double-brace escaping (`{{macro}}`) for literal placeholder names and single-brace
 /// syntax (`{macro}`) in the `Value` column of 3-column tables so [`render_placeholder_help_text`]
