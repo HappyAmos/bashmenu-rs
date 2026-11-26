@@ -2747,6 +2747,7 @@ pub fn get_token_preview_spans(
                 let mod_x = p_inner_x + (p_avail_w.saturating_sub(mod_w)) / 2;
                 let mod_y = content_start_y + (p_avail_h.saturating_sub(mod_h)) / 2;
                 spans.push((mod_y + 2, mod_x + 2, (mod_x + 35).min(mod_x + mod_w - 1)));
+                spans.push((mod_y + 3, mod_x + 2, (mod_x + 36).min(mod_x + mod_w - 1)));
             }
             PreviewMode::MenuEditor => {
                 let left_w = p_avail_w / 2;

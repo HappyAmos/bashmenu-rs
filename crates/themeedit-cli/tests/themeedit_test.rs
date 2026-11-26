@@ -3232,9 +3232,9 @@ fn test_flash_spans_mode_aware_across_preview_tabs() {
     assert!(ed_hl.iter().any(|s| s.0 == area.y + 6)); // alt_buffer: true
     assert!(ed_hl.iter().any(|s| s.0 == area.y + area.height - 3)); // status bar
 
-    // 3:Modals: text flashes modal body text (inside modal rect)
+    // 3:Modals: text flashes both modal body text lines (mod_y+2 and mod_y+3)
     let mod_text = get_token_preview_spans(&text_tok, area, PreviewMode::Modals, &styles);
-    assert_eq!(mod_text.len(), 1);
+    assert_eq!(mod_text.len(), 2);
     assert!(mod_text[0].1 > area.x + 2);
 
     // 4:MenuEdit, 5:Toasts, 6:ThemeEdit, 7:Shortcuts all produce non-empty mode-specific text spans
