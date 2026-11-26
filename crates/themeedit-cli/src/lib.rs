@@ -3049,6 +3049,61 @@ pub fn relativize_wallpaper_path(path: &std::path::Path) -> String {
     path.to_string_lossy().to_string()
 }
 
+/// Tracks the isolated theme used to style `themeedit`'s own UI chrome.
+///
+/// Selecting or editing another theme updates only the preview pane; chrome
+/// styles refresh only when the configured theme itself is saved to disk.
+#[derive(Debug, Clone)]
+pub struct EditorChromeTheme {
+    /// Name of the configured theme that owns the editor's UI chrome.
+    pub configured_name: String,
+    /// Snapshot of the configured theme used to render editor chrome.
+    pub theme: Theme,
+}
+
+impl EditorChromeTheme {
+    /// Initializes editor chrome from `configured_name` when present in
+    /// `state.themes` (and not `"random"`), falling back to the initial
+    /// active theme in `state`.
+    pub fn from_state(state: &ThemeEditorState, configured_name: Option<&str>) -> Self {
+        if let Some(name) = configured_name
+            .map(str::trim)
+            .filter(|n| !n.is_empty() && !n.eq_ignore_ascii_case("random"))
+        {
+            if let Some(theme) = state.themes.get(name) {
+                return Self {
+                    configured_name: name.to_string(),
+                    theme: theme.clone(),
+                };
+            }
+        }
+        Self {
+            configured_name: state.current_name.clone(),
+            theme: state.current_theme.clone(),
+        }
+    }
+
+    /// Refreshes the chrome theme snapshot if the theme just saved to disk
+    /// is the configured theme. Returns `true` if chrome was updated.
+    pub fn sync_on_save(&mut self, saved_name: &str, saved_theme: &Theme) -> bool {
+        if saved_name == self.configured_name {
+            self.theme = saved_theme.clone();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Resolves `ThemeEdit` activity styles from the isolated chrome theme.
+    pub fn resolve_styles(&self, truecolor: bool) -> ResolvedThemeStyles {
+        ResolvedThemeStyles::from_theme_for_activity(
+            &self.theme,
+            truecolor,
+            ThemeActivity::ThemeEdit,
+        )
+    }
+}
+
 /// Renders the root window frame and background fill for the Theme Editor.
 ///
 /// Fills all cells in `area` with `styles.background` and renders the outer
