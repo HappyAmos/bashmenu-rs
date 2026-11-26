@@ -142,20 +142,3 @@ fn test_stress_ymlcheck_adversarial_inputs() {
 
     let _ = fs::remove_dir_all(&tmp_dir);
 }
-
-#[test]
-fn test_stress_bashedit_adversarial_paths() {
-    let res = Command::new("cargo")
-        .args([
-            "run",
-            "-p",
-            "bashedit-cli",
-            "--bin",
-            "bashedit",
-            "--",
-            "--help",
-        ])
-        .output()
-        .expect("bashedit help");
-    assert!(res.status.success());
-}

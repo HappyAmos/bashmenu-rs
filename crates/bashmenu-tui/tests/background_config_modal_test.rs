@@ -201,18 +201,34 @@ fn test_background_config_modal_render() {
 fn test_background_config_modal_mouse_interaction() {
     let mut modal = BackgroundConfigModal::new(None);
     let area = Rect::new(0, 0, 80, 24);
+    let styles = ResolvedThemeStyles::default();
+    let mut buf = Buffer::empty(area);
+    modal.render(area, &styles, &mut buf);
 
-    // Close button click at top right of frame returns Cancel
+    // Locate the rendered `[x]` close button on the top modal border
+    let mut close_pos = None;
+    for y in 0..area.height {
+        let row_str: String = (0..area.width).map(|x| buf[(x, y)].symbol()).collect();
+        if let Some(byte_idx) = row_str.find("[x]").or_else(|| row_str.find("[X]")) {
+            let col = row_str[..byte_idx].chars().count() as u16 + 1;
+            close_pos = Some((col, y));
+            break;
+        }
+    }
+    let (close_col, close_row) = close_pos.expect("Rendered modal must include [x] close button");
+
     let close_mouse = MouseEvent {
         kind: MouseEventKind::Down(MouseButton::Left),
-        column: 70,
-        row: 4,
+        column: close_col,
+        row: close_row,
         modifiers: KeyModifiers::NONE,
     };
     let act = modal.handle_mouse(close_mouse, area);
-    // Even if close button position varies slightly with geometry,
-    // verify handle_mouse executes cleanly without panic
-    let _ = act;
+    assert_eq!(
+        act,
+        BackgroundConfigAction::Cancel,
+        "Clicking [x] close button must return Cancel"
+    );
 }
 
 #[test]

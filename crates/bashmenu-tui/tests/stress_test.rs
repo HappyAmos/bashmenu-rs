@@ -64,16 +64,12 @@ fn test_stress_transition_dim_color_extremes() {
 
     for color in colors {
         for factor in factors {
-            // Must not panic on negative, zero, or overflow factors
             let dimmed = dim_color(color, factor);
-            match dimmed {
-                Color::Rgb(r, g, b) => {
-                    let _ = (r, g, b);
-                }
-                Color::Indexed(idx) => {
-                    let _ = idx;
-                }
-                _ => {}
+            if factor <= 0.0 && matches!(dimmed, Color::Rgb(_, _, _)) {
+                assert_eq!(dimmed, Color::Rgb(0, 0, 0));
+            }
+            if factor >= 1.0 && matches!(color, Color::Rgb(_, _, _)) {
+                assert_eq!(dimmed, color);
             }
         }
     }
@@ -81,59 +77,63 @@ fn test_stress_transition_dim_color_extremes() {
 
 #[test]
 fn test_stress_bayer_matrix_bounds() {
-    for y in 0..1000 {
-        for x in 0..1000 {
-            let val = BAYER_4X4[(y % 4) as usize][(x % 4) as usize];
+    let mut seen = 0u16;
+    for row in BAYER_4X4 {
+        for val in row {
             assert!(val <= 15, "Bayer 4x4 dither values must be in range 0..=15");
+            seen |= 1u16 << val;
         }
     }
+    assert_eq!(
+        seen, 0xFFFF,
+        "Bayer 4x4 matrix must cover every value 0..=15 exactly once"
+    );
 }
 
 #[test]
 fn test_stress_transition_effect_fuzz_parsing() {
-    let test_strings = [
-        "",
-        "   ",
-        "fade",
-        "FADE",
-        "  FaDe  ",
-        "curtain",
-        "CURTAIN",
-        "dissolve",
-        "dither",
-        "pixel",
-        "matrix",
-        "rain",
-        "cyber",
-        "slide",
-        "slide_left",
-        "slideleft",
-        "slide_right",
-        "slideright",
-        "blinds",
-        "venetian",
-        "slats",
-        "iris",
-        "zoom",
-        "box",
-        "wipedown",
-        "wipe_down",
-        "blind",
-        "roll",
-        "instant",
-        "none",
-        "disabled",
-        "off",
-        "0",
-        "false",
-        "unknown_random_gibberish",
-        "123456",
-        "!@#$%^&*()",
+    let expected = [
+        ("", TransitionEffect::Fade),
+        ("   ", TransitionEffect::Fade),
+        ("fade", TransitionEffect::Fade),
+        ("FADE", TransitionEffect::Fade),
+        ("  FaDe  ", TransitionEffect::Fade),
+        ("curtain", TransitionEffect::Curtain),
+        ("CURTAIN", TransitionEffect::Curtain),
+        ("dissolve", TransitionEffect::Dissolve),
+        ("dither", TransitionEffect::Dissolve),
+        ("pixel", TransitionEffect::Dissolve),
+        ("matrix", TransitionEffect::Matrix),
+        ("rain", TransitionEffect::Matrix),
+        ("cyber", TransitionEffect::Matrix),
+        ("slide", TransitionEffect::SlideLeft),
+        ("slide_left", TransitionEffect::SlideLeft),
+        ("slideleft", TransitionEffect::SlideLeft),
+        ("slide_right", TransitionEffect::SlideRight),
+        ("slideright", TransitionEffect::SlideRight),
+        ("blinds", TransitionEffect::Blinds),
+        ("venetian", TransitionEffect::Blinds),
+        ("slats", TransitionEffect::Blinds),
+        ("iris", TransitionEffect::Iris),
+        ("zoom", TransitionEffect::Iris),
+        ("box", TransitionEffect::Iris),
+        ("wipedown", TransitionEffect::WipeDown),
+        ("wipe_down", TransitionEffect::WipeDown),
+        ("blind", TransitionEffect::WipeDown),
+        ("roll", TransitionEffect::WipeDown),
+        ("instant", TransitionEffect::Instant),
+        ("none", TransitionEffect::None),
+        ("disabled", TransitionEffect::None),
+        ("off", TransitionEffect::None),
+        ("0", TransitionEffect::None),
+        ("false", TransitionEffect::None),
+        ("unknown_random_gibberish", TransitionEffect::Fade),
+        ("123456", TransitionEffect::Fade),
+        ("!@#$%^&*()", TransitionEffect::Fade),
     ];
 
-    for s in test_strings {
-        let eff = TransitionEffect::parse(Some(s));
-        let _ = format!("{:?}", eff);
+    for (s, want) in expected {
+        assert_eq!(TransitionEffect::parse(Some(s)), want, "Mismatch for {s:?}");
     }
     assert_eq!(TransitionEffect::parse(None), TransitionEffect::Fade);
 }

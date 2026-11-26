@@ -998,11 +998,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_ensure_terminal_sane_callable() {
-        ensure_terminal_sane();
-    }
-
-    #[test]
     fn test_capture_snapshot_invokes_callback_once_and_preserves_cells() {
         let mut calls = 0usize;
         let snapshot = capture_snapshot(20, 6, |f| {

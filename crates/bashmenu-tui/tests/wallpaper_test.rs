@@ -8,6 +8,8 @@ use ratatui::layout::Rect;
 use ratatui::style::Color;
 use std::path::PathBuf;
 
+static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[test]
 fn test_color_to_rgb() {
     assert_eq!(color_to_rgb(Color::Rgb(10, 20, 30)), (10, 20, 30));
@@ -141,6 +143,7 @@ fn test_composite_buffer_padding_and_glyphs() {
 
 #[test]
 fn test_menu_view_renders_with_wallpaper() {
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
     std::env::set_var("BASHMENU_DIR", &repo_root);
 
@@ -221,6 +224,7 @@ fn test_menu_view_renders_with_wallpaper() {
 
 #[test]
 fn test_wallpaper_scaling_modes() {
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
     std::env::set_var("BASHMENU_DIR", &repo_root);
 
@@ -251,6 +255,7 @@ fn test_wallpaper_scaling_modes() {
 
 #[test]
 fn test_resolve_wallpaper_user_overrides() {
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
     std::env::set_var("BASHMENU_DIR", &repo_root);
 
@@ -349,6 +354,7 @@ fn test_downsample_palette_to_16_and_8() {
 
 #[test]
 fn test_wallpaper_compositor_quarterblock_mode() {
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
     std::env::set_var("BASHMENU_DIR", &repo_root);
     std::env::set_var("BASHMENU_QUADRANT_BLOCKS", "1");
@@ -396,6 +402,7 @@ fn test_wallpaper_compositor_quarterblock_mode() {
 
 #[test]
 fn test_wallpaper_compositor_console_fallback_to_halfblock() {
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
     std::env::set_var("BASHMENU_DIR", &repo_root);
     // Explicitly simulate Linux console lacking Unicode quadrant blocks
@@ -432,6 +439,7 @@ fn test_wallpaper_compositor_console_fallback_to_halfblock() {
 
 #[test]
 fn test_wallpaper_compositor_color_tier_downsampling() {
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
     std::env::set_var("BASHMENU_DIR", &repo_root);
 
@@ -480,6 +488,7 @@ fn test_wallpaper_compositor_color_tier_downsampling() {
 
 #[test]
 fn test_color_tier_detect_priority() {
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     // Basic virtual console must take precedence over inherited COLORTERM=truecolor
     std::env::remove_var("BASHMENU_COLOR_TIER");
     std::env::set_var("COLORTERM", "truecolor");
@@ -509,6 +518,7 @@ fn test_color_tier_detect_priority() {
 
 #[test]
 fn test_wallpaper_compositor_clustering() {
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
     std::env::set_var("BASHMENU_DIR", &repo_root);
 

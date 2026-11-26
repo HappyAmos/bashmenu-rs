@@ -1,4 +1,4 @@
-//! Comprehensive stress tests for `bashmenu-core` logic, macro engine,
+//! Stress tests for `bashmenu-core` logic, macro engine,
 //! configuration serialization, and notebook 3-way conflict resolution.
 
 use bashmenu_core::config::BashMenuConfig;
@@ -78,10 +78,21 @@ fn test_stress_macro_engine_malformed_and_binary() {
     ];
 
     for input in malformed_inputs {
-        // Must never panic on any malformed or binary inputs
         let out = interpolate_placeholders(input, &ctx);
-        let _ = extract_toasts(input, &ctx);
-        let _ = out.len();
+        let (cleaned, toasts) = extract_toasts(input, &ctx);
+        if input.is_empty() {
+            assert!(out.is_empty());
+            assert!(cleaned.is_empty());
+        }
+        if input.contains("{home}") {
+            assert!(!out.contains("{home}"));
+        }
+        if !input.contains("{toast:") || input == "{toast:}" {
+            assert!(
+                toasts.is_empty(),
+                "Input without valid toast body should produce 0 toasts: {input:?}"
+            );
+        }
     }
 }
 
@@ -114,19 +125,28 @@ fn test_stress_macro_engine_concurrent_threads() {
 fn test_stress_command_cache_and_clearing() {
     let config = BashMenuConfig::default();
     let ctx = MacroContext::new(&config);
+    let counter_file =
+        std::env::temp_dir().join(format!("bm_cache_test_{}.cnt", std::process::id()));
+    let _ = fs::remove_file(&counter_file);
+    let cmd = format!(
+        "{{command:sh -c 'n=$(cat \"{p}\" 2>/dev/null || echo 0); n=$((n+1)); echo $n > \"{p}\"; echo $n'}}",
+        p = counter_file.display()
+    );
 
-    // Run command substitution
-    let res1 = interpolate_placeholders("{command:echo 'cache_stress'}", &ctx);
-    assert_eq!(res1.trim(), "cache_stress");
-
-    // Second run hits cache
-    let res2 = interpolate_placeholders("{command:echo 'cache_stress'}", &ctx);
-    assert_eq!(res2.trim(), "cache_stress");
-
-    // Clear cache
     clear_command_cache();
-    let res3 = interpolate_placeholders("{command:echo 'cache_stress'}", &ctx);
-    assert_eq!(res3.trim(), "cache_stress");
+    let res1 = interpolate_placeholders(&cmd, &ctx);
+    assert_eq!(res1.trim(), "1");
+
+    // Second run must return the cached value without re-executing the command
+    let res2 = interpolate_placeholders(&cmd, &ctx);
+    assert_eq!(res2.trim(), "1");
+
+    // Clearing cache forces re-execution and increments the counter to 2
+    clear_command_cache();
+    let res3 = interpolate_placeholders(&cmd, &ctx);
+    assert_eq!(res3.trim(), "2");
+
+    let _ = fs::remove_file(&counter_file);
 }
 
 #[test]
