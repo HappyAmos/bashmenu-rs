@@ -80,7 +80,7 @@ Show Whitespace: Display visible tabs and spaces in editor (show_whitespace=true
 External: Execute outside terminal sandbox (external=true)
 ";
 
-pub use bashmenu_core::PLACEHOLDER_HELP_TEXT;
+pub use bashmenu_core::placeholder_help_text;
 
 /// Returns the 5-character badge identifying an item's type
 pub fn get_type_badge(item: &MenuItem) -> &'static str {

@@ -24,10 +24,10 @@ use bashmenu_core::pick_random_theme;
 use bashmenu_core::{
     add_or_update_note, build_notebook_submenu, clear_command_cache, delete_note, extract_toasts,
     get_note_by_title, interpolate_placeholders, load_config, load_menu, load_notebook,
-    load_shortcuts, load_themes, merge_note_content, rename_note, resolve_notebook_path,
-    resolve_shortcuts_path, save_config, save_notebook, t, BashMenuConfig, ConfirmAction,
-    ExecutionMode, MacroContext, MenuItem, MenuItemType, MenuSchema, NoteItem, NoteSwapFile,
-    PluginEngine, ShortcutsConfig, ToastNotification, ToastSeverity, MARKDOWN_REFERENCE_TEXT,
+    load_shortcuts, load_themes, markdown_reference_text, merge_note_content, rename_note,
+    resolve_notebook_path, resolve_shortcuts_path, save_config, save_notebook, t, BashMenuConfig,
+    ConfirmAction, ExecutionMode, MacroContext, MenuItem, MenuItemType, MenuSchema, NoteItem,
+    NoteSwapFile, PluginEngine, ShortcutsConfig, ToastNotification, ToastSeverity,
 };
 use bashmenu_tui::{
     install_panic_hook, is_framebuffer_available, ColorTier, ConfirmChoice, ConfirmModal,
@@ -1227,7 +1227,7 @@ fn main() -> Result<()> {
                                 editor: Box::new(editor_snapshot),
                                 help: HelpModal::new(
                                     t!("bashedit.markdown_ref_title"),
-                                    MARKDOWN_REFERENCE_TEXT,
+                                    &markdown_reference_text(),
                                 ),
                             };
                         }
