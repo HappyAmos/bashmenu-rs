@@ -822,6 +822,73 @@ fn test_menuedit_execution_mode_selector_and_window_percent() {
 }
 
 #[test]
+fn test_menuedit_show_command_checkbox_visibility_and_persistence() {
+    use bashmenu_core::{ExecutionMode, MenuItem, MenuItemType};
+    use crossterm::event::{KeyCode, KeyModifiers};
+    use menuedit_cli::{FocusControl, ItemEditModal};
+
+    let item = MenuItem {
+        label: "Create Issue".to_string(),
+        r#type: MenuItemType::Command,
+        command: Some("gh issue create".to_string()),
+        ..Default::default()
+    };
+
+    let mut modal = ItemEditModal::new(&item);
+
+    // Console mode (2): ShowCommandChk must be hidden
+    assert_eq!(modal.exec_mode, 2);
+    assert!(!modal
+        .focus_controls()
+        .contains(&FocusControl::ShowCommandChk));
+
+    // Switch to Interactive mode (1): ShowCommandChk must appear and default to unchecked
+    modal.exec_mode = 1;
+    let ctrls_interactive = modal.focus_controls();
+    assert!(ctrls_interactive.contains(&FocusControl::ShowCommandChk));
+    assert!(!modal.show_command);
+
+    // Focus ShowCommandChk and toggle with Space
+    let chk_idx = ctrls_interactive
+        .iter()
+        .position(|c| *c == FocusControl::ShowCommandChk)
+        .unwrap();
+    modal.active_control_idx = chk_idx;
+    modal.handle_key(KeyCode::Char(' '), KeyModifiers::NONE);
+    assert!(modal.show_command);
+
+    let saved_interactive = modal.build_updated_item();
+    assert_eq!(
+        saved_interactive.execution_mode(),
+        ExecutionMode::Interactive
+    );
+    assert!(saved_interactive.show_command());
+
+    // Reloading the saved item preserves show_command = true
+    let mut reloaded = ItemEditModal::new(&saved_interactive);
+    assert_eq!(reloaded.exec_mode, 1);
+    assert!(reloaded.show_command);
+
+    // Streaming mode (0): ShowCommandChk is also visible and persisted
+    reloaded.exec_mode = 0;
+    assert!(reloaded
+        .focus_controls()
+        .contains(&FocusControl::ShowCommandChk));
+    let saved_streaming = reloaded.build_updated_item();
+    assert_eq!(saved_streaming.execution_mode(), ExecutionMode::Streaming);
+    assert!(saved_streaming.show_command());
+
+    // Console mode (2): ShowCommandChk is hidden and show_command is cleared
+    reloaded.exec_mode = 2;
+    assert!(!reloaded
+        .focus_controls()
+        .contains(&FocusControl::ShowCommandChk));
+    let saved_console = reloaded.build_updated_item();
+    assert_eq!(saved_console.execution_mode(), ExecutionMode::Console);
+    assert!(!saved_console.show_command());
+}
+
+#[test]
 fn test_menuedit_inputs_selection_and_clipboard() {
     bashmenu_tui::clipboard::set_test_mode(true);
     use crossterm::event::{KeyCode, KeyModifiers};

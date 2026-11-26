@@ -563,6 +563,14 @@ impl MenuItem {
             .map(|pct| pct.clamp(20, 100))
             .unwrap_or(65)
     }
+
+    /// Whether floating Streaming/Interactive modals display the executed command
+    pub fn show_command(&self) -> bool {
+        self.extra
+            .get("show_command")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)
+    }
 }
 
 /// Execution mode for a menu command or action

@@ -48,6 +48,8 @@ pub struct StreamOutputModal {
     pub window_percent: u16,
     /// Whether stdin remains connected for interactive user inputs
     pub interactive: bool,
+    /// Whether to display the executed command header at the top of the floating console
+    pub show_command: bool,
     /// Buffered output lines collected from process stdout/stderr (or synced from VT100 screen)
     pub lines: Vec<String>,
     /// Vertical scroll offset in lines (non-VT100 mode)
@@ -87,6 +89,7 @@ impl StreamOutputModal {
             command,
             window_percent: window_percent.clamp(20, 100),
             interactive,
+            show_command: false,
             lines: Vec::new(),
             scroll_offset: 0,
             auto_scroll: true,
@@ -105,6 +108,11 @@ impl StreamOutputModal {
         }
     }
 
+    /// Sets whether the executed command header is shown at the top of the modal.
+    pub fn set_show_command(&mut self, show: bool) {
+        self.show_command = show;
+    }
+
     /// Sets the target PTY dimensions `(cols, rows)` before [`Self::start`] is called.
     pub fn set_pty_size(&mut self, cols: u16, rows: u16) {
         self.pty_size = (cols.max(20), rows.max(4));
@@ -112,9 +120,10 @@ impl StreamOutputModal {
 
     /// Resizes the embedded VT100 screen and PTY when the outer terminal resizes.
     pub fn resize_for_area(&mut self, area: Rect) {
+        let header_rows = u16::from(self.show_command);
         let (dw, dh) = self.calculate_dialog_dimensions(area);
         let cols = dw.saturating_sub(5).max(20);
-        let rows = dh.saturating_sub(3).max(4);
+        let rows = dh.saturating_sub(3 + header_rows).max(4);
         self.pty_size = (cols, rows);
         if let Some(ref mut parser) = self.vt_parser {
             parser.set_size(rows, cols);
@@ -559,7 +568,45 @@ impl StreamOutputModal {
             return;
         }
 
-        let content_h = inner.height.saturating_sub(1) as usize;
+        let header_rows = if self.show_command && inner.height >= 3 {
+            1usize
+        } else {
+            0
+        };
+        if header_rows == 1 {
+            let avail_cmd_w = inner.width.saturating_sub(2) as usize;
+            let prefix = "$ ";
+            let prefix_style = Style::default()
+                .fg(styles.accent.fg.unwrap_or(Color::Cyan))
+                .bg(styles.background)
+                .add_modifier(Modifier::BOLD);
+            let cmd_style = Style::default()
+                .fg(styles
+                    .help_text
+                    .fg
+                    .or(styles.text.fg)
+                    .unwrap_or(Color::Gray))
+                .bg(styles.background);
+            buf.set_string(inner.x + 1, inner.y, prefix, prefix_style);
+            let max_cmd_chars = avail_cmd_w.saturating_sub(prefix.len());
+            let cmd_chars: Vec<char> = self.command.chars().collect();
+            let display_cmd: String = if cmd_chars.len() > max_cmd_chars && max_cmd_chars > 1 {
+                let mut s: String = cmd_chars[..max_cmd_chars - 1].iter().collect();
+                s.push('…');
+                s
+            } else {
+                cmd_chars.into_iter().take(max_cmd_chars).collect()
+            };
+            buf.set_string(
+                inner.x + 1 + prefix.len() as u16,
+                inner.y,
+                &display_cmd,
+                cmd_style,
+            );
+        }
+
+        let content_y = inner.y + header_rows as u16;
+        let content_h = inner.height.saturating_sub(1 + header_rows as u16) as usize;
         let avail_w = inner.width.saturating_sub(3) as usize; // reserve margin and scrollbar
         let default_text_style = styles.text.bg(styles.background);
 
@@ -571,7 +618,7 @@ impl StreamOutputModal {
             let render_cols = avail_w.min(screen_cols as usize);
 
             for r in 0..render_rows {
-                let y = inner.y + r as u16;
+                let y = content_y + r as u16;
                 for c in 0..render_cols {
                     let Some(cell) = screen.cell(r as u16, c as u16) else {
                         continue;
@@ -611,7 +658,7 @@ impl StreamOutputModal {
             if self.is_running && self.vt_scrollback == 0 && !screen.hide_cursor() {
                 let (cur_r, cur_c) = screen.cursor_position();
                 if (cur_r as usize) < content_h && (cur_c as usize) < avail_w {
-                    let cur_cell = &mut buf[(inner.x + 1 + cur_c, inner.y + cur_r)];
+                    let cur_cell = &mut buf[(inner.x + 1 + cur_c, content_y + cur_r)];
                     cur_cell.modifier.toggle(Modifier::REVERSED);
                 }
             }
@@ -628,7 +675,7 @@ impl StreamOutputModal {
 
             for row_idx in 0..content_h {
                 let line_idx = eff_scroll + row_idx;
-                let y = inner.y + row_idx as u16;
+                let y = content_y + row_idx as u16;
 
                 if line_idx < total_lines {
                     let raw_line = &self.lines[line_idx];
@@ -641,7 +688,7 @@ impl StreamOutputModal {
             if content_h >= 3 {
                 super::frame::render_modal_scrollbar(
                     inner.x + inner.width.saturating_sub(1),
-                    inner.y,
+                    content_y,
                     content_h,
                     total_lines,
                     eff_scroll,

@@ -290,6 +290,9 @@ pub fn format_inspector_text(
     if let Some(b) = item.interactive {
         flags.push(format!("interactive={}", b));
     }
+    if let Some(b) = item.extra.get("show_command").and_then(|v| v.as_bool()) {
+        flags.push(format!("show_command={}", b));
+    }
     if let Some(b) = item.extra.get("show_whitespace").and_then(|v| v.as_bool()) {
         flags.push(format!("show_whitespace={}", b));
     }
@@ -361,6 +364,7 @@ pub fn format_inspector_text(
         "stream",
         "exec_mode",
         "window_percent",
+        "show_command",
         "floating",
         "quiet",
         "interactive",
