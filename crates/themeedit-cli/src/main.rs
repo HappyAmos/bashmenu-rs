@@ -2787,21 +2787,31 @@ fn hit_test_preview_with_style(
                 }
                 if row > p_inner_y && row < tree_rect.bottom().saturating_sub(1) {
                     if col > tree_rect.x && col < tree_rect.right().saturating_sub(1) {
-                        if row == p_inner_y + 1 {
+                        // Rows inside [ Tokens ] preview pane:
+                        // +1: "▾ Theme:"                   (accent)
+                        // +2: "▾ Colors:"                  (accent)
+                        // +3: "  Background    Color 234"  (text)
+                        // +4: "▶ Text Color    Color 255"  (highlight_text on text, highlight on empty right)
+                        // +5: "  Help Text     Inherit"    (text)
+                        // +6: "  Divider       Color 81"   (text)
+                        // +7: "▸ Borders:"                 (accent)
+                        if row == p_inner_y + 1 || row == p_inner_y + 2 || row == p_inner_y + 7 {
                             return Some((
                                 "accent",
-                                row,
-                                tree_rect.x + 2,
-                                tree_rect.right().saturating_sub(2),
-                            ));
-                        }
-                        if row == p_inner_y + 2 {
-                            return Some((
-                                "highlight",
                                 row,
                                 tree_rect.x + 1,
                                 tree_rect.right().saturating_sub(1),
                             ));
+                        }
+                        if row == p_inner_y + 4 {
+                            const HIGHLIGHT_TOKEN_TEXT_W: u16 = 25; // "▶ Text Color    Color 255"
+                            let inner_start = tree_rect.x + 1;
+                            let inner_end = tree_rect.right().saturating_sub(1);
+                            let text_end = (inner_start + HIGHLIGHT_TOKEN_TEXT_W).min(inner_end);
+                            if col < text_end {
+                                return Some(("highlight_text", row, inner_start, text_end));
+                            }
+                            return Some(("highlight", row, text_end, inner_end));
                         }
                         return Some((
                             "text",
@@ -2811,6 +2821,24 @@ fn hit_test_preview_with_style(
                         ));
                     }
                     if col > sample_rect.x && col < sample_rect.right().saturating_sub(1) {
+                        if row == p_inner_y + 1 {
+                            const ACTIVE_ITEM_TEXT_W: u16 = 13; // "► 1. Terminal"
+                            let inner_start = sample_rect.x + 1;
+                            let inner_end = sample_rect.right().saturating_sub(1);
+                            let text_end = (inner_start + ACTIVE_ITEM_TEXT_W).min(inner_end);
+                            if col < text_end {
+                                return Some(("highlight_text", row, inner_start, text_end));
+                            }
+                            return Some(("highlight", row, text_end, inner_end));
+                        }
+                        if row == p_inner_y + 3 {
+                            return Some((
+                                "divider",
+                                row,
+                                sample_rect.x + 1,
+                                sample_rect.right().saturating_sub(1),
+                            ));
+                        }
                         return Some((
                             "text",
                             row,
@@ -3041,7 +3069,8 @@ mod tests {
             Some("text")
         );
 
-        // 3. ThemeEdit tab: title headers -> "title", unselected tree rows -> "text"
+        // 3. ThemeEdit tab: title headers -> "title", categories -> "accent",
+        //    highlighted rows split "highlight_text" (text) vs "highlight" (right space)
         assert_eq!(
             hit_test_preview(
                 p_inner_x + 4,
@@ -3053,16 +3082,89 @@ mod tests {
             .map(|r| r.0),
             Some("title")
         );
+        for cat_offset in [1_u16, 2, 7] {
+            assert_eq!(
+                hit_test_preview(
+                    p_inner_x + 4,
+                    p_inner_y + cat_offset,
+                    right_area,
+                    PreviewMode::ThemeEditor,
+                    false
+                )
+                .map(|r| r.0),
+                Some("accent"),
+                "Category row offset {} must map to accent",
+                cat_offset
+            );
+        }
         assert_eq!(
             hit_test_preview(
                 p_inner_x + 6,
-                p_inner_y + 4,
+                p_inner_y + 3,
                 right_area,
                 PreviewMode::ThemeEditor,
                 false
             )
             .map(|r| r.0),
             Some("text")
+        );
+        // Wide preview so both text and trailing highlight background exist on both panes
+        let wide_area = Rect::new(43, 2, 100, 24);
+        let wide_inner_x = wide_area.x + 2;
+        let wide_inner_y = wide_area.y + 2;
+        let wide_avail_w = wide_area.width.saturating_sub(4);
+        let wide_left_w = ((wide_avail_w as usize * 48) / 100).max(16) as u16;
+        let wide_right_w = wide_avail_w.saturating_sub(wide_left_w + 1);
+        let wide_tree_right = wide_inner_x + wide_left_w;
+        let wide_sample_x = wide_inner_x + wide_left_w + 1;
+        let wide_sample_right = wide_sample_x + wide_right_w;
+
+        // "▶ Text Color    Color 255" text -> highlight_text; trailing space -> highlight
+        assert_eq!(
+            hit_test_preview(
+                wide_inner_x + 6,
+                wide_inner_y + 4,
+                wide_area,
+                PreviewMode::ThemeEditor,
+                false
+            )
+            .map(|r| r.0),
+            Some("highlight_text")
+        );
+        assert_eq!(
+            hit_test_preview(
+                wide_tree_right - 2,
+                wide_inner_y + 4,
+                wide_area,
+                PreviewMode::ThemeEditor,
+                false
+            )
+            .map(|r| r.0),
+            Some("highlight")
+        );
+
+        // "► 1. Terminal" text -> highlight_text; trailing space -> highlight
+        assert_eq!(
+            hit_test_preview(
+                wide_sample_x + 4,
+                wide_inner_y + 1,
+                wide_area,
+                PreviewMode::ThemeEditor,
+                false
+            )
+            .map(|r| r.0),
+            Some("highlight_text")
+        );
+        assert_eq!(
+            hit_test_preview(
+                wide_sample_right - 2,
+                wide_inner_y + 1,
+                wide_area,
+                PreviewMode::ThemeEditor,
+                false
+            )
+            .map(|r| r.0),
+            Some("highlight")
         );
     }
 

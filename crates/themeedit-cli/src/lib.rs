@@ -2478,13 +2478,19 @@ pub fn get_token_preview_spans(
                 let left_w = ((p_avail_w as usize * 48) / 100).max(16) as u16;
                 let right_w = p_avail_w.saturating_sub(left_w + 1);
                 let sample_x = p_inner_x + left_w + 1;
-                spans.push((content_start_y + 3, p_inner_x + 1, p_inner_x + left_w - 1));
-                if right_w >= 10 {
-                    spans.push((
-                        content_start_y + 2,
-                        sample_x + 2,
-                        (sample_x + 18).min(sample_x + right_w - 1),
-                    ));
+                let tree_inner_end = p_inner_x + left_w - 1;
+                if key == "highlight_text" {
+                    let token_text_end = (p_inner_x + 1 + 25).min(tree_inner_end);
+                    spans.push((content_start_y + 4, p_inner_x + 1, token_text_end));
+                    if right_w >= 10 {
+                        let sample_text_end = (sample_x + 1 + 13).min(sample_x + right_w - 1);
+                        spans.push((content_start_y + 1, sample_x + 1, sample_text_end));
+                    }
+                } else {
+                    spans.push((content_start_y + 4, p_inner_x + 1, tree_inner_end));
+                    if right_w >= 10 {
+                        spans.push((content_start_y + 1, sample_x + 1, sample_x + right_w - 1));
+                    }
                 }
             }
             PreviewMode::ShortcutEditor => {
@@ -2612,7 +2618,7 @@ pub fn get_token_preview_spans(
             }
             PreviewMode::ThemeEditor => {
                 let left_w = ((p_avail_w as usize * 48) / 100).max(16) as u16;
-                for r in [2_u16, 4, 5] {
+                for r in [3_u16, 5, 6] {
                     spans.push((content_start_y + r, p_inner_x + 1, p_inner_x + left_w - 1));
                 }
             }
@@ -2652,7 +2658,9 @@ pub fn get_token_preview_spans(
             }
             PreviewMode::ThemeEditor => {
                 let left_w = ((p_avail_w as usize * 48) / 100).max(16) as u16;
-                spans.push((content_start_y + 1, p_inner_x + 1, p_inner_x + left_w - 1));
+                for r in [1_u16, 2, 7] {
+                    spans.push((content_start_y + r, p_inner_x + 1, p_inner_x + left_w - 1));
+                }
             }
             PreviewMode::ShortcutEditor => {
                 let left_w = p_avail_w / 2;
