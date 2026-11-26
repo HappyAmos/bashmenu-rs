@@ -39,15 +39,15 @@ settings:
     weather:
       script: curl -s 'wttr.in/{user.postal_code}?format=4'
       sleep: 10000
-    alienware:
+    server1:
       sleep: 15000
-      script: '{scripts_dir}/serverup.sh 192.168.4.46 [b]Alienware[/b]'
-    pi3b:
+      script: '{scripts_dir}/serverup.sh 192.168.1.10 [b]Server1[/b]'
+    server2:
       sleep: 20000
-      script: '{scripts_dir}/serverup.sh 192.168.4.47 [b]Pi3b[/b]'
-    halftop:
+      script: '{scripts_dir}/serverup.sh 192.168.1.11 [b]Server2[/b]'
+    server3:
       sleep: 25000
-      script: '{scripts_dir}/serverup.sh 192.168.4.96 [b]Halftop[/b]'
+      script: '{scripts_dir}/serverup.sh 192.168.1.12 [b]Server3[/b]'
     otd:
       script: otd.sh
       sleep: 40000

@@ -10,7 +10,7 @@ We ask that all participants in the BashMenu-RS community uphold the following p
 
 - **Respect and Professionalism:** Treat fellow contributors with kindness and professional courtesy. Focus critiques on code, architecture, and technical merits rather than individuals.
 - **Collaborative Problem Solving:** Assume good intent. Offer constructive, actionable feedback during reviews and technical discussions.
-- **Thoughtful Craftsmanship:** Respect the project's technical goals—including high-performance terminal UX, zero-latency startup, and terminal state safety—while helping others understand these invariants.
+- **Thoughtful Craftsmanship:** Respect the project's technical goals and terminal safety invariants, and help others understand them during reviews.
 - **Integrity and Inclusivity:** Ensure that discussions, pull requests, issue trackers, and community spaces remain inclusive and accessible to everyone.
 
 ## Unacceptable Behavior

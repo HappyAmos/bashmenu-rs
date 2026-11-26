@@ -7,8 +7,8 @@
 # OPTIONS:     -h, --help        Show usage information and exit.
 # ==============================================================================
 
-SERVER="pi3b.lan"
-REMOTE_FILE_DIR="/mnt/wd320/private/andrew/Linux/"
+SERVER="${BASHMENU_KEY_SERVER:-myserver.lan}"
+REMOTE_FILE_DIR="${BASHMENU_KEY_DIR:-/path/to/keys}"
 
 print_help_text() {
     echo "Download the text from a file via SSH from [$SERVER@$REMOTE_FILE_DIR]"

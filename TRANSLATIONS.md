@@ -45,40 +45,42 @@ Translate the values on the right side of each colon (`:`).
 #### What to Translate:
 ```yaml
 # English (en_us.yml):
-menu:
-  save: "Save"
-  cancel: "Cancel"
-  exit_confirm: "Are you sure you want to exit?"
+common:
+  buttons:
+    save: "Save"
+    cancel: "Cancel"
+    ok: "OK"
 
 # French (fr_fr.yml):
-menu:
-  save: "Enregistrer"
-  cancel: "Annuler"
-  exit_confirm: "Êtes-vous sûr de vouloir quitter ?"
+common:
+  buttons:
+    save: "Enregistrer"
+    cancel: "Annuler"
+    ok: "OK"
 ```
 
 #### What NOT to Touch:
 1. **Never change the keys (the left-hand side names):**
    ```yaml
    # CORRECT:
-   btn_save: "Enregistrer"
+   save: "Enregistrer"
 
    # WRONG (will break the program):
-   btn_enregistrer: "Enregistrer"
+   enregistrer: "Enregistrer"
    ```
 2. **Preserve interpolation placeholders (`{...}`):**
    Dynamic placeholders enclosed in curly brackets (such as `{name}`, `{theme}`, `{file}`, `{line}`, `{version}`) are replaced at runtime with real data. Keep them intact in your translation:
    ```yaml
    # English:
-   file_saved: "File '{file}' saved successfully."
+   saved_file: "Saved {file}"
 
    # French:
-   file_saved: "Le fichier '{file}' a été enregistré avec succès."
+   saved_file: "{file} enregistré"
    ```
 3. **Preserve glyph and icon macros (`{nf:...}`, `{ascii:...}`):**
    If a string includes a Nerd Font glyph or CP437 character macro, leave the macro unchanged:
    ```yaml
-   indicator: "{nf:󰖟} Web"
+   indicator: "{nf:W:f059f:🌐} Web"
    ```
 
 ---
@@ -125,7 +127,7 @@ cargo run -p ymlcheck-cli -- -l locales/fr_fr.yml
 When successful, `ymlcheck` will output:
 ```text
 Validating locale string table: locales/fr_fr.yml...
-SUCCESS: 'locales/fr_fr.yml' is a valid locale string table with 100% key parity (310 keys validated)!
+SUCCESS: 'locales/fr_fr.yml' is a valid locale string table with 100% key parity (311 keys validated)!
 ```
 
 If any keys are missing or spelled incorrectly, `ymlcheck` will point out the exact keys you need to fix.

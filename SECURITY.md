@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-BashMenu-RS is actively developed in rolling release fashion on the `main` branch. Security fixes and patches are prioritized and applied directly to `main`.
+BashMenu-RS follows trunk-based development on `main` with tagged Semantic Versioning releases (`vX.Y.Z`). Security fixes are applied to `main` and published in the next release.
 
 | Version / Branch | Supported          |
 | ---------------- | ------------------ |

@@ -147,6 +147,22 @@ done
 ln -sf "$BIN_DIR/bashmenu" "$BIN_DIR/bm"
 echo "  [+] Created shortcut 'bm' -> $BIN_DIR/bm"
 
+# Helper to locate an installed or freshly built companion binary
+resolve_tool_bin() {
+    tool="$1"
+    if [ -x "$BIN_DIR/$tool" ]; then
+        echo "$BIN_DIR/$tool"
+    elif [ -x "$SCRIPT_DIR/target/release/$tool" ]; then
+        echo "$SCRIPT_DIR/target/release/$tool"
+    elif [ -x "$SCRIPT_DIR/bin/$tool" ]; then
+        echo "$SCRIPT_DIR/bin/$tool"
+    elif command -v "$tool" >/dev/null 2>&1; then
+        command -v "$tool"
+    else
+        echo ""
+    fi
+}
+
 # Initialize user config directory if missing
 CONFIG_DIR="$HOME/.config/bashmenu"
 mkdir -p "$CONFIG_DIR"
@@ -158,27 +174,8 @@ for cfg in bashmenu.yml bashmenu.mnu bashmenu.themes shortcuts.yml cheat.yml; do
     dest="$CONFIG_DIR/$cfg"
     if [ "$cfg" = "bashmenu.mnu" ] && [ "$MERGE_MENU" = "true" ] && [ -f "$src" ]; then
         if [ -f "$dest" ]; then
-            MENUEDIT_BIN=""
-            if [ -x "$BIN_DIR/menuedit" ]; then
-                MENUEDIT_BIN="$BIN_DIR/menuedit"
-            elif [ -x "$SCRIPT_DIR/target/release/menuedit" ]; then
-                MENUEDIT_BIN="$SCRIPT_DIR/target/release/menuedit"
-            elif [ -x "$SCRIPT_DIR/bin/menuedit" ]; then
-                MENUEDIT_BIN="$SCRIPT_DIR/bin/menuedit"
-            elif command -v menuedit >/dev/null 2>&1; then
-                MENUEDIT_BIN="$(command -v menuedit)"
-            fi
-
-            YMLCHECK_BIN=""
-            if [ -x "$BIN_DIR/ymlcheck" ]; then
-                YMLCHECK_BIN="$BIN_DIR/ymlcheck"
-            elif [ -x "$SCRIPT_DIR/target/release/ymlcheck" ]; then
-                YMLCHECK_BIN="$SCRIPT_DIR/target/release/ymlcheck"
-            elif [ -x "$SCRIPT_DIR/bin/ymlcheck" ]; then
-                YMLCHECK_BIN="$SCRIPT_DIR/bin/ymlcheck"
-            elif command -v ymlcheck >/dev/null 2>&1; then
-                YMLCHECK_BIN="$(command -v ymlcheck)"
-            fi
+            MENUEDIT_BIN="$(resolve_tool_bin menuedit)"
+            YMLCHECK_BIN="$(resolve_tool_bin ymlcheck)"
 
             if [ -n "$MENUEDIT_BIN" ]; then
                 echo "  [*] Launching interactive menu merge..."
@@ -239,18 +236,6 @@ if [ -d "$SCRIPT_DIR/locales" ]; then
 fi
 
 # Initialize user notebooks directory if missing
-if [ -d "$SCRIPT_DIR/notebooks" ]; then
-    mkdir -p "$CONFIG_DIR/notebooks"
-    for nb in "$SCRIPT_DIR/notebooks"/*.yml; do
-        if [ -f "$nb" ]; then
-            nb_name="$(basename "$nb")"
-            if [ ! -f "$CONFIG_DIR/notebooks/$nb_name" ]; then
-                cp "$nb" "$CONFIG_DIR/notebooks/$nb_name"
-                echo "  [+] Initialized user notebook: $CONFIG_DIR/notebooks/$nb_name"
-            fi
-        fi
-    done
-fi
 if [ -f "$SCRIPT_DIR/defaults/notes.yml" ] && [ ! -f "$CONFIG_DIR/notebooks/notes.yml" ] && [ ! -f "$CONFIG_DIR/notes.yml" ]; then
     mkdir -p "$CONFIG_DIR/notebooks"
     cp "$SCRIPT_DIR/defaults/notes.yml" "$CONFIG_DIR/notebooks/notes.yml"

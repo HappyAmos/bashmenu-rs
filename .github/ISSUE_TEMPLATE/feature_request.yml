@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thank you for suggesting an enhancement for BashMenu-RS! We welcome ideas that improve the user experience while respecting our design principles (instant startup, zero runtime dependencies, and terminal state safety).
+        Thank you for suggesting an enhancement for BashMenu-RS! We welcome ideas that improve the terminal user experience while keeping startup fast and terminal state handling safe.
 
   - type: textarea
     id: problem

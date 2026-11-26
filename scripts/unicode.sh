@@ -18,13 +18,11 @@
 # menu loop below, and add the retrieval line in the case 
 # statement below.
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# Function to pipe output through pager.sh, less -R, $PAGER, or fallback
+# Function to pipe output through bmpager, less -R, $PAGER, or fallback
 show_in_pager() {
     if [ -t 1 ]; then
-        if [ -x "${SCRIPT_DIR}/pager.sh" ]; then
-            "${SCRIPT_DIR}/pager.sh"
+        if command -v bmpager >/dev/null 2>&1; then
+            bmpager
         elif command -v less >/dev/null 2>&1; then
             less -R
         elif [ -n "${PAGER:-}" ]; then
@@ -65,9 +63,7 @@ print_unicode_range() {
         hex=$(printf "%08X" "$i")
         
         # Display short code point notation and the rendered symbol safely across shell versions
-        if [[ "$mode" == "builtin" ]]; then
-            printf "U+%04X:\U$hex\t" "$i"
-        elif [[ "$mode" == "python" ]]; then
+        if [[ "$mode" == "python" ]]; then
             local symbol
             symbol=$(python3 -c "import sys; sys.stdout.write(chr($i))" 2>/dev/null || true)
             printf "U+%04X:%s\t" "$i" "$symbol"

@@ -1,4 +1,4 @@
-.TH BASHMENU 1 "2026-11-24" "v0.1.6" "HA Bash Menu Manual"
+.TH BASHMENU 1 "2026-11-26" "v0.1.7" "HA Bash Menu Manual"
 .SH NAME
 bashmenu \- lightweight Ratatui TUI menu engine and settings manager
 .SH SYNOPSIS
@@ -6,6 +6,7 @@ bashmenu \- lightweight Ratatui TUI menu engine and settings manager
 [\fB\-c\fR \fIconfig\fR]
 [\fB\-m\fR \fImenu\fR]
 [\fB\-t\fR \fItheme\fR]
+[\fB\-L\fR \fIlocale\fR]
 [\fB\-s\fR \fIshortcuts\fR]
 [\fB\-r\fR|\fB\-\-repo\fR]
 [\fB\-i\fR|\fB\-\-image\fR]
@@ -109,7 +110,7 @@ Discovers and displays system hostname, FQDN, kernel, and OS identity.
 Cross-platform basic tools installer wrapper.
 .TP
 .I scripts/install_cheat.sh
-Installs interactive cheat sheet terminal tools.
+Helper script to clone a cheatsheet Git repository into the local environment.
 .TP
 .I scripts/install_games.sh
 Cross-platform installer for terminal games.
@@ -137,6 +138,9 @@ Cross-platform system update wrapper supporting apt, dnf, pacman, pkg, and brew.
 .TP
 .I scripts/temp.sh
 Native server and CPU temperature reporting script supporting Celsius and Fahrenheit.
+.TP
+.I scripts/terminal_radar.sh
+Terminal weather radar viewer script.
 .TP
 .I scripts/unicode.sh
 Interactive Unicode Block Explorer script.
@@ -491,7 +495,7 @@ Open placeholders reference, save shortcuts.yml, or exit editor.
 .B Edit Shortcut Modal:
 TAB/DOWN (next field), SHIFT+TAB/UP (prev field), F2/Ctrl+K (capture key), Ctrl+P (placeholders), Ctrl+S (save), ESC (cancel).
 .SS YAML Schema & Syntax Validator (ymlcheck)
-Validates YAML syntax and schemas using mutually exclusive modes (ymlcheck [MODE] <FILES>...): \fB\-c, \-\-config\fR (bashmenu.yml), \fB\-t, \-\-themes, \-\-theme\fR (bashmenu.themes), \fB\-m, \-\-menu\fR (bashmenu.mnu), \fB\-s, \-\-shortcuts, \-\-shortcut\fR (shortcuts.yml), and \fB\-y, \-\-yaml\fR (general YAML syntax; also default when omitted).
+Validates YAML syntax and schemas using mutually exclusive modes (ymlcheck [MODE] <FILES>...): \fB\-c, \-\-config\fR (bashmenu.yml), \fB\-t, \-\-themes, \-\-theme\fR (bashmenu.themes), \fB\-m, \-\-menu\fR (bashmenu.mnu), \fB\-s, \-\-shortcuts, \-\-shortcut\fR (shortcuts.yml), \fB\-l, \-\-locale\fR (locale string tables), and \fB\-y, \-\-yaml\fR (general YAML syntax; also default when omitted).
 .SH CONFIGURATION & SCHEMA SPECIFICATIONS
 .SS Settings Store (bashmenu.yml)
 Stores nested, dot-notation accessible key-value settings. Any nested path (e.g.
@@ -891,8 +895,10 @@ Supported Theme Elements: background, title, border, text, highlight, highlight_
 footer, help_text (configures help text in bottom gutter and modal footers),
 plugin (configures text color of background plugin feeds), gutter, selection,
 shortcut_key, divider, toast_info, toast_warning, toast_error, window_close_button,
-scrollbar, shadow (rendered with [fg, -1] syncing drop-shadow bg to fg), and whitespace
-(configures non-visible whitespace character color in the text editor).
+scrollbar, shadow (rendered with [fg, -1] syncing drop-shadow bg to fg), whitespace
+(configures non-visible whitespace character color in the text editor), selected_tab,
+unselected_tab, line_numbers, modal_yes_button, modal_no_button, modal_cancel_button,
+and key_color.
 .PP
 .B Per-Activity Color Overrides & -1 Inheritance:
 Each color tier (256, 16, 8) contains optional nested override maps for
@@ -924,18 +930,12 @@ and \fBborder_vertical\fR as shorthands), \fBborder_top_left\fR,
 \fBgutter_right_tee\fR, \fBgutter_top_tee\fR, \fBgutter_bottom_tee\fR,
 \fBtitle_left_cap\fR, \fBtitle_right_cap\fR, and \fBshadow_char\fR.
 Omitted keys fall back to standard single-line box drawing characters.
-Dividers strictly follow a 4-tier style priority: theme divider definitions
-override plugin divider definitions in bashmenu.yml, which override declared
-definitions in bashmenu.mnu, which fall back to {ascii:196}. Outer window
-borders never override dividers. Dividers only appear in a menu if declared as
-an option in bashmenu.mnu. Dividers of length \fB{window_width}\fR render
-within standard margins with vertical borders and no tees; dividers of length
-\fB{screen_width}\fR run border to border using left and right tees without margins.
+Divider styles are defined in \fBbashmenu.themes\fR (falling back to {ascii:196}) and outer window borders never override dividers. Dividers only appear in a menu if declared as an option in bashmenu.mnu. Dividers of length \fB{window_width}\fR render within standard margins with vertical borders and no tees; dividers of length \fB{screen_width}\fR run border to border using left and right tees without margins.
 .PP
 .B Toast Notification Style (toast:):
 Themes can configure persistent toast layout via a top-level \fBtoast:\fR section (editable in \fBthemeedit\fR under \fITheme: -> Toast Style\fR): \fBstyle\fR accepts \fBbar\fR (default left accent glyph via \fBtoast.char\fR) or \fBframed\fR (severity-colored \fI╓─┐ / ║...│ / ╙─┘\fR borders with 1-character horizontal margins).
 .SS Wallpaper Backgrounds & TrueColor Compositing (settings.background)
-HA Bash Menu features a TrueColor half-block (\(bu) wallpaper compositing engine that renders graphical background images directly behind menus, options, and status lines using universal ANSI text capabilities.
+HA Bash Menu features a TrueColor half-block wallpaper compositing engine that renders graphical background images directly behind menus, options, and status lines using ANSI text capabilities.
 Wallpapers can be specified in user settings (\fIsettings.background\fR in bashmenu.yml) or bundled with themes (\fItheme_background\fR in bashmenu.themes).
 Supported settings:
 .TP
@@ -960,7 +960,7 @@ Color channel quantization step between 1 and 32 (default: 1). Default 1 retains
 .SS Dynamic Block Injection
 The inject_block type installs templates inside profile files (e.g. .bashrc).
 It wraps the template in markers (# CODEBLOCK:block_id:START/END) to manage
-seamless interactive installs, updates, and uninstalls.
+interactive installs, updates, and uninstalls.
 .SS Subprocess Execution Modes (Console, Streaming, Interactive)
 Commands and scripts support three subprocess execution modes:
 .IP \(bu 2
@@ -1063,9 +1063,9 @@ after suspending terminal raw mode. This prevents disturbance to underlying term
 lines and the active menu layout.
 .IP \(bu 2
 .B Automatic Restoration:
-When the screensaver command terminates, the menu interface is seamlessly
-restored and the inactivity timer is automatically re-armed.
+When the screensaver command terminates, the menu interface is restored
+and the inactivity timer is automatically re-armed.
 .SS Multi-Platform Support & Environment Detection
-HA Bash Menu incorporates an environment detection engine in bashmenu.sh enabling graceful degradation and multi-platform compatibility without manual configuration. All files leverage universal shebangs. Cross-Platform package wrappers automatically translate dependency installs to the correct local package manager (apt, dnf, pacman, pkg, or brew), and smartly add or omit sudo depending on whether it is running in standard Linux, macOS, WSL, or containerized user-spaces like Termux.
+HA Bash Menu detects terminal capabilities, color depth, and host platform at runtime. Root installer and launcher scripts use POSIX /bin/sh while companion scripts in scripts/ use /usr/bin/env bash. Cross-platform package wrappers translate dependency installs to the local package manager (apt, dnf, pacman, pkg, or brew) and add or omit sudo depending on Linux, macOS, WSL, or Termux.
 .SH AUTHOR
 Distributed under the MIT License.

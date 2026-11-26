@@ -35,19 +35,24 @@ while [ -L "$SOURCE" ]; do
 done
 SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 
-# UTF-8 locale handling
-if command -v locale >/dev/null 2>&1; then
-    if locale -a 2>/dev/null | grep -qiE "^en_US\.(utf-?8)$"; then
-        export LANG=en_US.UTF-8
-        export LC_ALL=en_US.UTF-8
-    elif locale -a 2>/dev/null | grep -qiE "^c\.(utf-?8)$"; then
-        export LANG=C.UTF-8
-        export LC_ALL=C.UTF-8
-    else
-        export LANG="${LANG:-C.UTF-8}"
-        export LC_ALL="${LC_ALL:-C.UTF-8}"
-    fi
-fi
+# Ensure a UTF-8 locale without overriding an existing UTF-8 locale
+case "${LC_ALL:-${LANG:-}}" in
+    *[Uu][Tt][Ff]-8*|*[Uu][Tt][Ff]8*) ;;
+    *)
+        if command -v locale >/dev/null 2>&1; then
+            if locale -a 2>/dev/null | grep -qiE "^en_US\.(utf-?8)$"; then
+                export LANG=en_US.UTF-8
+                export LC_ALL=en_US.UTF-8
+            elif locale -a 2>/dev/null | grep -qiE "^c\.(utf-?8)$"; then
+                export LANG=C.UTF-8
+                export LC_ALL=C.UTF-8
+            else
+                export LANG="${LANG:-C.UTF-8}"
+                export LC_ALL="${LC_ALL:-C.UTF-8}"
+            fi
+        fi
+        ;;
+esac
 
 # Locate compiled bashmenu binary in order of preference
 locate_binary() {
@@ -93,9 +98,9 @@ case "${1:-}" in
         exit 0
         ;;
     -h|--help)
-        echo "BashMenu - Modern High-Performance Terminal Menu System (Rust)"
+        echo "BashMenu - Terminal Menu System (Rust)"
         echo ""
-        echo "Usage: ./bashmenu.sh [OPTIONS] [-- [BASHMENU_OPTIONS]]"
+        echo "Usage: ./bashmenu.sh [OPTIONS | BASHMENU_OPTIONS]"
         echo ""
         echo "Launcher Options:"
         echo "  --build           Build release binaries with Cargo"

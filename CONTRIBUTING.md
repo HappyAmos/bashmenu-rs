@@ -98,13 +98,13 @@ Whenever you add or modify a placeholder, macro, directive, or configuration att
 6. `assets/bashmenu.1`: Linux system manual page.
 
 ### 4. Zero Hardcoded User-Facing Text Invariant
-All user-facing strings (button labels, modal titles, prompts, error notices, status gutters, inspector labels) must strictly resolve through the string table (`locales/en_us.yml`) via `t!(...)`. No raw user-facing string literals are permitted in TUI rendering or CLI message dispatch paths. This ensures all text can be translated into other languages seamlessly via a single locale file.
+All user-facing strings (button labels, modal titles, prompts, error notices, status gutters, inspector labels) must resolve through the string table (`locales/en_us.yml`) via `t!(...)`. No raw user-facing string literals are permitted in TUI rendering or CLI message dispatch paths so all text can be translated via a single locale file.
 
 ---
 
 ## Shell Script Guidelines
 
-Shell scripts in the root directory or `scripts/` must:
+Shell scripts in the root directory (`#!/bin/sh` entrypoints) or `scripts/` (`#!/usr/bin/env bash`) must:
 - Include a descriptive script header:
   ```bash
   #!/usr/bin/env bash

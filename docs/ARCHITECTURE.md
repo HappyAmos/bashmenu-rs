@@ -1,11 +1,11 @@
 # BashMenu-RS Architecture & Design Blueprint
 
 ## 1. Overview & System Goals
-BashMenu-RS is a zero-dependency, compiled terminal menu system and companion developer tool suite implemented in **Rust + Bash scripting** using **Ratatui** and **Crossterm**. It is designed around five core tenets:
-- **Instantaneous Startup & Zero Latency**: Sub-10ms cold start times, double-buffered cell diffing, and immediate `MouseDown` activation without perceptible delay.
-- **Terminal Safety & Robustness**: Global panic recovery hooks (`std::panic::set_hook`), RAII terminal raw mode restoration (`TerminalGuard`), and DEC Mode 2026 synchronized output preventing flickering and terminal corruption.
-- **Self-Contained Implementation Invariant**: 100% self-contained across all capabilities (transitions, framebuffer, downsampling, note merging) without relying on external window managers, emulators (`kmscon`, `fbterm`), or shell utilities.
-- **Modular Workspace Architecture**: A strictly decoupled Cargo workspace separating serialization models, reusable Ratatui UI components, and standalone CLI utilities.
+BashMenu-RS is a compiled terminal menu system and companion tool suite implemented in **Rust + Bash scripting** using **Ratatui** and **Crossterm**. It is designed around five core goals:
+- **Fast Startup & Responsive Rendering**: Compiled native binaries, double-buffered cell diffing, and immediate `MouseDown` activation.
+- **Terminal Safety**: Global panic recovery hooks (`std::panic::set_hook`), RAII terminal raw mode restoration (`TerminalGuard`), and DEC Mode 2026 synchronized output to prevent flickering and terminal corruption.
+- **Self-Contained TUI Capabilities**: Screen transitions, `/dev/fb0` framebuffer rendering, color downsampling, and 3-way note merging are implemented directly in Rust without relying on external window managers or console emulators (`kmscon`, `fbterm`).
+- **Modular Workspace Architecture**: A Cargo workspace separating serialization models, reusable Ratatui UI components, and standalone CLI utilities.
 - **Extensible Configuration Hierarchy**: Macro expansion, customizable palettes, pluggable background tasks, notebook markdown management, and leader-based keyboard chording.
 
 ---
@@ -22,7 +22,6 @@ bashmenu-rs/
 ├── bashmenu.sh                   # POSIX/Bash launcher trampoline
 ├── install.sh                    # Multi-binary release installer (~/.local/bin)
 ├── uninstall.sh                  # Uninstallation script
-├── patches/libyml/               # Vendored libyml fix for flow scalar string join overflow
 └── crates/
     ├── bashmenu-core/            # Shared data models, Serde loaders, macro & plugin engines, notebooks
     ├── bashmenu-tui/             # Reusable Ratatui widgets, custom borders, modals, wallpaper, transitions, fb
@@ -77,7 +76,7 @@ bashmenu-rs/
 - **Direct Linux Framebuffer Engine (`framebuffer.rs`)**:
   - Self-contained `/dev/fb0` hardware rendering using Linux `ioctl(FBIOGET_VSCREENINFO)` / `ioctl(FBIOGET_FSCREENINFO)` and `mmap` for direct TrueColor and 16-bit RGB video RAM blitting on minimal Linux VT consoles.
 - **Visual Screen Transitions (`transition.rs` & `terminal.rs`)**:
-  - Synchronized DEC Mode 2026 transitions (`TransitionEffect`: `Fade`, `Curtain`, `Dissolve`, `Matrix`, `SlideLeft`, `SlideRight`, `Blinds`, `Iris`, `WipeDown`, `Instant`, `None`) executed via `draw_with_transition` and `draw_with_transition_out`, plus modal zoom animations (`ModalAnimation`: `Zoom`, `None`) via `draw_modal_grow` and `draw_modal_shrink`. Occurs on application launch, menu page/submenu navigation, notebook changes, paging, modal dialogs, and application switches.
+  - Synchronized DEC Mode 2026 transitions (`TransitionEffect`: `Fade`, `Curtain`, `Dissolve`, `Matrix`, `SlideLeft`, `SlideRight`, `Blinds`, `Iris`, `WipeDown`, `Instant`, `None`) executed via `draw_with_transition` and `draw_with_transition_out`, plus modal zoom animations (`ModalAnimation`: `Zoom`, `None`) via `animate_modal_grow` and `animate_modal_shrink`. Occurs on application launch, menu page/submenu navigation, notebook changes, paging, modal dialogs, and application switches.
 - **Adaptive Color Depth Fallback (`style.rs`)**:
   - Native `ColorTier` detection (`Color8`, `Color16`, `Color256`, `TrueColor`) inspecting `BASHMENU_COLOR_TIER`, `COLORTERM`, and `TERM`. Automatically maps TrueColor/256 palettes down to ANSI 16 and standard 8 colors using Euclidean RGB distance calculations when running on minimal consoles (`TERM=linux`).
 
@@ -99,7 +98,7 @@ bashmenu-rs/
 - **`themeedit`**: Visual theme & palette editor with split-screen live preview, 2D color/ASCII pickers, wallpaper background configuration modal with cursor inversion, and `<Ctrl+S>` direct disk save.
 - **`bashedit`**: Full-screen terminal text editor utilizing Unicode line buffers (`Vec<String>`) with a bounded 100-snapshot undo/redo stack, colocated `.<filename>.swp` swap files, crash recovery prompts, and universal clipboard support.
 - **`bmpager`**: Standalone native terminal pager with CommonMark markdown parsing, fenced code block framing, OSC 8 clickable hyperlinks, search navigation, and vim-like keybindings.
-- **`cheat`**: High-performance interactive CLI Markdown cheatsheet search engine and viewer with syntax highlighting and instant query filtering.
+- **`cheat`**: CLI Markdown cheatsheet lookup and search tool that renders sheets through `bmpager --markdown`.
 - **`ymlcheck`**: Standalone YAML schema validator and linter for `bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, and `shortcuts.yml`.
 
 ---
