@@ -3070,6 +3070,18 @@ fn main() -> Result<()> {
                                                         item.window_percent(),
                                                         is_interactive,
                                                     );
+                                                    let screen_rect = ratatui::layout::Rect::new(
+                                                        0,
+                                                        0,
+                                                        size.width,
+                                                        size.height,
+                                                    );
+                                                    let (dw, dh) = modal
+                                                        .calculate_dialog_dimensions(screen_rect);
+                                                    modal.set_pty_size(
+                                                        dw.saturating_sub(5).max(20),
+                                                        dh.saturating_sub(3).max(4),
+                                                    );
                                                     modal.start();
                                                     active_modal = ActiveModal::StreamOutput(modal);
                                                     need_redraw = true;
