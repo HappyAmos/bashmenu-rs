@@ -434,9 +434,9 @@ impl InputModal {
                 let is_cur = char_idx == safe_cursor;
 
                 let cell_style = if is_selected || is_cur {
-                    styles.highlight.add_modifier(Modifier::REVERSED)
+                    styles.input_box.add_modifier(Modifier::REVERSED)
                 } else {
-                    styles.highlight
+                    styles.input_box
                 };
 
                 let cell = &mut buf[(input_x + i as u16, input_y)];

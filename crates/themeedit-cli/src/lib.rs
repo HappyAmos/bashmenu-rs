@@ -545,6 +545,14 @@ impl ThemeEditorState {
                 kind: TokenKind::Color("modal_cancel_button".to_string()),
             },
             TokenItem {
+                label: "Input Box Background".to_string(),
+                kind: TokenKind::Color("input_box".to_string()),
+            },
+            TokenItem {
+                label: "Input Box Text".to_string(),
+                kind: TokenKind::Color("input_box_text".to_string()),
+            },
+            TokenItem {
                 label: "Line Numbers Color".to_string(),
                 kind: TokenKind::Color("line_numbers".to_string()),
             },
@@ -808,6 +816,17 @@ impl ThemeEditorState {
         );
         colors.insert(
             "selected_tab_text".to_string(),
+            serde_json::Value::Number(255.into()),
+        );
+        colors.insert(
+            "input_box".to_string(),
+            serde_json::Value::Array(vec![
+                serde_json::Value::Number(255.into()),
+                serde_json::Value::Number(236.into()),
+            ]),
+        );
+        colors.insert(
+            "input_box_text".to_string(),
             serde_json::Value::Number(255.into()),
         );
         colors.insert(
@@ -1793,6 +1812,14 @@ impl ThemeEditorState {
                             || (k == "modal_no_button" && (key == "no_button" || key == "modal_no"))
                             || (k == "modal_cancel_button"
                                 && (key == "cancel_button" || key == "modal_cancel"))
+                            || (k == "input_box"
+                                && (key == "input_box_bg"
+                                    || key == "input_box_background"
+                                    || key == "input_bg"))
+                            || (k == "input_box_text"
+                                && (key == "input_box_fg"
+                                    || key == "input_box_foreground"
+                                    || key == "input_text"))
                     }
                     TokenKind::Border(k) => {
                         (k == "top_tee" && key == "gutter_top_tee")
@@ -1950,11 +1977,11 @@ fn format_yaml_token_display(
             return Some(s);
         }
     }
-    if key == "highlight_text" || key == "selected_tab_text" {
-        let pair_key = if key == "highlight_text" {
-            "highlight"
-        } else {
-            "selected_tab"
+    if key == "highlight_text" || key == "selected_tab_text" || key == "input_box_text" {
+        let pair_key = match key {
+            "highlight_text" => "highlight",
+            "selected_tab_text" => "selected_tab",
+            _ => "input_box",
         };
         if let Some(pair_val) = find_tier_token_value(c_map, activity, pair_key) {
             if let Some(fg_val) = pair_val.as_array().and_then(|s| s.first()) {
@@ -1992,11 +2019,11 @@ fn resolve_activity_color(theme: &Theme, activity: ThemeActivity, key: &str) -> 
     let styles = ResolvedThemeStyles::from_theme_for_activity(theme, true, activity);
     if let Some(c_map) = &theme.colors_256 {
         let check_act = |act: ThemeActivity| -> Option<Color> {
-            if key == "highlight_text" || key == "selected_tab_text" {
-                let pair_key = if key == "highlight_text" {
-                    "highlight"
-                } else {
-                    "selected_tab"
+            if key == "highlight_text" || key == "selected_tab_text" || key == "input_box_text" {
+                let pair_key = match key {
+                    "highlight_text" => "highlight",
+                    "selected_tab_text" => "selected_tab",
+                    _ => "input_box",
                 };
                 if let Some(val) = find_tier_token_value(c_map, act, key) {
                     if !is_inherited_color_value(val) {
@@ -2020,7 +2047,11 @@ fn resolve_activity_color(theme: &Theme, activity: ThemeActivity, key: &str) -> 
                 }
                 return None;
             }
-            if key == "highlight" || key == "selection" || key == "selected_tab" {
+            if key == "highlight"
+                || key == "selection"
+                || key == "selected_tab"
+                || key == "input_box"
+            {
                 if let Some(val) = find_tier_token_value(c_map, act, key) {
                     if let Some(seq) = val.as_array() {
                         if let Some(bg) = seq.get(1) {
@@ -2086,6 +2117,8 @@ fn resolve_activity_color(theme: &Theme, activity: ThemeActivity, key: &str) -> 
             .or(styles.selected_tab.fg)
             .unwrap_or(Color::Cyan),
         "selected_tab_text" => styles.selected_tab.fg.unwrap_or(Color::Black),
+        "input_box" => styles.input_box.bg.unwrap_or(Color::Indexed(236)),
+        "input_box_text" => styles.input_box.fg.unwrap_or(Color::White),
         "unselected_tab" => styles.unselected_tab.fg.unwrap_or(Color::DarkGray),
         "line_numbers" => styles.line_numbers.fg.unwrap_or(Color::DarkGray),
         "whitespace" => styles.whitespace.fg.unwrap_or(Color::DarkGray),
@@ -2196,11 +2229,11 @@ fn write_color_token_to_tier(
 
     if key == "background" {
         target.insert(key, val);
-    } else if key == "highlight" || key == "selected_tab" {
-        let text_key = if key == "highlight" {
-            "highlight_text"
-        } else {
-            "selected_tab_text"
+    } else if key == "highlight" || key == "selected_tab" || key == "input_box" {
+        let text_key = match key {
+            "highlight" => "highlight_text",
+            "selected_tab" => "selected_tab_text",
+            _ => "input_box_text",
         };
         let existing_fg = target
             .get(text_key)
@@ -2231,11 +2264,11 @@ fn write_color_token_to_tier(
     } else if key == "selection" {
         let fg_val = contrast_fg_value(color, tier);
         target.insert(key, serde_json::Value::Array(vec![fg_val, val]));
-    } else if key == "highlight_text" || key == "selected_tab_text" {
-        let pair_key = if key == "highlight_text" {
-            "highlight"
-        } else {
-            "selected_tab"
+    } else if key == "highlight_text" || key == "selected_tab_text" || key == "input_box_text" {
+        let pair_key = match key {
+            "highlight_text" => "highlight",
+            "selected_tab_text" => "selected_tab",
+            _ => "input_box",
         };
         if is_override {
             target.insert(key, val);
@@ -2276,11 +2309,11 @@ fn reset_tier_token_entry(
         return;
     };
     sub.insert(key.to_string(), inherit_val.clone());
-    if key == "highlight_text" || key == "selected_tab_text" {
-        let pair_key = if key == "highlight_text" {
-            "highlight"
-        } else {
-            "selected_tab"
+    if key == "highlight_text" || key == "selected_tab_text" || key == "input_box_text" {
+        let pair_key = match key {
+            "highlight_text" => "highlight",
+            "selected_tab_text" => "selected_tab",
+            _ => "input_box",
         };
         if let Some(serde_json::Value::Array(seq)) = sub.get_mut(pair_key) {
             if !seq.is_empty() {
@@ -2558,6 +2591,24 @@ pub fn get_token_preview_spans(
                 spans.push((content_start_y, p_inner_x, p_inner_x + p_avail_w));
             }
         }
+        TokenKind::Color(key) if key == "input_box" || key == "input_box_text" => {
+            if mode == PreviewMode::Modals {
+                let p_avail_h = right_area.height.saturating_sub(4);
+                let mod_w = (p_avail_w.saturating_sub(4)).clamp(32, 50);
+                let mod_h = 12_u16.min(p_avail_h);
+                let mod_x = p_inner_x + (p_avail_w.saturating_sub(mod_w)) / 2;
+                let mod_y = content_start_y + (p_avail_h.saturating_sub(mod_h)) / 2;
+                let inp_x = mod_x + 2;
+                let inp_end = mod_x + mod_w.saturating_sub(2);
+                if key == "input_box_text" {
+                    let text_start = inp_x + 1;
+                    let text_end = (text_start + 18).min(inp_end);
+                    spans.push((mod_y + 5, text_start, text_end));
+                } else {
+                    spans.push((mod_y + 5, inp_x, inp_end));
+                }
+            }
+        }
         TokenKind::Color(key) if key == "selected_tab" || key == "selected_tab_text" => {
             if let Some(active_tab) = preview_tab_bar_layout(right_area, mode)
                 .into_iter()
@@ -2628,7 +2679,6 @@ pub fn get_token_preview_spans(
                 let mod_x = p_inner_x + (p_avail_w.saturating_sub(mod_w)) / 2;
                 let mod_y = content_start_y + (p_avail_h.saturating_sub(mod_h)) / 2;
                 spans.push((mod_y + 2, mod_x + 2, (mod_x + 35).min(mod_x + mod_w - 1)));
-                spans.push((mod_y + 5, mod_x + 3, mod_x + mod_w.saturating_sub(3)));
             }
             PreviewMode::MenuEditor => {
                 let left_w = p_avail_w / 2;
