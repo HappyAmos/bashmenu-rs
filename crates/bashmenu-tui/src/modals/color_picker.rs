@@ -662,11 +662,8 @@ impl ColorPickerModal {
         let t2_active = self.tab == ColorPickerTab::TrueColorHsv;
         let t3_active = self.tab == ColorPickerTab::HexInput;
 
-        let active_style = Style::default()
-            .fg(Color::Black)
-            .bg(Color::Cyan)
-            .add_modifier(Modifier::BOLD);
-        let inactive_style = Style::default().fg(Color::White);
+        let active_style = styles.selected_tab.add_modifier(Modifier::BOLD);
+        let inactive_style = styles.unselected_tab;
 
         let t1_s = if t1_active {
             active_style

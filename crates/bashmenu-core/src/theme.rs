@@ -18,7 +18,7 @@ pub const ACTIVITY_OVERRIDE_KEYS: [&str; 6] = [
 
 /// Returns `true` if `token` stores a single scalar color rather than a `[fg, bg]` pair.
 pub fn is_scalar_color_token(token: &str) -> bool {
-    matches!(token, "background" | "highlight_text")
+    matches!(token, "background" | "highlight_text" | "selected_tab_text")
 }
 
 /// Returns the supported color override token keys for a given activity section name.
@@ -33,6 +33,7 @@ pub fn activity_override_tokens(activity_key: &str) -> &'static [&'static str] {
             "accent",
             "selection",
             "selected_tab",
+            "selected_tab_text",
             "unselected_tab",
             "line_numbers",
             "whitespace",
@@ -110,6 +111,7 @@ pub fn activity_override_tokens(activity_key: &str) -> &'static [&'static str] {
             "accent",
             "selection",
             "selected_tab",
+            "selected_tab_text",
             "unselected_tab",
             "shortcut_key",
             "help_text",
@@ -562,6 +564,10 @@ impl Theme {
         colors.insert("key_color".to_string(), make_pair(255, -1));
         colors.insert("selection".to_string(), make_pair(0, 255));
         colors.insert("selected_tab".to_string(), make_pair(0, 255));
+        colors.insert(
+            "selected_tab_text".to_string(),
+            serde_json::Value::Number(0.into()),
+        );
         colors.insert("unselected_tab".to_string(), make_pair(245, -1));
         colors.insert("line_numbers".to_string(), make_pair(242, -1));
         colors.insert("whitespace".to_string(), make_pair(242, -1));

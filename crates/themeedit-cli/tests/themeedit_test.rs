@@ -2958,36 +2958,67 @@ fn test_selected_tab_color_token_and_preview() {
     let themes_path = get_fixture_path("bashmenu.themes");
     let mut state = ThemeEditorState::new(themes_path, Some("dracula".to_string()));
     assert!(state.select_token_by_key("selected_tab"));
-    assert_eq!(state.tokens[state.selected_idx].label, "Selected Tab Color");
+    assert_eq!(
+        state.tokens[state.selected_idx].label,
+        "Selected Tab Background"
+    );
 
-    // Customize selected_tab color and verify resolution
+    // Customize selected_tab background and selected_tab_text foreground independently
     state.set_color_token_value("selected_tab", Color::Indexed(196));
+    assert!(state.select_token_by_key("selected_tab_text"));
+    assert_eq!(state.tokens[state.selected_idx].label, "Selected Tab Text");
+    state.set_color_token_value("selected_tab_text", Color::Indexed(226));
+
     let resolved = ResolvedThemeStyles::from_theme_for_activity(
         &state.current_theme,
         true,
         ThemeActivity::BashEdit,
     );
     assert_eq!(resolved.selected_tab.bg, Some(Color::Indexed(196)));
+    assert_eq!(resolved.selected_tab.fg, Some(Color::Indexed(226)));
 
-    // Render TextEditor preview and verify both preview header active tab and editor active tab use selected_tab bg
+    // Changing selected_tab background again preserves custom selected_tab_text foreground
+    state.set_color_token_value("selected_tab", Color::Indexed(33));
+    let resolved_after_bg = ResolvedThemeStyles::from_theme_for_activity(
+        &state.current_theme,
+        true,
+        ThemeActivity::BashEdit,
+    );
+    assert_eq!(resolved_after_bg.selected_tab.bg, Some(Color::Indexed(33)));
+    assert_eq!(resolved_after_bg.selected_tab.fg, Some(Color::Indexed(226)));
+
+    // Render TextEditor preview and verify both preview header active tab and editor active tab
+    // apply both Selected Tab Background (bg) and Selected Tab Text (fg)
     let area = Rect::new(0, 0, 96, 24);
     let mut buf = Buffer::empty(area);
     let mut wp = None;
-    render_preview_pane(area, &mut buf, PreviewMode::TextEditor, &resolved, &mut wp);
+    render_preview_pane(
+        area,
+        &mut buf,
+        PreviewMode::TextEditor,
+        &resolved_after_bg,
+        &mut wp,
+    );
 
     let tabs = preview_tab_bar_layout(area, PreviewMode::TextEditor);
     let active_tab = tabs
         .iter()
         .find(|t| t.mode == PreviewMode::TextEditor)
         .expect("TextEditor tab must exist");
-    assert_eq!(buf[(active_tab.x_start, area.y)].bg, Color::Indexed(196));
-    assert_eq!(buf[(area.x + 2, area.y + 2)].bg, Color::Indexed(196));
+    assert_eq!(buf[(active_tab.x_start, area.y)].bg, Color::Indexed(33));
+    assert_eq!(buf[(active_tab.x_start, area.y)].fg, Color::Indexed(226));
+    assert_eq!(buf[(area.x + 2, area.y + 2)].bg, Color::Indexed(33));
+    assert_eq!(buf[(area.x + 2, area.y + 2)].fg, Color::Indexed(226));
 
-    // Verify flash spans cover both active header tab and editor active tab
-    let token = state.tokens[state.selected_idx].clone();
-    let spans = get_token_preview_spans(&token, area, PreviewMode::TextEditor, &resolved);
-    assert!(spans.contains(&(area.y, active_tab.x_start, active_tab.x_end)));
-    assert!(spans.contains(&(area.y + 2, area.x + 2, area.x + 19)));
+    // Verify flash spans cover both active header tab and editor active tab for both tokens
+    for key in ["selected_tab", "selected_tab_text"] {
+        assert!(state.select_token_by_key(key));
+        let token = state.tokens[state.selected_idx].clone();
+        let spans =
+            get_token_preview_spans(&token, area, PreviewMode::TextEditor, &resolved_after_bg);
+        assert!(spans.contains(&(area.y, active_tab.x_start, active_tab.x_end)));
+        assert!(spans.contains(&(area.y + 2, area.x + 2, area.x + 19)));
+    }
 }
 
 #[test]
