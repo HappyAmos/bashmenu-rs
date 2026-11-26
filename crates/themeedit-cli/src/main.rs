@@ -2073,11 +2073,23 @@ fn open_selected_token_picker(state: &mut ThemeEditorState, active_modal: &mut A
                 "Pick Theme Color"
             };
             let show_base_opt = state.preview_mode != PreviewMode::Menu;
-            *active_modal = ActiveModal::ColorPicker(
-                key,
-                ColorPickerModal::new(title, initial_color)
-                    .with_apply_to_base_option(show_base_opt),
-            );
+            let mut picker = ColorPickerModal::new(title, initial_color)
+                .with_apply_to_base_option(show_base_opt);
+            if let Some(resolved_wp) = state
+                .current_theme
+                .wallpaper_config()
+                .and_then(|wp| wp.image)
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .and_then(|s| bashmenu_tui::resolve_wallpaper_path(&s))
+            {
+                if let Ok((swatches_256, swatches_rgb)) =
+                    bashmenu_tui::extract_image_swatches(&resolved_wp)
+                {
+                    picker = picker.with_background_palette(swatches_256, swatches_rgb);
+                }
+            }
+            *active_modal = ActiveModal::ColorPicker(key, picker);
         }
         TokenKind::WallpaperImage
         | TokenKind::WallpaperOpacity

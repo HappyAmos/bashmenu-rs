@@ -809,6 +809,79 @@ struct ExtractedColor {
     count: u32,
 }
 
+/// Pair of visually sorted `(xterm_256_swatches, truecolor_rgb_swatches)`
+/// extracted from a background wallpaper image.
+pub type ImageSwatches = (Vec<u8>, Vec<(u8, u8, u8)>);
+
+/// Extracts visually sorted ANSI 256-color and 24-bit TrueColor RGB swatches
+/// (up to 256 each) from an image file for the interactive color picker.
+pub fn extract_image_swatches(image_path: &Path) -> Result<ImageSwatches, String> {
+    let dyn_img = image::open(image_path)
+        .map_err(|e| format!("Failed to open image '{}': {}", image_path.display(), e))?;
+    let rgb_img = dyn_img.to_rgb8();
+    let thumb = if rgb_img.width() > 160 || rgb_img.height() > 160 {
+        imageops::thumbnail(&rgb_img, 160, 160)
+    } else {
+        rgb_img
+    };
+
+    // 1. Collect xterm-256 index frequencies and 5-bit RGB bucket averages
+    let mut counts_256 = [0u32; 256];
+    let mut rgb_buckets: std::collections::HashMap<u16, (u64, u64, u64, u32)> =
+        std::collections::HashMap::new();
+
+    for pixel in thumb.pixels() {
+        let (r, g, b) = (pixel[0], pixel[1], pixel[2]);
+        let idx = rgb_to_xterm256(r, g, b);
+        counts_256[idx as usize] += 1;
+
+        let key = (((r as u16) >> 3) << 10) | (((g as u16) >> 3) << 5) | ((b as u16) >> 3);
+        let entry = rgb_buckets.entry(key).or_insert((0, 0, 0, 0));
+        entry.0 += r as u64;
+        entry.1 += g as u64;
+        entry.2 += b as u64;
+        entry.3 += 1;
+    }
+
+    // Visual sort key: achromatic neutrals first (dark -> light), then 16 hue bands (dark -> light)
+    let sort_key = |r: u8, g: u8, b: u8| -> (u8, u8, u32) {
+        let (h, s, _) = rgb_to_hsv(r, g, b);
+        let lum = (color_luminance(r, g, b) * 100.0) as u32;
+        if s < 0.12 {
+            (0, 0, lum)
+        } else {
+            let hue_band = ((h * 16.0).floor() as u8).min(15);
+            (1, hue_band, lum)
+        }
+    };
+
+    // Build sorted 256-color swatch list (prefer 16..=255 xterm cube/grayscale)
+    let mut swatches_256: Vec<u8> = (16..=255u8)
+        .filter(|&i| counts_256[i as usize] > 0)
+        .collect();
+    swatches_256.sort_by_key(|&idx| {
+        let (r, g, b) = indexed_to_rgb(idx);
+        sort_key(r, g, b)
+    });
+
+    // Build top-256 TrueColor RGB swatch list sorted visually
+    let mut ranked_rgb: Vec<((u8, u8, u8), u32)> = rgb_buckets
+        .into_values()
+        .map(|(sr, sg, sb, n)| {
+            let r = (sr / n as u64).min(255) as u8;
+            let g = (sg / n as u64).min(255) as u8;
+            let b = (sb / n as u64).min(255) as u8;
+            ((r, g, b), n)
+        })
+        .collect();
+    ranked_rgb.sort_by_key(|&(_, count)| std::cmp::Reverse(count));
+    ranked_rgb.truncate(256);
+    let mut swatches_rgb: Vec<(u8, u8, u8)> = ranked_rgb.into_iter().map(|(rgb, _)| rgb).collect();
+    swatches_rgb.sort_by_key(|&(r, g, b)| sort_key(r, g, b));
+
+    Ok((swatches_256, swatches_rgb))
+}
+
 /// Auto-derives a harmonious 256-color theme palette (`colors_256` map) from an image file.
 pub fn derive_palette_from_image(
     image_path: &Path,

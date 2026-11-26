@@ -64,9 +64,9 @@ pub use transition::{
 pub use wallpaper::{
     color_to_rgb, composite_buffer, derive_palette_from_image, downsample_color_value_to_16,
     downsample_color_value_to_8, downsample_palette_to_16, downsample_palette_to_8,
-    resolve_wallpaper_path, rgb_to_ansi16_name, rgb_to_ansi8_name, rgb_to_xterm256,
-    supports_quadrant_blocks, WallpaperCell, WallpaperCompositor, WallpaperGrid, ANSI16_NAMES,
-    ANSI8_NAMES,
+    extract_image_swatches, resolve_wallpaper_path, rgb_to_ansi16_name, rgb_to_ansi8_name,
+    rgb_to_xterm256, supports_quadrant_blocks, WallpaperCell, WallpaperCompositor, WallpaperGrid,
+    ANSI16_NAMES, ANSI8_NAMES,
 };
 
 use std::io::Write;
