@@ -2732,7 +2732,6 @@ fn draw_connected_panel(
     let t_style = styles.title.bg(base_bg).add_modifier(Modifier::BOLD);
 
     let title_block = format!("[ {} ]", title);
-    let title_w = visible_text_len(&title_block);
     let inner_w = rect.width.saturating_sub(2) as usize;
 
     buf.set_string(rect.x, rect.y, "┌─", b_style);
@@ -2747,7 +2746,6 @@ fn draw_connected_panel(
         if rem > 0 {
             buf.set_string(rect.x + 2 + cw as u16, rect.y, "─".repeat(rem), b_style);
         }
-        let _ = title_w;
     }
     buf.set_string(rect.x + rect.width - 1, rect.y, "┐", b_style);
 

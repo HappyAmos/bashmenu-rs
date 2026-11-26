@@ -170,36 +170,10 @@ enum ActiveModal {
     ViewColors(ColorGridModal),
 }
 
-/// Locates a companion executable (`bmpager`, `bashmenu`, etc.) across
-/// standard search paths.
-fn locate_tool(name: &str) -> PathBuf {
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            let candidate = dir.join(name);
-            if candidate.is_file() {
-                return candidate;
-            }
-        }
-    }
-    if let Ok(dir) = std::env::var("BASHMENU_DIR") {
-        let candidate = PathBuf::from(&dir).join("target/release").join(name);
-        if candidate.is_file() {
-            return candidate;
-        }
-    }
-    if let Ok(home) = std::env::var("HOME") {
-        let candidate = PathBuf::from(home).join(".local/bin").join(name);
-        if candidate.is_file() {
-            return candidate;
-        }
-    }
-    PathBuf::from(name)
-}
-
 /// Spawns `bmpager` in markdown mode via `TerminalGuard::suspend_keep_alt`
 /// to preview document.
 fn launch_markdown_preview(guard: &mut TerminalGuard, tab: &EditorBuffer) {
-    let pager_bin = locate_tool("bmpager");
+    let pager_bin = bashmenu_core::locate_companion_tool("bmpager");
     let temp_dir = std::env::temp_dir();
     let temp_file = temp_dir.join(format!("bashedit_md_preview_{}.md", std::process::id()));
     let md_text = tab.lines.join("\n");
@@ -273,18 +247,7 @@ fn main() -> Result<()> {
     };
     let config = load_config(&config_path).unwrap_or_default();
 
-    // Initialize active locale (CLI flag > config.settings.locale > LC_ALL > LC_MESSAGES > LANG)
-    let locale_target = cli
-        .locale
-        .or_else(|| config.settings.locale.clone())
-        .or_else(|| std::env::var("LC_ALL").ok())
-        .or_else(|| std::env::var("LC_MESSAGES").ok())
-        .or_else(|| std::env::var("LANG").ok());
-
-    if let Some(ref loc) = locale_target {
-        let clean_loc = loc.split('.').next().unwrap_or(loc);
-        let _ = bashmenu_core::set_locale(clean_loc);
-    }
+    bashmenu_core::init_locale_from_env(cli.locale.as_deref(), config.settings.locale.as_deref());
 
     let themes = load_themes(&themes_path).unwrap_or_default();
     let use_nerd = config.settings.use_nerd_fonts.unwrap_or(false);

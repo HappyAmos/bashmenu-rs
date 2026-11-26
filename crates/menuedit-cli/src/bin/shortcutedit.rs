@@ -41,18 +41,10 @@ fn main() -> Result<()> {
     };
     let cfg = bashmenu_core::load_config(&cfg_path).ok();
 
-    let locale_target = cli
-        .locale
-        .clone()
-        .or_else(|| cfg.as_ref().and_then(|c| c.settings.locale.clone()))
-        .or_else(|| std::env::var("LC_ALL").ok())
-        .or_else(|| std::env::var("LC_MESSAGES").ok())
-        .or_else(|| std::env::var("LANG").ok());
-
-    if let Some(ref loc) = locale_target {
-        let clean_loc = loc.split('.').next().unwrap_or(loc);
-        let _ = bashmenu_core::set_locale(clean_loc);
-    }
+    bashmenu_core::init_locale_from_env(
+        cli.locale.as_deref(),
+        cfg.as_ref().and_then(|c| c.settings.locale.as_deref()),
+    );
 
     let shortcuts_path = if let Some(ref f) = cli.file {
         if cli.local && !f.is_absolute() {

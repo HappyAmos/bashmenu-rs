@@ -625,8 +625,13 @@ impl MenuEditorState {
         if self.stack.len() <= 1 {
             return false;
         }
-        let child_level = self.stack.pop().unwrap();
-        let parent_level = self.stack.last_mut().unwrap();
+        let Some(child_level) = self.stack.pop() else {
+            return false;
+        };
+        let Some(parent_level) = self.stack.last_mut() else {
+            self.stack.push(child_level);
+            return false;
+        };
         let idx = parent_level.selected_idx;
         if idx < parent_level.items.len() {
             parent_level.items[idx].submenu = Some(Submenu {
