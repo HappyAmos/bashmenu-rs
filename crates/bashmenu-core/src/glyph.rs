@@ -3,7 +3,12 @@
 
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::LazyLock;
 use unicode_width::UnicodeWidthStr;
+
+static ASCII_MACRO_RE: LazyLock<regex::Regex> = LazyLock::new(|| {
+    regex::Regex::new(r"\{ascii:\s*(\d+)\s*\}").expect("valid static ascii macro regex")
+});
 
 /// IBM PC CP437 character mapping table for codes 0..=255.
 pub const CP437_TABLE: [char; 256] = [
@@ -39,16 +44,16 @@ pub fn parse_ascii_val(text: &str) -> String {
         return text.to_string();
     }
 
-    let re = regex::Regex::new(r"\{ascii:\s*(\d+)\s*\}").unwrap();
-    re.replace_all(text, |caps: &regex::Captures| {
-        if let Ok(code) = caps[1].parse::<u32>() {
-            let byte = (code % 256) as u8;
-            cp437_to_char(byte).to_string()
-        } else {
-            caps[0].to_string()
-        }
-    })
-    .to_string()
+    ASCII_MACRO_RE
+        .replace_all(text, |caps: &regex::Captures| {
+            if let Ok(code) = caps[1].parse::<u32>() {
+                let byte = (code % 256) as u8;
+                cp437_to_char(byte).to_string()
+            } else {
+                caps[0].to_string()
+            }
+        })
+        .to_string()
 }
 
 /// Checks if a string token represents a valid hexadecimal Unicode codepoint specifier (`#hex`, `$hex`, `0xhex`).

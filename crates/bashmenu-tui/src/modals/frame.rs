@@ -190,3 +190,119 @@ pub fn is_close_button_clicked(inner: Rect, mouse_row: u16, mouse_col: u16) -> b
         && mouse_col >= right_x.saturating_sub(3)
         && mouse_col <= right_x.saturating_sub(1)
 }
+
+/// Renders a vertical modal scrollbar at column `sb_x` spanning `start_y..start_y+content_h`.
+pub(crate) fn render_modal_scrollbar(
+    sb_x: u16,
+    start_y: u16,
+    content_h: usize,
+    total_lines: usize,
+    scroll_offset: usize,
+    styles: &ResolvedThemeStyles,
+    buf: &mut Buffer,
+) {
+    if total_lines <= content_h || content_h == 0 {
+        return;
+    }
+
+    let sb_fg = styles
+        .scrollbar
+        .fg
+        .unwrap_or(styles.accent.fg.unwrap_or(Color::Cyan));
+    let sb_bg = styles.background;
+    let arrow_style = Style::default()
+        .fg(sb_fg)
+        .bg(sb_bg)
+        .add_modifier(Modifier::BOLD);
+    let thumb_style = Style::default().fg(sb_fg).bg(sb_bg);
+    let track_style = Style::default().fg(Color::DarkGray).bg(sb_bg);
+
+    let max_scroll = total_lines.saturating_sub(content_h);
+    let eff_scroll = scroll_offset.min(max_scroll);
+
+    if content_h >= 3 {
+        buf.set_string(sb_x, start_y, "▲", arrow_style);
+        buf.set_string(sb_x, start_y + content_h as u16 - 1, "▼", arrow_style);
+
+        let track_len = content_h - 2;
+        let thumb_size = ((track_len as f64 * content_h as f64) / total_lines as f64)
+            .round()
+            .clamp(1.0, track_len as f64) as usize;
+        let available_track = track_len.saturating_sub(thumb_size);
+        let scroll_ratio = if max_scroll > 0 {
+            eff_scroll as f64 / max_scroll as f64
+        } else {
+            0.0
+        };
+        let thumb_start = (scroll_ratio * available_track as f64).round() as usize;
+
+        for t_idx in 0..track_len {
+            let y = start_y + 1 + t_idx as u16;
+            if t_idx >= thumb_start && t_idx < thumb_start + thumb_size {
+                buf.set_string(sb_x, y, "█", thumb_style);
+            } else {
+                buf.set_string(sb_x, y, "░", track_style);
+            }
+        }
+    } else if content_h == 2 {
+        buf.set_string(sb_x, start_y, "▲", arrow_style);
+        buf.set_string(sb_x, start_y + 1, "▼", arrow_style);
+    } else {
+        buf.set_string(sb_x, start_y, "█", thumb_style);
+    }
+}
+
+/// Returns `true` if `line` is a pipe-delimited Markdown table row.
+pub(crate) fn is_markdown_table_row(line: &str) -> bool {
+    let trimmed = line.trim();
+    trimmed.starts_with('|') && trimmed.ends_with('|') && trimmed.matches('|').count() >= 2
+}
+
+/// Returns `true` if `line` is a Markdown table delimiter row (e.g. `|---|---|`).
+pub(crate) fn is_markdown_table_delimiter(line: &str) -> bool {
+    let trimmed = line.trim();
+    if !trimmed.starts_with('|') || !trimmed.ends_with('|') {
+        return false;
+    }
+    let parts: Vec<&str> = trimmed.split('|').collect();
+    if parts.len() < 3 {
+        return false;
+    }
+    parts[1..parts.len() - 1].iter().all(|c| {
+        let s = c.trim();
+        !s.is_empty() && s.chars().all(|ch| ch == '-' || ch == ':') && s.contains('-')
+    })
+}
+
+/// Extracts trimmed cell strings from a pipe-delimited Markdown table row.
+pub(crate) fn parse_markdown_table_cells(line: &str) -> Vec<String> {
+    let trimmed = line.trim();
+    let parts: Vec<&str> = trimmed.split('|').collect();
+    if parts.len() >= 2 {
+        parts[1..parts.len() - 1]
+            .iter()
+            .map(|s| s.trim().to_string())
+            .collect()
+    } else {
+        Vec::new()
+    }
+}
+
+/// Iteratively shrinks the widest columns until total width fits in `avail_w`.
+pub(crate) fn shrink_table_columns(col_widths: &mut [usize], avail_w: usize) {
+    let cols = col_widths.len();
+    let overhead = cols * 3 + 1;
+    let max_text_w = avail_w.saturating_sub(overhead);
+    if cols > 0 && max_text_w >= cols * 4 {
+        while col_widths.iter().sum::<usize>() > max_text_w {
+            let Some((max_c, &max_val)) = col_widths.iter().enumerate().max_by_key(|(_, &w)| w)
+            else {
+                break;
+            };
+            if max_val <= 4 {
+                break;
+            }
+            col_widths[max_c] -= 1;
+        }
+    }
+}

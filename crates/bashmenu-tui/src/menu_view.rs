@@ -325,7 +325,10 @@ impl MenuView {
                 break;
             }
 
-            let parent_items = &new_stack.last().unwrap().items;
+            let Some(parent_level) = new_stack.last() else {
+                break;
+            };
+            let parent_items = &parent_level.items;
             let matching_sub = parent_items
                 .get(prev_old.selected_idx)
                 .and_then(|it| it.submenu.as_ref())

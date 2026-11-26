@@ -777,27 +777,10 @@ pub fn rgb_to_xterm256(r: u8, g: u8, b: u8) -> u8 {
     best_idx
 }
 
-/// Converts standard sRGB component values (0-255) to HSV color space:
-/// hue in `[0.0, 1.0)`, saturation in `[0.0, 1.0]`, and value/brightness in `[0.0, 1.0]`.
+/// Converts sRGB (0..=255) to normalized HSV (`h` in `[0.0, 1.0)`).
 fn rgb_to_hsv(r: u8, g: u8, b: u8) -> (f64, f64, f64) {
-    let rf = r as f64 / 255.0;
-    let gf = g as f64 / 255.0;
-    let bf = b as f64 / 255.0;
-    let max = rf.max(gf).max(bf);
-    let min = rf.min(gf).min(bf);
-    let delta = max - min;
-
-    let h = if delta < 1e-6 {
-        0.0
-    } else if (max - rf).abs() < 1e-6 {
-        ((gf - bf) / delta).rem_euclid(6.0) / 6.0
-    } else if (max - gf).abs() < 1e-6 {
-        (((bf - rf) / delta) + 2.0) / 6.0
-    } else {
-        (((rf - gf) / delta) + 4.0) / 6.0
-    };
-    let s = if max < 1e-6 { 0.0 } else { delta / max };
-    (h, s, max)
+    let (h_deg, s, v) = crate::modals::color_picker::rgb_to_hsv(r, g, b);
+    ((h_deg as f64) / 360.0, s as f64, v as f64)
 }
 
 /// Computes the relative perceptual luminance of an sRGB color using standard Rec. 709 coefficients.

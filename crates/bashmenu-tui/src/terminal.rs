@@ -177,7 +177,7 @@ impl TerminalGuard {
     }
 
     /// Invalidates previous frame buffer without `\x1b[2J` so the next
-    /// `draw()` overwrites every cell atomically without a blank flash.
+    /// `draw()` overwrites every cell without a blank flash.
     pub fn request_clear(&mut self) {
         let _ = self.terminal.autoresize();
         for cell in self.terminal.current_buffer_mut().content.iter_mut() {
@@ -947,7 +947,7 @@ impl Drop for TerminalGuard {
 }
 
 /// Restores canonical cooked mode, ensuring character echo, line-buffering,
-/// signal processing, and newline translations are strictly enabled.
+/// signal processing, and newline translations are enabled.
 #[cfg(unix)]
 pub fn ensure_terminal_sane() {
     let fds = [libc::STDIN_FILENO, libc::STDOUT_FILENO, libc::STDERR_FILENO];

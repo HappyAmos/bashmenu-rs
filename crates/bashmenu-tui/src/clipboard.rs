@@ -42,7 +42,7 @@ pub fn get_shared_cutbuffer_path() -> PathBuf {
 
 /// Minimal standard Base64 encoder for OSC 52 clipboard sequences
 pub fn base64_encode(bytes: &[u8]) -> String {
-    /// Standard Base64 character lookup table.
+    // Standard Base64 character lookup table.
     const CHARSET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
     for chunk in bytes.chunks(3) {

@@ -252,56 +252,16 @@ impl MessageModal {
         }
 
         // 2. Render scrollbar if message exceeds visible window height
-        if total_lines > content_h && content_h > 0 && inner.width >= 4 {
-            let sb_x = inner.x + inner.width.saturating_sub(1);
-            let content_start_y = inner.y + 1;
-            let sb_fg = styles
-                .scrollbar
-                .fg
-                .unwrap_or(styles.accent.fg.unwrap_or(Color::Cyan));
-            let sb_bg = styles.background;
-            let arrow_style = Style::default()
-                .fg(sb_fg)
-                .bg(sb_bg)
-                .add_modifier(Modifier::BOLD);
-            let thumb_style = Style::default().fg(sb_fg).bg(sb_bg);
-            let track_style = Style::default().fg(Color::DarkGray).bg(sb_bg);
-
-            if content_h >= 3 {
-                buf.set_string(sb_x, content_start_y, "▲", arrow_style);
-                buf.set_string(
-                    sb_x,
-                    content_start_y + content_h as u16 - 1,
-                    "▼",
-                    arrow_style,
-                );
-
-                let track_len = content_h - 2;
-                let thumb_size = ((track_len as f64 * content_h as f64) / total_lines as f64)
-                    .round()
-                    .clamp(1.0, track_len as f64) as usize;
-                let available_track = track_len.saturating_sub(thumb_size);
-                let scroll_ratio = if max_scroll > 0 {
-                    eff_scroll as f64 / max_scroll as f64
-                } else {
-                    0.0
-                };
-                let thumb_start = (scroll_ratio * available_track as f64).round() as usize;
-
-                for t_idx in 0..track_len {
-                    let y = content_start_y + 1 + t_idx as u16;
-                    if t_idx >= thumb_start && t_idx < thumb_start + thumb_size {
-                        buf.set_string(sb_x, y, "█", thumb_style);
-                    } else {
-                        buf.set_string(sb_x, y, "░", track_style);
-                    }
-                }
-            } else if content_h == 2 {
-                buf.set_string(sb_x, content_start_y, "▲", arrow_style);
-                buf.set_string(sb_x, content_start_y + 1, "▼", arrow_style);
-            } else if content_h == 1 {
-                buf.set_string(sb_x, content_start_y, "█", thumb_style);
-            }
+        if inner.width >= 4 {
+            super::frame::render_modal_scrollbar(
+                inner.x + inner.width.saturating_sub(1),
+                inner.y + 1,
+                content_h,
+                total_lines,
+                eff_scroll,
+                styles,
+                buf,
+            );
         }
 
         // 3. Render [ OK ] button
@@ -326,41 +286,10 @@ impl MessageModal {
     }
 }
 
-/// Checks whether a text line starts and ends with pipes (table row).
-fn is_table_row(line: &str) -> bool {
-    let trimmed = line.trim();
-    trimmed.starts_with('|') && trimmed.ends_with('|') && trimmed.matches('|').count() >= 2
-}
-
-/// Checks whether a markdown table row is a delimiter line (e.g. `|---|`).
-fn is_table_delimiter(line: &str) -> bool {
-    let trimmed = line.trim();
-    if !trimmed.starts_with('|') || !trimmed.ends_with('|') {
-        return false;
-    }
-    let parts: Vec<&str> = trimmed.split('|').collect();
-    if parts.len() < 3 {
-        return false;
-    }
-    parts[1..parts.len() - 1].iter().all(|c| {
-        let s = c.trim();
-        !s.is_empty() && s.chars().all(|ch| ch == '-' || ch == ':') && s.contains('-')
-    })
-}
-
-/// Extracts trimmed text cells from between pipe delimiters of a row.
-fn parse_cells(line: &str) -> Vec<String> {
-    let trimmed = line.trim();
-    let parts: Vec<&str> = trimmed.split('|').collect();
-    if parts.len() >= 2 {
-        parts[1..parts.len() - 1]
-            .iter()
-            .map(|s| s.trim().to_string())
-            .collect()
-    } else {
-        Vec::new()
-    }
-}
+use super::frame::{
+    is_markdown_table_delimiter as is_table_delimiter, is_markdown_table_row as is_table_row,
+    parse_markdown_table_cells as parse_cells, shrink_table_columns,
+};
 
 /// Wraps cell text chunking long strings without spaces when needed.
 fn wrap_cell_text(text: &str, max_w: usize) -> Vec<String> {
@@ -412,22 +341,7 @@ fn render_table(
         }
     }
 
-    // Shrink columns if table exceeds available width
-    let overhead = cols * 3 + 1;
-    let max_text_w = avail_w.saturating_sub(overhead);
-    if cols > 0 && max_text_w >= cols * 4 {
-        while col_widths.iter().sum::<usize>() > max_text_w {
-            let (max_c, &max_val) = col_widths
-                .iter()
-                .enumerate()
-                .max_by_key(|(_, &w)| w)
-                .unwrap();
-            if max_val <= 4 {
-                break;
-            }
-            col_widths[max_c] -= 1;
-        }
-    }
+    shrink_table_columns(&mut col_widths, avail_w);
 
     let border_style = styles
         .map(|s| Style::default().fg(s.border).bg(s.background))

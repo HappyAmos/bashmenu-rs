@@ -105,20 +105,36 @@ static GLOBAL_CATALOG: LazyLock<RwLock<LocaleCatalog>> =
 
 /// Translate a key into the active locale.
 pub fn translate(key: &str) -> String {
-    let catalog = GLOBAL_CATALOG.read().unwrap();
+    let catalog = GLOBAL_CATALOG
+        .read()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     catalog.get(key).to_string()
 }
 
 /// Translate a key into the active locale with variable interpolation.
 pub fn translate_with(key: &str, vars: &[(&str, &str)]) -> String {
-    let catalog = GLOBAL_CATALOG.read().unwrap();
+    let catalog = GLOBAL_CATALOG
+        .read()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     catalog.get_with(key, vars)
 }
 
 /// Get the active locale code (e.g. "en_US", "es_ES").
 pub fn current_locale() -> String {
-    let catalog = GLOBAL_CATALOG.read().unwrap();
+    let catalog = GLOBAL_CATALOG
+        .read()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     catalog.active_locale().to_string()
+}
+
+/// Initializes the global locale from CLI flag, config setting, or environment
+/// (`LC_ALL`, `LC_MESSAGES`, `LANG`) in priority order.
+pub fn init_locale_from_env(cli_locale: Option<&str>, config_locale: Option<&str>) {
+    if let Some(loc) = cli_locale.or(config_locale) {
+        let _ = set_locale(loc);
+    } else {
+        let _ = set_locale("auto");
+    }
 }
 
 /// Set the active locale by code or file path.
@@ -130,7 +146,9 @@ pub fn set_locale(locale_or_path: &str) -> Result<(), String> {
         || locale_or_path.eq_ignore_ascii_case("en")
         || locale_or_path.eq_ignore_ascii_case("en_us")
     {
-        let mut catalog = GLOBAL_CATALOG.write().unwrap();
+        let mut catalog = GLOBAL_CATALOG
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         catalog.reset_to_default();
         return Ok(());
     }
@@ -151,20 +169,26 @@ pub fn set_locale(locale_or_path: &str) -> Result<(), String> {
                 return Ok(());
             }
         }
-        let mut catalog = GLOBAL_CATALOG.write().unwrap();
+        let mut catalog = GLOBAL_CATALOG
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         catalog.reset_to_default();
         return Ok(());
     }
 
     let candidate_path = Path::new(locale_or_path);
     if candidate_path.is_file() {
-        let mut catalog = GLOBAL_CATALOG.write().unwrap();
+        let mut catalog = GLOBAL_CATALOG
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         return catalog.load_file(candidate_path);
     }
 
     // Try resolving from standard locale search directories
     if let Some(resolved) = resolve_locale_path(locale_or_path) {
-        let mut catalog = GLOBAL_CATALOG.write().unwrap();
+        let mut catalog = GLOBAL_CATALOG
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         return catalog.load_file(&resolved);
     }
 

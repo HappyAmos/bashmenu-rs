@@ -392,11 +392,12 @@ pub fn normalize_single_key_token(raw: &str) -> String {
 
     // Handle single character directly (preserving case for plain letters like 't' vs 'T')
     if trimmed.chars().count() == 1 {
-        let ch = trimmed.chars().next().unwrap();
-        if ch == ' ' {
-            return "space".to_string();
+        if let Some(ch) = trimmed.chars().next() {
+            if ch == ' ' {
+                return "space".to_string();
+            }
+            return ch.to_string();
         }
-        return ch.to_string();
     }
 
     let lower = trimmed

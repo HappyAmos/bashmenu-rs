@@ -626,23 +626,70 @@ fn insert_nested_yaml_value(
         if !curr.is_object() {
             *curr = serde_json::Value::Object(serde_json::Map::new());
         }
-        let mapping = curr.as_object_mut().unwrap();
+        let Some(mapping) = curr.as_object_mut() else {
+            return;
+        };
         if !mapping.contains_key(part) || !mapping.get(part).is_some_and(|v| v.is_object()) {
             mapping.insert(
                 part.to_string(),
                 serde_json::Value::Object(serde_json::Map::new()),
             );
         }
-        curr = mapping.get_mut(part).unwrap();
+        let Some(next) = mapping.get_mut(part) else {
+            return;
+        };
+        curr = next;
     }
 
     if !curr.is_object() {
         *curr = serde_json::Value::Object(serde_json::Map::new());
     }
-    if let Some(mapping) = curr.as_object_mut() {
-        let leaf_key = parts.last().unwrap().to_string();
-        mapping.insert(leaf_key, value);
+    if let (Some(mapping), Some(&leaf_key)) = (curr.as_object_mut(), parts.last()) {
+        mapping.insert(leaf_key.to_string(), value);
     }
+}
+
+/// Resolves a configuration/menu/theme file path, honoring `--local` mode
+/// (keeping relative paths in the current working directory) when `local` is true.
+pub fn resolve_path_with_local<P: AsRef<Path>>(target: P, local: bool) -> PathBuf {
+    let target = target.as_ref();
+    if local {
+        if target.is_absolute() {
+            target.to_path_buf()
+        } else {
+            std::env::current_dir()
+                .map(|cwd| cwd.join(target))
+                .unwrap_or_else(|_| target.to_path_buf())
+        }
+    } else {
+        resolve_app_path(target)
+    }
+}
+
+/// Locates a sibling companion binary (e.g. `menuedit`, `themeedit`, `bmpager`)
+/// next to the current executable, in `~/.local/bin`, or falling back to `PATH`.
+pub fn locate_companion_tool(name: &str) -> PathBuf {
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let candidate = dir.join(name);
+            if candidate.exists() {
+                return candidate;
+            }
+            if let Some(parent) = dir.parent() {
+                let candidate2 = parent.join(name);
+                if candidate2.exists() {
+                    return candidate2;
+                }
+            }
+        }
+    }
+    if let Ok(home) = std::env::var("HOME") {
+        let local_bin = PathBuf::from(home).join(".local/bin").join(name);
+        if local_bin.exists() {
+            return local_bin;
+        }
+    }
+    PathBuf::from(name)
 }
 
 /// Returns the canonical BashMenu user configuration directory:
@@ -748,11 +795,18 @@ pub fn save_config<P: AsRef<Path>>(path: P, config: &BashMenuConfig) -> Result<(
         if !existing.trim().is_empty() {
             if let Err(parse_err) = serde_saphyr::from_str::<BashMenuConfig>(&existing) {
                 let backup_path = p.with_extension("yml.bak");
-                let _ = fs::write(&backup_path, &existing);
+                let backup_note = match fs::write(&backup_path, &existing) {
+                    Ok(()) => format!("backup saved to {}", backup_path.display()),
+                    Err(backup_err) => format!(
+                        "failed to write backup {}: {}",
+                        backup_path.display(),
+                        backup_err
+                    ),
+                };
                 return Err(BashMenuError::Schema(format!(
-                    "Refusing to overwrite unparseable {} (backup saved to {}): {}",
+                    "Refusing to overwrite unparseable {} ({}): {}",
                     p.display(),
-                    backup_path.display(),
+                    backup_note,
                     parse_err
                 )));
             }
