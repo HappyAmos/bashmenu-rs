@@ -158,6 +158,17 @@ impl ShortcutDispatcher {
         false
     }
 
+    /// Returns the remaining duration before leader-key pending mode expires,
+    /// or `None` when not pending or when timeout is disabled (`0`).
+    pub fn leader_timeout_remaining(&self) -> Option<Duration> {
+        let since = self.leader_pending_since?;
+        let timeout_ms = self.config.leader_timeout_ms;
+        if timeout_ms == 0 {
+            return None;
+        }
+        Some(Duration::from_millis(timeout_ms).saturating_sub(since.elapsed()))
+    }
+
     /// Returns all enabled `<leader> <key>` shortcuts as `(chord_key, &ShortcutEntry)`.
     pub fn active_leader_entries(&self) -> Vec<(String, &ShortcutEntry)> {
         self.config
