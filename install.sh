@@ -234,6 +234,10 @@ if [ -d "$SCRIPT_DIR/locales" ]; then
     ln -sfn "$SCRIPT_DIR/locales" "$CONFIG_DIR/locales"
     echo "  [+] Symlinked locales -> $CONFIG_DIR/locales"
 fi
+if [ -d "$SCRIPT_DIR/templates" ]; then
+    ln -sfn "$SCRIPT_DIR/templates" "$CONFIG_DIR/templates"
+    echo "  [+] Symlinked templates -> $CONFIG_DIR/templates"
+fi
 
 # Initialize user notebooks directory if missing
 if [ -f "$SCRIPT_DIR/defaults/notes.yml" ] && [ ! -f "$CONFIG_DIR/notebooks/notes.yml" ] && [ ! -f "$CONFIG_DIR/notes.yml" ]; then

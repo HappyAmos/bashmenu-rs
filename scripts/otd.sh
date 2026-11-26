@@ -51,10 +51,14 @@ except Exception:
 elif command -v curl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
     raw=$(curl -s -m 3 https://today.zenquotes.io/api 2>/dev/null)
     if [ -n "$raw" ]; then
-        if command -v fold >/dev/null 2>&1; then
-            echo "$raw" | jq -r 'if type == "object" and .data?.Events then .data.Events | .[(now * 1000 | floor) % length] | "\(.text)\n\([.links[]? | select(.url | startswith("http"))][1].url // "")" elif type == "array" and .[1]?.q then .[1].q else empty end' 2>/dev/null | fold -s -w "$COLUMNS" || true
-        else
-            echo "$raw" | jq -r 'if type == "object" and .data?.Events then .data.Events | .[(now * 1000 | floor) % length] | "\(.text)\n\([.links[]? | select(.url | startswith("http"))][1].url // "")" elif type == "array" and .[1]?.q then .[1].q else empty end' 2>/dev/null || true
+        jq_filter='if type == "object" and .data?.Events then .data.Events | .[(now * 1000 | floor) % length] | "\(.text)\n\([.links[]? | select(.url | startswith("http"))][1].url // "")" elif type == "array" and .[1]?.q then .[1].q else empty end'
+        out=$(printf '%s\n' "$raw" | jq -r "$jq_filter" 2>/dev/null || true)
+        if [ -n "$out" ]; then
+            if command -v fold >/dev/null 2>&1; then
+                printf '%s\n' "$out" | fold -s -w "$COLUMNS"
+            else
+                printf '%s\n' "$out"
+            fi
         fi
     fi
 fi

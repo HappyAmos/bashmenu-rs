@@ -1271,7 +1271,14 @@ fn main() -> Result<()> {
                                 // If clicked elsewhere while editing name, commit rename
                                 if is_editing_name {
                                     let new_name = state.name_input.as_string();
-                                    let _ = state.rename_theme(&new_name);
+                                    if let Err(e) = state.rename_theme(&new_name) {
+                                        toast_rack.add(ToastNotification {
+                                            title: Some(t!("themeedit.title")),
+                                            message: format!("Rename failed: {}", e),
+                                            severity: ToastSeverity::Warning,
+                                            timeout_secs: 3.0,
+                                        });
+                                    }
                                     is_editing_name = false;
                                 }
 

@@ -261,7 +261,7 @@ items:
                 icon: '{nf::#ea85}'
                 action: '{scripts_dir}/webopen.sh http://artscene.textfiles.com/vt100/'
                 script: '{scripts_dir}/webopen.sh http://artscene.textfiles.com/vt100/'
-                start_dir: '{script_dir}'
+                start_dir: '{scripts_dir}'
                 interactive: true
                 quiet: true
                 alt_buffer: true

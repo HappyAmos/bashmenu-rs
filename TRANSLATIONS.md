@@ -127,7 +127,7 @@ cargo run -p ymlcheck-cli -- -l locales/fr_fr.yml
 When successful, `ymlcheck` will output:
 ```text
 Validating locale string table: locales/fr_fr.yml...
-SUCCESS: 'locales/fr_fr.yml' is a valid locale string table with 100% key parity (311 keys validated)!
+SUCCESS: 'locales/fr_fr.yml' is a valid locale string table with 100% key parity (314 keys validated)!
 ```
 
 If any keys are missing or spelled incorrectly, `ymlcheck` will point out the exact keys you need to fix.

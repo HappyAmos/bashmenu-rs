@@ -78,14 +78,14 @@ fn resolve_editor_mode(override_mode: Option<&str>) -> String {
     "default".to_string()
 }
 
-/// Locates the `bashedit` executable across PATH, `~/.local/bin`, and target build directories.
+/// Locates the `bashedit` executable across companion binary locations and PATH.
 fn find_bashedit_exe() -> Option<PathBuf> {
+    let companion = bashmenu_core::locate_companion_tool("bashedit");
+    if companion.is_file() {
+        return Some(companion);
+    }
     if let Ok(p) = which::which("bashedit") {
         return Some(p);
-    }
-    let local = dirs::home_dir()?.join(".local/bin/bashedit");
-    if local.is_file() {
-        return Some(local);
     }
     let target = PathBuf::from("target/release/bashedit");
     if target.is_file() {
@@ -127,14 +127,5 @@ mod which {
             }
         }
         Err(())
-    }
-}
-
-mod dirs {
-    use std::path::PathBuf;
-
-    /// Resolves the user's home directory from `$HOME`.
-    pub fn home_dir() -> Option<PathBuf> {
-        std::env::var("HOME").ok().map(PathBuf::from)
     }
 }

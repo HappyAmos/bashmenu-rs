@@ -77,7 +77,7 @@ HA Bash Menu is comprised of modular scripts and configuration files:
 | `--config <FILE>` | `-c` | Explicit path to configuration file (default: `~/.config/bashmenu/bashmenu.yml`). |
 | `--menu <FILE>` | `-m` | Explicit path to menu definition file (default: `~/.config/bashmenu/bashmenu.mnu`). |
 | `--theme <NAME>` | `-t` | Override active theme name. |
-| `--locale <FILE\|CODE>` | `-L` | Override UI locale (e.g. `es_es` or path to a locale YAML file). |
+| `--locale <FILE\|CODE>` | `-l` | Override UI locale (e.g. `es_es` or path to a locale YAML file). |
 | `--shortcuts <FILE>` | `-s` | Explicit path to keyboard shortcuts file (default: `~/.config/bashmenu/shortcuts.yml`). |
 | `--repo` | `-r` | Load configuration files (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `cheat.yml`, `notes.yml`) from repository `defaults/` directory. |
 | `--image` | `-i` | Render full-resolution TrueColor background images directly via the Linux framebuffer (`/dev/fb0`) instead of character-block translation. |
@@ -99,7 +99,7 @@ These scripts are stored in the `/scripts` directory and can be used directly or
 | `scripts/games.sh` | Interactive runner menu for terminal games (ninvaders, pacman4console, nsnake, greed, moon-buggy, nethack, asteroids). |
 | `scripts/get_api_key.sh` | Script to securely retrieve and format API keys or credentials. |
 | `scripts/getdns.py` | CLI python utility to query and discover currently active upstream system DNS server settings. |
-| `scripts/glyphs.sh` | Curses search and preview dialog box utility for selecting Unicode emojis and Nerd Font icons. |
+| `scripts/glyphs.sh` | CLI search utility for discovering Unicode emojis and Nerd Font icons. |
 | `scripts/hostname.sh` | Hostname and system identity discovery utility reporting hostname, FQDN, kernel, architecture, and OS distribution. |
 | `scripts/install_basics.sh` | Cross-platform basic tools installer wrapper. |
 | `scripts/install_cheat.sh` | Helper script to clone a cheatsheet Git repository into the local environment. |

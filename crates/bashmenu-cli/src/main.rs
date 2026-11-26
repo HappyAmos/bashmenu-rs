@@ -1803,6 +1803,7 @@ fn main() -> Result<()> {
                                 active_modal = ActiveModal::NoteEditor(ed);
                             }
                             NoteConflictChoice::Overwrite => {
+                                let mut saved_ok = false;
                                 if let Ok(mut nb) = load_notebook(&modal.filepath) {
                                     add_or_update_note(
                                         &mut nb,
@@ -1812,22 +1813,36 @@ fn main() -> Result<()> {
                                             ..Default::default()
                                         },
                                     );
-                                    let _ = save_notebook(&modal.filepath, &nb);
-                                    NoteSwapFile::remove(
-                                        Path::new(&modal.filepath),
-                                        &modal.note_title,
-                                    );
-                                    let sub = build_notebook_submenu(&modal.filepath, &nb);
-                                    menu_view.reload_current_notebook(
-                                        sub.items,
-                                        Some(modal.note_title.as_str()),
-                                    );
+                                    match save_notebook(&modal.filepath, &nb) {
+                                        Ok(()) => {
+                                            saved_ok = true;
+                                            NoteSwapFile::remove(
+                                                Path::new(&modal.filepath),
+                                                &modal.note_title,
+                                            );
+                                            let sub = build_notebook_submenu(&modal.filepath, &nb);
+                                            menu_view.reload_current_notebook(
+                                                sub.items,
+                                                Some(modal.note_title.as_str()),
+                                            );
+                                        }
+                                        Err(e) => {
+                                            toast_rack.add(ToastNotification {
+                                                title: Some(t!("common.dialogs.error_title")),
+                                                message: format!("Failed to save notebook: {}", e),
+                                                severity: ToastSeverity::Error,
+                                                timeout_secs: 4.0,
+                                            });
+                                        }
+                                    }
                                 }
-                                toast_rack.add(ToastNotification::new(
-                                    t!("bashmenu.notes_overwritten"),
-                                    Some(t!("common.dialogs.info_title")),
-                                    3.0,
-                                ));
+                                if saved_ok {
+                                    toast_rack.add(ToastNotification::new(
+                                        t!("bashmenu.notes_overwritten"),
+                                        Some(t!("common.dialogs.info_title")),
+                                        3.0,
+                                    ));
+                                }
                                 active_modal = ActiveModal::NoteViewer(NoteViewerModal::new(
                                     &modal.note_title,
                                     &modal.filepath,
@@ -1849,6 +1864,7 @@ fn main() -> Result<()> {
                             }
                             NoteConflictChoice::SaveAsCopy => {
                                 let copy_title = format!("{} (User Copy)", modal.note_title);
+                                let mut saved_ok = false;
                                 if let Ok(mut nb) = load_notebook(&modal.filepath) {
                                     add_or_update_note(
                                         &mut nb,
@@ -1858,22 +1874,36 @@ fn main() -> Result<()> {
                                             ..Default::default()
                                         },
                                     );
-                                    let _ = save_notebook(&modal.filepath, &nb);
-                                    NoteSwapFile::remove(
-                                        Path::new(&modal.filepath),
-                                        &modal.note_title,
-                                    );
-                                    let sub = build_notebook_submenu(&modal.filepath, &nb);
-                                    menu_view.reload_current_notebook(
-                                        sub.items,
-                                        Some(copy_title.as_str()),
-                                    );
+                                    match save_notebook(&modal.filepath, &nb) {
+                                        Ok(()) => {
+                                            saved_ok = true;
+                                            NoteSwapFile::remove(
+                                                Path::new(&modal.filepath),
+                                                &modal.note_title,
+                                            );
+                                            let sub = build_notebook_submenu(&modal.filepath, &nb);
+                                            menu_view.reload_current_notebook(
+                                                sub.items,
+                                                Some(copy_title.as_str()),
+                                            );
+                                        }
+                                        Err(e) => {
+                                            toast_rack.add(ToastNotification {
+                                                title: Some(t!("common.dialogs.error_title")),
+                                                message: format!("Failed to save notebook: {}", e),
+                                                severity: ToastSeverity::Error,
+                                                timeout_secs: 4.0,
+                                            });
+                                        }
+                                    }
                                 }
-                                toast_rack.add(ToastNotification::new(
-                                    t!("bashmenu.notes_saved_copy", title => &copy_title),
-                                    Some(t!("common.dialogs.info_title")),
-                                    3.0,
-                                ));
+                                if saved_ok {
+                                    toast_rack.add(ToastNotification::new(
+                                        t!("bashmenu.notes_saved_copy", title => &copy_title),
+                                        Some(t!("common.dialogs.info_title")),
+                                        3.0,
+                                    ));
+                                }
                                 active_modal = ActiveModal::NoteViewer(NoteViewerModal::new(
                                     &copy_title,
                                     &modal.filepath,

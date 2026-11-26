@@ -1483,7 +1483,19 @@ fn test_default_wallpaper_dir_and_path_relativization() {
         "/tmp/custom_background.png"
     );
 
-    // 4. Test BASHMENU_DIR environment override
+    // 4. Test BASHMENU_DIR environment override (serialized + RAII cleanup)
+    struct EnvRestore(Option<String>);
+    impl Drop for EnvRestore {
+        fn drop(&mut self) {
+            match &self.0 {
+                Some(v) => std::env::set_var("BASHMENU_DIR", v),
+                None => std::env::remove_var("BASHMENU_DIR"),
+            }
+        }
+    }
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _env_guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _restore = EnvRestore(std::env::var("BASHMENU_DIR").ok());
     let temp_path = std::env::temp_dir().join(format!("bashmenu_wp_test_{}", std::process::id()));
     let custom_wp = temp_path.join("assets/wallpapers");
     std::fs::create_dir_all(&custom_wp).expect("create custom wallpapers dir");
@@ -1492,7 +1504,7 @@ fn test_default_wallpaper_dir_and_path_relativization() {
     let resolved_override = default_wallpaper_dir();
     assert_eq!(resolved_override, custom_wp);
 
-    std::env::remove_var("BASHMENU_DIR");
+    drop(_restore);
     let _ = std::fs::remove_dir_all(&temp_path);
 }
 

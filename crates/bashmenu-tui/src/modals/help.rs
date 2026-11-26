@@ -293,27 +293,32 @@ impl HelpModal {
     }
 }
 
-/// Simple word wrapper for help modal text
+/// Simple word wrapper for help modal text using Unicode display widths.
 fn wrap_help_text(text: &str, max_w: usize) -> Vec<String> {
     if max_w == 0 {
         return Vec::new();
     }
-    if text.len() <= max_w {
+    if UnicodeWidthStr::width(text) <= max_w {
         return vec![text.to_string()];
     }
 
     let mut result = Vec::new();
     let mut current = String::new();
+    let mut current_w = 0usize;
 
     for word in text.split_whitespace() {
+        let word_w = UnicodeWidthStr::width(word);
         if current.is_empty() {
             current.push_str(word);
-        } else if current.len() + 1 + word.len() <= max_w {
+            current_w = word_w;
+        } else if current_w + 1 + word_w <= max_w {
             current.push(' ');
             current.push_str(word);
+            current_w += 1 + word_w;
         } else {
             result.push(current);
             current = word.to_string();
+            current_w = word_w;
         }
     }
 

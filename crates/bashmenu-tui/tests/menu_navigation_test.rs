@@ -431,6 +431,18 @@ fn test_bbcode_placeholder_and_right_aligned_brackets() {
         is_divider: false,
     }]);
 
+    struct EnvRestore(Option<String>);
+    impl Drop for EnvRestore {
+        fn drop(&mut self) {
+            match &self.0 {
+                Some(v) => std::env::set_var("BASHMENU_DIR", v),
+                None => std::env::remove_var("BASHMENU_DIR"),
+            }
+        }
+    }
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _env_guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _restore = EnvRestore(std::env::var("BASHMENU_DIR").ok());
     std::env::set_var("BASHMENU_DIR", "/opt/bashmenu");
 
     let area = Rect::new(0, 0, 80, 24);
