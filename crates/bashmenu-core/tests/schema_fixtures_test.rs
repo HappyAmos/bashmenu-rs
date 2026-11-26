@@ -44,7 +44,7 @@ fn test_parse_production_bashmenu_yml() {
         Some("{bashmenu_dir}/scripts".to_string())
     );
     assert_eq!(config.settings.transition, Some("blinds".to_string()));
-    assert_eq!(config.settings.transition_speed, Some("normal".to_string()));
+    assert_eq!(config.settings.transition_speed, Some("fast".to_string()));
     assert_eq!(config.settings.modal_animation, Some("zoom".to_string()));
     assert_eq!(
         config.settings.modal_animation_speed,
