@@ -21,6 +21,11 @@ pub const ITEM_TYPES: &[(&str, &str)] = &[
     ("notebook", "Notebook Menu (notes collection file)"),
     ("confirm", "Confirm Dialog (Yes/No/Cancel dialog)"),
     ("message", "Message Popup (alert / info text dialog)"),
+    ("info", "Info Modal (Markdown / text popup dialog)"),
+    (
+        "imarkdown",
+        "Interactive Markdown (forms, buttons, bash blocks)",
+    ),
     ("python", "Python Routine (built-in python function)"),
     ("inject_block", "Inject Block (dynamic code block template)"),
     ("theme_selector", "Theme Selector (dynamic theme menu)"),

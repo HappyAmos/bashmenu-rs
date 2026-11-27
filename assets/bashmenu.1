@@ -1139,7 +1139,8 @@ and the inactivity timer is automatically re-armed.
 Markdown files containing \fBinteractive: true\fR in their YAML frontmatter
 (\fB--- ... ---\fR) render as interactive TUI forms with embedded widgets and
 on-demand Bash execution. Launch them either inside BashMenu via
-\fB{info:<path>}\fR or directly from the terminal with
+\fB{imarkdown:<path>}\fR or \fB{info:<path>}\fR (or \fBtype: imarkdown\fR /
+\fBtype: info\fR in \fBmenuedit\fR) or directly from the terminal with
 \fBbashmenu --imarkdown <FILE>\fR (or make the file executable with a
 \fB#!/usr/bin/env -S bashmenu --imarkdown\fR shebang line). Standalone mode
 preserves the terminal's native default background behind the themed popup,
