@@ -1,11 +1,12 @@
 //! Local Unix-domain-socket UI-RPC client/server and interactive Markdown
 //! script runner for `interactive: true` Markdown documents (`bashmenu-bash`).
 
+#[cfg(unix)]
 use bashmenu_core::{
-    is_valid_bash_identifier, parse_interactive_markdown, transpile_bashmenu_bash,
-    MarkdownFrontmatter, MarkdownSegment, ScriptBlock, UiRpcRequest, UiRpcResponse,
+    is_valid_bash_identifier, parse_interactive_markdown, transpile_bashmenu_bash, MarkdownSegment,
     UI_RPC_SOCKET_ENV,
 };
+use bashmenu_core::{MarkdownFrontmatter, ScriptBlock, UiRpcRequest, UiRpcResponse};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
