@@ -72,14 +72,39 @@ if [ "$HAS_PREBUILT" = "false" ]; then
                             fi
                             ;;
                         *)
+                            RUSTUP_TMP="$(mktemp "${TMPDIR:-/tmp}/rustup-init.XXXXXX.sh")"
                             if command -v curl >/dev/null 2>&1; then
-                                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+                                curl --proto '=https' --tlsv1.2 -fsSL https://sh.rustup.rs -o "$RUSTUP_TMP"
                             elif command -v wget >/dev/null 2>&1; then
-                                wget --https-only -qO- https://sh.rustup.rs | sh -s -- -y
+                                wget --https-only -qO "$RUSTUP_TMP" https://sh.rustup.rs
                             else
+                                rm -f "$RUSTUP_TMP"
                                 echo "Error: Neither curl nor wget was found. Please install curl or wget first." >&2
                                 exit 1
                             fi
+                            if [ ! -s "$RUSTUP_TMP" ]; then
+                                rm -f "$RUSTUP_TMP"
+                                echo "Error: Downloaded rustup installer is empty. Install manually from https://rustup.rs" >&2
+                                exit 1
+                            fi
+                            ACTUAL_SHA=""
+                            if command -v sha256sum >/dev/null 2>&1; then
+                                ACTUAL_SHA="$(sha256sum "$RUSTUP_TMP" | awk '{print $1}')"
+                            elif command -v shasum >/dev/null 2>&1; then
+                                ACTUAL_SHA="$(shasum -a 256 "$RUSTUP_TMP" | awk '{print $1}')"
+                            fi
+                            if [ -n "${RUSTUP_INIT_SHA256:-}" ]; then
+                                if [ -z "$ACTUAL_SHA" ] || [ "$ACTUAL_SHA" != "$RUSTUP_INIT_SHA256" ]; then
+                                    rm -f "$RUSTUP_TMP"
+                                    echo "Error: rustup installer SHA256 mismatch (expected $RUSTUP_INIT_SHA256, got ${ACTUAL_SHA:-unavailable})." >&2
+                                    exit 1
+                                fi
+                                echo "  [+] Verified rustup installer SHA256: $ACTUAL_SHA"
+                            elif [ -n "$ACTUAL_SHA" ]; then
+                                echo "  [*] Downloaded rustup installer (SHA256: $ACTUAL_SHA; set RUSTUP_INIT_SHA256 to pin, or install manually via https://rustup.rs)"
+                            fi
+                            sh "$RUSTUP_TMP" -y
+                            rm -f "$RUSTUP_TMP"
                             ;;
                     esac
 
