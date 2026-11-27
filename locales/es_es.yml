@@ -465,7 +465,7 @@ help:
     | {{app.<key.path>}} | Clave de configuración en bashmenu.yml (ej. {{app.theme}}) |
     | {{env:<var_name>}} | Valor de variable de entorno (ej. {{env:USER}}) |
     | {{env}} / {{environment}} | Modal / tabla de inspección de variables de entorno |
-    | {{info:<path>}} | Muestra archivo Markdown con frontmatter YAML (title, width, height) |
+    | {{info:<path>}} / {{imarkdown:<path>}} | Muestra archivo Markdown / Markdown interactivo con frontmatter YAML (title, width, height, interactive) |
     | {{help}} | Acción integrada: abre el manual de documentación de BashMenu |
     | {{theme_picker}} | Acción integrada: abre el selector interactivo de temas |
     | {{text_editor}} | Acción integrada: inicia el editor de texto bashedit |

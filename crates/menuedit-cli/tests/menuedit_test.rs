@@ -1652,8 +1652,10 @@ fn test_item_type_picker_modal_scrolling_and_all_items() {
     use ratatui::buffer::Buffer;
     use ratatui::layout::Rect;
 
-    // Verify all 16 items exist and {divider} is present at the end
-    assert_eq!(ITEM_TYPES.len(), 16);
+    // Verify all 18 items exist (including info & imarkdown) and {divider} is at the end
+    assert_eq!(ITEM_TYPES.len(), 18);
+    assert!(ITEM_TYPES.iter().any(|(t, _)| *t == "info"));
+    assert!(ITEM_TYPES.iter().any(|(t, _)| *t == "imarkdown"));
     assert_eq!(ITEM_TYPES.last().unwrap().0, "{divider}");
 
     let mut picker = ItemTypePickerModal::new("command");
@@ -1663,7 +1665,7 @@ fn test_item_type_picker_modal_scrolling_and_all_items() {
     // End key moves to the last item ({divider})
     let act = picker.handle_key(KeyCode::End);
     assert_eq!(act, None);
-    assert_eq!(picker.selected_idx, 15);
+    assert_eq!(picker.selected_idx, ITEM_TYPES.len() - 1);
     assert_eq!(ITEM_TYPES[picker.selected_idx].0, "{divider}");
 
     // Home key moves to first item (submenu)

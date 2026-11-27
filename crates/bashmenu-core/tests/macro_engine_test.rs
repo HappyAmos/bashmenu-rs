@@ -769,6 +769,20 @@ fn test_info_macro_and_frontmatter_dimensions() {
         bashmenu_core::extract_info_macro_path("{info:~/.config/bashmenu/info.md}").as_deref(),
         Some("~/.config/bashmenu/info.md")
     );
+    assert_eq!(
+        bashmenu_core::extract_info_macro_path("{imarkdown:~/.config/bashmenu/playground.md}")
+            .as_deref(),
+        Some("~/.config/bashmenu/playground.md")
+    );
+    assert_eq!(
+        bashmenu_core::extract_info_macro_path("open {imarkdown:{bashmenu_dir}/wizard.md}")
+            .as_deref(),
+        Some("{bashmenu_dir}/wizard.md")
+    );
+    assert_eq!(
+        bashmenu_core::extract_info_macro_path("{{imarkdown:escaped.md}}"),
+        None
+    );
 
     let td = std::env::temp_dir().join(format!(
         "bashmenu_info_macro_test_{}_{}",

@@ -3198,6 +3198,29 @@ fn main() -> Result<()> {
                                     item.prompt
                                         .as_deref()
                                         .and_then(bashmenu_core::extract_info_macro_path)
+                                })
+                                .or_else(|| {
+                                    if matches!(
+                                        item.r#type,
+                                        MenuItemType::Other(ref s)
+                                            if s == "imarkdown" || s == "info"
+                                    ) {
+                                        item.action
+                                            .as_deref()
+                                            .or(item.message())
+                                            .or(item.command.as_deref())
+                                            .or(item.script.as_deref())
+                                            .or(item.prompt.as_deref())
+                                            .map(str::trim)
+                                            .filter(|s| {
+                                                !s.is_empty()
+                                                    && (s.ends_with(".md")
+                                                        || ctx.resolve_info_file_path(s).is_file())
+                                            })
+                                            .map(String::from)
+                                    } else {
+                                        None
+                                    }
                                 });
 
                             if has_env {
@@ -3458,7 +3481,10 @@ fn main() -> Result<()> {
                             } else if matches!(
                                 item.r#type,
                                 MenuItemType::Other(ref s)
-                                    if s == "message" || s == "popup" || s == "info"
+                                    if s == "message"
+                                        || s == "popup"
+                                        || s == "info"
+                                        || s == "imarkdown"
                             ) {
                                 let raw_title = item.title().unwrap_or("Message");
                                 let raw_msg = item

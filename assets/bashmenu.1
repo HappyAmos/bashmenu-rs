@@ -1135,6 +1135,56 @@ lines and the active menu layout.
 .B Automatic Restoration:
 When the screensaver command terminates, the menu interface is restored
 and the inactivity timer is automatically re-armed.
+.SS Interactive Markdown Applications (interactive: true & --imarkdown)
+Markdown files containing \fBinteractive: true\fR in their YAML frontmatter
+(\fB--- ... ---\fR) render as interactive TUI forms with embedded widgets and
+on-demand Bash execution. Launch them either inside BashMenu via
+\fB{imarkdown:<path>}\fR or \fB{info:<path>}\fR (or \fBtype: imarkdown\fR /
+\fBtype: info\fR in \fBmenuedit\fR) or directly from the terminal with
+\fBbashmenu --imarkdown <FILE>\fR (or make the file executable with a
+\fB#!/usr/bin/env -S bashmenu --imarkdown\fR shebang line). Standalone mode
+preserves the terminal's native default background behind the themed popup,
+restores the pre-launch terminal on exit, and exits \fB0\fR on Submit/OK or
+\fB1\fR on Cancel/Esc.
+.IP \(bu 2
+.B Reserved Script Blocks (bashmenu-bash:id="..."):
+Fenced blocks starting with \fBbashmenu-bash: id="NAME"\fR are held in reserve
+(omitted from visible Markdown and never auto-executed on load) and invoked by
+\fB{button: ...: action="NAME"}\fR. Standard fences (\fB```bash\fR) render
+normally.
+.IP \(bu 2
+.B Live UI-RPC & Bidirectional Data Binding:
+Every \fB{input}\fR, \fB{radio}\fR, and \fB{checkbox}\fR exports its \fBid\fR
+as a Bash environment variable (\fB$VAR\fR) and expands \fB{id:VAR}\fR inside
+both Markdown text and \fBbashmenu-bash\fR blocks. Scripts can open live
+\fB{param:...}\fR, \fB{message:...}\fR, and \fB{toast:...}\fR popups and write
+computed values back to the document via \fB{id:VAR="VALUE"}\fR.
+.IP \(bu 2
+.B Soft-Refresh & Controls:
+Pressing \fBEnter\fR, \fBTab\fR, or \fBShift+Tab\fR in an input (or toggling a
+radio/checkbox) soft-refreshes \fB{id:...}\fR live. \fBtype="action"\fR buttons
+run scripts in-place without closing; \fBtype="submit"\fR/\fB"ok"\fR run their
+optional action and clear/continue past \fB{clear}\fR (or close);
+\fBtype="cancel"\fR exits immediately.
+.PP
+.B Example Interactive Markdown File:
+.RS
+.nf
+#!/usr/bin/env -S bashmenu --imarkdown
+---
+title: Interactive Demo ({host})
+width: 80%
+height: 70%
+interactive: true
+---
+````bashmenu-bash: id="lookup"
+{id:result="Hello $guestName ($(date '+%H:%M:%S'))"}
+````
+Name: {input: default="{user}": id="guestName"}
+Result: {id:result}
+{button: type="action": text="Compute": action="lookup"} {button: type="ok"}
+.fi
+.RE
 .SS Multi-Platform Support & Environment Detection
 HA Bash Menu detects terminal capabilities, color depth, and host platform at runtime. Root installer and launcher scripts use POSIX /bin/sh while companion scripts in scripts/ use /usr/bin/env bash. Cross-platform package wrappers translate dependency installs to the local package manager (apt, dnf, pacman, pkg, or brew) and add or omit sudo depending on Linux, macOS, WSL, or Termux.
 .SH AUTHOR

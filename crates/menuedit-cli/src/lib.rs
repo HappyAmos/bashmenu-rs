@@ -106,6 +106,8 @@ pub fn get_type_badge(item: &MenuItem) -> &'static str {
         MenuItemType::Other(s) => match s.as_str() {
             "confirm" => "[CNF]",
             "message" => "[MSG]",
+            "info" => "[INF]",
+            "imarkdown" => "[IMD]",
             "inject_block" => "[INJ]",
             "theme_selector" => "[THM]",
             "notebook" => "[NBK]",

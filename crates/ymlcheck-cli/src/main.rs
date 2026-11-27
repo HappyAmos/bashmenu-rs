@@ -128,6 +128,7 @@ const VALID_OPTION_TYPES: &[&str] = &[
     "message",
     "popup",
     "info",
+    "imarkdown",
     "python",
     "inject_block",
     "theme_selector",
