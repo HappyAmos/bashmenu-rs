@@ -33,6 +33,7 @@ editor for Linux systems.
   - [6.2 System & Path Placeholders](#62-system--path-placeholders)
   - [6.3 Nerd Fonts & Emoji Adaptive Resolution](#63-nerd-fonts--emoji-adaptive-resolution)
   - [6.4 Console Tag Rich Formatting](#64-console-tag-rich-formatting)
+  - [6.5 Interactive Markdown Applications (`interactive: true` & `--imarkdown`)](#65-interactive-markdown-applications-interactive-true--imarkdown)
 - [7. Advanced Integration Use Cases](#7-advanced-integration-use-cases)
   - [7.1 Modular Block Injection (`type: inject_block`)](#71-modular-block-injection-type-inject_block)
   - [7.2 Subprocess Execution Modes (`execution_mode`, `stream`, `interactive`)](#72-subprocess-execution-modes-execution_mode-stream-interactive)
@@ -1138,15 +1139,18 @@ These variables are dynamically resolved using active configuration and environm
 | `{tty_mode}` | Current TTY session mode (e.g., `virtual console (tty)`, `pty`, `serial console (tty)`). |
 
 #### Markdown Modal YAML Frontmatter (`{info:<path>}`)
-Custom Markdown files loaded via `{info:<path>}` (and `assets/about.md`) support an optional YAML frontmatter header delimited by `---` lines:
+Custom Markdown files loaded via `{info:<path>}` (or launched directly with `bashmenu --imarkdown <file>`) support an optional YAML frontmatter header delimited by `---` lines (and an optional leading `#!/usr/bin/env -S bashmenu --imarkdown` shebang line):
 
 ```yaml
 ---
 title: Custom Modal Title ({host})   # Optional; supports placeholders (defaults to filename)
 width: 80%                           # Optional; 1..=100 (% of terminal width; accepts 80, "80", "80%")
 height: 70%                          # Optional; 1..=100 (% of terminal height; accepts 70, "70", "70%")
+interactive: true                    # Optional; enables forms, buttons, live {id:...}, and bashmenu-bash blocks
 ---
 ```
+
+See [Section 6.5: Interactive Markdown Applications](#65-interactive-markdown-applications-interactive-true--imarkdown) for the full guide and a complete runnable example.
 
 ### 6.3 Nerd Fonts & Emoji Adaptive Resolution
 The application resolves icons dynamically according to terminal features and
@@ -1217,6 +1221,98 @@ The application includes a rich formatting parser allowing developers to use inl
 * **Backslash Tag Escaping:** Preceding a tag bracket with a backslash (`\[b]`, `\[red]`) escapes the formatting parser, rendering the literal bracketed text.
 * **`no_formatting` Directive / Flag:** Menu items and dialog displays accept an optional `no_formatting: true` attribute to disable tag processing entirely when displaying literal bracketed text.
 * **Native Markdown Tables & Headings:** Pipe-delimited Markdown tables (`| Col1 | Col2 |`) and headings (`## Heading`) are parsed and rendered natively by `MessageModal` (such as `{info:<path>}` and `{env}`) rather than BBCode tags.
+
+### 6.5 Interactive Markdown Applications (`interactive: true` & `--imarkdown`)
+
+When a Markdown file includes `interactive: true` in its YAML frontmatter, BashMenu turns it into an interactive TUI form and script runner. The exact same `.md` file can be launched either:
+
+1. **Inside BashMenu** via a menu item referencing `{info:<path>}` (for example, `message: "{info:~/.config/bashmenu/playground.md}"`).
+2. **Standalone from the terminal** via `bashmenu --imarkdown <file>` (or directly as an executable script with `#!/usr/bin/env -S bashmenu --imarkdown` on line 1 and `chmod +x`). Standalone mode renders the themed popup over your terminal's native default background (`Color::Reset`), restores the pre-launch terminal cleanly on exit, and returns exit code `0` on `Submit`/`OK` or `1` on `Cancel`/`Esc`.
+
+#### How Execution Works
+- **Reserved Bash Code Blocks (`bashmenu-bash:id="..."`):**
+  Fenced blocks starting with ```` ```bashmenu-bash: id="<name>" ```` are **held in reserve**—they are never rendered into visible Markdown and never auto-executed when the file opens. Instead, they act like Bash functions invoked on demand by `{button: ...: action="<name>"}`. Any non-`bashmenu-*` fence (such as ```` ```bash ```` or ```` ```xbashmenu-bash ````) renders as a normal visible Markdown code block.
+- **Form-to-Bash Data Binding:**
+  Every `{input}`, `{radio}`, and `{checkbox}` widget with an `id` exports its committed value as a Bash environment variable (`$VAR`) when an action runs. Inside `bashmenu-bash` blocks, `{id:VAR}` also expands to `${VAR:-}`.
+- **Live UI-RPC & Script-to-Page Write-Back (`{id:VAR="VALUE"}`):**
+  Running `bashmenu-bash` blocks communicate with the live BashMenu TUI over a private `0600` Unix domain socket:
+  - `{param:...}` / `{message:...}` / `{toast:...}` inside Bash open real TUI modals/toasts mid-script.
+  - `{id:VAR="VALUE"}` writes a computed value from Bash back into the document's live `{id:VAR}` map (and updates any matching form widget on screen).
+- **Soft-Refresh, Buttons & `{clear}`:**
+  - Pressing `Enter`, `Tab`, or `Shift+Tab` in an `{input}` field (or changing a `{radio}` / `{checkbox}`) triggers a soft-refresh that updates all `{id:...}` placeholders live on the page.
+  - `{button: type="action": text="Compute": action="..."}` runs its Bash block **in-place** and stays on the current view so `{id:VAR="VALUE"}` updates appear immediately.
+  - `{button: type="submit": action="..."}` and `{button: type="ok": action="..."}` run their optional Bash block, then clear/advance past `{clear}` (if present) or close the modal.
+  - `{button: type="cancel": action="..."}` runs its optional cleanup block and closes the modal immediately.
+  - `{clear}` clears the interactive Markdown screen before rendering subsequent content while preserving all committed `{id:...}` values.
+  - `Up`/`Down` arrows (when not moving inside a multiline input or radio group), `PageUp`/`PageDown`, and mouse wheel scroll the modal viewport.
+
+#### Complete In-Document Example
+
+`````markdown
+#!/usr/bin/env -S bashmenu --imarkdown
+---
+title: Interactive Demo ({host})
+width: 80%
+height: 75%
+interactive: true
+---
+
+````bashmenu-bash: id="computeSummary"
+#!/usr/bin/env bash
+NOW=$(date '+%H:%M:%S')
+UPPER_NAME=$(printf '%s' "$guestName" | tr '[:lower:]' '[:upper:]')
+
+if [ "$includeHost" = "true" ]; then
+    SUMMARY="Hello $UPPER_NAME on $(hostname) ($favTheme)"
+else
+    SUMMARY="Hello $UPPER_NAME ($favTheme)"
+fi
+
+# Write computed values back to the live Markdown document:
+{id:lastRun="$NOW"}
+{id:computedSummary="$SUMMARY"}
+````
+
+````bashmenu-bash: id="runConfirm"
+#!/usr/bin/env bash
+NOTE="{param:title='Quick Note':text='Add an optional note for {id:guestName}:'}"
+{id:userNote="${NOTE:-None}"}
+{message:"Saved settings for {id:guestName} ({id:favTheme})!"}
+````
+
+# Interactive Markdown Demo
+
+Welcome, **{user}**! Fill out the fields below and press `Tab` or `Enter` to refresh `{id:...}` values live.
+
+Name: {input: default="{user}": id="guestName"}
+
+Secret PIN: {input: default="": id="secretPin": width=16: masked=true}
+
+Pick a style:
+{radio: favTheme: "Retro Terminal": "Modern Minimal": "Cyberpunk Neon"}
+
+{checkbox: includeHost: "Include hostname in summary": true}
+
+Current values: **{id:guestName}** | **{id:favTheme}** | Include host: **{id:includeHost}**
+
+**Live script output** (click **Compute** to update in-place):
+- Last run: `{id:lastRun}`
+- Summary: {id:computedSummary}
+
+{button: type="action": text="Compute": action="computeSummary"}    {button: type="submit": action="runConfirm"}    {button: type="cancel"}
+
+{clear}
+
+# Summary
+
+All done, **{id:guestName}**!
+
+- **Style:** {id:favTheme}
+- **Computed summary:** {id:computedSummary}
+- **Note:** {id:userNote}
+
+{button: type="ok"}
+`````
 
 ---
 
