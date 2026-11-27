@@ -355,7 +355,7 @@ help:
     | {{checkbox:VAR:"Label":false}} | Casilla de verificación booleana en Markdown interactivo (exporta "true"/"false") |
     | {{id:VAR}} | Valor interpolado en vivo de {{input}}/{{radio}}/{{checkbox}} (en Bash: {{id:VAR="VAL"}} escribe al documento) |
     | {{button:type="submit"\|"ok"\|"action"\|"cancel":action="ID"}} | Botón de acción que ejecuta ```bashmenu-bash:id="ID"``` (action permanece en página; opcional text="...") |
-    | {{clear}} | Salto de página en Markdown interactivo; la página siguiente se muestra tras Submit/OK |
+    | {{clear}} | Limpia la pantalla de Markdown interactivo antes de mostrar el contenido siguiente |
     | {{file_picker}} | Abre el selector visual de archivos |
     | {{file_picker:path:<dir>}} | Selector de archivos en el directorio especificado |
     | {{file_picker:stem}} | Ruta sin extensión de archivo (/ruta/a/img) |

@@ -719,9 +719,8 @@ optional \fBaction\fR block and closes the modal immediately. Supports optional
 \fBtext="..."\fR / \fBlabel="..."\fR label override.
 .TP
 .B {clear}
-Splits an \fBinteractive: true\fR Markdown document into sequential pages.
-Activating a \fBsubmit\fR or \fBok\fR button clears the current page and shows
-the next page while preserving committed \fB{input:id=...}\fR variables.
+Clears the interactive Markdown screen before rendering subsequent content
+while preserving committed \fB{id:...}\fR variables.
 .TP
 .B {file_picker}
 Launches a visual file chooser dialog box.

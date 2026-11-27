@@ -357,7 +357,7 @@ help:
     | {{checkbox:VAR:"Label":false}} | Boolean toggle checkbox in interactive Markdown (exports "true"/"false") |
     | {{id:VAR}} | Live interpolated value from matching {{input}}/{{radio}}/{{checkbox}} (in Bash: {{id:VAR="VAL"}} writes back) |
     | {{button:type="submit"\|"ok"\|"action"\|"cancel":action="ID"}} | Action button invoking reserved ```bashmenu-bash:id="ID"``` block (action stays on page; optional text="...") |
-    | {{clear}} | Multi-page break in interactive Markdown; next page renders after Submit/OK |
+    | {{clear}} | Clears the interactive Markdown screen before rendering subsequent content |
     | {{file_picker}} | Launches visual file chooser dialog |
     | {{file_picker:path:<dir>}} | File chooser opening in specified default directory |
     | {{file_picker:stem}} | Path without file extension (/path/to/img) |
