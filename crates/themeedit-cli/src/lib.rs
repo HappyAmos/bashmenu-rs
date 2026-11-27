@@ -1972,7 +1972,10 @@ fn is_token_value_inherited_for_key(key: &str, val: &serde_json::Value) -> bool 
     if is_inherited_color_value(val) {
         return true;
     }
-    if key == "highlight" || key == "selection" {
+    if matches!(
+        key,
+        "highlight" | "selection" | "selected_tab" | "input_box" | "input_box_unfocused"
+    ) {
         if let Some(seq) = val.as_array() {
             return seq.get(1).is_none_or(is_inherited_color_value);
         }
@@ -2002,13 +2005,16 @@ fn format_yaml_token_display(
 ) -> Option<String> {
     if let Some(val) = find_tier_token_value(c_map, activity, key) {
         if let Some(seq) = val.as_array() {
-            if key == "highlight" || key == "selection" {
+            if matches!(
+                key,
+                "highlight" | "selection" | "selected_tab" | "input_box" | "input_box_unfocused"
+            ) {
                 if let Some(bg_val) = seq.get(1) {
                     if let Some(s) = format_yaml_scalar_value(bg_val) {
                         return Some(s);
                     }
                 }
-                if key == "highlight" {
+                if matches!(key, "highlight" | "input_box" | "input_box_unfocused") {
                     return None;
                 }
             }
@@ -2056,10 +2062,10 @@ fn resolve_activity_display(theme: &Theme, activity: ThemeActivity, key: &str) -
         }
     }
     let col = resolve_activity_color(theme, activity, key);
-    if col != Color::Reset {
-        format!("Color {}", color_to_u8(col))
-    } else {
-        "Default".to_string()
+    match col {
+        Color::Reset => "Default".to_string(),
+        Color::Rgb(r, g, b) => format!("#{:02x}{:02x}{:02x}", r, g, b),
+        _ => format!("Color {}", color_to_u8(col)),
     }
 }
 

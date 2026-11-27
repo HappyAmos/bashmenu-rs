@@ -95,6 +95,35 @@ enum ActiveModal {
 /// `(x, y, length)` spans).
 type FlashHighlight = (std::time::Instant, Vec<(u16, u16, u16)>);
 
+/// Formats an unselected sidebar token row so `val_str` (color code/value) is
+/// preserved intact instead of being clipped mid-code when `label` is long.
+fn format_sidebar_row_preserving_value(
+    cursor: &str,
+    label: &str,
+    val_str: &str,
+    max_width: usize,
+) -> String {
+    let cursor_w = unicode_width::UnicodeWidthStr::width(cursor);
+    let val_w = unicode_width::UnicodeWidthStr::width(val_str);
+    let avail_label = max_width.saturating_sub(cursor_w + 1 + val_w);
+    if avail_label < 6 {
+        return format!("{}{:<20} {}", cursor, label, val_str);
+    }
+    let mut clipped = String::new();
+    let mut used = 0usize;
+    let limit = avail_label.saturating_sub(1); // reserve 1 col for '…'
+    for ch in label.chars() {
+        let cw = unicode_width::UnicodeWidthChar::width(ch).unwrap_or(0);
+        if used + cw > limit {
+            break;
+        }
+        clipped.push(ch);
+        used += cw;
+    }
+    clipped.push('…');
+    format!("{}{} {}", cursor, clipped, val_str)
+}
+
 /// Triggers confirmation dialog or diagnostic toast for deriving theme colors from wallpaper.
 fn trigger_derive_colors(
     state: &ThemeEditorState,
@@ -444,16 +473,21 @@ fn main() -> Result<()> {
                             let label_text = format!("{}{:<20} {}", cursor, token.label, val_str);
                             let label_vis =
                                 unicode_width::UnicodeWidthStr::width(label_text.as_str());
-                            let disp_text = if is_sel
-                                && label_vis > left_area.width as usize
-                                && left_area.width > 0
-                            {
+                            let max_w = left_area.width as usize;
+                            let disp_text = if is_sel && label_vis > max_w && max_w > 0 {
                                 get_marquee_slice(
                                     &label_text,
-                                    left_area.width as usize,
+                                    max_w,
                                     marquee_tracker.offset,
                                     &themeedit_styles.marquee_char,
                                     themeedit_styles.marquee_gap,
+                                )
+                            } else if !is_sel && label_vis > max_w && max_w > 0 {
+                                format_sidebar_row_preserving_value(
+                                    cursor,
+                                    &token.label,
+                                    &val_str,
+                                    max_w,
                                 )
                             } else {
                                 label_text
@@ -3444,5 +3478,32 @@ mod tests {
                 .map(|r| r.0),
             Some("background")
         );
+    }
+
+    #[test]
+    fn test_sidebar_row_preserves_color_code_for_long_input_box_labels() {
+        // Issue #85: long labels like "Input Box Focused Text" / "Input Box Unfocused Text"
+        // must truncate the label with '…' instead of chopping the color code on the right.
+        let row_256 = format_sidebar_row_preserving_value(
+            "    ",
+            "Input Box Unfocused Text",
+            "Color 234",
+            36,
+        );
+        assert!(
+            row_256.ends_with("Color 234"),
+            "Color code must remain intact (got: {:?})",
+            row_256
+        );
+        assert!(unicode_width::UnicodeWidthStr::width(row_256.as_str()) <= 36);
+
+        let row_hex =
+            format_sidebar_row_preserving_value("    ", "Input Box Focused Text", "#1a2b3c", 32);
+        assert!(
+            row_hex.ends_with("#1a2b3c"),
+            "Hex code must remain intact (got: {:?})",
+            row_hex
+        );
+        assert!(unicode_width::UnicodeWidthStr::width(row_hex.as_str()) <= 32);
     }
 }
