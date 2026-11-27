@@ -511,10 +511,25 @@ pub fn parse_markdown_frontmatter(raw: &str) -> (Option<String>, &str) {
 }
 
 /// Finds the byte span `(start, end, inner_path)` of the first `{info:<path>}`
-/// macro in `text`, supporting nested `{...}` placeholders inside `<path>`.
+/// or `{imarkdown:<path>}` macro in `text`, supporting nested `{...}`
+/// placeholders inside `<path>` and skipping double-brace escapes.
 pub fn find_info_macro_span(text: &str) -> Option<(usize, usize, String)> {
-    let start = text.find("{info:")?;
-    let content_start = start + "{info:".len();
+    let mut best: Option<(usize, usize)> = None;
+    for prefix in ["{info:", "{imarkdown:"] {
+        let mut search = 0usize;
+        while let Some(rel) = text[search..].find(prefix) {
+            let start = search + rel;
+            if start > 0 && text.as_bytes()[start - 1] == b'{' {
+                search = start + prefix.len();
+                continue;
+            }
+            if best.map(|(b, _)| start < b).unwrap_or(true) {
+                best = Some((start, start + prefix.len()));
+            }
+            break;
+        }
+    }
+    let (start, content_start) = best?;
     let mut depth = 1usize;
     for (rel_idx, ch) in text[content_start..].char_indices() {
         match ch {
@@ -535,7 +550,8 @@ pub fn find_info_macro_span(text: &str) -> Option<(usize, usize, String)> {
     None
 }
 
-/// Extracts the inner path expression from the first `{info:<path>}` macro in `text`.
+/// Extracts the inner path expression from the first `{info:<path>}` or
+/// `{imarkdown:<path>}` macro in `text`.
 pub fn extract_info_macro_path(text: &str) -> Option<String> {
     find_info_macro_span(text).map(|(_, _, p)| p)
 }

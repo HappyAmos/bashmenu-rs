@@ -1138,8 +1138,8 @@ These variables are dynamically resolved using active configuration and environm
 | `{color_mode}` | Current terminal color depth mode (e.g., `3-bit (8 color)`, `16 color`, `256 color`, `truecolor`). |
 | `{tty_mode}` | Current TTY session mode (e.g., `virtual console (tty)`, `pty`, `serial console (tty)`). |
 
-#### Markdown Modal YAML Frontmatter (`{info:<path>}`)
-Custom Markdown files loaded via `{info:<path>}` (or launched directly with `bashmenu --imarkdown <file>`) support an optional YAML frontmatter header delimited by `---` lines (and an optional leading `#!/usr/bin/env -S bashmenu --imarkdown` shebang line):
+#### Markdown Modal YAML Frontmatter (`{info:<path>}` / `{imarkdown:<path>}`)
+Custom Markdown files loaded via `{info:<path>}` or its alias `{imarkdown:<path>}` (or launched directly with `bashmenu --imarkdown <file>`) support an optional YAML frontmatter header delimited by `---` lines (and an optional leading `#!/usr/bin/env -S bashmenu --imarkdown` shebang line):
 
 ```yaml
 ---
@@ -1226,7 +1226,7 @@ The application includes a rich formatting parser allowing developers to use inl
 
 When a Markdown file includes `interactive: true` in its YAML frontmatter, BashMenu turns it into an interactive TUI form and script runner. The exact same `.md` file can be launched either:
 
-1. **Inside BashMenu** via a menu item referencing `{info:<path>}` (for example, `message: "{info:~/.config/bashmenu/playground.md}"`).
+1. **Inside BashMenu** via a menu item referencing `{imarkdown:<path>}` or `{info:<path>}` (or `type: imarkdown` / `type: info` in `menuedit`'s type picker with the file path in `action:`/`message:`).
 2. **Standalone from the terminal** via `bashmenu --imarkdown <file>` (or directly as an executable script with `#!/usr/bin/env -S bashmenu --imarkdown` on line 1 and `chmod +x`). Standalone mode renders the themed popup over your terminal's native default background (`Color::Reset`), restores the pre-launch terminal cleanly on exit, and returns exit code `0` on `Submit`/`OK` or `1` on `Cancel`/`Esc`.
 
 #### How Execution Works

@@ -1003,7 +1003,16 @@ impl ItemEditModal {
     pub fn shows_prompt(&self) -> bool {
         matches!(
             self.current_type.as_str(),
-            "command" | "script" | "config" | "toggle" | "radio" | "confirm" | "message" | "python"
+            "command"
+                | "script"
+                | "config"
+                | "toggle"
+                | "radio"
+                | "confirm"
+                | "message"
+                | "info"
+                | "imarkdown"
+                | "python"
         )
     }
 
@@ -1201,6 +1210,8 @@ impl ItemEditModal {
             "notebook" => "[NBK]",
             "confirm" => "[CNF]",
             "message" => "[MSG]",
+            "info" => "[INF]",
+            "imarkdown" => "[IMD]",
             "python" => "[PY ]",
             "inject_block" => "[INJ]",
             "theme_selector" => "[THM]",
@@ -1220,6 +1231,8 @@ impl ItemEditModal {
             "notebook" => "Notebook Menu",
             "confirm" => "Confirm Dialog",
             "message" => "Message Popup",
+            "info" => "Info Modal",
+            "imarkdown" => "Interactive Markdown",
             "python" => "Python Routine",
             "inject_block" => "Inject Block",
             "theme_selector" => "Theme Selector",
