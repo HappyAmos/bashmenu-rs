@@ -92,6 +92,47 @@ pub struct ScriptBlock {
     pub code: String,
 }
 
+/// Layout orientation for a `{radio:...}` option group.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RadioLayout {
+    /// Stacked vertically, one option per row (default).
+    #[default]
+    Vertical,
+    /// Rendered inline horizontally on a single row.
+    Horizontal,
+}
+
+/// Specification for an embedded `{radio:...}` single-choice widget.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct RadioSpec {
+    /// Bash variable identifier exported on submit and via `{id:<name>}`.
+    pub id: String,
+    /// Ordered selectable option labels/values.
+    pub options: Vec<String>,
+    /// Index of the initially selected option (`0..options.len()`).
+    pub default_index: usize,
+    /// Visual layout (`Vertical` or `Horizontal`).
+    pub layout: RadioLayout,
+}
+
+impl RadioSpec {
+    /// Returns the option text for `idx` (or `""` if out of bounds).
+    pub fn value_at(&self, idx: usize) -> &str {
+        self.options.get(idx).map(|s| s.as_str()).unwrap_or("")
+    }
+}
+
+/// Specification for an embedded `{checkbox:...}` boolean toggle widget.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct CheckboxSpec {
+    /// Bash variable identifier exported as `"true"` or `"false"`.
+    pub id: String,
+    /// Visible label displayed beside `[x]` / `[ ]`.
+    pub label: String,
+    /// Initial checked state (default `false`).
+    pub default_checked: bool,
+}
+
 /// A rendered element inside an interactive Markdown form document.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MarkdownFormBlock {
@@ -105,6 +146,10 @@ pub enum MarkdownFormBlock {
         /// Parsed input widget specification.
         spec: InputFieldSpec,
     },
+    /// Embedded `{radio:...}` single-choice option group.
+    Radio(RadioSpec),
+    /// Embedded `{checkbox:...}` boolean toggle widget.
+    Checkbox(CheckboxSpec),
     /// One or more `{button:...}` controls rendered side-by-side on a single row.
     Buttons(Vec<ButtonSpec>),
 }
@@ -838,6 +883,38 @@ pub fn parse_interactive_markdown_doc(body: &str) -> InteractiveMarkdownDoc {
             continue;
         }
 
+        // Check for `{radio:...}` widget
+        if let Some((start, end, spec)) = find_radio_macro_span(line) {
+            flush_text(&mut text_buf, &mut current_page);
+            let before = &line[..start];
+            let after = &line[end..];
+            if !before.trim().is_empty() {
+                current_page.push(MarkdownFormBlock::Text(before.trim_end().to_string()));
+            }
+            current_page.push(MarkdownFormBlock::Radio(spec));
+            if !after.trim().is_empty() {
+                text_buf.push_str(after.trim_start());
+                text_buf.push('\n');
+            }
+            continue;
+        }
+
+        // Check for `{checkbox:...}` widget
+        if let Some((start, end, spec)) = find_checkbox_macro_span(line) {
+            flush_text(&mut text_buf, &mut current_page);
+            let before = &line[..start];
+            let after = &line[end..];
+            if !before.trim().is_empty() {
+                current_page.push(MarkdownFormBlock::Text(before.trim_end().to_string()));
+            }
+            current_page.push(MarkdownFormBlock::Checkbox(spec));
+            if !after.trim().is_empty() {
+                text_buf.push_str(after.trim_start());
+                text_buf.push('\n');
+            }
+            continue;
+        }
+
         // Check for `{input:...}` widget
         if let Some((start, end, spec)) = find_input_macro_span(line) {
             flush_text(&mut text_buf, &mut current_page);
@@ -875,8 +952,223 @@ pub fn parse_interactive_markdown_doc(body: &str) -> InteractiveMarkdownDoc {
     }
 }
 
+/// Splits colon-separated arguments inside `{radio:...}` or `{checkbox:...}`,
+/// preserving quoted strings (`"`, `'`, `` ` ``) that may contain colons.
+/// Returns `(raw_segment, was_quoted)` pairs.
+fn split_colon_macro_args(inner: &str) -> Vec<(String, bool)> {
+    let mut out = Vec::new();
+    let mut rest = inner.trim();
+
+    while !rest.is_empty() {
+        rest = rest.trim_start();
+        if let Some(stripped) = rest.strip_prefix(':') {
+            rest = stripped.trim_start();
+            continue;
+        }
+        if rest.is_empty() {
+            break;
+        }
+
+        if matches!(rest.as_bytes().first(), Some(b'"' | b'\'' | b'`')) {
+            if let Some((val, tail)) = parse_input_quoted_value(rest) {
+                out.push((val, true));
+                rest = tail;
+                continue;
+            }
+        }
+
+        // Scan until next unquoted `:`
+        let mut quote: Option<char> = None;
+        let mut escaped = false;
+        let mut split_at = rest.len();
+        for (idx, ch) in rest.char_indices() {
+            if escaped {
+                escaped = false;
+                continue;
+            }
+            if ch == '\\' && quote.is_some() {
+                escaped = true;
+                continue;
+            }
+            if let Some(q) = quote {
+                if ch == q {
+                    quote = None;
+                }
+            } else if matches!(ch, '"' | '\'' | '`') {
+                quote = Some(ch);
+            } else if ch == ':' {
+                split_at = idx;
+                break;
+            }
+        }
+        let seg = rest[..split_at].trim();
+        if !seg.is_empty() {
+            out.push((seg.to_string(), false));
+        }
+        rest = if split_at < rest.len() {
+            &rest[split_at + 1..]
+        } else {
+            ""
+        };
+    }
+
+    out
+}
+
+/// Parses an optional `key = value` segment (unquoting `value` if quoted).
+fn parse_kv_arg(seg: &str, allowed_keys: &[&str]) -> Option<(String, String)> {
+    for &key in allowed_keys {
+        if let Some(after) = seg.strip_prefix(key) {
+            let after_ws = after.trim_start();
+            if let Some(val_part) = after_ws.strip_prefix('=') {
+                let val_trim = val_part.trim();
+                let val = if matches!(val_trim.as_bytes().first(), Some(b'"' | b'\'' | b'`')) {
+                    parse_input_quoted_value(val_trim)
+                        .map(|(v, _)| v)
+                        .unwrap_or_else(|| val_trim.to_string())
+                } else {
+                    val_trim.to_string()
+                };
+                return Some((key.to_string(), val));
+            }
+        }
+    }
+    None
+}
+
+/// Parses `{radio:...}` inner fields supporting both positional shorthand
+/// (`{radio: rdoValue: "Example 1": "Example 2"}`) and key-value attributes
+/// (`id="..."`, `default="..."`, `layout="vertical"|"horizontal"`).
+fn parse_radio_macro_fields(inner: &str) -> RadioSpec {
+    let mut spec = RadioSpec::default();
+    let mut default_val: Option<String> = None;
+
+    for (seg, quoted) in split_colon_macro_args(inner) {
+        if !quoted {
+            if let Some((k, v)) = parse_kv_arg(&seg, &["id", "default", "layout"]) {
+                match k.as_str() {
+                    "id" => spec.id = v,
+                    "default" => default_val = Some(v),
+                    "layout" => {
+                        spec.layout = match v.to_ascii_lowercase().as_str() {
+                            "horizontal" | "inline" | "row" => RadioLayout::Horizontal,
+                            _ => RadioLayout::Vertical,
+                        };
+                    }
+                    _ => {}
+                }
+                continue;
+            }
+            if spec.id.is_empty() && spec.options.is_empty() && is_valid_bash_identifier(&seg) {
+                spec.id = seg;
+                continue;
+            }
+        }
+        spec.options.push(seg);
+    }
+
+    if let Some(dv) = default_val {
+        if let Some(idx) = spec.options.iter().position(|o| o == &dv) {
+            spec.default_index = idx;
+        }
+    }
+
+    spec
+}
+
+/// Finds the first unescaped `{radio:...}` macro span in `s` with at least one option.
+pub fn find_radio_macro_span(s: &str) -> Option<(usize, usize, RadioSpec)> {
+    let mut search_from = 0usize;
+    while let Some(rel) = s[search_from..].find("{radio:") {
+        let start = search_from + rel;
+        if start > 0 && s.as_bytes()[start - 1] == b'{' {
+            search_from = start + 7;
+            continue;
+        }
+        if let Some(end) = scan_balanced_macro_end(s, start) {
+            let inner = &s[start + 7..end - 1];
+            let spec = parse_radio_macro_fields(inner);
+            if !spec.options.is_empty() {
+                return Some((start, end, spec));
+            }
+            search_from = end;
+            continue;
+        }
+        search_from = start + 7;
+    }
+    None
+}
+
+/// Parses `{checkbox:...}` inner fields supporting both positional shorthand
+/// (`{checkbox: enableLogs: "Enable verbose logging": true}`) and key-value
+/// attributes (`id="..."`, `label="..."`/`text="..."`, `default=true`/`checked=true`).
+fn parse_checkbox_macro_fields(inner: &str) -> CheckboxSpec {
+    let mut spec = CheckboxSpec::default();
+
+    for (seg, quoted) in split_colon_macro_args(inner) {
+        if !quoted {
+            if let Some((k, v)) = parse_kv_arg(&seg, &["id", "label", "text", "default", "checked"])
+            {
+                match k.as_str() {
+                    "id" => spec.id = v,
+                    "label" | "text" => spec.label = v,
+                    "default" | "checked" => {
+                        spec.default_checked =
+                            matches!(v.to_ascii_lowercase().as_str(), "true" | "1" | "yes" | "on");
+                    }
+                    _ => {}
+                }
+                continue;
+            }
+            if spec.id.is_empty() && spec.label.is_empty() && is_valid_bash_identifier(&seg) {
+                spec.id = seg;
+                continue;
+            }
+            if !spec.label.is_empty() {
+                let lower = seg.to_ascii_lowercase();
+                if matches!(lower.as_str(), "true" | "1" | "yes" | "on") {
+                    spec.default_checked = true;
+                    continue;
+                } else if matches!(lower.as_str(), "false" | "0" | "no" | "off") {
+                    spec.default_checked = false;
+                    continue;
+                }
+            }
+        }
+        if spec.label.is_empty() {
+            spec.label = seg;
+        }
+    }
+
+    spec
+}
+
+/// Finds the first unescaped `{checkbox:...}` macro span in `s`.
+pub fn find_checkbox_macro_span(s: &str) -> Option<(usize, usize, CheckboxSpec)> {
+    let mut search_from = 0usize;
+    while let Some(rel) = s[search_from..].find("{checkbox:") {
+        let start = search_from + rel;
+        if start > 0 && s.as_bytes()[start - 1] == b'{' {
+            search_from = start + 10;
+            continue;
+        }
+        if let Some(end) = scan_balanced_macro_end(s, start) {
+            let inner = &s[start + 10..end - 1];
+            let spec = parse_checkbox_macro_fields(inner);
+            if !spec.id.is_empty() || !spec.label.is_empty() {
+                return Some((start, end, spec));
+            }
+            search_from = end;
+            continue;
+        }
+        search_from = start + 10;
+    }
+    None
+}
+
 /// Returns true if the Markdown body uses interactive form features (`{input}`,
-/// `{button}`, `{clear}`, or reserved `bashmenu-<lang>:id="..."` blocks).
+/// `{radio}`, `{checkbox}`, `{button}`, `{clear}`, or reserved
+/// `bashmenu-<lang>:id="..."` blocks).
 pub fn has_interactive_markdown_form(body: &str) -> bool {
     let doc = parse_interactive_markdown_doc(body);
     !doc.reserved_scripts.is_empty()
@@ -884,7 +1176,10 @@ pub fn has_interactive_markdown_form(body: &str) -> bool {
         || doc.pages.iter().flatten().any(|b| {
             matches!(
                 b,
-                MarkdownFormBlock::Input { .. } | MarkdownFormBlock::Buttons(_)
+                MarkdownFormBlock::Input { .. }
+                    | MarkdownFormBlock::Radio(_)
+                    | MarkdownFormBlock::Checkbox(_)
+                    | MarkdownFormBlock::Buttons(_)
             )
         })
 }
@@ -1248,5 +1543,46 @@ echo \"shown literally\"
             b,
             MarkdownFormBlock::Text(t) if t.contains("xbashmenu-bash") && t.contains("shown literally")
         )));
+    }
+
+    #[test]
+    fn test_parse_radio_and_checkbox_macros() {
+        // Shorthand positional radio
+        let (_, _, r1) = find_radio_macro_span(r#"{radio: rdoValue: "Example 1": "Example 2"}"#)
+            .expect("parse shorthand radio");
+        assert_eq!(r1.id, "rdoValue");
+        assert_eq!(r1.options, vec!["Example 1", "Example 2"]);
+        assert_eq!(r1.default_index, 0);
+        assert_eq!(r1.layout, RadioLayout::Vertical);
+
+        // Key-value radio with default and horizontal layout
+        let (_, _, r2) = find_radio_macro_span(
+            r#"{radio: id="env": default="Prod": layout="horizontal": "Dev": "Staging": "Prod"}"#,
+        )
+        .expect("parse kv radio");
+        assert_eq!(r2.id, "env");
+        assert_eq!(r2.options, vec!["Dev", "Staging", "Prod"]);
+        assert_eq!(r2.default_index, 2);
+        assert_eq!(r2.layout, RadioLayout::Horizontal);
+
+        // Shorthand positional checkbox
+        let (_, _, c1) =
+            find_checkbox_macro_span(r#"{checkbox: enableLogs: "Enable verbose logging": true}"#)
+                .expect("parse shorthand checkbox");
+        assert_eq!(c1.id, "enableLogs");
+        assert_eq!(c1.label, "Enable verbose logging");
+        assert!(c1.default_checked);
+
+        // Key-value checkbox
+        let (_, _, c2) =
+            find_checkbox_macro_span("{checkbox: id='dryRun': label='Dry run': default=false}")
+                .expect("parse kv checkbox");
+        assert_eq!(c2.id, "dryRun");
+        assert_eq!(c2.label, "Dry run");
+        assert!(!c2.default_checked);
+
+        // Escaped macros are ignored
+        assert!(find_radio_macro_span(r#"{{radio: rdoValue: "A": "B"}}"#).is_none());
+        assert!(find_checkbox_macro_span(r#"{{checkbox: flag: "Label"}}"#).is_none());
     }
 }

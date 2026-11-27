@@ -3045,6 +3045,33 @@ fn main() -> Result<()> {
                                                                 spec,
                                                             }
                                                         }
+                                                        bashmenu_core::MarkdownFormBlock::Radio(
+                                                            mut spec,
+                                                        ) => {
+                                                            for opt in &mut spec.options {
+                                                                if opt.contains('{') {
+                                                                    *opt = interpolate_placeholders(
+                                                                        opt, &safe_ctx,
+                                                                    );
+                                                                }
+                                                            }
+                                                            bashmenu_core::MarkdownFormBlock::Radio(
+                                                                spec,
+                                                            )
+                                                        }
+                                                        bashmenu_core::MarkdownFormBlock::Checkbox(
+                                                            mut spec,
+                                                        ) => {
+                                                            if spec.label.contains('{') {
+                                                                spec.label =
+                                                                    interpolate_placeholders(
+                                                                        &spec.label, &safe_ctx,
+                                                                    );
+                                                            }
+                                                            bashmenu_core::MarkdownFormBlock::Checkbox(
+                                                                spec,
+                                                            )
+                                                        }
                                                         bashmenu_core::MarkdownFormBlock::Buttons(
                                                             mut btns,
                                                         ) => {

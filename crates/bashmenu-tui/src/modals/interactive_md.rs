@@ -4,7 +4,8 @@
 use super::frame::{is_close_button_clicked, render_modal_frame, render_modal_scrollbar};
 use crate::style::ResolvedThemeStyles;
 use bashmenu_core::{
-    substitute_id_placeholders, t, ButtonSpec, ButtonType, InputFieldSpec, MarkdownFormBlock,
+    substitute_id_placeholders, t, ButtonSpec, ButtonType, CheckboxSpec, InputFieldSpec,
+    MarkdownFormBlock, RadioLayout, RadioSpec,
 };
 use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
@@ -37,10 +38,66 @@ pub enum InteractiveFormAction {
 pub enum FormFocus {
     /// Focused on `fields[idx]`.
     Input(usize),
+    /// Focused on `radios[idx]`.
+    Radio(usize),
+    /// Focused on `checkboxes[idx]`.
+    Checkbox(usize),
     /// Focused on `buttons[idx]` (an inline `{button:...}` control).
     Button(usize),
     /// Focused on the fallback footer `[ OK ]` button (only when page has no `{button:...}`).
     FallbackOk,
+}
+
+/// Runtime state for an embedded `{radio:...}` option group.
+#[derive(Debug, Clone)]
+pub struct RadioFieldState {
+    /// Original parsed radio specification.
+    pub spec: RadioSpec,
+    /// Currently selected option index (`0..spec.options.len()`).
+    pub selected: usize,
+}
+
+impl RadioFieldState {
+    /// Creates a radio state initialized to `spec.default_index`.
+    pub fn from_spec(spec: RadioSpec) -> Self {
+        let selected = if spec.options.is_empty() {
+            0
+        } else {
+            spec.default_index.min(spec.options.len() - 1)
+        };
+        Self { spec, selected }
+    }
+
+    /// Returns the currently selected option text.
+    pub fn value(&self) -> String {
+        self.spec.value_at(self.selected).to_string()
+    }
+}
+
+/// Runtime state for an embedded `{checkbox:...}` boolean toggle.
+#[derive(Debug, Clone)]
+pub struct CheckboxFieldState {
+    /// Original parsed checkbox specification.
+    pub spec: CheckboxSpec,
+    /// Current checked state.
+    pub checked: bool,
+}
+
+impl CheckboxFieldState {
+    /// Creates a checkbox state initialized to `spec.default_checked`.
+    pub fn from_spec(spec: CheckboxSpec) -> Self {
+        let checked = spec.default_checked;
+        Self { spec, checked }
+    }
+
+    /// Returns `"true"` or `"false"`.
+    pub fn value(&self) -> String {
+        if self.checked {
+            "true".to_string()
+        } else {
+            "false".to_string()
+        }
+    }
 }
 
 /// Editable runtime state for a single embedded `{input:...}` widget.
@@ -209,6 +266,10 @@ pub struct InteractiveMarkdownModal {
     pub current_page: usize,
     /// Runtime state for each [`MarkdownFormBlock::Input`] on the current page.
     pub fields: Vec<InputFieldState>,
+    /// Runtime state for each [`MarkdownFormBlock::Radio`] on the current page.
+    pub radios: Vec<RadioFieldState>,
+    /// Runtime state for each [`MarkdownFormBlock::Checkbox`] on the current page.
+    pub checkboxes: Vec<CheckboxFieldState>,
     /// Flattened list of [`ButtonSpec`] controls on the current page.
     pub buttons: Vec<ButtonSpec>,
     /// Committed `id -> value` map persisted across pages for `{id:<name>}` interpolation.
@@ -223,6 +284,10 @@ pub struct InteractiveMarkdownModal {
     last_content_h: Cell<Option<usize>>,
     /// Cached screen rectangles for each rendered input field (for mouse hit-testing).
     last_field_rects: RefCell<Vec<Rect>>,
+    /// Cached screen rectangles for each radio option `[radio_idx][opt_idx]`.
+    last_radio_rects: RefCell<Vec<Vec<Rect>>>,
+    /// Cached screen rectangles for each checkbox row.
+    last_checkbox_rects: RefCell<Vec<Rect>>,
     /// Cached screen rectangles for each rendered inline button.
     last_button_rects: RefCell<Vec<Rect>>,
     /// Cached fallback `[ OK ]` button screen rectangle.
@@ -247,6 +312,8 @@ impl InteractiveMarkdownModal {
             pages,
             current_page: 0,
             fields: Vec::new(),
+            radios: Vec::new(),
+            checkboxes: Vec::new(),
             buttons: Vec::new(),
             committed_vars: HashMap::new(),
             focus: FormFocus::FallbackOk,
@@ -254,6 +321,8 @@ impl InteractiveMarkdownModal {
             last_max_scroll: Cell::new(None),
             last_content_h: Cell::new(None),
             last_field_rects: RefCell::new(Vec::new()),
+            last_radio_rects: RefCell::new(Vec::new()),
+            last_checkbox_rects: RefCell::new(Vec::new()),
             last_button_rects: RefCell::new(Vec::new()),
             last_ok_rect: RefCell::new(None),
         };
@@ -272,10 +341,12 @@ impl InteractiveMarkdownModal {
         self
     }
 
-    /// Populates `fields`, `buttons`, `committed_vars` defaults, and initial focus
-    /// for `self.current_page`.
+    /// Populates `fields`, `radios`, `checkboxes`, `buttons`, `committed_vars` defaults,
+    /// and initial focus for `self.current_page`.
     fn load_current_page(&mut self) {
         self.fields.clear();
+        self.radios.clear();
+        self.checkboxes.clear();
         self.buttons.clear();
         if let Some(blocks) = self.pages.get(self.current_page) {
             for b in blocks {
@@ -289,6 +360,24 @@ impl InteractiveMarkdownModal {
                         }
                         self.fields.push(st);
                     }
+                    MarkdownFormBlock::Radio(spec) => {
+                        let st = RadioFieldState::from_spec(spec.clone());
+                        if !st.spec.id.is_empty() {
+                            self.committed_vars
+                                .entry(st.spec.id.clone())
+                                .or_insert_with(|| st.value());
+                        }
+                        self.radios.push(st);
+                    }
+                    MarkdownFormBlock::Checkbox(spec) => {
+                        let st = CheckboxFieldState::from_spec(spec.clone());
+                        if !st.spec.id.is_empty() {
+                            self.committed_vars
+                                .entry(st.spec.id.clone())
+                                .or_insert_with(|| st.value());
+                        }
+                        self.checkboxes.push(st);
+                    }
                     MarkdownFormBlock::Buttons(btns) => {
                         self.buttons.extend(btns.iter().cloned());
                     }
@@ -298,13 +387,11 @@ impl InteractiveMarkdownModal {
         }
         self.scroll_offset = 0;
         self.last_max_scroll.set(None);
-        self.focus = if !self.fields.is_empty() {
-            FormFocus::Input(0)
-        } else if !self.buttons.is_empty() {
-            FormFocus::Button(0)
-        } else {
-            FormFocus::FallbackOk
-        };
+        self.focus = self
+            .focus_ring()
+            .first()
+            .copied()
+            .unwrap_or(FormFocus::FallbackOk);
     }
 
     /// Returns true if another `{clear}` page follows the current page.
@@ -325,11 +412,21 @@ impl InteractiveMarkdownModal {
         }
     }
 
-    /// Commits all current page input values into [`Self::committed_vars`].
+    /// Commits all current page input, radio, and checkbox values into [`Self::committed_vars`].
     pub fn soft_refresh(&mut self) {
         for f in &self.fields {
             if !f.spec.id.is_empty() {
                 self.committed_vars.insert(f.spec.id.clone(), f.value());
+            }
+        }
+        for r in &self.radios {
+            if !r.spec.id.is_empty() {
+                self.committed_vars.insert(r.spec.id.clone(), r.value());
+            }
+        }
+        for c in &self.checkboxes {
+            if !c.spec.id.is_empty() {
+                self.committed_vars.insert(c.spec.id.clone(), c.value());
             }
         }
     }
@@ -379,15 +476,37 @@ impl InteractiveMarkdownModal {
 
     fn focus_ring(&self) -> Vec<FormFocus> {
         let mut ring = Vec::new();
-        for i in 0..self.fields.len() {
-            ring.push(FormFocus::Input(i));
+        let mut input_i = 0usize;
+        let mut radio_i = 0usize;
+        let mut cb_i = 0usize;
+        let mut btn_i = 0usize;
+        if let Some(blocks) = self.pages.get(self.current_page) {
+            for b in blocks {
+                match b {
+                    MarkdownFormBlock::Input { .. } => {
+                        ring.push(FormFocus::Input(input_i));
+                        input_i += 1;
+                    }
+                    MarkdownFormBlock::Radio(_) => {
+                        ring.push(FormFocus::Radio(radio_i));
+                        radio_i += 1;
+                    }
+                    MarkdownFormBlock::Checkbox(_) => {
+                        ring.push(FormFocus::Checkbox(cb_i));
+                        cb_i += 1;
+                    }
+                    MarkdownFormBlock::Buttons(btns) => {
+                        for _ in 0..btns.len() {
+                            ring.push(FormFocus::Button(btn_i));
+                            btn_i += 1;
+                        }
+                    }
+                    MarkdownFormBlock::Text(_) => {}
+                }
+            }
         }
         if self.buttons.is_empty() {
             ring.push(FormFocus::FallbackOk);
-        } else {
-            for i in 0..self.buttons.len() {
-                ring.push(FormFocus::Button(i));
-            }
         }
         ring
     }
@@ -455,6 +574,57 @@ impl InteractiveMarkdownModal {
                         action: None,
                         vars: self.committed_vars.clone(),
                     })
+                }
+                KeyCode::Up | KeyCode::Char('k') => {
+                    self.scroll_modal_by(-1);
+                    None
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    self.scroll_modal_by(1);
+                    None
+                }
+                _ => None,
+            },
+            FormFocus::Radio(r_idx) => {
+                let len = self
+                    .radios
+                    .get(r_idx)
+                    .map(|r| r.spec.options.len())
+                    .unwrap_or(0);
+                if len == 0 {
+                    return None;
+                }
+                match code {
+                    KeyCode::Up | KeyCode::Left | KeyCode::Char('k') | KeyCode::Char('h') => {
+                        let r = &mut self.radios[r_idx];
+                        r.selected = if r.selected == 0 {
+                            len - 1
+                        } else {
+                            r.selected - 1
+                        };
+                        self.soft_refresh();
+                        None
+                    }
+                    KeyCode::Down | KeyCode::Right | KeyCode::Char('j') | KeyCode::Char('l') => {
+                        let r = &mut self.radios[r_idx];
+                        r.selected = (r.selected + 1) % len;
+                        self.soft_refresh();
+                        None
+                    }
+                    KeyCode::Enter | KeyCode::Char(' ') => {
+                        self.soft_refresh();
+                        None
+                    }
+                    _ => None,
+                }
+            }
+            FormFocus::Checkbox(c_idx) => match code {
+                KeyCode::Enter | KeyCode::Char(' ') => {
+                    if let Some(cb) = self.checkboxes.get_mut(c_idx) {
+                        cb.checked = !cb.checked;
+                    }
+                    self.soft_refresh();
+                    None
                 }
                 KeyCode::Up | KeyCode::Char('k') => {
                     self.scroll_modal_by(-1);
@@ -597,6 +767,53 @@ impl InteractiveMarkdownModal {
                     }
                 }
 
+                // Check `{radio:...}` option click
+                let clicked_radio: Option<(usize, usize)> = {
+                    let rects = self.last_radio_rects.borrow();
+                    rects.iter().enumerate().find_map(|(r_idx, opts)| {
+                        opts.iter().enumerate().find_map(|(o_idx, r)| {
+                            if r.width > 0
+                                && mouse.row == r.y
+                                && mouse.column >= r.x
+                                && mouse.column < r.x + r.width
+                            {
+                                Some((r_idx, o_idx))
+                            } else {
+                                None
+                            }
+                        })
+                    })
+                };
+                if let Some((r_idx, o_idx)) = clicked_radio {
+                    self.focus = FormFocus::Radio(r_idx);
+                    if let Some(r) = self.radios.get_mut(r_idx) {
+                        if o_idx < r.spec.options.len() {
+                            r.selected = o_idx;
+                        }
+                    }
+                    self.soft_refresh();
+                    return None;
+                }
+
+                // Check `{checkbox:...}` click
+                let clicked_cb: Option<usize> = {
+                    let rects = self.last_checkbox_rects.borrow();
+                    rects.iter().position(|r| {
+                        r.width > 0
+                            && mouse.row == r.y
+                            && mouse.column >= r.x
+                            && mouse.column < r.x + r.width
+                    })
+                };
+                if let Some(c_idx) = clicked_cb {
+                    self.focus = FormFocus::Checkbox(c_idx);
+                    if let Some(cb) = self.checkboxes.get_mut(c_idx) {
+                        cb.checked = !cb.checked;
+                    }
+                    self.soft_refresh();
+                    return None;
+                }
+
                 // Check `{input:...}` field click
                 let clicked_field: Option<usize> = {
                     let rects = self.last_field_rects.borrow();
@@ -677,6 +894,15 @@ impl InteractiveMarkdownModal {
                             }
                             field_idx += 1;
                         }
+                        MarkdownFormBlock::Radio(spec) => {
+                            est_rows += match spec.layout {
+                                RadioLayout::Vertical => spec.options.len() + 1,
+                                RadioLayout::Horizontal => 2,
+                            };
+                        }
+                        MarkdownFormBlock::Checkbox(_) => {
+                            est_rows += 2;
+                        }
                         MarkdownFormBlock::Buttons(_) => {
                             est_rows += 2;
                         }
@@ -710,6 +936,16 @@ impl InteractiveMarkdownModal {
                 row_in_field: usize,
                 prefix: Option<String>,
             },
+            RadioOptionRow {
+                radio_idx: usize,
+                opt_idx: usize,
+            },
+            RadioHorizontalRow {
+                radio_idx: usize,
+            },
+            CheckboxRow {
+                checkbox_idx: usize,
+            },
             ButtonRow {
                 start_btn_idx: usize,
                 count: usize,
@@ -729,6 +965,8 @@ impl InteractiveMarkdownModal {
 
         let mut vrows: Vec<VirtualRow> = Vec::new();
         let mut field_counter = 0usize;
+        let mut radio_counter = 0usize;
+        let mut checkbox_counter = 0usize;
         let mut button_counter = 0usize;
 
         if let Some(blocks) = self.pages.get(self.current_page) {
@@ -766,6 +1004,32 @@ impl InteractiveMarkdownModal {
                             vrows.push(VirtualRow::Blank);
                         }
                     }
+                    MarkdownFormBlock::Radio(spec) => {
+                        let r_idx = radio_counter;
+                        radio_counter += 1;
+                        match spec.layout {
+                            RadioLayout::Vertical => {
+                                for opt_idx in 0..spec.options.len() {
+                                    vrows.push(VirtualRow::RadioOptionRow {
+                                        radio_idx: r_idx,
+                                        opt_idx,
+                                    });
+                                }
+                            }
+                            RadioLayout::Horizontal => {
+                                vrows.push(VirtualRow::RadioHorizontalRow { radio_idx: r_idx });
+                            }
+                        }
+                        vrows.push(VirtualRow::Blank);
+                    }
+                    MarkdownFormBlock::Checkbox(_) => {
+                        let c_idx = checkbox_counter;
+                        checkbox_counter += 1;
+                        vrows.push(VirtualRow::CheckboxRow {
+                            checkbox_idx: c_idx,
+                        });
+                        vrows.push(VirtualRow::Blank);
+                    }
                     MarkdownFormBlock::Buttons(btns) => {
                         let start_idx = button_counter;
                         let count = btns.len();
@@ -786,6 +1050,12 @@ impl InteractiveMarkdownModal {
         self.last_content_h.set(Some(content_h));
 
         let mut field_rects = vec![Rect::default(); self.fields.len()];
+        let mut radio_rects: Vec<Vec<Rect>> = self
+            .radios
+            .iter()
+            .map(|r| vec![Rect::default(); r.spec.options.len()])
+            .collect();
+        let mut checkbox_rects = vec![Rect::default(); self.checkboxes.len()];
         let mut button_rects = vec![Rect::default(); self.buttons.len()];
 
         for (vis_i, vrow) in vrows.iter().skip(eff_scroll).take(content_h).enumerate() {
@@ -884,6 +1154,87 @@ impl InteractiveMarkdownModal {
                         );
                     }
                 }
+                VirtualRow::RadioOptionRow { radio_idx, opt_idx } => {
+                    if let Some(r) = self.radios.get(*radio_idx) {
+                        if let Some(opt) = r.spec.options.get(*opt_idx) {
+                            let is_focused = self.focus == FormFocus::Radio(*radio_idx);
+                            let is_sel = r.selected == *opt_idx;
+                            let glyph = if is_sel { "(●)" } else { "( )" };
+                            let opt_text = substitute_id_placeholders(opt, &self.committed_vars);
+                            let line_str = format!(" {glyph} {opt_text} ");
+                            let clipped: String = line_str.chars().take(avail_w).collect();
+                            let style = if is_focused && is_sel {
+                                styles.highlight.add_modifier(Modifier::BOLD)
+                            } else if is_sel {
+                                styles
+                                    .accent
+                                    .bg(styles.background)
+                                    .add_modifier(Modifier::BOLD)
+                            } else if is_focused {
+                                styles.text.bg(styles.background)
+                            } else {
+                                base_style
+                            };
+                            buf.set_string(left_x, y, &clipped, style);
+                            radio_rects[*radio_idx][*opt_idx] =
+                                Rect::new(left_x, y, clipped.chars().count() as u16, 1);
+                        }
+                    }
+                }
+                VirtualRow::RadioHorizontalRow { radio_idx } => {
+                    if let Some(r) = self.radios.get(*radio_idx) {
+                        let is_focused = self.focus == FormFocus::Radio(*radio_idx);
+                        let mut cur_x = left_x;
+                        let right_bound = inner.x + inner.width.saturating_sub(1);
+                        for (opt_idx, opt) in r.spec.options.iter().enumerate() {
+                            if cur_x >= right_bound {
+                                break;
+                            }
+                            let is_sel = r.selected == opt_idx;
+                            let glyph = if is_sel { "(●)" } else { "( )" };
+                            let opt_text = substitute_id_placeholders(opt, &self.committed_vars);
+                            let item_str = format!(" {glyph} {opt_text} ");
+                            let max_chars = (right_bound - cur_x) as usize;
+                            let clipped: String = item_str.chars().take(max_chars).collect();
+                            let style = if is_focused && is_sel {
+                                styles.highlight.add_modifier(Modifier::BOLD)
+                            } else if is_sel {
+                                styles
+                                    .accent
+                                    .bg(styles.background)
+                                    .add_modifier(Modifier::BOLD)
+                            } else {
+                                base_style
+                            };
+                            let w = clipped.chars().count() as u16;
+                            buf.set_string(cur_x, y, &clipped, style);
+                            radio_rects[*radio_idx][opt_idx] = Rect::new(cur_x, y, w, 1);
+                            cur_x = cur_x.saturating_add(w + 1);
+                        }
+                    }
+                }
+                VirtualRow::CheckboxRow { checkbox_idx } => {
+                    if let Some(cb) = self.checkboxes.get(*checkbox_idx) {
+                        let is_focused = self.focus == FormFocus::Checkbox(*checkbox_idx);
+                        let glyph = if cb.checked { "[x]" } else { "[ ]" };
+                        let lbl = substitute_id_placeholders(&cb.spec.label, &self.committed_vars);
+                        let line_str = format!(" {glyph} {lbl} ");
+                        let clipped: String = line_str.chars().take(avail_w).collect();
+                        let style = if is_focused {
+                            styles.highlight.add_modifier(Modifier::BOLD)
+                        } else if cb.checked {
+                            styles
+                                .accent
+                                .bg(styles.background)
+                                .add_modifier(Modifier::BOLD)
+                        } else {
+                            base_style
+                        };
+                        buf.set_string(left_x, y, &clipped, style);
+                        checkbox_rects[*checkbox_idx] =
+                            Rect::new(left_x, y, clipped.chars().count() as u16, 1);
+                    }
+                }
                 VirtualRow::ButtonRow {
                     start_btn_idx,
                     count,
@@ -923,6 +1274,8 @@ impl InteractiveMarkdownModal {
         }
 
         *self.last_field_rects.borrow_mut() = field_rects;
+        *self.last_radio_rects.borrow_mut() = radio_rects;
+        *self.last_checkbox_rects.borrow_mut() = checkbox_rects;
         *self.last_button_rects.borrow_mut() = button_rects;
 
         // Outer modal scrollbar
@@ -1135,5 +1488,59 @@ Welcome back, {id:guestName}!
             Some("Alice")
         );
         assert_eq!(modal.focus, FormFocus::Button(0));
+    }
+
+    #[test]
+    fn test_radio_and_checkbox_interaction_and_live_refresh() {
+        let md = "\
+Choose an option:
+{radio: rdoValue: \"Example 1\": \"Example 2\": \"Example 3\"}
+{checkbox: enableLogs: \"Enable verbose logging\": false}
+Selected: {id:rdoValue} | Logs: {id:enableLogs}
+{button: type=\"submit\"}
+";
+        let doc = parse_interactive_markdown_doc(md);
+        let mut modal = InteractiveMarkdownModal::from_pages("Choices", doc.pages);
+        assert_eq!(modal.focus, FormFocus::Radio(0));
+        assert_eq!(
+            modal.committed_vars.get("rdoValue").map(String::as_str),
+            Some("Example 1")
+        );
+        assert_eq!(
+            modal.committed_vars.get("enableLogs").map(String::as_str),
+            Some("false")
+        );
+
+        // Move radio selection down -> live refresh to Example 2
+        modal.handle_key_with_modifiers(KeyCode::Down, KeyModifiers::NONE);
+        assert_eq!(
+            modal.committed_vars.get("rdoValue").map(String::as_str),
+            Some("Example 2")
+        );
+
+        // Tab to checkbox and toggle with Space -> live refresh to true
+        modal.handle_key_with_modifiers(KeyCode::Tab, KeyModifiers::NONE);
+        assert_eq!(modal.focus, FormFocus::Checkbox(0));
+        modal.handle_key_with_modifiers(KeyCode::Char(' '), KeyModifiers::NONE);
+        assert_eq!(
+            modal.committed_vars.get("enableLogs").map(String::as_str),
+            Some("true")
+        );
+
+        // Render and verify selected glyphs and live interpolated text appear
+        let area = Rect::new(0, 0, 80, 24);
+        let mut buf = Buffer::empty(area);
+        let styles = ResolvedThemeStyles::default();
+        modal.render(area, &styles, &mut buf);
+        let mut rendered = String::new();
+        for y in 0..area.height {
+            for x in 0..area.width {
+                rendered.push_str(buf[(x, y)].symbol());
+            }
+            rendered.push('\n');
+        }
+        assert!(rendered.contains("(●) Example 2"));
+        assert!(rendered.contains("[x] Enable verbose logging"));
+        assert!(rendered.contains("Selected: Example 2 | Logs: true"));
     }
 }

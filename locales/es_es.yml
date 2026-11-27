@@ -351,7 +351,9 @@ help:
     | {{param}} | Solicita entrada de texto modal (admite title="...", text="...", default="...", masked, raw) |
     | {{message:"TEXT"}} | Diálogo emergente centrado con botón Aceptar (sin título; o title="...":text="...", admite ", ', `) |
     | {{input:default="":id=VAR:width=XX:multiline=false:scrollbar=true}} | Campo de texto integrado en Markdown interactivo (height=5 por defecto en multilínea) |
-    | {{id:VAR}} | Valor interpolado en vivo de {{input:id=VAR}} (se actualiza al pulsar Enter) |
+    | {{radio:VAR:"Option 1":"Option 2"}} | Lista de selección única en Markdown interactivo (admite id=, default=, layout="horizontal") |
+    | {{checkbox:VAR:"Label":false}} | Casilla de verificación booleana en Markdown interactivo (exporta "true"/"false") |
+    | {{id:VAR}} | Valor interpolado en vivo de {{input}}/{{radio}}/{{checkbox}} (se actualiza al instante) |
     | {{button:type="submit"\|"ok"\|"cancel":action="ID"}} | Botón de acción que ejecuta el bloque reservado ```bashmenu-bash:id="ID"``` (opcional text="...") |
     | {{clear}} | Salto de página en Markdown interactivo; la página siguiente se muestra tras Submit/OK |
     | {{file_picker}} | Abre el selector visual de archivos |

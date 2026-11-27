@@ -683,10 +683,23 @@ Pressing \fBEnter\fR (or \fBCtrl+Enter\fR in multiline) soft-refreshes live
 \fB{id:VAR}\fR placeholders; clicking \fB[ OK ]\fR exports every \fBid\fR as a
 Bash variable into \fBbashmenu-bash\fR code blocks.
 .TP
+.B {radio:VAR:"Option 1":"Option 2"}
+Embeds a single-choice radio button group inside an \fBinteractive: true\fR
+Markdown modal. Supports positional shorthand or \fBid="..."\fR,
+\fBdefault="..."\fR, and \fBlayout="vertical"|"horizontal"\fR attributes.
+Changing selection via arrow keys or mouse click updates \fB{id:VAR}\fR live
+and exports the selected option text as \fB$VAR\fR to reserved scripts.
+.TP
+.B {checkbox:VAR:"Label":false}
+Embeds a boolean \fB[x]\fR/\fB[ ]\fR checkbox inside an \fBinteractive: true\fR
+Markdown modal. Supports positional shorthand or \fBid="..."\fR,
+\fBlabel="..."\fR/\fBtext="..."\fR, and \fBdefault=true|false\fR attributes.
+Toggling updates \fB{id:VAR}\fR live and exports \fB"true"\fR or \fB"false"\fR.
+.TP
 .B {id:VAR}
-Displays the live committed value of the matching \fB{input:id=VAR}\fR field in
-an \fBinteractive: true\fR Markdown document, seeded from \fBdefault\fR on load
-and updated on \fBEnter\fR soft-refresh.
+Displays the live committed value of the matching \fB{input}\fR, \fB{radio}\fR,
+or \fB{checkbox}\fR field in an \fBinteractive: true\fR Markdown document (and
+expands to \fB${VAR:-}\fR inside \fBbashmenu-bash\fR code blocks).
 .TP
 .B {button:type="submit"|"ok"|"cancel":action="ID"}
 Renders an interactive action button inside an \fBinteractive: true\fR Markdown
