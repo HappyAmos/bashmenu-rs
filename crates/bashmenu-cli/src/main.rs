@@ -214,6 +214,13 @@ enum ActiveModal {
         std::sync::mpsc::Sender<bashmenu_core::UiRpcResponse>,
         MessageModal,
     ),
+    /// Interactive Markdown form modal with embedded `{input:...}` widgets.
+    InteractiveForm {
+        modal: bashmenu_tui::InteractiveMarkdownModal,
+        frontmatter: bashmenu_core::MarkdownFrontmatter,
+        fallback_title: String,
+        raw_body: String,
+    },
     /// Toggle setting value selection dialog.
     Toggle(String, ToggleModal),
     /// Config value text input dialog.
@@ -252,6 +259,7 @@ impl ActiveModal {
             ActiveModal::Message(m)
             | ActiveModal::ItemMessage(_, m)
             | ActiveModal::RpcMessage(_, m) => m.dialog_dimensions(area),
+            ActiveModal::InteractiveForm { modal: m, .. } => m.dialog_dimensions(area),
             ActiveModal::Toggle(_, m) => m.dialog_dimensions(area),
             ActiveModal::Radio(_, m) => m.dialog_dimensions(area),
             ActiveModal::ItemFilePicker(_, _, m) => m.dialog_dimensions(area),
@@ -916,6 +924,9 @@ fn main() -> Result<()> {
                     ActiveModal::Message(modal)
                     | ActiveModal::ItemMessage(_, modal)
                     | ActiveModal::RpcMessage(_, modal) => {
+                        modal.render(f.area(), &modal_styles, f.buffer_mut());
+                    }
+                    ActiveModal::InteractiveForm { modal, .. } => {
                         modal.render(f.area(), &modal_styles, f.buffer_mut());
                     }
                     ActiveModal::Toggle(_, modal) => {
@@ -1791,6 +1802,63 @@ fn main() -> Result<()> {
                         };
                         let _ = reply_tx.send(resp);
                         active_modal = ActiveModal::None;
+                    }
+                }
+                ActiveModal::InteractiveForm {
+                    modal,
+                    frontmatter,
+                    fallback_title,
+                    raw_body,
+                } => {
+                    let action = match ev {
+                        Event::Key(key) => modal.handle_key_with_modifiers(key.code, key.modifiers),
+                        Event::Mouse(mouse) => modal.handle_mouse(mouse, area),
+                        Event::Paste(text) => {
+                            modal.paste(text.as_str());
+                            None
+                        }
+                        _ => None,
+                    };
+                    if let Some(act) = action {
+                        match act {
+                            bashmenu_tui::InteractiveFormAction::Submit(vars) => {
+                                let fm = frontmatter.clone();
+                                let fb_title = fallback_title.clone();
+                                let body_src = raw_body.clone();
+                                active_modal = ActiveModal::None;
+                                let has_scripts =
+                                    bashmenu_core::parse_interactive_markdown(&body_src)
+                                        .iter()
+                                        .any(|s| {
+                                            matches!(
+                                                s,
+                                                bashmenu_core::MarkdownSegment::Script { .. }
+                                            )
+                                        });
+                                if has_scripts {
+                                    match ui_rpc::spawn_interactive_markdown(
+                                        fm,
+                                        fb_title,
+                                        body_src,
+                                        ui_rpc::current_bashmenu_exe(),
+                                        vars,
+                                    ) {
+                                        Ok(session) => {
+                                            active_interactive_md = Some(session);
+                                        }
+                                        Err(err) => {
+                                            active_modal = ActiveModal::Message(MessageModal::new(
+                                                "Interactive Markdown Error",
+                                                err.to_string(),
+                                            ));
+                                        }
+                                    }
+                                }
+                            }
+                            bashmenu_tui::InteractiveFormAction::Cancel => {
+                                active_modal = ActiveModal::None;
+                            }
+                        }
                     }
                 }
                 ActiveModal::Toggle(key_path, modal) => {
@@ -2833,20 +2901,68 @@ fn main() -> Result<()> {
                                     None
                                 };
                                 if let Some((fm, fallback_title, body)) = interactive_launch {
-                                    match ui_rpc::spawn_interactive_markdown(
-                                        fm,
-                                        fallback_title,
-                                        body,
-                                        ui_rpc::current_bashmenu_exe(),
-                                    ) {
-                                        Ok(session) => {
-                                            active_interactive_md = Some(session);
-                                        }
-                                        Err(err) => {
-                                            active_modal = ActiveModal::Message(MessageModal::new(
-                                                "Interactive Markdown Error",
-                                                err.to_string(),
-                                            ));
+                                    if bashmenu_core::has_markdown_form_inputs(&body) {
+                                        let safe_ctx = ctx.clone().with_allow_command_macros(false);
+                                        let form_title = fm
+                                            .title
+                                            .as_deref()
+                                            .map(|t| interpolate_placeholders(t, &safe_ctx))
+                                            .unwrap_or_else(|| fallback_title.clone());
+                                        let form_blocks =
+                                            bashmenu_core::parse_markdown_form_blocks(&body)
+                                                .into_iter()
+                                                .map(|b| match b {
+                                                    bashmenu_core::MarkdownFormBlock::Text(t) => {
+                                                        bashmenu_core::MarkdownFormBlock::Text(
+                                                            interpolate_placeholders(&t, &safe_ctx),
+                                                        )
+                                                    }
+                                                    bashmenu_core::MarkdownFormBlock::Input(
+                                                        mut spec,
+                                                    ) => {
+                                                        if spec.default_value.contains('{') {
+                                                            spec.default_value =
+                                                                interpolate_placeholders(
+                                                                    &spec.default_value,
+                                                                    &safe_ctx,
+                                                                );
+                                                        }
+                                                        bashmenu_core::MarkdownFormBlock::Input(
+                                                            spec,
+                                                        )
+                                                    }
+                                                })
+                                                .collect();
+                                        let form_modal =
+                                            bashmenu_tui::InteractiveMarkdownModal::new(
+                                                form_title,
+                                                form_blocks,
+                                            )
+                                            .with_dimensions(fm.width, fm.height);
+                                        active_modal = ActiveModal::InteractiveForm {
+                                            modal: form_modal,
+                                            frontmatter: fm,
+                                            fallback_title,
+                                            raw_body: body,
+                                        };
+                                    } else {
+                                        match ui_rpc::spawn_interactive_markdown(
+                                            fm,
+                                            fallback_title,
+                                            body,
+                                            ui_rpc::current_bashmenu_exe(),
+                                            std::collections::HashMap::new(),
+                                        ) {
+                                            Ok(session) => {
+                                                active_interactive_md = Some(session);
+                                            }
+                                            Err(err) => {
+                                                active_modal =
+                                                    ActiveModal::Message(MessageModal::new(
+                                                        "Interactive Markdown Error",
+                                                        err.to_string(),
+                                                    ));
+                                            }
                                         }
                                     }
                                 } else {

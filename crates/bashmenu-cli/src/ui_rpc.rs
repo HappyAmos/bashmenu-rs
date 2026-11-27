@@ -2,9 +2,10 @@
 //! script runner for `interactive: true` Markdown documents (`bashmenu-bash`).
 
 use bashmenu_core::{
-    parse_interactive_markdown, transpile_bashmenu_bash, MarkdownFrontmatter, MarkdownSegment,
-    UiRpcRequest, UiRpcResponse, UI_RPC_SOCKET_ENV,
+    is_valid_bash_identifier, parse_interactive_markdown, transpile_bashmenu_bash,
+    MarkdownFrontmatter, MarkdownSegment, UiRpcRequest, UiRpcResponse, UI_RPC_SOCKET_ENV,
 };
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 
@@ -168,6 +169,7 @@ pub fn spawn_interactive_markdown(
     fallback_title: String,
     raw_body: String,
     self_bin: PathBuf,
+    initial_vars: HashMap<String, String>,
 ) -> std::io::Result<InteractiveMdSession> {
     use std::io::{BufRead, BufReader, Write};
     use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
@@ -264,10 +266,14 @@ pub fn spawn_interactive_markdown(
                                 f.flush()
                             });
                         if write_res.is_ok() {
-                            let out = std::process::Command::new("/bin/bash")
-                                .arg(&script_path)
-                                .env(UI_RPC_SOCKET_ENV, &sock_path)
-                                .output();
+                            let mut cmd = std::process::Command::new("/bin/bash");
+                            cmd.arg(&script_path).env(UI_RPC_SOCKET_ENV, &sock_path);
+                            for (k, v) in &initial_vars {
+                                if is_valid_bash_identifier(k) {
+                                    cmd.env(k, v);
+                                }
+                            }
+                            let out = cmd.output();
                             let _ = std::fs::remove_file(&script_path);
                             if let Ok(output) = out {
                                 let stdout = String::from_utf8_lossy(&output.stdout);
@@ -311,6 +317,7 @@ pub fn spawn_interactive_markdown(
     fallback_title: String,
     raw_body: String,
     _self_bin: PathBuf,
+    _initial_vars: HashMap<String, String>,
 ) -> std::io::Result<InteractiveMdSession> {
     let (_rpc_tx, rpc_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();

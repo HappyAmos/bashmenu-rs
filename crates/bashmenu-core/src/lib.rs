@@ -30,8 +30,10 @@ pub use i18n::{
     set_locale, translate, translate_with, LocaleCatalog, LocaleInfo, DEFAULT_EN_US_YAML,
 };
 pub use interactive_md::{
-    parse_interactive_markdown, transpile_bashmenu_bash, MarkdownSegment, UiRpcRequest,
-    UiRpcResponse, UI_RPC_SOCKET_ENV,
+    find_input_macro_span, has_markdown_form_inputs, is_valid_bash_identifier,
+    parse_interactive_markdown, parse_markdown_form_blocks, transpile_bashmenu_bash,
+    InputFieldSpec, MarkdownFormBlock, MarkdownSegment, UiRpcRequest, UiRpcResponse,
+    UI_RPC_SOCKET_ENV,
 };
 pub use macro_engine::{
     apply_dir_picker_macros, apply_dir_picker_macros_raw, apply_file_picker_macros,

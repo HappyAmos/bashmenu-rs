@@ -10,6 +10,47 @@ use std::path::Path;
 /// Environment variable carrying the Unix domain socket path for live UI-RPC.
 pub const UI_RPC_SOCKET_ENV: &str = "BASHMENU_IPC_SOCK";
 
+/// Specification for an embedded `{input:...}` form widget inside an
+/// interactive Markdown document.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InputFieldSpec {
+    /// Bash variable name assigned the field value on form submission (`id=...`).
+    pub id: String,
+    /// Pre-populated default text (`default="..."`, default `""`).
+    pub default_value: String,
+    /// Optional fixed column width (`width=XX`); `None` fills between margins.
+    pub width: Option<u16>,
+    /// Multi-line text area (`multiline=true`) vs single-line (`false`, default).
+    pub multiline: bool,
+    /// Show scrollbar when `multiline` is true (`scrollbar=true` by default;
+    /// ignored when `multiline` is false).
+    pub scrollbar: bool,
+    /// Visible row height when `multiline` is true (`height=N`, default `5`).
+    pub height: u16,
+}
+
+impl Default for InputFieldSpec {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            default_value: String::new(),
+            width: None,
+            multiline: false,
+            scrollbar: true,
+            height: 5,
+        }
+    }
+}
+
+/// A rendered element inside an interactive Markdown form document.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MarkdownFormBlock {
+    /// Standard static Markdown text.
+    Text(String),
+    /// Embedded interactive `{input:...}` widget.
+    Input(InputFieldSpec),
+}
+
 /// A segment of an interactive Markdown document.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MarkdownSegment {
@@ -127,6 +168,229 @@ pub fn parse_interactive_markdown(body: &str) -> Vec<MarkdownSegment> {
     }
 
     segments
+}
+
+/// Returns true if `name` is a valid POSIX/Bash variable identifier
+/// (`^[a-zA-Z_][a-zA-Z0-9_]*$`).
+pub fn is_valid_bash_identifier(name: &str) -> bool {
+    let mut bytes = name.bytes();
+    let Some(first) = bytes.next() else {
+        return false;
+    };
+    if !(first.is_ascii_alphabetic() || first == b'_') {
+        return false;
+    }
+    bytes.all(|b| b.is_ascii_alphanumeric() || b == b'_')
+}
+
+/// Parses a single quoted (`"`, `'`, `` ` ``) value from the start of `s`.
+fn parse_input_quoted_value(s: &str) -> Option<(String, &str)> {
+    let mut chars = s.char_indices();
+    let (_, delim) = chars.next()?;
+    if !matches!(delim, '"' | '\'' | '`') {
+        return None;
+    }
+    let mut out = String::new();
+    while let Some((off, ch)) = chars.next() {
+        if ch == '\\' {
+            if let Some((_, next_ch)) = chars.next() {
+                match next_ch {
+                    'n' => out.push('\n'),
+                    't' => out.push('\t'),
+                    '\\' => out.push('\\'),
+                    c if c == delim => out.push(c),
+                    other => {
+                        out.push('\\');
+                        out.push(other);
+                    }
+                }
+            } else {
+                out.push('\\');
+            }
+            continue;
+        }
+        if ch == delim {
+            return Some((out, &s[off + ch.len_utf8()..]));
+        }
+        out.push(ch);
+    }
+    None
+}
+
+/// Parses colon-separated `key = value` pairs inside `{input:...}`.
+fn parse_input_macro_fields(inner: &str) -> InputFieldSpec {
+    let mut spec = InputFieldSpec::default();
+    let mut rest = inner.trim();
+
+    while !rest.is_empty() {
+        rest = rest.trim_start();
+        if let Some(stripped) = rest.strip_prefix(':') {
+            rest = stripped.trim_start();
+            continue;
+        }
+        if rest.is_empty() {
+            break;
+        }
+
+        let mut matched_key: Option<(&str, &str)> = None;
+        for key in ["default", "id", "width", "multiline", "scrollbar", "height"] {
+            if let Some(after) = rest.strip_prefix(key) {
+                let after_ws = after.trim_start();
+                if after_ws.is_empty() || after_ws.starts_with('=') || after_ws.starts_with(':') {
+                    matched_key = Some((key, after_ws));
+                    break;
+                }
+            }
+        }
+
+        let Some((key, after_key)) = matched_key else {
+            // Skip unknown token up to next `:`
+            if let Some(colon) = rest.find(':') {
+                rest = &rest[colon + 1..];
+            } else {
+                break;
+            }
+            continue;
+        };
+
+        if let Some(after_eq) = after_key.strip_prefix('=') {
+            let val_start = after_eq.trim_start();
+            let (val, next_rest) = if let Some((qval, rem)) = parse_input_quoted_value(val_start) {
+                (qval, rem)
+            } else {
+                let mut depth = 0usize;
+                let mut end_off = val_start.len();
+                for (off, ch) in val_start.char_indices() {
+                    match ch {
+                        '{' => depth += 1,
+                        '}' => depth = depth.saturating_sub(1),
+                        ':' if depth == 0 => {
+                            end_off = off;
+                            break;
+                        }
+                        _ => {}
+                    }
+                }
+                (
+                    val_start[..end_off].trim().replace("\\n", "\n"),
+                    &val_start[end_off..],
+                )
+            };
+
+            match key {
+                "default" => spec.default_value = val,
+                "id" => spec.id = val.trim().to_string(),
+                "width" => {
+                    if let Ok(w) = val.trim().parse::<u16>() {
+                        if w > 0 {
+                            spec.width = Some(w);
+                        }
+                    }
+                }
+                "multiline" => {
+                    spec.multiline = val.eq_ignore_ascii_case("true") || val == "1";
+                }
+                "scrollbar" => {
+                    spec.scrollbar = !val.eq_ignore_ascii_case("false") && val != "0";
+                }
+                "height" => {
+                    if let Ok(h) = val.trim().parse::<u16>() {
+                        if h > 0 {
+                            spec.height = h.clamp(1, 50);
+                        }
+                    }
+                }
+                _ => {}
+            }
+
+            rest = next_rest.trim_start();
+            if let Some(stripped) = rest.strip_prefix(':') {
+                rest = stripped;
+            }
+        } else {
+            match key {
+                "multiline" => spec.multiline = true,
+                "scrollbar" => spec.scrollbar = true,
+                _ => {}
+            }
+            rest = after_key.trim_start();
+            if let Some(stripped) = rest.strip_prefix(':') {
+                rest = stripped;
+            }
+        }
+    }
+
+    spec
+}
+
+/// Finds the byte bounds and parsed [`InputFieldSpec`] of the first `{input:...}`
+/// (or `{input}`) macro in `text`, skipping double-brace escaped `{{input...}}`.
+pub fn find_input_macro_span(text: &str) -> Option<(usize, usize, InputFieldSpec)> {
+    const PREFIX: &str = "{input";
+    let bytes = text.as_bytes();
+    let mut search_from = 0usize;
+
+    while let Some(rel) = text[search_from..].find(PREFIX) {
+        let start = search_from + rel;
+        if start > 0 && bytes[start - 1] == b'{' {
+            search_from = start + PREFIX.len();
+            continue;
+        }
+        let after = &text[start + PREFIX.len()..];
+        if let Some(first_ch) = after.chars().next() {
+            if first_ch == '}' || first_ch == ':' {
+                if let Some(end) = scan_balanced_macro_end(text, start) {
+                    let inner = if first_ch == ':' {
+                        &text[start + PREFIX.len() + 1..end - 1]
+                    } else {
+                        ""
+                    };
+                    return Some((start, end, parse_input_macro_fields(inner)));
+                }
+            }
+        }
+        search_from = start + PREFIX.len();
+    }
+
+    None
+}
+
+/// Parses a Markdown document body (ignoring `bashmenu-<lang>` script blocks)
+/// into ordered [`MarkdownFormBlock`]s of static text and `{input:...}` widgets.
+pub fn parse_markdown_form_blocks(body: &str) -> Vec<MarkdownFormBlock> {
+    let mut blocks: Vec<MarkdownFormBlock> = Vec::new();
+    for seg in parse_interactive_markdown(body) {
+        if let MarkdownSegment::Markdown(md_chunk) = seg {
+            let mut cursor = 0usize;
+            while cursor < md_chunk.len() {
+                if let Some((rel_start, rel_end, spec)) = find_input_macro_span(&md_chunk[cursor..])
+                {
+                    let start = cursor + rel_start;
+                    let end = cursor + rel_end;
+                    let before = md_chunk[cursor..start].trim_matches(['\r', '\n']);
+                    if !before.trim().is_empty() {
+                        blocks.push(MarkdownFormBlock::Text(before.to_string()));
+                    }
+                    blocks.push(MarkdownFormBlock::Input(spec));
+                    cursor = end;
+                } else {
+                    let tail = md_chunk[cursor..].trim_matches(['\r', '\n']);
+                    if !tail.trim().is_empty() {
+                        blocks.push(MarkdownFormBlock::Text(tail.to_string()));
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    blocks
+}
+
+/// Returns true if the Markdown body contains at least one embedded `{input...}` widget.
+pub fn has_markdown_form_inputs(body: &str) -> bool {
+    parse_markdown_form_blocks(body)
+        .iter()
+        .any(|b| matches!(b, MarkdownFormBlock::Input(_)))
 }
 
 /// Escapes `s` for inclusion inside a Bash double-quoted string while keeping
@@ -310,5 +574,36 @@ done
             out.contains("GUESS=\"$(__bm_param \"\" \"Guess a number (q to quit):\" \"\" \"0\")\"")
         );
         assert!(out.contains("*) __bm_message \"\" \"You entered $GUESS\" ;;"));
+    }
+
+    #[test]
+    fn test_parse_input_macro_defaults_and_options() {
+        let (_, _, full) = find_input_macro_span(
+            r#"{input: default="hello" : id = bashVariableName : width=40 : multiline=true : scrollbar=false : height=8}"#,
+        )
+        .expect("parse full input");
+        assert_eq!(full.default_value, "hello");
+        assert_eq!(full.id, "bashVariableName");
+        assert_eq!(full.width, Some(40));
+        assert!(full.multiline);
+        assert!(!full.scrollbar);
+        assert_eq!(full.height, 8);
+
+        // Verify defaults: default="", width=None, multiline=false, scrollbar=true, height=5
+        let (_, _, minimal) =
+            find_input_macro_span("{input: id = myVar }").expect("parse minimal input");
+        assert_eq!(minimal.id, "myVar");
+        assert_eq!(minimal.default_value, "");
+        assert_eq!(minimal.width, None);
+        assert!(!minimal.multiline);
+        assert!(minimal.scrollbar);
+        assert_eq!(minimal.height, 5);
+
+        // Identifier validation
+        assert!(is_valid_bash_identifier("bashVariableName"));
+        assert!(is_valid_bash_identifier("_var_2"));
+        assert!(!is_valid_bash_identifier("1bad"));
+        assert!(!is_valid_bash_identifier("bad-name"));
+        assert!(!is_valid_bash_identifier(""));
     }
 }
