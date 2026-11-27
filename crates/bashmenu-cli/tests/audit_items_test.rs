@@ -205,7 +205,7 @@ fn test_search_nerd_font_and_emoji_menu_item_streaming() {
         .as_ref()
         .or(resolved.command.as_ref())
         .unwrap();
-    assert!(action.contains("glyphs.sh folder"));
+    assert!(action.contains("glyphs.sh 'folder'"));
 }
 
 #[test]

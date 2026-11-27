@@ -335,6 +335,7 @@ impl ShortcutEntry {
             on_no: None,
             submenu: None,
             extra,
+            ..Default::default()
         }
     }
 

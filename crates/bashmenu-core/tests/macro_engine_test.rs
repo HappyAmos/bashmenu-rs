@@ -341,50 +341,62 @@ fn test_file_and_dir_picker_macros_and_modifiers() {
         PathBuf::from("/home/testuser/.config/bashmenu/scripts")
     );
 
-    // 2. Apply file_picker modifiers
+    // 2. Apply file_picker modifiers (POSIX shell-quoted by default, :raw opt-in)
     let chosen_file = Path::new("/tmp/photos/vacation.png");
     assert_eq!(
         apply_file_picker_macros("open {file_picker}", chosen_file, Some(&ctx)),
+        "open '/tmp/photos/vacation.png'"
+    );
+    assert_eq!(
+        apply_file_picker_macros("open {file_picker:raw}", chosen_file, Some(&ctx)),
         "open /tmp/photos/vacation.png"
     );
     assert_eq!(
         apply_file_picker_macros("stem={file_picker:stem}", chosen_file, Some(&ctx)),
-        "stem=/tmp/photos/vacation"
+        "stem='/tmp/photos/vacation'"
     );
     assert_eq!(
         apply_file_picker_macros("name={file_picker:name}", chosen_file, Some(&ctx)),
-        "name=vacation.png"
+        "name='vacation.png'"
     );
     assert_eq!(
         apply_file_picker_macros("base={file_picker:base}", chosen_file, Some(&ctx)),
-        "base=vacation"
+        "base='vacation'"
     );
     assert_eq!(
         apply_file_picker_macros("dir={file_picker:dir}", chosen_file, Some(&ctx)),
-        "dir=/tmp/photos"
+        "dir='/tmp/photos'"
     );
     assert_eq!(
         apply_file_picker_macros("ext={file_picker:ext}", chosen_file, Some(&ctx)),
-        "ext=.png"
+        "ext='.png'"
     );
 
-    // 3. Apply dir_picker modifiers
+    // 3. Apply dir_picker modifiers (POSIX shell-quoted by default, :raw opt-in)
     let chosen_dir = Path::new("/home/testuser/github/bashmenu-rs");
     assert_eq!(
         apply_dir_picker_macros("cd {dir_picker_new} && opencode", chosen_dir, Some(&ctx)),
+        "cd '/home/testuser/github/bashmenu-rs' && opencode"
+    );
+    assert_eq!(
+        apply_dir_picker_macros(
+            "cd {dir_picker_new:raw} && opencode",
+            chosen_dir,
+            Some(&ctx)
+        ),
         "cd /home/testuser/github/bashmenu-rs && opencode"
     );
     assert_eq!(
         apply_dir_picker_macros("folder={dir_picker:name}", chosen_dir, Some(&ctx)),
-        "folder=bashmenu-rs"
+        "folder='bashmenu-rs'"
     );
     assert_eq!(
         apply_dir_picker_macros("parent={dir_picker:dir}", chosen_dir, Some(&ctx)),
-        "parent=/home/testuser/github"
+        "parent='/home/testuser/github'"
     );
     assert_eq!(
         apply_dir_picker_macros("parent={dir_picker:parent}", chosen_dir, Some(&ctx)),
-        "parent=/home/testuser/github"
+        "parent='/home/testuser/github'"
     );
 
     // 4. MenuItem helper methods
@@ -402,8 +414,127 @@ fn test_file_and_dir_picker_macros_and_modifiers() {
     assert!(item.first_picker_spec(&ctx).is_none());
     assert_eq!(
         item.command.as_deref(),
-        Some("cd /home/testuser/github/bashmenu-rs && opencode")
+        Some("cd '/home/testuser/github/bashmenu-rs' && opencode")
     );
+}
+
+#[test]
+fn test_shell_and_macro_injection_defense_issue_91() {
+    use bashmenu_core::{
+        apply_file_picker_macros, posix_shell_quote, shell_quote_for_context, MenuItem,
+        MenuItemType,
+    };
+    use std::path::PathBuf;
+
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../defaults/bashmenu.yml");
+    let config = load_config(fixture).expect("load config");
+    let mut ctx = MacroContext::new(&config);
+    ctx.home_dir = PathBuf::from("/home/testuser");
+    ctx.bashmenu_dir = PathBuf::from("/home/testuser/.config/bashmenu");
+
+    // 1. POSIX single-quote helper & quote-context preservation
+    assert_eq!(
+        posix_shell_quote("a'b $(id); rm -rf /"),
+        "'a'\\''b $(id); rm -rf /'"
+    );
+    assert_eq!(
+        shell_quote_for_context("echo {param}", 5, "$(id)"),
+        "'$(id)'"
+    );
+    assert_eq!(
+        shell_quote_for_context("echo '{param}'", 6, "it's $(id)"),
+        "it'\\''s $(id)"
+    );
+    assert_eq!(
+        shell_quote_for_context("echo \"hello {param}\"", 12, "$(id)"),
+        "\"'$(id)'\""
+    );
+
+    // 2. {param} shell-escapes metacharacters by default; :raw opts out
+    let mut cmd_item = MenuItem {
+        label: "Ping".to_string(),
+        command: Some("ping -c 1 {param:prompt=Host:} && echo {param:raw}".to_string()),
+        ..Default::default()
+    };
+    cmd_item.apply_param_placeholder("127.0.0.1; touch /tmp/pwned");
+    assert_eq!(
+        cmd_item.command.as_deref(),
+        Some("ping -c 1 '127.0.0.1; touch /tmp/pwned' && echo 127.0.0.1; touch /tmp/pwned")
+    );
+
+    // 3. Self-referential {param} input must not infinite-loop
+    let mut loop_item = MenuItem {
+        label: "Echo".to_string(),
+        command: Some("echo {param}".to_string()),
+        ..Default::default()
+    };
+    loop_item.apply_param_placeholder("{param}");
+    assert_eq!(loop_item.command.as_deref(), Some("echo '{param}'"));
+
+    // 4. Editor items and `file` fields stay unquoted (passed via Command::arg, not bash -c)
+    let mut editor_item = MenuItem {
+        label: "Edit".to_string(),
+        r#type: MenuItemType::Editor,
+        file: Some("{file_picker_new}".to_string()),
+        action: Some("{file_picker_new}".to_string()),
+        ..Default::default()
+    };
+    let tricky_file = Path::new("/tmp/my file $(id)'s.txt");
+    editor_item.apply_picker_result(tricky_file, false, Some(&ctx));
+    assert_eq!(
+        editor_item.file.as_deref(),
+        Some("/tmp/my file $(id)'s.txt")
+    );
+    assert_eq!(
+        editor_item.action.as_deref(),
+        Some("/tmp/my file $(id)'s.txt")
+    );
+
+    // 5. Double-quoted picker template (e.g. convert "{file_picker:stem}.pixel.png")
+    //    evaluates safely in /bin/bash -c without executing $(...) in filename
+    let tricky_img = Path::new("/tmp/$(echo PWNED)/a'b\"c.jpg");
+    let convert_cmd = apply_file_picker_macros(
+        "printf '%s' \"{file_picker:stem}.pixel.png\"",
+        tricky_img,
+        Some(&ctx),
+    );
+    assert!(convert_cmd.contains("'/tmp/$(echo PWNED)/a'\\''b\"c'"));
+    #[cfg(unix)]
+    {
+        let out = std::process::Command::new("/bin/bash")
+            .arg("-c")
+            .arg(&convert_cmd)
+            .output()
+            .expect("run bash -c");
+        assert!(out.status.success());
+        assert_eq!(
+            String::from_utf8_lossy(&out.stdout),
+            "/tmp/$(echo PWNED)/a'b\"c.pixel.png"
+        );
+    }
+
+    // 6. Recursive macro injection defense: template macros interpolate BEFORE
+    //    user input is applied, so {command:...} and {toast:...} in user input
+    //    are never evaluated.
+    let mut macro_item = MenuItem {
+        label: "Run".to_string(),
+        command: Some("{toast:2:\"Running\"}{scripts_dir}/tool.sh {param}".to_string()),
+        ..Default::default()
+    };
+    macro_item.interpolate_template_macros(&ctx);
+    assert!(macro_item.macros_interpolated);
+    assert_eq!(macro_item.pending_toasts.len(), 1);
+    assert_eq!(macro_item.pending_toasts[0].message, "Running");
+    macro_item.apply_param_placeholder("{command:echo PWNED}{toast:5:\"Fake\"}");
+    let expected = format!(
+        "{}/scripts/tool.sh '{{command:echo PWNED}}{{toast:5:\"Fake\"}}'",
+        ctx.bashmenu_dir.display()
+    );
+    assert_eq!(macro_item.command.as_deref(), Some(expected.as_str()));
+    // Idempotent second call must NOT evaluate {command:...} from user input
+    macro_item.interpolate_template_macros(&ctx);
+    assert_eq!(macro_item.command.as_deref(), Some(expected.as_str()));
+    assert_eq!(macro_item.pending_toasts.len(), 1);
 }
 
 #[test]

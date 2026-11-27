@@ -1003,11 +1003,12 @@ Menu items can trigger non-blocking, self-dismissing toast notifications rendere
 
 ### 6.1 Dynamic Input Directives
 Dynamic input directives trigger modal dialogs when selected,
-substituting the placeholder in the action string prior to execution:
+substituting the placeholder in the action string prior to execution.
+When targeting shell commands, substituted values are **POSIX single-quote escaped by default** to prevent shell injection (append `:raw` such as `{param:raw}` or `{file_picker:raw}` only when unquoted expansion is intentionally desired). Non-shell targets such as `type: editor` file paths are passed unquoted directly to the editor binary.
 
 | Directive | Description | Supported Attributes |
 | :--- | :--- | :--- |
-| `{param}` | Prompts for a single-line parameter value using a text modal. | `title` (modal header), `prompt` (body text), `masked` (mask input with asterisks) |
+| `{param}` | Prompts for a single-line parameter value using a text modal. | `title` (modal header), `prompt` (body text), `masked` (mask input with asterisks), `:raw` (opt out of shell quoting) |
 | `{file_picker}` | Launches a visual file chooser dialog. | `title`, `start_dir` |
 | `{file_picker:path:<dir>}` | Launches file chooser defaulting to specified starting directory. | `title`, `start_dir` |
 | `{file_picker_new}` / `{file_picker:new}` | Launches a visual file chooser dialog that permits creating **new files** (by pressing `n` or `N`). | `title`, `start_dir` |

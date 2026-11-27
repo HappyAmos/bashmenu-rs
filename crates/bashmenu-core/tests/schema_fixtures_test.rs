@@ -303,8 +303,8 @@ fn test_menu_item_param_placeholder_and_masked() {
 
     item.apply_param_placeholder("cargo");
     assert!(!item.has_param_placeholder());
-    assert_eq!(item.action.as_deref(), Some("which cargo"));
-    assert_eq!(item.command.as_deref(), Some("which cargo"));
+    assert_eq!(item.action.as_deref(), Some("which 'cargo'"));
+    assert_eq!(item.command.as_deref(), Some("which 'cargo'"));
 }
 
 #[test]
@@ -336,7 +336,7 @@ fn test_parse_production_shortcuts_yml_and_inline_param() {
     assert_eq!(ping_item.param_modal_prompt(), "Enter Host or IP:");
     ping_item.apply_param_placeholder("1.1.1.1");
     assert!(!ping_item.has_param_placeholder());
-    assert_eq!(ping_item.action.as_deref(), Some("ping -c 4 1.1.1.1"));
+    assert_eq!(ping_item.action.as_deref(), Some("ping -c 4 '1.1.1.1'"));
 
     // Roundtrip save preserves SHORTCUTS_HEADER
     let tmp = std::env::temp_dir().join("test_shortcuts_roundtrip.yml");

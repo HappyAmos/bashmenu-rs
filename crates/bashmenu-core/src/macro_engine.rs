@@ -1271,14 +1271,78 @@ fn expand_tilde_path(raw: &str, home_dir: &Path) -> PathBuf {
     }
 }
 
+/// Escapes `value` as a single POSIX shell argument using single quotes.
+///
+/// Embedded single quotes are replaced with `'\''`, preventing command
+/// substitution (`$(...)`, backticks), variable expansion, word splitting,
+/// and globbing when passed to `/bin/bash -c`.
+pub fn posix_shell_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\\''"))
+}
+
+/// POSIX shell quoting state at a byte offset within a command template.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ShellQuoteState {
+    Unquoted,
+    SingleQuoted,
+    DoubleQuoted,
+}
+
+/// Determines the active POSIX shell quote state at `token_start` in `template`.
+fn shell_quote_state_at(template: &str, token_start: usize) -> ShellQuoteState {
+    let prefix = &template[..token_start.min(template.len())];
+    let mut state = ShellQuoteState::Unquoted;
+    let mut chars = prefix.chars();
+    while let Some(ch) = chars.next() {
+        match state {
+            ShellQuoteState::Unquoted => match ch {
+                '\\' => {
+                    let _ = chars.next();
+                }
+                '\'' => state = ShellQuoteState::SingleQuoted,
+                '"' => state = ShellQuoteState::DoubleQuoted,
+                _ => {}
+            },
+            ShellQuoteState::SingleQuoted => {
+                if ch == '\'' {
+                    state = ShellQuoteState::Unquoted;
+                }
+            }
+            ShellQuoteState::DoubleQuoted => match ch {
+                '\\' => {
+                    let _ = chars.next();
+                }
+                '"' => state = ShellQuoteState::Unquoted,
+                _ => {}
+            },
+        }
+    }
+    state
+}
+
+/// Escapes `value` safely for POSIX shell substitution at `token_start`.
+///
+/// Preserves the surrounding quote state after the token:
+/// - Unquoted: `'value'`
+/// - Inside `'...'`: escapes internal `'` as `'\''`
+/// - Inside `"..."`: closes `"`, emits `'value'`, and reopens `"`
+pub fn shell_quote_for_context(template: &str, token_start: usize, value: &str) -> String {
+    match shell_quote_state_at(template, token_start) {
+        ShellQuoteState::Unquoted => posix_shell_quote(value),
+        ShellQuoteState::SingleQuoted => value.replace('\'', "'\\''"),
+        ShellQuoteState::DoubleQuoted => format!("\"{}\"", posix_shell_quote(value)),
+    }
+}
+
 /// Parses a picker macro type and optional colon-delimited specification into
-/// `(is_new, modifier, start_dir_string)`.
-pub fn parse_picker_macro(
+/// `(is_new, is_raw, modifier, start_dir_string)`.
+fn parse_picker_macro_flags(
     macro_type: &str,
     spec: Option<&str>,
     ctx: Option<&MacroContext>,
-) -> (bool, Option<String>, Option<String>) {
+) -> (bool, bool, Option<String>, Option<String>) {
     let mut is_new = macro_type.ends_with("_new");
+    let mut is_raw = false;
     let mut modifier = None;
     let mut start_dir = None;
 
@@ -1296,6 +1360,10 @@ pub fn parse_picker_macro(
         let mut tokens: Vec<&str> = resolved_spec.split(':').collect();
         if let Some(pos) = tokens.iter().position(|&t| t == "new") {
             is_new = true;
+            tokens.remove(pos);
+        }
+        if let Some(pos) = tokens.iter().position(|&t| t == "raw") {
+            is_raw = true;
             tokens.remove(pos);
         }
 
@@ -1316,6 +1384,17 @@ pub fn parse_picker_macro(
         }
     }
 
+    (is_new, is_raw, modifier, start_dir)
+}
+
+/// Parses a picker macro type and optional colon-delimited specification into
+/// `(is_new, modifier, start_dir_string)`.
+pub fn parse_picker_macro(
+    macro_type: &str,
+    spec: Option<&str>,
+    ctx: Option<&MacroContext>,
+) -> (bool, Option<String>, Option<String>) {
+    let (is_new, _, modifier, start_dir) = parse_picker_macro_flags(macro_type, spec, ctx);
     (is_new, modifier, start_dir)
 }
 
@@ -1373,12 +1452,35 @@ pub fn extract_picker_spec(
     })
 }
 
-/// Substitutes `{file_picker...}` macros and their modifiers (`:stem`, `:name`, `:base`, `:dir`, `:ext`, `:path:`)
-/// with the chosen file path.
+/// Substitutes `{file_picker...}` macros and their modifiers (`:stem`, `:name`,
+/// `:base`, `:dir`, `:ext`, `:path:`, `:raw`) with the chosen file path.
+///
+/// Substitutions are POSIX shell-quoted by default unless `:raw` is specified.
 pub fn apply_file_picker_macros(
     template_str: &str,
     chosen_path: &Path,
     ctx: Option<&MacroContext>,
+) -> String {
+    apply_file_picker_macros_inner(template_str, chosen_path, ctx, true)
+}
+
+/// Substitutes `{file_picker...}` macros without POSIX shell quoting.
+///
+/// Use for non-shell targets such as editor file paths passed directly via
+/// `Command::arg`.
+pub fn apply_file_picker_macros_raw(
+    template_str: &str,
+    chosen_path: &Path,
+    ctx: Option<&MacroContext>,
+) -> String {
+    apply_file_picker_macros_inner(template_str, chosen_path, ctx, false)
+}
+
+fn apply_file_picker_macros_inner(
+    template_str: &str,
+    chosen_path: &Path,
+    ctx: Option<&MacroContext>,
+    shell_quote: bool,
 ) -> String {
     if !template_str.contains("{file_picker") {
         return template_str.to_string();
@@ -1412,12 +1514,13 @@ pub fn apply_file_picker_macros(
         .unwrap_or_default();
 
     let mut res = template_str.to_string();
+    let mut search_from = 0usize;
 
     // Avoid duplicating a preceding directory prefix when the macro has no modifier
     if let Some(caps) = FILE_PICKER_MACRO_RE.captures(&res) {
         if let (Some(full), Some(m_type)) = (caps.get(0), caps.get(1)) {
-            let (_, modifier, _) =
-                parse_picker_macro(m_type.as_str(), caps.get(2).map(|m| m.as_str()), ctx);
+            let (_, is_raw, modifier, _) =
+                parse_picker_macro_flags(m_type.as_str(), caps.get(2).map(|m| m.as_str()), ctx);
             if modifier.is_none() {
                 let preceding = &res[..full.start()];
                 let dir_cap = PRECEDING_QUOTED_DIR_RE
@@ -1441,12 +1544,15 @@ pub fn apply_file_picker_macros(
                         if (!cand_clean.is_empty() && cand_clean == parent_clean)
                             || cand_path.is_dir()
                         {
-                            res = format!(
-                                "{}{}{}",
-                                &res[..dir_match.start()],
-                                fpath,
-                                &res[full.end()..]
-                            );
+                            let replacement = if shell_quote && !is_raw {
+                                shell_quote_for_context(&res, dir_match.start(), &fpath)
+                            } else {
+                                fpath.clone()
+                            };
+                            let start = dir_match.start();
+                            let end = full.end();
+                            res.replace_range(start..end, &replacement);
+                            search_from = start + replacement.len();
                         }
                     }
                 }
@@ -1454,29 +1560,62 @@ pub fn apply_file_picker_macros(
         }
     }
 
-    FILE_PICKER_MACRO_RE
-        .replace_all(&res, |caps: &Captures| {
-            let m_type = &caps[1];
-            let spec_opt = caps.get(2).map(|m| m.as_str());
-            let (_, modifier, _) = parse_picker_macro(m_type, spec_opt, ctx);
-            match modifier.as_deref() {
-                Some("stem") => p_stem.clone(),
-                Some("name") => p_name.clone(),
-                Some("base") => p_base.clone(),
-                Some("dir") => p_dir.clone(),
-                Some("ext") => p_ext.clone(),
-                _ => fpath.clone(),
-            }
-        })
-        .into_owned()
+    while let Some(caps) = FILE_PICKER_MACRO_RE.captures(&res[search_from..]) {
+        let full = caps.get(0).unwrap();
+        let start = search_from + full.start();
+        let end = search_from + full.end();
+        let m_type = caps[1].to_string();
+        let spec_opt = caps.get(2).map(|m| m.as_str().to_string());
+        let (_, is_raw, modifier, _) = parse_picker_macro_flags(&m_type, spec_opt.as_deref(), ctx);
+        let raw_val = match modifier.as_deref() {
+            Some("stem") => &p_stem,
+            Some("name") => &p_name,
+            Some("base") => &p_base,
+            Some("dir") => &p_dir,
+            Some("ext") => &p_ext,
+            _ => &fpath,
+        };
+        let replacement = if shell_quote && !is_raw {
+            shell_quote_for_context(&res, start, raw_val)
+        } else {
+            raw_val.clone()
+        };
+        res.replace_range(start..end, &replacement);
+        search_from = start + replacement.len();
+    }
+
+    res
 }
 
-/// Substitutes `{dir_picker...}` macros and their modifiers (`:name`, `:dir`, `:parent`, `:path:`)
-/// with the chosen directory path.
+/// Substitutes `{dir_picker...}` macros and their modifiers (`:name`, `:dir`,
+/// `:parent`, `:path:`, `:raw`) with the chosen directory path.
+///
+/// Substitutions are POSIX shell-quoted by default unless `:raw` is specified.
 pub fn apply_dir_picker_macros(
     template_str: &str,
     chosen_path: &Path,
     ctx: Option<&MacroContext>,
+) -> String {
+    apply_dir_picker_macros_inner(template_str, chosen_path, ctx, true)
+}
+
+/// Substitutes `{dir_picker...}` macros without POSIX shell quoting.
+///
+/// Use for non-shell targets such as editor file paths passed directly via
+/// `Command::arg`.
+pub fn apply_dir_picker_macros_raw(
+    template_str: &str,
+    chosen_path: &Path,
+    ctx: Option<&MacroContext>,
+) -> String {
+    apply_dir_picker_macros_inner(template_str, chosen_path, ctx, false)
+}
+
+fn apply_dir_picker_macros_inner(
+    template_str: &str,
+    chosen_path: &Path,
+    ctx: Option<&MacroContext>,
+    shell_quote: bool,
 ) -> String {
     if !template_str.contains("{dir_picker") {
         return template_str.to_string();
@@ -1492,11 +1631,12 @@ pub fn apply_dir_picker_macros(
         .unwrap_or_default();
 
     let mut res = template_str.to_string();
+    let mut search_from = 0usize;
 
     if let Some(caps) = DIR_PICKER_MACRO_RE.captures(&res) {
         if let (Some(full), Some(m_type)) = (caps.get(0), caps.get(1)) {
-            let (_, modifier, _) =
-                parse_picker_macro(m_type.as_str(), caps.get(2).map(|m| m.as_str()), ctx);
+            let (_, is_raw, modifier, _) =
+                parse_picker_macro_flags(m_type.as_str(), caps.get(2).map(|m| m.as_str()), ctx);
             if modifier.is_none() {
                 let preceding = &res[..full.start()];
                 let dir_cap = PRECEDING_QUOTED_DIR_RE
@@ -1520,12 +1660,15 @@ pub fn apply_dir_picker_macros(
                         if (!cand_clean.is_empty() && cand_clean == parent_clean)
                             || cand_path.is_dir()
                         {
-                            res = format!(
-                                "{}{}{}",
-                                &res[..dir_match.start()],
-                                dpath,
-                                &res[full.end()..]
-                            );
+                            let replacement = if shell_quote && !is_raw {
+                                shell_quote_for_context(&res, dir_match.start(), &dpath)
+                            } else {
+                                dpath.clone()
+                            };
+                            let start = dir_match.start();
+                            let end = full.end();
+                            res.replace_range(start..end, &replacement);
+                            search_from = start + replacement.len();
                         }
                     }
                 }
@@ -1533,18 +1676,28 @@ pub fn apply_dir_picker_macros(
         }
     }
 
-    DIR_PICKER_MACRO_RE
-        .replace_all(&res, |caps: &Captures| {
-            let m_type = &caps[1];
-            let spec_opt = caps.get(2).map(|m| m.as_str());
-            let (_, modifier, _) = parse_picker_macro(m_type, spec_opt, ctx);
-            match modifier.as_deref() {
-                Some("name") => p_name.clone(),
-                Some("dir") | Some("parent") => p_dir.clone(),
-                _ => dpath.clone(),
-            }
-        })
-        .into_owned()
+    while let Some(caps) = DIR_PICKER_MACRO_RE.captures(&res[search_from..]) {
+        let full = caps.get(0).unwrap();
+        let start = search_from + full.start();
+        let end = search_from + full.end();
+        let m_type = caps[1].to_string();
+        let spec_opt = caps.get(2).map(|m| m.as_str().to_string());
+        let (_, is_raw, modifier, _) = parse_picker_macro_flags(&m_type, spec_opt.as_deref(), ctx);
+        let raw_val = match modifier.as_deref() {
+            Some("name") => &p_name,
+            Some("dir") | Some("parent") => &p_dir,
+            _ => &dpath,
+        };
+        let replacement = if shell_quote && !is_raw {
+            shell_quote_for_context(&res, start, raw_val)
+        } else {
+            raw_val.clone()
+        };
+        res.replace_range(start..end, &replacement);
+        search_from = start + replacement.len();
+    }
+
+    res
 }
 /// Regular expression matching toast macro directives `{toast:[duration:]"message"}`.
 static TOAST_RE: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
