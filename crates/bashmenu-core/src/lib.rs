@@ -29,12 +29,14 @@ pub use i18n::{
     set_locale, translate, translate_with, LocaleCatalog, LocaleInfo, DEFAULT_EN_US_YAML,
 };
 pub use macro_engine::{
-    apply_dir_picker_macros, apply_file_picker_macros, clear_command_cache, detect_color_mode,
-    detect_tty_mode, evaluate_color_mode, evaluate_tty_mode, extract_info_macro_path,
-    extract_picker_spec, extract_toasts, find_info_macro_span, full_file_location,
-    interpolate_placeholders, parse_markdown_frontmatter, parse_markdown_frontmatter_full,
-    parse_picker_macro, resolve_config_dot_path, resolve_dev_dir, resolve_workspace_version,
-    MacroContext, MarkdownFrontmatter, PickerSpec, ToastNotification, ToastSeverity,
+    apply_dir_picker_macros, apply_dir_picker_macros_raw, apply_file_picker_macros,
+    apply_file_picker_macros_raw, clear_command_cache, detect_color_mode, detect_tty_mode,
+    evaluate_color_mode, evaluate_tty_mode, extract_info_macro_path, extract_picker_spec,
+    extract_toasts, find_info_macro_span, full_file_location, interpolate_placeholders,
+    parse_markdown_frontmatter, parse_markdown_frontmatter_full, parse_picker_macro,
+    posix_shell_quote, resolve_config_dot_path, resolve_dev_dir, resolve_workspace_version,
+    shell_quote_for_context, MacroContext, MarkdownFrontmatter, PickerSpec, ToastNotification,
+    ToastSeverity,
 };
 pub use menu::{
     load_menu, save_menu, ConfirmAction, ConfirmActionDetails, ExecutionMode, MenuItem,

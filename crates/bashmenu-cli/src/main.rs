@@ -1701,7 +1701,13 @@ fn main() -> Result<()> {
                     };
                     if let Some(opt_val) = submitted {
                         if let Some(val) = opt_val {
+                            let mut ctx = make_macro_ctx!(&config);
+                            ctx.window_width = size.width as usize;
+                            ctx.window_height = size.height as usize;
+                            ctx.screen_width = size.width as usize;
+
                             let mut resolved_item = item.clone();
+                            resolved_item.interpolate_template_macros(&ctx);
                             resolved_item.apply_param_placeholder(&val);
                             active_modal = ActiveModal::None;
                             pending_action = Some(MenuAction::Execute(resolved_item));
@@ -1815,6 +1821,7 @@ fn main() -> Result<()> {
                             ctx.screen_width = size.width as usize;
 
                             let mut resolved_item = item.clone();
+                            resolved_item.interpolate_template_macros(&ctx);
                             resolved_item.apply_picker_result(&target_path, *is_dir, Some(&ctx));
                             active_modal = ActiveModal::None;
                             pending_action = Some(MenuAction::Execute(resolved_item));
@@ -2872,7 +2879,11 @@ fn main() -> Result<()> {
                                     .or(item.script.as_ref())
                                     .map(|s| s.as_str())
                                     .unwrap_or_default();
-                                let target = interpolate_placeholders(target_raw, &ctx);
+                                let target = if item.macros_interpolated {
+                                    target_raw.to_string()
+                                } else {
+                                    interpolate_placeholders(target_raw, &ctx)
+                                };
                                 let editor_bin = locate_tool("bashedit");
                                 let trans_enabled = item.transition_enabled();
                                 if trans_enabled {
@@ -3036,14 +3047,22 @@ fn main() -> Result<()> {
                                         .or(item.script.as_deref())
                                         .or(item.command.as_deref())
                                         .unwrap_or_default();
-                                    let (clean, toasts) = extract_toasts(raw_msg, &ctx);
+                                    let (clean, toasts) = if item.macros_interpolated {
+                                        (raw_msg.to_string(), item.pending_toasts.clone())
+                                    } else {
+                                        extract_toasts(raw_msg, &ctx)
+                                    };
                                     for t in toasts {
                                         toast_rack.add(t);
                                     }
                                     if !clean.trim().is_empty() {
                                         let title =
                                             item.title().map(|t| interpolate_placeholders(t, &ctx));
-                                        let interp_msg = interpolate_placeholders(&clean, &ctx);
+                                        let interp_msg = if item.macros_interpolated {
+                                            clean
+                                        } else {
+                                            interpolate_placeholders(&clean, &ctx)
+                                        };
                                         toast_rack.add(ToastNotification::new(
                                             interp_msg, title, timeout,
                                         ));
@@ -3056,12 +3075,20 @@ fn main() -> Result<()> {
                                         .or(item.action.as_deref())
                                         .or(item.script.as_deref());
                                     if let Some(raw_cmd) = cmd_to_run {
-                                        let (clean_cmd, toasts) = extract_toasts(raw_cmd, &ctx);
+                                        let (clean_cmd, toasts) = if item.macros_interpolated {
+                                            (raw_cmd.to_string(), item.pending_toasts.clone())
+                                        } else {
+                                            extract_toasts(raw_cmd, &ctx)
+                                        };
                                         for t in toasts {
                                             toast_rack.add(t);
                                             need_redraw = true;
                                         }
-                                        let final_cmd = interpolate_placeholders(&clean_cmd, &ctx);
+                                        let final_cmd = if item.macros_interpolated {
+                                            clean_cmd.clone()
+                                        } else {
+                                            interpolate_placeholders(&clean_cmd, &ctx)
+                                        };
                                         if !final_cmd.trim().is_empty() {
                                             let requires_root = item
                                                 .extra

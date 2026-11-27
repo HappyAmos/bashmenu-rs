@@ -649,12 +649,17 @@ Shuts down the menu interface completely.
 .SH DYNAMIC DIRECTIVES & SYSTEM PLACEHOLDERS
 .SS Dynamic Input Directives
 These directives prompt the user inside modal dialogs, replacing the placeholder
-with the chosen value prior to action execution.
+with the chosen value prior to action execution. Shell-targeted substitutions
+are POSIX single-quote escaped by default to prevent shell injection; append
+\fB:raw\fR (e.g. \fB{param:raw}\fR or \fB{file_picker:raw}\fR) only when
+unquoted shell expansion is intentionally required. Non-shell targets such as
+\fBtype: editor\fR file paths remain unquoted.
 .TP
 .B {param}
 Prompts for a single-line text value using a modal input box. Supports
-\fBtitle\fR (modal header), \fBprompt\fR (body prompt text), and
-\fBmasked\fR (boolean to mask input with asterisks for secrets/passwords).
+\fBtitle\fR (modal header), \fBprompt\fR (body prompt text),
+\fBmasked\fR (boolean to mask input with asterisks for secrets/passwords), and
+\fB:raw\fR (opt out of POSIX shell quoting).
 .TP
 .B {file_picker}
 Launches a visual file chooser dialog box.
