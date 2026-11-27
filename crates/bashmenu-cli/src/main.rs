@@ -154,8 +154,8 @@ struct Cli {
     locale: Option<String>,
 
     /// Run an interactive Markdown document directly as a standalone TUI
-    #[arg(long = "iomarkdown", value_name = "FILE")]
-    iomarkdown: Option<PathBuf>,
+    #[arg(long = "imarkdown", value_name = "FILE")]
+    imarkdown: Option<PathBuf>,
 }
 
 /// State preserved while an interactive Markdown form's reserved script runs.
@@ -328,7 +328,7 @@ fn build_cli_command() -> clap::Command {
         .mut_arg("repo", |a| a.help(t!("cli.bashmenu.repo")))
         .mut_arg("image", |a| a.help(t!("cli.bashmenu.image")))
         .mut_arg("locale", |a| a.help(t!("cli.bashmenu.locale")))
-        .mut_arg("iomarkdown", |a| a.help(t!("cli.bashmenu.iomarkdown")))
+        .mut_arg("imarkdown", |a| a.help(t!("cli.bashmenu.imarkdown")))
         .arg(
             clap::Arg::new("help")
                 .short('h')
@@ -643,10 +643,10 @@ fn main() -> Result<()> {
     }
     guard.set_default_bg(styles.background);
 
-    // 6b. Optional standalone `--iomarkdown <FILE>` mode
-    let standalone_iomarkdown = cli.iomarkdown.is_some();
+    // 6b. Optional standalone `--imarkdown <FILE>` mode
+    let standalone_imarkdown = cli.imarkdown.is_some();
     let mut standalone_cancelled = false;
-    if let Some(ref io_path) = cli.iomarkdown {
+    if let Some(ref io_path) = cli.imarkdown {
         let init_size = guard.terminal_mut().size()?;
         let mut init_ctx = make_macro_ctx!(&config);
         init_ctx.window_width = init_size.width as usize;
@@ -766,11 +766,11 @@ fn main() -> Result<()> {
 
     // 7. Interactive Event Loop
     let mut need_redraw = true;
-    let mut pending_transition = !standalone_iomarkdown;
+    let mut pending_transition = !standalone_imarkdown;
     let mut modal_anchor: (u16, u16) = (0, 0);
     let mut pending_modal_grow = false;
     loop {
-        if standalone_iomarkdown
+        if standalone_imarkdown
             && matches!(active_modal, ActiveModal::None)
             && active_interactive_md.is_none()
             && suspended_interactive_form.is_none()
@@ -788,7 +788,7 @@ fn main() -> Result<()> {
             .unwrap_or("fast");
         let modal_speed = TransitionSpeed::parse(Some(modal_speed_str));
         let modal_anim = ModalAnimation::parse(config.settings.modal_animation.as_deref());
-        let modal_anim_enabled = !standalone_iomarkdown
+        let modal_anim_enabled = !standalone_imarkdown
             && modal_anim == ModalAnimation::Zoom
             && modal_speed != TransitionSpeed::Custom(0);
 
@@ -1069,7 +1069,7 @@ fn main() -> Result<()> {
             }
 
             let render_fn = |f: &mut ratatui::Frame<'_>| {
-                if standalone_iomarkdown {
+                if standalone_imarkdown {
                     let bg_style = ratatui::style::Style::default().bg(styles.background);
                     let area = f.area();
                     let buf = f.buffer_mut();
@@ -2135,7 +2135,7 @@ fn main() -> Result<()> {
                                     }
                                 }
                                 bashmenu_tui::InteractiveFormAction::Cancel { action, vars } => {
-                                    if standalone_iomarkdown {
+                                    if standalone_imarkdown {
                                         standalone_cancelled = true;
                                     }
                                     if let Some(id) = action.as_deref() {
@@ -4025,7 +4025,7 @@ fn main() -> Result<()> {
     }
 
     drop(guard);
-    if standalone_iomarkdown && standalone_cancelled {
+    if standalone_imarkdown && standalone_cancelled {
         std::process::exit(1);
     }
 

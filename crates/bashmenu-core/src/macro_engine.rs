@@ -2674,7 +2674,7 @@ mod tests {
     #[test]
     fn test_parse_markdown_frontmatter_with_shebang() {
         let raw = "\
-#!/usr/bin/env -S bashmenu --iomarkdown
+#!/usr/bin/env -S bashmenu --imarkdown
 ---
 title: Standalone Wizard
 width: 90%
@@ -2693,7 +2693,7 @@ Body text
         assert!(!body.contains("#!/usr/bin/env"));
 
         // Shebang without frontmatter still strips the shebang line
-        let no_fm = "#!/usr/bin/env -S bashmenu --iomarkdown\n# Plain Doc\n";
+        let no_fm = "#!/usr/bin/env -S bashmenu --imarkdown\n# Plain Doc\n";
         let (fm2, body2) = parse_markdown_frontmatter_full(no_fm);
         assert_eq!(fm2.title, None);
         assert_eq!(body2, "# Plain Doc\n");
