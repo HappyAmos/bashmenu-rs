@@ -156,7 +156,23 @@ impl ColorPickerModal {
         let (tab, sel_256) = match initial_color {
             Color::Indexed(code) => (ColorPickerTab::Palette256, code),
             Color::Rgb(_, _, _) => (ColorPickerTab::TrueColorHsv, rgb_to_xterm256(r, g, b)),
-            _ => (ColorPickerTab::Palette256, rgb_to_xterm256(r, g, b)),
+            Color::Black => (ColorPickerTab::Palette256, 0),
+            Color::Red => (ColorPickerTab::Palette256, 1),
+            Color::Green => (ColorPickerTab::Palette256, 2),
+            Color::Yellow => (ColorPickerTab::Palette256, 3),
+            Color::Blue => (ColorPickerTab::Palette256, 4),
+            Color::Magenta => (ColorPickerTab::Palette256, 5),
+            Color::Cyan => (ColorPickerTab::Palette256, 6),
+            Color::Gray => (ColorPickerTab::Palette256, 7),
+            Color::DarkGray => (ColorPickerTab::Palette256, 8),
+            Color::LightRed => (ColorPickerTab::Palette256, 9),
+            Color::LightGreen => (ColorPickerTab::Palette256, 10),
+            Color::LightYellow => (ColorPickerTab::Palette256, 11),
+            Color::LightBlue => (ColorPickerTab::Palette256, 12),
+            Color::LightMagenta => (ColorPickerTab::Palette256, 13),
+            Color::LightCyan => (ColorPickerTab::Palette256, 14),
+            Color::White => (ColorPickerTab::Palette256, 15),
+            Color::Reset => (ColorPickerTab::Palette256, rgb_to_xterm256(r, g, b)),
         };
 
         let hex_len = hex.len();

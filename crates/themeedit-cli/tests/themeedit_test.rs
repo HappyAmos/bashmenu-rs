@@ -3825,3 +3825,68 @@ fn test_input_box_tokens_sidebar_display_matches_color_picker() {
         Color::Indexed(250)
     );
 }
+
+#[test]
+fn test_issue_85_default_input_box_text_and_all_tokens_match_color_picker() {
+    use bashmenu_tui::ColorPickerModal;
+    use themeedit_cli::{PreviewMode, TokenKind};
+
+    // Reproduce Issue #85 on an unmodified theme where input_box_text /
+    // input_box_unfocused_text are not explicitly specified in YAML.
+    let themes_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(themes_path, Some("dracula".to_string()));
+    state.preview_mode = PreviewMode::Menu;
+
+    let focused_tok = state
+        .tokens
+        .iter()
+        .find(|t| t.kind == TokenKind::Color("input_box_text".to_string()))
+        .unwrap();
+    let unfocused_tok = state
+        .tokens
+        .iter()
+        .find(|t| t.kind == TokenKind::Color("input_box_unfocused_text".to_string()))
+        .unwrap();
+
+    assert_eq!(state.get_token_value_display(focused_tok), "Color 254");
+    assert_eq!(state.get_token_value_display(unfocused_tok), "Color 244");
+    assert_eq!(
+        ColorPickerModal::new("Focused", state.get_color_token_color("input_box_text"))
+            .selected_256,
+        254
+    );
+    assert_eq!(
+        ColorPickerModal::new(
+            "Unfocused",
+            state.get_color_token_color("input_box_unfocused_text")
+        )
+        .selected_256,
+        244
+    );
+
+    // Universal parity: for EVERY color token on both Menu and Modals tabs, if the
+    // sidebar reports "Color N" (or "Inherit (Color N)"), ColorPickerModal must open on N.
+    for mode in [PreviewMode::Menu, PreviewMode::Modals] {
+        state.preview_mode = mode;
+        for tok in &state.tokens {
+            if let TokenKind::Color(ref key) = tok.kind {
+                let disp = state.get_token_value_display(tok);
+                let inner = disp
+                    .strip_prefix("Inherit (")
+                    .and_then(|s| s.strip_suffix(')'))
+                    .unwrap_or(&disp);
+                if let Some(num_str) = inner.strip_prefix("Color ") {
+                    if let Ok(expected_idx) = num_str.trim().parse::<u8>() {
+                        let picker =
+                            ColorPickerModal::new("Check", state.get_color_token_color(key));
+                        assert_eq!(
+                            picker.selected_256, expected_idx,
+                            "Token '{}' on {:?} sidebar displays '{}' but ColorPickerModal opened on {}",
+                            key, mode, disp, picker.selected_256
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
