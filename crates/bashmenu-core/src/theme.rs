@@ -35,6 +35,8 @@ pub fn activity_override_tokens(activity_key: &str) -> &'static [&'static str] {
             "background",
             "title",
             "text",
+            "highlight",
+            "highlight_text",
             "border",
             "divider",
             "accent",

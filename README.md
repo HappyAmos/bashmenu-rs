@@ -19,13 +19,15 @@ BM uses `{}` brackets to include environment variables, custom scripts, dynamic 
 
 Installation is fairly simple if you already have Rust installed. Just clone this Github repository, then run the install.sh script. The script copies binaries and symlinks to ~/.local/bin/. Configuration files are stored in ~/.config/bashmenu, while cache is installed in ~/.cache/bashmenu. A utility script is included in the repository root, uninstall.sh, that removes binaries, symlinks, and cache from ~/.local/bin, ~/.config/bashmenu, and ~/.cache/bashmenu, respectively. The repository is not removed when uninstalling.
 
+I welcome contributors to help find bugs, do multi-platform testing, write translations, provide feedback, etc.
+
 ## Features
 
 - **Pure Terminal TUI**
 - **Configurable Visual Screen Transitions**
 - **Direct Linux Framebuffer Support (`/dev/fb0`)**
 - **Automated Color Resolution Fallback**
-- **Notebook Concurrent Conflict Resolution & 3-Way Merge**
+- **Markdown Notebooks**
 - **TrueColor Wallpaper Compositor**
 - **Macro Engine**
 - **Interactive Directives**
