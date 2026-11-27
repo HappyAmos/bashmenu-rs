@@ -498,6 +498,7 @@ fn test_shell_and_macro_injection_defense_issue_91() {
         tricky_img,
         Some(&ctx),
     );
+    assert!(convert_cmd.contains("'/tmp/$(echo PWNED)/a'\\''b\"c'"));
     #[cfg(unix)]
     {
         let out = std::process::Command::new("/bin/bash")
