@@ -578,6 +578,7 @@ cli:
     repo: "Cargar archivos de configuración desde el directorio defaults del repositorio"
     image: "Renderizar imágenes de fondo TrueColor directamente mediante framebuffer"
     locale: "Sobrescribir el idioma activo (ej. \"en_US\", \"es_ES\", o ruta a archivo YAML)"
+    iomarkdown: "Ejecutar un documento Markdown interactivo directamente como TUI independiente"
   bashedit:
     about: "Editor de texto de terminal con recuperación de fallos, pestañas y archivos swap locales"
     file: "Archivo a editar (dejar vacío para un búfer nuevo sin guardar)"

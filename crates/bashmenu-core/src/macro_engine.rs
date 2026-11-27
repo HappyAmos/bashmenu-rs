@@ -459,12 +459,19 @@ fn parse_percent_value(val: &serde_json::Value) -> Option<u16> {
 /// Parses optional YAML frontmatter (`--- ... ---`) at the top of a Markdown
 /// document, returning `(MarkdownFrontmatter, remaining_markdown_body)`.
 pub fn parse_markdown_frontmatter_full(raw: &str) -> (MarkdownFrontmatter, &str) {
-    let trimmed = raw.strip_prefix('\u{feff}').unwrap_or(raw);
+    let mut trimmed = raw.strip_prefix('\u{feff}').unwrap_or(raw);
+    if trimmed.starts_with("#!") {
+        if let Some(nl) = trimmed.find('\n') {
+            trimmed = &trimmed[nl + 1..];
+        } else {
+            return (MarkdownFrontmatter::default(), "");
+        }
+    }
     let Some(first_nl) = trimmed.find('\n') else {
-        return (MarkdownFrontmatter::default(), raw);
+        return (MarkdownFrontmatter::default(), trimmed);
     };
     if trimmed[..first_nl].trim_end() != "---" {
-        return (MarkdownFrontmatter::default(), raw);
+        return (MarkdownFrontmatter::default(), trimmed);
     }
     let after_open = &trimmed[first_nl + 1..];
 
@@ -493,7 +500,7 @@ pub fn parse_markdown_frontmatter_full(raw: &str) -> (MarkdownFrontmatter, &str)
         offset += line.len();
     }
 
-    (MarkdownFrontmatter::default(), raw)
+    (MarkdownFrontmatter::default(), trimmed)
 }
 
 /// Parses optional YAML frontmatter (`--- ... ---`) at the top of a Markdown
@@ -2662,5 +2669,33 @@ mod tests {
             interpolate_placeholders(r#"Status: {toast:2:"popup"}Ready"#, &ctx),
             "Status: Ready"
         );
+    }
+
+    #[test]
+    fn test_parse_markdown_frontmatter_with_shebang() {
+        let raw = "\
+#!/usr/bin/env -S bashmenu --iomarkdown
+---
+title: Standalone Wizard
+width: 90%
+height: 80%
+interactive: true
+---
+# Hello
+Body text
+";
+        let (fm, body) = parse_markdown_frontmatter_full(raw);
+        assert_eq!(fm.title.as_deref(), Some("Standalone Wizard"));
+        assert_eq!(fm.width, Some(90));
+        assert_eq!(fm.height, Some(80));
+        assert!(fm.interactive);
+        assert!(body.starts_with("# Hello"));
+        assert!(!body.contains("#!/usr/bin/env"));
+
+        // Shebang without frontmatter still strips the shebang line
+        let no_fm = "#!/usr/bin/env -S bashmenu --iomarkdown\n# Plain Doc\n";
+        let (fm2, body2) = parse_markdown_frontmatter_full(no_fm);
+        assert_eq!(fm2.title, None);
+        assert_eq!(body2, "# Plain Doc\n");
     }
 }

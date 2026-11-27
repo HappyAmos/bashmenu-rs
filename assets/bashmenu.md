@@ -82,6 +82,7 @@ HA Bash Menu is comprised of modular scripts and configuration files:
 | `--repo` | `-r` | Load configuration files (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `cheat.yml`, `notes.yml`) from repository `defaults/` directory. |
 | `--image` | `-i` | Render full-resolution TrueColor background images directly via the Linux framebuffer (`/dev/fb0`) instead of character-block translation. |
 | `--local` | | Load and save configuration files in current working directory. |
+| `--iomarkdown <FILE>` | | Run an interactive (or static) Markdown document directly as a standalone TUI without launching the main menu (supports `#!/usr/bin/env -S bashmenu --iomarkdown` shebangs; exits `0` on submit/OK and `1` on cancel). |
 
 ---
 

@@ -152,6 +152,10 @@ struct Cli {
     /// Override active locale (e.g. "en_US", "es_ES", or path to YAML locale file)
     #[arg(short, long)]
     locale: Option<String>,
+
+    /// Run an interactive Markdown document directly as a standalone TUI
+    #[arg(long = "iomarkdown", value_name = "FILE")]
+    iomarkdown: Option<PathBuf>,
 }
 
 /// State preserved while an interactive Markdown form's reserved script runs.
@@ -324,6 +328,7 @@ fn build_cli_command() -> clap::Command {
         .mut_arg("repo", |a| a.help(t!("cli.bashmenu.repo")))
         .mut_arg("image", |a| a.help(t!("cli.bashmenu.image")))
         .mut_arg("locale", |a| a.help(t!("cli.bashmenu.locale")))
+        .mut_arg("iomarkdown", |a| a.help(t!("cli.bashmenu.iomarkdown")))
         .arg(
             clap::Arg::new("help")
                 .short('h')
@@ -638,12 +643,140 @@ fn main() -> Result<()> {
     }
     guard.set_default_bg(styles.background);
 
+    // 6b. Optional standalone `--iomarkdown <FILE>` mode
+    let standalone_iomarkdown = cli.iomarkdown.is_some();
+    let mut standalone_cancelled = false;
+    if let Some(ref io_path) = cli.iomarkdown {
+        let init_size = guard.terminal_mut().size()?;
+        let mut init_ctx = make_macro_ctx!(&config);
+        init_ctx.window_width = init_size.width as usize;
+        init_ctx.window_height = init_size.height as usize;
+        init_ctx.screen_width = init_size.width as usize;
+
+        let raw_str = io_path.to_string_lossy();
+        let resolved = if io_path.is_file() {
+            io_path.clone()
+        } else {
+            init_ctx.resolve_info_file_path(&raw_str)
+        };
+        let raw_content = match fs::read_to_string(&resolved) {
+            Ok(c) => c,
+            Err(e) => {
+                drop(guard);
+                eprintln!("bashmenu: failed to read '{}': {}", resolved.display(), e);
+                std::process::exit(1);
+            }
+        };
+        let fallback_title = resolved
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("Markdown")
+            .to_string();
+        let (fm, body) = bashmenu_core::parse_markdown_frontmatter_full(&raw_content);
+        let safe_ctx = init_ctx.clone().with_allow_command_macros(false);
+        let form_title = fm
+            .title
+            .as_deref()
+            .map(|t| interpolate_placeholders(t, &safe_ctx))
+            .unwrap_or_else(|| fallback_title.clone());
+
+        if bashmenu_core::has_interactive_markdown_form(body) {
+            let doc = bashmenu_core::parse_interactive_markdown_doc(body);
+            let interpolated_pages: Vec<Vec<bashmenu_core::MarkdownFormBlock>> = doc
+                .pages
+                .into_iter()
+                .map(|page| {
+                    page.into_iter()
+                        .map(|b| match b {
+                            bashmenu_core::MarkdownFormBlock::Text(t) => {
+                                bashmenu_core::MarkdownFormBlock::Text(interpolate_placeholders(
+                                    &t, &safe_ctx,
+                                ))
+                            }
+                            bashmenu_core::MarkdownFormBlock::Input { prefix, mut spec } => {
+                                let prefix =
+                                    prefix.map(|p| interpolate_placeholders(&p, &safe_ctx));
+                                if spec.default_value.contains('{') {
+                                    spec.default_value =
+                                        interpolate_placeholders(&spec.default_value, &safe_ctx);
+                                }
+                                bashmenu_core::MarkdownFormBlock::Input { prefix, spec }
+                            }
+                            bashmenu_core::MarkdownFormBlock::Radio(mut spec) => {
+                                for opt in &mut spec.options {
+                                    if opt.contains('{') {
+                                        *opt = interpolate_placeholders(opt, &safe_ctx);
+                                    }
+                                }
+                                bashmenu_core::MarkdownFormBlock::Radio(spec)
+                            }
+                            bashmenu_core::MarkdownFormBlock::Checkbox(mut spec) => {
+                                if spec.label.contains('{') {
+                                    spec.label = interpolate_placeholders(&spec.label, &safe_ctx);
+                                }
+                                bashmenu_core::MarkdownFormBlock::Checkbox(spec)
+                            }
+                            bashmenu_core::MarkdownFormBlock::Buttons(mut btns) => {
+                                for btn in &mut btns {
+                                    if let Some(ref mut lbl) = btn.label {
+                                        if lbl.contains('{') {
+                                            *lbl = interpolate_placeholders(lbl, &safe_ctx);
+                                        }
+                                    }
+                                }
+                                bashmenu_core::MarkdownFormBlock::Buttons(btns)
+                            }
+                        })
+                        .collect()
+                })
+                .collect();
+            let form_modal =
+                bashmenu_tui::InteractiveMarkdownModal::from_pages(form_title, interpolated_pages)
+                    .with_dimensions(fm.width, fm.height);
+            active_modal = ActiveModal::InteractiveForm {
+                modal: Box::new(form_modal),
+                reserved_scripts: doc.reserved_scripts,
+                frontmatter: fm,
+                fallback_title,
+            };
+        } else if fm.interactive {
+            match ui_rpc::spawn_interactive_markdown(
+                fm,
+                fallback_title,
+                body.to_string(),
+                ui_rpc::current_bashmenu_exe(),
+                std::collections::HashMap::new(),
+            ) {
+                Ok(session) => {
+                    active_interactive_md = Some(session);
+                }
+                Err(err) => {
+                    drop(guard);
+                    eprintln!("bashmenu: interactive markdown error: {err}");
+                    std::process::exit(1);
+                }
+            }
+        } else {
+            let rendered_body = interpolate_placeholders(body, &safe_ctx);
+            active_modal = ActiveModal::Message(
+                MessageModal::new(form_title, rendered_body).with_dimensions(fm.width, fm.height),
+            );
+        }
+    }
+
     // 7. Interactive Event Loop
     let mut need_redraw = true;
-    let mut pending_transition = true;
+    let mut pending_transition = !standalone_iomarkdown;
     let mut modal_anchor: (u16, u16) = (0, 0);
     let mut pending_modal_grow = false;
     loop {
+        if standalone_iomarkdown
+            && matches!(active_modal, ActiveModal::None)
+            && active_interactive_md.is_none()
+            && suspended_interactive_form.is_none()
+        {
+            break;
+        }
         let size = guard.terminal_mut().size()?;
         let area = ratatui::layout::Rect::new(0, 0, size.width, size.height);
         let trans_speed = TransitionSpeed::parse(config.settings.transition_speed.as_deref());
@@ -655,8 +788,9 @@ fn main() -> Result<()> {
             .unwrap_or("fast");
         let modal_speed = TransitionSpeed::parse(Some(modal_speed_str));
         let modal_anim = ModalAnimation::parse(config.settings.modal_animation.as_deref());
-        let modal_anim_enabled =
-            modal_anim == ModalAnimation::Zoom && modal_speed != TransitionSpeed::Custom(0);
+        let modal_anim_enabled = !standalone_iomarkdown
+            && modal_anim == ModalAnimation::Zoom
+            && modal_speed != TransitionSpeed::Custom(0);
 
         // Drain plugin background updates
         let mut plugins_updated = false;
@@ -935,7 +1069,18 @@ fn main() -> Result<()> {
             }
 
             let render_fn = |f: &mut ratatui::Frame<'_>| {
-                menu_view.render(f.area(), f.buffer_mut());
+                if standalone_iomarkdown {
+                    let bg_style = ratatui::style::Style::default().bg(styles.background);
+                    let area = f.area();
+                    let buf = f.buffer_mut();
+                    for y in area.y..area.y + area.height {
+                        for x in area.x..area.x + area.width {
+                            buf[(x, y)].set_char(' ').set_style(bg_style);
+                        }
+                    }
+                } else {
+                    menu_view.render(f.area(), f.buffer_mut());
+                }
                 match &mut active_modal {
                     ActiveModal::None => {
                         shortcut_dispatcher.render_leader_popup(
@@ -1990,6 +2135,9 @@ fn main() -> Result<()> {
                                     }
                                 }
                                 bashmenu_tui::InteractiveFormAction::Cancel { action, vars } => {
+                                    if standalone_iomarkdown {
+                                        standalone_cancelled = true;
+                                    }
                                     if let Some(id) = action.as_deref() {
                                         if let Some(script) = reserved_scripts.get(id).cloned() {
                                             match ui_rpc::spawn_reserved_script_block(
@@ -3874,6 +4022,11 @@ fn main() -> Result<()> {
                 need_redraw = true;
             }
         }
+    }
+
+    drop(guard);
+    if standalone_iomarkdown && standalone_cancelled {
+        std::process::exit(1);
     }
 
     Ok(())

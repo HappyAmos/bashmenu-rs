@@ -580,6 +580,7 @@ cli:
     repo: "Load configuration files from the repository defaults directory"
     image: "Render full-resolution TrueColor background images directly via framebuffer"
     locale: "Override active locale (e.g. \"en_US\", \"es_ES\", or path to YAML locale file)"
+    iomarkdown: "Run an interactive Markdown document directly as a standalone TUI"
   bashedit:
     about: "Terminal text editor with crash recovery, tabs, and colocated swap files"
     file: "File to edit (leave blank for empty unsaved buffer)"
