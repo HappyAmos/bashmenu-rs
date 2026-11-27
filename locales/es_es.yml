@@ -350,6 +350,12 @@ help:
     | :--- | :--- |
     | {{param}} | Solicita entrada de texto modal (admite title="...", text="...", default="...", masked, raw) |
     | {{message:"TEXT"}} | Diálogo emergente centrado con botón Aceptar (sin título; o title="...":text="...", admite ", ', `) |
+    | {{input:id=VAR:default="":...}} | Campo de texto integrado en Markdown interactivo (width, multiline, scrollbar, height=5, masked) |
+    | {{radio:VAR:"Option 1":"Option 2"}} | Lista de selección única en Markdown interactivo (admite id=, default=, layout="horizontal") |
+    | {{checkbox:VAR:"Label":false}} | Casilla de verificación booleana en Markdown interactivo (exporta "true"/"false") |
+    | {{id:VAR}} | Valor interpolado en vivo de {{input}}/{{radio}}/{{checkbox}} (en Bash: {{id:VAR="VAL"}} escribe al documento) |
+    | {{button:type="submit"\|"ok"\|"action"\|"cancel":action="ID"}} | Botón de acción que ejecuta ```bashmenu-bash:id="ID"``` (action permanece en página; opcional text="...") |
+    | {{clear}} | Limpia la pantalla de Markdown interactivo antes de mostrar el contenido siguiente |
     | {{file_picker}} | Abre el selector visual de archivos |
     | {{file_picker:path:<dir>}} | Selector de archivos en el directorio especificado |
     | {{file_picker:stem}} | Ruta sin extensión de archivo (/ruta/a/img) |
@@ -487,6 +493,7 @@ help:
     | title: <text> | Título de la ventana emergente (admite marcadores; por defecto el archivo) |
     | width: <1..100>[%] | Ancho en % de la terminal (acepta 80, "80" o "80%") |
     | height: <1..100>[%] | Alto en % de la terminal (acepta 70, "70" o "70%") |
+    | interactive: true | Habilita bloques reservados bashmenu-bash:id="...", {{input:...}}, {{button:...}}, {{clear}} y {{id:...}} en vivo |
   markdown_reference: |-
     # Referencia de sintaxis Markdown
 
@@ -571,6 +578,7 @@ cli:
     repo: "Cargar archivos de configuración desde el directorio defaults del repositorio"
     image: "Renderizar imágenes de fondo TrueColor directamente mediante framebuffer"
     locale: "Sobrescribir el idioma activo (ej. \"en_US\", \"es_ES\", o ruta a archivo YAML)"
+    imarkdown: "Ejecutar un documento Markdown interactivo directamente como TUI independiente"
   bashedit:
     about: "Editor de texto de terminal con recuperación de fallos, pestañas y archivos swap locales"
     file: "Archivo a editar (dejar vacío para un búfer nuevo sin guardar)"

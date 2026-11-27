@@ -361,16 +361,12 @@ impl<'a> MacroContext<'a> {
         )
     }
 
-    /// Loads a user-specified Markdown file with optional YAML frontmatter
-    /// (`title`, `width`, `height`), expands placeholders and `~` in `path_expr`,
-    /// and interpolates placeholders in both the title and Markdown body.
-    pub fn render_info_file(
-        &self,
-        path_expr: &str,
-    ) -> Result<(MarkdownFrontmatter, String), String> {
+    /// Resolves an `{info:<path>}` file path expression (expanding placeholders
+    /// and leading `~`) against the filesystem, `bashmenu_dir`, and `dev_dir`.
+    pub fn resolve_info_file_path(&self, path_expr: &str) -> PathBuf {
         let expanded_expr = interpolate_placeholders(path_expr.trim(), self);
         let candidate = expand_tilde_path(&expanded_expr, &self.home_dir);
-        let resolved = if candidate.is_absolute() || candidate.is_file() {
+        if candidate.is_absolute() || candidate.is_file() {
             candidate
         } else {
             let in_bm = self.bashmenu_dir.join(&candidate);
@@ -384,7 +380,17 @@ impl<'a> MacroContext<'a> {
                     candidate
                 }
             }
-        };
+        }
+    }
+
+    /// Loads a user-specified Markdown file with optional YAML frontmatter
+    /// (`title`, `width`, `height`), expands placeholders and `~` in `path_expr`,
+    /// and interpolates placeholders in both the title and Markdown body.
+    pub fn render_info_file(
+        &self,
+        path_expr: &str,
+    ) -> Result<(MarkdownFrontmatter, String), String> {
+        let resolved = self.resolve_info_file_path(path_expr);
 
         let raw = std::fs::read_to_string(&resolved).map_err(|e| {
             format!(
@@ -425,6 +431,8 @@ pub struct MarkdownFrontmatter {
     pub width: Option<u16>,
     /// Optional popup window height in percent of terminal height (`height:` in frontmatter)
     pub height: Option<u16>,
+    /// When true, `bashmenu-<lang>` fenced code blocks execute interactively
+    pub interactive: bool,
 }
 
 /// Parses a percentage value (`80`, `"80"`, `"80%"`) from a YAML value, clamped to `1..=100`.
@@ -451,19 +459,26 @@ fn parse_percent_value(val: &serde_json::Value) -> Option<u16> {
 /// Parses optional YAML frontmatter (`--- ... ---`) at the top of a Markdown
 /// document, returning `(MarkdownFrontmatter, remaining_markdown_body)`.
 pub fn parse_markdown_frontmatter_full(raw: &str) -> (MarkdownFrontmatter, &str) {
-    let trimmed = raw.strip_prefix('\u{feff}').unwrap_or(raw);
-    let after_open = if let Some(rest) = trimmed.strip_prefix("---\r\n") {
-        rest
-    } else if let Some(rest) = trimmed.strip_prefix("---\n") {
-        rest
-    } else {
-        return (MarkdownFrontmatter::default(), raw);
+    let mut trimmed = raw.strip_prefix('\u{feff}').unwrap_or(raw);
+    if trimmed.starts_with("#!") {
+        if let Some(nl) = trimmed.find('\n') {
+            trimmed = &trimmed[nl + 1..];
+        } else {
+            return (MarkdownFrontmatter::default(), "");
+        }
+    }
+    let Some(first_nl) = trimmed.find('\n') else {
+        return (MarkdownFrontmatter::default(), trimmed);
     };
+    if trimmed[..first_nl].trim_end() != "---" {
+        return (MarkdownFrontmatter::default(), trimmed);
+    }
+    let after_open = &trimmed[first_nl + 1..];
 
     let mut offset = 0;
     for line in after_open.split_inclusive('\n') {
         let line_no_nl = line.trim_end_matches(['\r', '\n']);
-        if line_no_nl == "---" {
+        if line_no_nl.trim_end() == "---" {
             let yaml_block = &after_open[..offset];
             let body = &after_open[offset + line.len()..];
             let mut fm = MarkdownFrontmatter::default();
@@ -475,13 +490,17 @@ pub fn parse_markdown_frontmatter_full(raw: &str) -> (MarkdownFrontmatter, &str)
                     .filter(|s| !s.is_empty());
                 fm.width = val.get("width").and_then(parse_percent_value);
                 fm.height = val.get("height").and_then(parse_percent_value);
+                fm.interactive = val
+                    .get("interactive")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
             }
             return (fm, body.trim_start_matches(['\r', '\n']));
         }
         offset += line.len();
     }
 
-    (MarkdownFrontmatter::default(), raw)
+    (MarkdownFrontmatter::default(), trimmed)
 }
 
 /// Parses optional YAML frontmatter (`--- ... ---`) at the top of a Markdown
@@ -2650,5 +2669,33 @@ mod tests {
             interpolate_placeholders(r#"Status: {toast:2:"popup"}Ready"#, &ctx),
             "Status: Ready"
         );
+    }
+
+    #[test]
+    fn test_parse_markdown_frontmatter_with_shebang() {
+        let raw = "\
+#!/usr/bin/env -S bashmenu --imarkdown
+---
+title: Standalone Wizard
+width: 90%
+height: 80%
+interactive: true
+---
+# Hello
+Body text
+";
+        let (fm, body) = parse_markdown_frontmatter_full(raw);
+        assert_eq!(fm.title.as_deref(), Some("Standalone Wizard"));
+        assert_eq!(fm.width, Some(90));
+        assert_eq!(fm.height, Some(80));
+        assert!(fm.interactive);
+        assert!(body.starts_with("# Hello"));
+        assert!(!body.contains("#!/usr/bin/env"));
+
+        // Shebang without frontmatter still strips the shebang line
+        let no_fm = "#!/usr/bin/env -S bashmenu --imarkdown\n# Plain Doc\n";
+        let (fm2, body2) = parse_markdown_frontmatter_full(no_fm);
+        assert_eq!(fm2.title, None);
+        assert_eq!(body2, "# Plain Doc\n");
     }
 }

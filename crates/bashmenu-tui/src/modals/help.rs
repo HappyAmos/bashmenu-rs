@@ -297,6 +297,40 @@ impl HelpModal {
     }
 }
 
+/// Breaks a single over-wide token into chunks of at most `max_w` display columns,
+/// preferring natural separator boundaries (`:`, `|`, `/`, `,`) when possible.
+fn split_overwide_word(word: &str, max_w: usize) -> Vec<String> {
+    let mut chunks = Vec::new();
+    let mut remaining = word;
+    while !remaining.is_empty() {
+        if UnicodeWidthStr::width(remaining) <= max_w {
+            chunks.push(remaining.to_string());
+            break;
+        }
+        let mut width_so_far = 0usize;
+        let mut hard_split = 0usize;
+        let mut soft_split: Option<usize> = None;
+        for (idx, ch) in remaining.char_indices() {
+            let cw = unicode_width::UnicodeWidthChar::width(ch).unwrap_or(0);
+            if width_so_far + cw > max_w {
+                break;
+            }
+            width_so_far += cw;
+            let next_idx = idx + ch.len_utf8();
+            hard_split = next_idx;
+            if matches!(ch, ':' | '|' | '/' | ',') && width_so_far >= max_w / 3 {
+                soft_split = Some(next_idx);
+            }
+        }
+        let split_at = soft_split
+            .unwrap_or(hard_split)
+            .max(remaining.chars().next().map(|c| c.len_utf8()).unwrap_or(1));
+        chunks.push(remaining[..split_at].to_string());
+        remaining = &remaining[split_at..];
+    }
+    chunks
+}
+
 /// Simple word wrapper for help modal text using Unicode display widths.
 fn wrap_help_text(text: &str, max_w: usize) -> Vec<String> {
     if max_w == 0 {
@@ -312,7 +346,18 @@ fn wrap_help_text(text: &str, max_w: usize) -> Vec<String> {
 
     for word in text.split_whitespace() {
         let word_w = UnicodeWidthStr::width(word);
-        if current.is_empty() {
+        if word_w > max_w {
+            if !current.is_empty() {
+                result.push(std::mem::take(&mut current));
+                current_w = 0;
+            }
+            let mut parts = split_overwide_word(word, max_w);
+            if let Some(last) = parts.pop() {
+                result.extend(parts);
+                current_w = UnicodeWidthStr::width(last.as_str());
+                current = last;
+            }
+        } else if current.is_empty() {
             current.push_str(word);
             current_w = word_w;
         } else if current_w + 1 + word_w <= max_w {
@@ -430,8 +475,9 @@ fn render_table(
     mid_spans.push(ratatui::text::Span::styled("┤", border_style));
     wrapped_lines.push(ratatui::text::Line::from(mid_spans));
 
-    // 4. Data Rows
-    for r in table_rows.iter().skip(1) {
+    // 4. Data Rows (with subtle row dividers between entries)
+    let data_count = table_rows.len().saturating_sub(1);
+    for (row_idx, r) in table_rows.iter().skip(1).enumerate() {
         let cell_lines: Vec<Vec<String>> = (0..cols)
             .map(|c| {
                 let cell_text = r.get(c).map(|s| s.as_str()).unwrap_or("");
@@ -473,6 +519,21 @@ fn render_table(
                 row_spans.push(ratatui::text::Span::styled("│", border_style));
             }
             wrapped_lines.push(ratatui::text::Line::from(row_spans));
+        }
+        if row_idx + 1 < data_count {
+            let mut div_spans = Vec::new();
+            div_spans.push(ratatui::text::Span::styled("├", border_style));
+            for (c, &cw) in col_widths.iter().enumerate() {
+                div_spans.push(ratatui::text::Span::styled(
+                    "─".repeat(cw + 2),
+                    border_style,
+                ));
+                if c + 1 < cols {
+                    div_spans.push(ratatui::text::Span::styled("┼", border_style));
+                }
+            }
+            div_spans.push(ratatui::text::Span::styled("┤", border_style));
+            wrapped_lines.push(ratatui::text::Line::from(div_spans));
         }
     }
 
