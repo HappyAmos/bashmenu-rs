@@ -311,10 +311,8 @@ if [ "$OS_CHECK" = "Linux" ] && [ -e /dev/fb0 ]; then
                     udevadm control --reload-rules 2>/dev/null || true
                     udevadm trigger --subsystem-match=graphics 2>/dev/null || true
                 fi
-                if command -v setfacl >/dev/null 2>&1; then
-                    setfacl -m "u:$1:rw" /dev/fb0 2>/dev/null || chmod 0666 /dev/fb0 2>/dev/null || true
-                else
-                    chmod 0666 /dev/fb0 2>/dev/null || true
+                if [ -c /dev/fb0 ] && [ ! -L /dev/fb0 ] && command -v setfacl >/dev/null 2>&1; then
+                    setfacl -m "u:$1:rw" /dev/fb0 2>/dev/null || true
                 fi
             '
             if [ -n "$PRIV_CMD" ]; then

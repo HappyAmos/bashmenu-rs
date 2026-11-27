@@ -308,12 +308,57 @@ pub fn render_ratatui_buffer_to_slice(
     }
 }
 
-/// Checks whether a Linux framebuffer device exists on the system.
+/// Validates that `path` strictly matches `^/dev/fb[0-9]+$`.
+pub fn is_valid_framebuffer_device_name(path: &str) -> bool {
+    match path.strip_prefix("/dev/fb") {
+        Some(digits) => !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()),
+        None => false,
+    }
+}
+
+/// Validates that a Unix username contains only safe characters (`[a-zA-Z0-9._-]`)
+/// and does not start with `-`.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+fn is_valid_unix_username(user: &str) -> bool {
+    !user.is_empty()
+        && !user.starts_with('-')
+        && user
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
+}
+
+/// Verifies that `path` matches `^/dev/fb[0-9]+$`, is not a symlink, and is a
+/// real character device on Linux.
+#[cfg(target_os = "linux")]
+pub fn validate_framebuffer_device_path(path: &str) -> bool {
+    use std::os::unix::fs::FileTypeExt;
+
+    if !is_valid_framebuffer_device_name(path) {
+        return false;
+    }
+    match std::fs::symlink_metadata(path) {
+        Ok(meta) => !meta.file_type().is_symlink() && meta.file_type().is_char_device(),
+        Err(_) => false,
+    }
+}
+
+/// Returns the validated Linux framebuffer device path from `$FRAMEBUFFER`
+/// (defaulting to `/dev/fb0`), or `None` if invalid or not a character device.
+#[cfg(target_os = "linux")]
+fn validated_framebuffer_path() -> Option<String> {
+    let fb_path = std::env::var("FRAMEBUFFER").unwrap_or_else(|_| "/dev/fb0".to_string());
+    if validate_framebuffer_device_path(&fb_path) {
+        Some(fb_path)
+    } else {
+        None
+    }
+}
+
+/// Checks whether a valid Linux framebuffer character device exists on the system.
 pub fn is_framebuffer_available() -> bool {
     #[cfg(target_os = "linux")]
     {
-        let fb_path = std::env::var("FRAMEBUFFER").unwrap_or_else(|_| "/dev/fb0".to_string());
-        Path::new(&fb_path).exists()
+        validated_framebuffer_path().is_some()
     }
     #[cfg(not(target_os = "linux"))]
     {
@@ -327,10 +372,9 @@ pub fn is_framebuffer_available() -> bool {
 pub fn is_framebuffer_permission_denied() -> bool {
     #[cfg(target_os = "linux")]
     {
-        let fb_path = std::env::var("FRAMEBUFFER").unwrap_or_else(|_| "/dev/fb0".to_string());
-        if !Path::new(&fb_path).exists() {
+        let Some(fb_path) = validated_framebuffer_path() else {
             return false;
-        }
+        };
         match std::fs::OpenOptions::new()
             .read(true)
             .write(true)
@@ -347,8 +391,8 @@ pub fn is_framebuffer_permission_denied() -> bool {
 }
 
 /// Interactively prompts the user (when attached to a TTY) to grant `video`
-/// group membership and immediate `/dev/fb0` ACL access via `sudo` or `doas`.
-/// Returns `true` if `/dev/fb0` becomes accessible.
+/// group membership and immediate framebuffer ACL access via `sudo` or `doas`.
+/// Returns `true` if the framebuffer device becomes accessible.
 pub fn ensure_framebuffer_access_interactive() -> bool {
     #[cfg(target_os = "linux")]
     {
@@ -367,11 +411,13 @@ pub fn ensure_framebuffer_access_interactive() -> bool {
             return false;
         }
 
-        let fb_path = std::env::var("FRAMEBUFFER").unwrap_or_else(|_| "/dev/fb0".to_string());
+        let Some(fb_path) = validated_framebuffer_path() else {
+            return false;
+        };
         let user = std::env::var("USER")
             .or_else(|_| std::env::var("LOGNAME"))
             .unwrap_or_default();
-        if user.is_empty() {
+        if !is_valid_unix_username(&user) {
             return false;
         }
 
@@ -417,10 +463,8 @@ if [ -d /etc/udev/rules.d ]; then
     udevadm control --reload-rules 2>/dev/null || true
     udevadm trigger --subsystem-match=graphics 2>/dev/null || true
 fi
-if command -v setfacl >/dev/null 2>&1; then
-    setfacl -m "u:$1:rw" "$2" 2>/dev/null || chmod 0666 "$2" 2>/dev/null || true
-else
-    chmod 0666 "$2" 2>/dev/null || true
+if [ -c "$2" ] && [ ! -L "$2" ] && command -v setfacl >/dev/null 2>&1; then
+    setfacl -m "u:$1:rw" "$2" 2>/dev/null || true
 fi
 "#;
         let _ = std::process::Command::new(priv_cmd)
@@ -652,7 +696,7 @@ impl FramebufferDevice {
             use std::fs::OpenOptions;
             use std::os::unix::io::AsRawFd;
 
-            let fb_path = std::env::var("FRAMEBUFFER").unwrap_or_else(|_| "/dev/fb0".to_string());
+            let fb_path = validated_framebuffer_path()?;
             let file = OpenOptions::new()
                 .read(true)
                 .write(true)
@@ -1114,5 +1158,38 @@ mod tests {
             evaluate_console_env(Some("linux"), Some("tty"), None, None, false, true),
             (false, false)
         );
+    }
+
+    #[test]
+    fn test_framebuffer_path_and_username_validation_issue_92() {
+        // Valid /dev/fb[0-9]+ device names
+        assert!(is_valid_framebuffer_device_name("/dev/fb0"));
+        assert!(is_valid_framebuffer_device_name("/dev/fb1"));
+        assert!(is_valid_framebuffer_device_name("/dev/fb12"));
+
+        // Invalid paths / traversal / arbitrary files
+        assert!(!is_valid_framebuffer_device_name(""));
+        assert!(!is_valid_framebuffer_device_name("/dev/fb"));
+        assert!(!is_valid_framebuffer_device_name("/dev/fb0a"));
+        assert!(!is_valid_framebuffer_device_name("/dev/fb0/../sda"));
+        assert!(!is_valid_framebuffer_device_name("/etc/shadow"));
+        assert!(!is_valid_framebuffer_device_name("dev/fb0"));
+        assert!(!is_valid_framebuffer_device_name("/tmp/fb0"));
+
+        // Unix username validation
+        assert!(is_valid_unix_username("andrew"));
+        assert!(is_valid_unix_username("user_1.test-2"));
+        assert!(!is_valid_unix_username(""));
+        assert!(!is_valid_unix_username("-bad"));
+        assert!(!is_valid_unix_username("user:rw"));
+        assert!(!is_valid_unix_username("user;id"));
+
+        // On Linux, real filesystem check rejects non-char-devices and non-fb paths
+        #[cfg(target_os = "linux")]
+        {
+            assert!(!validate_framebuffer_device_path("/etc/passwd"));
+            assert!(!validate_framebuffer_device_path("/dev/null"));
+            assert!(!validate_framebuffer_device_path("/tmp/fb0"));
+        }
     }
 }
