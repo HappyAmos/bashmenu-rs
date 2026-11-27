@@ -56,41 +56,12 @@ impl Default for PagerArgs {
 
 /// Prints the CLI usage instructions and command-line options for `bmpager`.
 pub fn print_usage() {
-    println!(
-        "Usage: command | bmpager [options]\n       bmpager [options] <file> [file...]\n\n\
-Interactive pager. Text is read from stdin or from the named files, then\n\
-displayed one screenful at a time. Press SPACE for the next page, b for\n\
-the previous page, arrow keys (or j/k) for single lines, and q to quit.\n\n\
-Options:\n  \
-  -h, --help        Show this help and exit.\n  \
-  -V, --version     Print the version and exit.\n  \
-  -m, --markdown    Render input formatted as Markdown.\n  \
-  -w, --wrap        Soft-wrap non-markdown text lines to window width.\n  \
-  +N                Start with line N at the top of the window.\n  \
-  +/PATTERN         Start at the first line containing PATTERN.\n  \
-  -c, --no-color    Discard ANSI escape sequences instead of rendering them.\n  \
-  --no-help         Omit the shortcut hints from the command bar.\n  \
-  --no-file         Do not show filename badge or allow editing current file.\n  \
-  --editor=MODE     Editor mode: 'default' ($EDITOR) or 'builtin' (BashEdit).\n  \
-  --builtin-editor  Use built-in editor (bashedit).\n  \
-  --system-editor   Use system default editor ($EDITOR / $VISUAL).\n  \
-  --max-lines=N     Store at most N input lines (default 1000000).\n  \
-  --file=PATH       Associated file path to open when editing piped streams.\n  \
-  --reload-cmd=CMD  Command to refresh spool after editing piped streams.\n  \
-  -l, --locale=LOC  Override active localization language code.\n\n\
-Keys:\n  \
-  DOWN j            Next line            UP k            Previous line\n  \
-  SPACE f PgDn      Next page            b PgUp          Previous page\n  \
-  Ctrl-D            Half page down       Ctrl-U          Half page up\n  \
-  g Home            Jump to TOP          G End           Jump to BOT\n  \
-  /                 Search forward       n / N           Next / prev match\n  \
-  l o               Follow / open link   e               Open in editor\n  \
-  h ? F1            Help manual modal    q Q Ctrl-C Esc  Quit"
-    );
+    println!("{}", bashmenu_core::t!("cli.bmpager.usage"));
 }
 
 /// Parses command-line arguments into structured `PagerArgs`.
 pub fn parse_cli_args() -> Result<PagerArgs, String> {
+    bashmenu_core::preinit_locale_from_args(true);
     let raw_args: Vec<String> = std::env::args().skip(1).collect();
     let mut args = PagerArgs::default();
     let mut i = 0;

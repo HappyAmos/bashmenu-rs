@@ -226,11 +226,42 @@ fn get_bottom_items() -> [String; 11] {
     ]
 }
 
+/// Builds the localized `clap::Command` for `themeedit`.
+fn build_cli_command() -> clap::Command {
+    use clap::CommandFactory;
+    Cli::command()
+        .about(t!("cli.themeedit.about"))
+        .help_template(t!("cli.help_template"))
+        .disable_help_flag(true)
+        .disable_version_flag(true)
+        .mut_arg("file", |a| a.help(t!("cli.themeedit.file")))
+        .mut_arg("theme", |a| a.help(t!("cli.themeedit.theme")))
+        .mut_arg("local", |a| a.help(t!("cli.themeedit.local")))
+        .mut_arg("locale", |a| a.help(t!("cli.themeedit.locale")))
+        .arg(
+            clap::Arg::new("help")
+                .short('h')
+                .long("help")
+                .action(clap::ArgAction::Help)
+                .help(t!("cli.common.help")),
+        )
+        .arg(
+            clap::Arg::new("version")
+                .short('V')
+                .long("version")
+                .action(clap::ArgAction::Version)
+                .help(t!("cli.common.version")),
+        )
+}
+
 /// Entry point for the theme editor TUI application (`themeedit`).
 fn main() -> Result<()> {
     install_panic_hook();
 
-    let cli = Cli::parse();
+    bashmenu_core::preinit_locale_from_args(false);
+    let matches = build_cli_command().get_matches();
+    let cli =
+        <Cli as clap::FromArgMatches>::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
     let cfg_path = if cli.local {
         PathBuf::from("./bashmenu.yml")
     } else {

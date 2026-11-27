@@ -540,3 +540,112 @@ help:
     | `^V` | Pegar portapapeles |
     | `^Z` / `^Y` | Deshacer / Rehacer |
     | `^Q` / `ESC` | Salir del editor |
+
+cli:
+  help_template: |-
+    {about-with-newline}
+    Uso: {usage}
+
+    {all-args}{after-help}
+  common:
+    help: "Mostrar ayuda"
+    version: "Mostrar versión"
+  cheat:
+    about: "Consultar y mostrar hojas de trucos (cheatsheets)."
+    query: "Consulta de búsqueda para mostrar el archivo Markdown."
+    list: "Listar todos los archivos con etiquetas, o filtrar por una consulta opcional."
+    search: "Buscar hojas de trucos y listar los archivos coincidentes con etiquetas."
+    directory: "Mostrar la ruta del directorio de hojas de trucos configurado."
+    locale: "Sobrescribir el idioma activo (ej. \"en_US\", \"es_ES\", o ruta a archivo YAML)"
+  bashmenu:
+    about: "Sistema moderno de menús de terminal de alto rendimiento en Rust"
+    menu: "Ruta al archivo de definición de menú"
+    config: "Ruta al archivo de configuración"
+    theme: "Sobrescribir el tema activo"
+    shortcuts: "Ruta al archivo de atajos de teclado personalizados (shortcuts.yml)"
+    local: "Cargar y guardar archivos de configuración en el directorio actual"
+    repo: "Cargar archivos de configuración desde el directorio defaults del repositorio"
+    image: "Renderizar imágenes de fondo TrueColor directamente mediante framebuffer"
+    locale: "Sobrescribir el idioma activo (ej. \"en_US\", \"es_ES\", o ruta a archivo YAML)"
+  bashedit:
+    about: "Editor de texto de terminal con recuperación de fallos, pestañas y archivos swap locales"
+    file: "Archivo a editar (dejar vacío para un búfer nuevo sin guardar)"
+    read_only: "Abrir en modo de solo lectura"
+    tabstop: "Ancho de tabulación (espacios por tabulación)"
+    show_whitespace: "Mostrar glifos visibles para espacios y tabulaciones"
+    wrap: "Ajustar líneas largas al ancho de la ventana de terminal"
+    tab_to_spaces: "Convertir pulsaciones de Tab en espacios en lugar de caracteres de tabulación"
+    line: "Número de línea inicial al que saltar"
+    theme: "Nombre del tema a sobrescribir"
+    local: "Cargar y guardar archivos de configuración en el directorio actual"
+    locale: "Sobrescribir el idioma activo (ej. \"en_US\", \"es_ES\", o ruta a archivo YAML)"
+  menuedit:
+    about: "Editor visual interactivo de menús con árbol y panel de propiedades lado a lado"
+    file: "Ruta al archivo de definición de menú"
+    local: "Cargar y guardar archivos de menú en el directorio actual"
+    select_path: "Ruta del elemento seleccionado (índices separados por comas, ej. \"0,2\")"
+    select_title: "Etiqueta o título del elemento seleccionado a enfocar"
+    title_chain: "Cadena jerárquica de títulos para resolución profunda (separada por comas o >)"
+    shortcuts: "Iniciar en modo editor de atajos de teclado (shortcuts.yml)"
+    merge: "Combinar interactivamente un menú de usuario con una plantilla base"
+    user_menu: "Archivo de menú de usuario para modo merge (por defecto bashmenu.mnu)"
+    vanilla_menu: "Archivo de menú plantilla base para modo merge"
+    output_menu: "Archivo de destino para el menú combinado (por defecto user_menu)"
+    backup: "Crear una copia de seguridad en esta ruta antes de escribir el menú combinado"
+    yes: "Aceptar valores predeterminados automáticamente en modo no interactivo"
+    locale: "Sobrescribir el idioma de la interfaz"
+  shortcutedit:
+    about: "Editor visual interactivo de atajos de teclado para shortcuts.yml"
+    file: "Ruta al archivo de configuración shortcuts.yml"
+    local: "Cargar y guardar shortcuts.yml en el directorio actual"
+    locale: "Sobrescribir el idioma de la interfaz"
+  themeedit:
+    about: "Editor visual interactivo de temas con edición de tokens y vistas previas"
+    file: "Ruta al archivo de definición de temas"
+    theme: "Nombre del tema específico a editar"
+    local: "Cargar y guardar archivos de temas en el directorio actual"
+    locale: "Sobrescribir el idioma de la interfaz"
+  ymlcheck:
+    about: "Validador YAML y verificador de esquemas para BashMenu"
+    files: "Ruta a uno o más archivos YAML para validar"
+    themes: "Validar como archivo de paleta de temas (bashmenu.themes)"
+    config: "Validar como archivo de configuración (bashmenu.yml)"
+    menu: "Validar como archivo de estructura de menú (bashmenu.mnu)"
+    shortcuts: "Validar como archivo de atajos de teclado (shortcuts.yml)"
+    locale: "Validar como tabla de cadenas de idioma (ej. locales/es_es.yml)"
+    yaml: "Validar solo sintaxis YAML sin verificación de esquema (predeterminado)"
+  bmpager:
+    usage: |-
+      Uso: comando | bmpager [opciones]
+           bmpager [opciones] <archivo> [archivo...]
+
+      Paginador interactivo. Lee texto desde stdin o los archivos indicados y lo
+      muestra pantalla por pantalla. Pulsa ESPACIO para la página siguiente, b para
+      la anterior, flechas (o j/k) línea por línea y q para salir.
+
+      Opciones:
+        -h, --help        Mostrar esta ayuda y salir.
+        -V, --version     Mostrar la versión y salir.
+        -m, --markdown    Renderizar la entrada formateada como Markdown.
+        -w, --wrap        Ajustar líneas de texto plano al ancho de la ventana.
+        +N                Comenzar en la línea N arriba de la ventana.
+        +/PATRÓN          Comenzar en la primera línea que contenga PATRÓN.
+        -c, --no-color    Descartar secuencias ANSI en lugar de renderizarlas.
+        --no-help         Omitir las pistas de atajos en la barra inferior.
+        --no-file         No mostrar nombre de archivo ni permitir editarlo.
+        --editor=MODO     Modo editor: 'default' ($EDITOR) o 'builtin' (BashEdit).
+        --builtin-editor  Usar editor integrado (bashedit).
+        --system-editor   Usar editor del sistema ($EDITOR / $VISUAL).
+        --max-lines=N     Almacenar como máximo N líneas (predeterminado 1000000).
+        --file=RUTA       Archivo asociado para abrir al editar flujos entubados.
+        --reload-cmd=CMD  Comando para recargar tras editar flujos entubados.
+        -l, --locale=LOC  Sobrescribir el código de idioma activo.
+
+      Teclas:
+        ABAJO j           Siguiente línea      ARRIBA k        Línea anterior
+        ESPACIO f AvPág   Página siguiente     b RePág         Página anterior
+        Ctrl-D            Media página abajo   Ctrl-U          Media página arriba
+        g Inicio          Ir al INICIO         G Fin           Ir al FINAL
+        /                 Buscar adelante      n / N           Coincidencia sig./ant.
+        l o               Abrir enlace         e               Abrir en editor
+        h ? F1            Manual de ayuda      q Q Ctrl-C Esc  Salir

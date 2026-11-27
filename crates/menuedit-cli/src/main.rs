@@ -253,11 +253,51 @@ fn get_footer_items() -> [(String, MenuEditFooterAction); 17] {
     ]
 }
 
+/// Builds the localized `clap::Command` for `menuedit`.
+fn build_cli_command() -> clap::Command {
+    use clap::CommandFactory;
+    Cli::command()
+        .about(t!("cli.menuedit.about"))
+        .help_template(t!("cli.help_template"))
+        .disable_help_flag(true)
+        .disable_version_flag(true)
+        .mut_arg("file", |a| a.help(t!("cli.menuedit.file")))
+        .mut_arg("local", |a| a.help(t!("cli.menuedit.local")))
+        .mut_arg("select_path", |a| a.help(t!("cli.menuedit.select_path")))
+        .mut_arg("select_title", |a| a.help(t!("cli.menuedit.select_title")))
+        .mut_arg("title_chain", |a| a.help(t!("cli.menuedit.title_chain")))
+        .mut_arg("shortcuts", |a| a.help(t!("cli.menuedit.shortcuts")))
+        .mut_arg("merge", |a| a.help(t!("cli.menuedit.merge")))
+        .mut_arg("user_menu", |a| a.help(t!("cli.menuedit.user_menu")))
+        .mut_arg("vanilla_menu", |a| a.help(t!("cli.menuedit.vanilla_menu")))
+        .mut_arg("output_menu", |a| a.help(t!("cli.menuedit.output_menu")))
+        .mut_arg("backup", |a| a.help(t!("cli.menuedit.backup")))
+        .mut_arg("yes", |a| a.help(t!("cli.menuedit.yes")))
+        .mut_arg("locale", |a| a.help(t!("cli.menuedit.locale")))
+        .arg(
+            clap::Arg::new("help")
+                .short('h')
+                .long("help")
+                .action(clap::ArgAction::Help)
+                .help(t!("cli.common.help")),
+        )
+        .arg(
+            clap::Arg::new("version")
+                .short('V')
+                .long("version")
+                .action(clap::ArgAction::Version)
+                .help(t!("cli.common.version")),
+        )
+}
+
 /// Entry point for the Menu Editor TUI application (`menuedit`).
 fn main() -> Result<()> {
     install_panic_hook();
 
-    let cli = Cli::parse();
+    bashmenu_core::preinit_locale_from_args(false);
+    let matches = build_cli_command().get_matches();
+    let cli =
+        <Cli as clap::FromArgMatches>::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
     let cfg_path = resolve_menu_path(Path::new("bashmenu.yml"), cli.local);
     let cfg = load_config(&cfg_path).ok();
 

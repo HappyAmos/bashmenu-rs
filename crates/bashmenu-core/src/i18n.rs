@@ -457,6 +457,62 @@ fn flatten_recursive(prefix: &str, val: &serde_json::Value, out: &mut HashMap<St
     }
 }
 
+/// Extracts a CLI locale override from raw argv tokens (without program name).
+///
+/// Recognizes `--locale <VAL>`, `--locale=<VAL>`, `-L <VAL>`, `-L=<VAL>`, and
+/// (when `accept_lower_l` is `true`, e.g. `bashmenu` and `bmpager`) `-l <VAL>`
+/// and `-l=<VAL>`. Stops scanning at `--`.
+pub fn extract_locale_from_args(args: &[String], accept_lower_l: bool) -> Option<String> {
+    let mut i = 0;
+    while i < args.len() {
+        let arg = args[i].as_str();
+        if arg == "--" {
+            break;
+        }
+        if arg == "--locale" || arg == "-L" || (accept_lower_l && arg == "-l") {
+            if let Some(val) = args.get(i + 1) {
+                if !val.starts_with('-') {
+                    return Some(val.clone());
+                }
+            }
+        } else if let Some(val) = arg.strip_prefix("--locale=") {
+            if !val.is_empty() {
+                return Some(val.to_string());
+            }
+        } else if let Some(val) = arg.strip_prefix("-L=") {
+            if !val.is_empty() {
+                return Some(val.to_string());
+            }
+        } else if accept_lower_l {
+            if let Some(val) = arg.strip_prefix("-l=") {
+                if !val.is_empty() {
+                    return Some(val.to_string());
+                }
+            }
+        }
+        i += 1;
+    }
+    None
+}
+
+/// Pre-initializes the global locale from `std::env::args()`, optional
+/// `bashmenu.yml` config (`settings.locale`), and system environment variables
+/// **before** `clap` parses arguments so `--help` output is localized.
+pub fn preinit_locale_from_args(accept_lower_l: bool) {
+    let raw_args: Vec<String> = std::env::args().skip(1).collect();
+    let cli_locale = extract_locale_from_args(&raw_args, accept_lower_l);
+    let use_local = raw_args.iter().any(|a| a == "--local");
+    let cfg_path = if use_local {
+        PathBuf::from("./bashmenu.yml")
+    } else {
+        crate::resolve_app_path("bashmenu.yml")
+    };
+    let cfg_locale = crate::load_config(&cfg_path)
+        .ok()
+        .and_then(|c| c.settings.locale);
+    init_locale_from_env(cli_locale.as_deref(), cfg_locale.as_deref());
+}
+
 /// Convenience macro for translating keys into the active locale.
 ///
 /// # Examples
@@ -587,5 +643,34 @@ bashedit:
                 key
             );
         }
+    }
+
+    #[test]
+    fn test_extract_locale_from_args() {
+        let mk = |items: &[&str]| items.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(
+            extract_locale_from_args(&mk(&["--locale", "es_es", "--help"]), false),
+            Some("es_es".to_string())
+        );
+        assert_eq!(
+            extract_locale_from_args(&mk(&["--locale=es_ES", "-h"]), false),
+            Some("es_ES".to_string())
+        );
+        assert_eq!(
+            extract_locale_from_args(&mk(&["-L", "es_es", "--help"]), false),
+            Some("es_es".to_string())
+        );
+        assert_eq!(
+            extract_locale_from_args(&mk(&["-l", "es_es", "--help"]), false),
+            None
+        );
+        assert_eq!(
+            extract_locale_from_args(&mk(&["-l", "es_es", "--help"]), true),
+            Some("es_es".to_string())
+        );
+        assert_eq!(
+            extract_locale_from_args(&mk(&["--", "--locale", "es_es"]), false),
+            None
+        );
     }
 }

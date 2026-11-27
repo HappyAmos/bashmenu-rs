@@ -542,3 +542,112 @@ help:
     | `^V` | Paste Buffer / Clipboard |
     | `^Z` / `^Y` | Undo / Redo |
     | `^Q` / `ESC` | Exit Editor |
+
+cli:
+  help_template: |-
+    {about-with-newline}
+    Usage: {usage}
+
+    {all-args}{after-help}
+  common:
+    help: "Print help"
+    version: "Print version"
+  cheat:
+    about: "Query and display cheatsheets."
+    query: "Search query to display markdown file."
+    list: "List all files with tags, or list matching files for an optional query."
+    search: "Search cheatsheets and list matching files with tags."
+    directory: "Print the configured cheatsheets directory path."
+    locale: "Override active locale (e.g. \"en_US\", \"es_ES\", or path to YAML locale file)"
+  bashmenu:
+    about: "Modern, high-performance terminal menu system in Rust"
+    menu: "Path to menu definition file"
+    config: "Path to configuration file"
+    theme: "Override active theme"
+    shortcuts: "Path to custom keyboard shortcuts file (shortcuts.yml)"
+    local: "Load and save configuration files in current working directory"
+    repo: "Load configuration files from the repository defaults directory"
+    image: "Render full-resolution TrueColor background images directly via framebuffer"
+    locale: "Override active locale (e.g. \"en_US\", \"es_ES\", or path to YAML locale file)"
+  bashedit:
+    about: "Terminal text editor with crash recovery, tabs, and colocated swap files"
+    file: "File to edit (leave blank for empty unsaved buffer)"
+    read_only: "Open in read-only mode"
+    tabstop: "Tab stop width (spaces per tab)"
+    show_whitespace: "Display visible glyphs for space and tab characters"
+    wrap: "Soft-wrap long lines to fit terminal viewport"
+    tab_to_spaces: "Convert tab keypresses to spaces instead of raw tab characters"
+    line: "Initial line number to jump to"
+    theme: "Theme override name"
+    local: "Load and save configuration files in current working directory"
+    locale: "Override active locale (e.g. \"en_US\", \"es_ES\", or path to YAML locale file)"
+  menuedit:
+    about: "Interactive visual menu editor with side-by-side tree and property inspector"
+    file: "Path to menu definition file"
+    local: "Load and save menu files in current working directory"
+    select_path: "Selected item path (comma-separated indices, e.g. \"0,2\")"
+    select_title: "Selected item label or title to focus"
+    title_chain: "Hierarchical title chain for deep node resolution (comma or > separated)"
+    shortcuts: "Launch in Keyboard Shortcuts editor mode (shortcuts.yml)"
+    merge: "Interactively merge a user menu with an upstream vanilla template"
+    user_menu: "User menu file for merge mode (defaults to user's bashmenu.mnu)"
+    vanilla_menu: "Vanilla / upstream template menu file for merge mode"
+    output_menu: "Destination file for merged menu (defaults to user_menu)"
+    backup: "Create a backup file at this path before writing merged menu"
+    yes: "Automatically accept defaults in non-interactive mode"
+    locale: "Override interface display locale"
+  shortcutedit:
+    about: "Interactive visual keyboard shortcuts editor for shortcuts.yml"
+    file: "Path to shortcuts.yml configuration file"
+    local: "Load and save shortcuts.yml in the current working directory"
+    locale: "Override interface display locale"
+  themeedit:
+    about: "Interactive visual theme editor with side-by-side token editing and multi-view previews"
+    file: "Path to theme definition file"
+    theme: "Name of specific theme to edit"
+    local: "Load and save theme files in current working directory"
+    locale: "Override interface display locale"
+  ymlcheck:
+    about: "YAML validator and schema linter for BashMenu"
+    files: "Path to one or more YAML files to validate"
+    themes: "Validate as a theme palette file (bashmenu.themes)"
+    config: "Validate as a settings configuration file (bashmenu.yml)"
+    menu: "Validate as a menu structure file (bashmenu.mnu)"
+    shortcuts: "Validate as a custom keyboard shortcuts file (shortcuts.yml)"
+    locale: "Validate as a translation locale string table (e.g. locales/es_es.yml)"
+    yaml: "Validate YAML syntax only with no schema enforcement (default)"
+  bmpager:
+    usage: |-
+      Usage: command | bmpager [options]
+             bmpager [options] <file> [file...]
+
+      Interactive pager. Text is read from stdin or from the named files, then
+      displayed one screenful at a time. Press SPACE for the next page, b for
+      the previous page, arrow keys (or j/k) for single lines, and q to quit.
+
+      Options:
+        -h, --help        Show this help and exit.
+        -V, --version     Print the version and exit.
+        -m, --markdown    Render input formatted as Markdown.
+        -w, --wrap        Soft-wrap non-markdown text lines to window width.
+        +N                Start with line N at the top of the window.
+        +/PATTERN         Start at the first line containing PATTERN.
+        -c, --no-color    Discard ANSI escape sequences instead of rendering them.
+        --no-help         Omit the shortcut hints from the command bar.
+        --no-file         Do not show filename badge or allow editing current file.
+        --editor=MODE     Editor mode: 'default' ($EDITOR) or 'builtin' (BashEdit).
+        --builtin-editor  Use built-in editor (bashedit).
+        --system-editor   Use system default editor ($EDITOR / $VISUAL).
+        --max-lines=N     Store at most N input lines (default 1000000).
+        --file=PATH       Associated file path to open when editing piped streams.
+        --reload-cmd=CMD  Command to refresh spool after editing piped streams.
+        -l, --locale=LOC  Override active localization language code.
+
+      Keys:
+        DOWN j            Next line            UP k            Previous line
+        SPACE f PgDn      Next page            b PgUp          Previous page
+        Ctrl-D            Half page down       Ctrl-U          Half page up
+        g Home            Jump to TOP          G End           Jump to BOT
+        /                 Search forward       n / N           Next / prev match
+        l o               Follow / open link   e               Open in editor
+        h ? F1            Help manual modal    q Q Ctrl-C Esc  Quit

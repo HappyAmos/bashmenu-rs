@@ -764,9 +764,49 @@ fn validate_locale_file(path: &Path) -> bool {
     passed
 }
 
+/// Builds the localized `clap::Command` for `ymlcheck`.
+fn build_cli_command() -> clap::Command {
+    use bashmenu_core::t;
+    use clap::CommandFactory;
+    Cli::command()
+        .about(t!("cli.ymlcheck.about"))
+        .help_template(t!("cli.help_template"))
+        .disable_help_flag(true)
+        .disable_version_flag(true)
+        .mut_arg("files", |a| a.help(t!("cli.ymlcheck.files")))
+        .mut_arg("themes", |a| a.help(t!("cli.ymlcheck.themes")))
+        .mut_arg("config", |a| a.help(t!("cli.ymlcheck.config")))
+        .mut_arg("menu", |a| a.help(t!("cli.ymlcheck.menu")))
+        .mut_arg("shortcuts", |a| a.help(t!("cli.ymlcheck.shortcuts")))
+        .mut_arg("locale", |a| a.help(t!("cli.ymlcheck.locale")))
+        .mut_arg("yaml", |a| a.help(t!("cli.ymlcheck.yaml")))
+        .arg(
+            clap::Arg::new("help")
+                .short('h')
+                .long("help")
+                .action(clap::ArgAction::Help)
+                .help(t!("cli.common.help")),
+        )
+        .arg(
+            clap::Arg::new("version")
+                .short('V')
+                .long("version")
+                .action(clap::ArgAction::Version)
+                .help(t!("cli.common.version")),
+        )
+}
+
 /// CLI entrypoint for `ymlcheck`.
 fn main() {
-    let cli = Cli::parse();
+    let cfg_path = bashmenu_core::resolve_app_path("bashmenu.yml");
+    let cfg_locale = bashmenu_core::load_config(&cfg_path)
+        .ok()
+        .and_then(|c| c.settings.locale);
+    bashmenu_core::init_locale_from_env(None, cfg_locale.as_deref());
+
+    let matches = build_cli_command().get_matches();
+    let cli =
+        <Cli as clap::FromArgMatches>::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
 
     let mut all_passed = true;
     for file in &cli.files {

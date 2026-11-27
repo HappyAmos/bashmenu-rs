@@ -273,12 +273,47 @@ fn locate_tool(name: &str) -> PathBuf {
     found
 }
 
+/// Builds the localized `clap::Command` for `bashmenu`.
+fn build_cli_command() -> clap::Command {
+    use clap::CommandFactory;
+    Cli::command()
+        .about(t!("cli.bashmenu.about"))
+        .help_template(t!("cli.help_template"))
+        .disable_help_flag(true)
+        .disable_version_flag(true)
+        .mut_arg("menu", |a| a.help(t!("cli.bashmenu.menu")))
+        .mut_arg("config", |a| a.help(t!("cli.bashmenu.config")))
+        .mut_arg("theme", |a| a.help(t!("cli.bashmenu.theme")))
+        .mut_arg("shortcuts", |a| a.help(t!("cli.bashmenu.shortcuts")))
+        .mut_arg("local", |a| a.help(t!("cli.bashmenu.local")))
+        .mut_arg("repo", |a| a.help(t!("cli.bashmenu.repo")))
+        .mut_arg("image", |a| a.help(t!("cli.bashmenu.image")))
+        .mut_arg("locale", |a| a.help(t!("cli.bashmenu.locale")))
+        .arg(
+            clap::Arg::new("help")
+                .short('h')
+                .long("help")
+                .action(clap::ArgAction::Help)
+                .help(t!("cli.common.help")),
+        )
+        .arg(
+            clap::Arg::new("version")
+                .short('V')
+                .long("version")
+                .action(clap::ArgAction::Version)
+                .help(t!("cli.common.version")),
+        )
+}
+
 /// Main application entrypoint for `bashmenu`.
 fn main() -> Result<()> {
     // 1. Terminal Panic Recovery Hook Invariant
     install_panic_hook();
 
-    let cli = Cli::parse();
+    bashmenu_core::preinit_locale_from_args(true);
+    let matches = build_cli_command().get_matches();
+    let cli =
+        <Cli as clap::FromArgMatches>::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
 
     let repo_dir = if cli.repo {
         let home = std::env::var("HOME")
