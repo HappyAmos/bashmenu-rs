@@ -159,30 +159,67 @@ pub fn format_icon_slot(raw_icon: Option<&str>, use_nerd_fonts: bool) -> String 
 }
 
 /// Resolves filesystem path to an extension script (e.g. `glyphs.sh`).
-pub fn resolve_script_path(script_name: &str) -> Option<PathBuf> {
-    if let Ok(dir) = std::env::var("BASHMENU_DIR") {
-        let p = PathBuf::from(dir).join("scripts").join(script_name);
-        if p.exists() {
+/// Resolves a helper script filename inside trusted `roots` directories only.
+///
+/// Rejects path separators and `..` traversal components, and never searches
+/// CWD-relative paths.
+fn resolve_script_path_in_roots(script_name: &str, roots: &[PathBuf]) -> Option<PathBuf> {
+    if script_name.is_empty()
+        || script_name.contains('/')
+        || script_name.contains('\\')
+        || script_name.contains("..")
+    {
+        return None;
+    }
+    for root in roots {
+        let p = root.join(script_name);
+        if p.is_file() {
             return Some(p);
+        }
+    }
+    None
+}
+
+/// Resolves a helper script path (e.g. `webopen.sh`, `glyphs.sh`) strictly
+/// within trusted install and user configuration directories.
+///
+/// Never falls back to CWD-relative `scripts/` paths.
+pub fn resolve_script_path(script_name: &str) -> Option<PathBuf> {
+    let mut roots: Vec<PathBuf> = Vec::new();
+
+    if let Ok(dir) = std::env::var("BASHMENU_DIR") {
+        let trimmed = dir.trim();
+        if !trimmed.is_empty() {
+            roots.push(PathBuf::from(trimmed).join("scripts"));
+        }
+    }
+    if let Ok(xdg) = std::env::var("XDG_CONFIG_HOME") {
+        let trimmed = xdg.trim();
+        if !trimmed.is_empty() {
+            roots.push(PathBuf::from(trimmed).join("bashmenu/scripts"));
         }
     }
     if let Ok(home) = std::env::var("HOME") {
-        let p = PathBuf::from(home)
-            .join(".config/bashmenu/scripts")
-            .join(script_name);
-        if p.exists() {
-            return Some(p);
+        let trimmed = home.trim();
+        if !trimmed.is_empty() {
+            roots.push(PathBuf::from(trimmed).join(".config/bashmenu/scripts"));
         }
     }
-    let local = PathBuf::from("scripts").join(script_name);
-    if local.exists() {
-        return Some(local);
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(exe_dir) = exe.parent() {
+            roots.push(exe_dir.join("scripts"));
+            if let Some(parent) = exe_dir.parent() {
+                roots.push(parent.join("share/bashmenu/scripts"));
+            }
+        }
     }
-    let parent = PathBuf::from("..").join("scripts").join(script_name);
-    if parent.exists() {
-        return Some(parent);
+    #[cfg(unix)]
+    {
+        roots.push(PathBuf::from("/usr/local/share/bashmenu/scripts"));
+        roots.push(PathBuf::from("/usr/share/bashmenu/scripts"));
     }
-    None
+
+    resolve_script_path_in_roots(script_name, &roots)
 }
 
 /// Executes external `glyphs.sh` helper script if available, or returns a formatted
@@ -251,5 +288,36 @@ mod tests {
         let none_col = format_icon_slot(None, true);
         assert_eq!(UnicodeWidthStr::width(none_col.as_str()), 4);
         assert_eq!(none_col, "    ");
+    }
+
+    #[test]
+    fn test_resolve_script_path_trusted_roots_only_issue_94() {
+        let tmp =
+            std::env::temp_dir().join(format!("bashmenu_issue94_test_{}", std::process::id()));
+        let trusted_scripts = tmp.join("trusted/scripts");
+        let _ = std::fs::create_dir_all(&trusted_scripts);
+        let trusted_webopen = trusted_scripts.join("webopen.sh");
+        std::fs::write(&trusted_webopen, "#!/bin/sh\n").expect("write trusted script");
+
+        let roots = std::slice::from_ref(&trusted_scripts);
+
+        // Resolves script inside trusted roots
+        assert_eq!(
+            resolve_script_path_in_roots("webopen.sh", roots),
+            Some(trusted_webopen.clone())
+        );
+
+        // Rejects path traversal and path separators
+        assert_eq!(resolve_script_path_in_roots("../webopen.sh", roots), None);
+        assert_eq!(
+            resolve_script_path_in_roots("scripts/webopen.sh", roots),
+            None
+        );
+        assert_eq!(resolve_script_path_in_roots("", roots), None);
+
+        // Empty trusted roots never fall back to CWD
+        assert_eq!(resolve_script_path_in_roots("webopen.sh", &[]), None);
+
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 }
