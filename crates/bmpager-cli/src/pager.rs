@@ -102,8 +102,20 @@ impl Pager {
     /// mode and terminal width, clamping `top_line` safely.
     pub fn rebuild_lines(&mut self) {
         let width = self.cols.clamp(20, 500);
+        let md_base_dir = self
+            .args
+            .associated_file
+            .as_ref()
+            .or_else(|| self.args.files.first())
+            .and_then(|p| p.parent())
+            .map(std::path::Path::to_path_buf);
         let mut rebuilt: Vec<String> = if self.args.markdown {
-            let rendered = crate::markdown::render_markdown(&self.raw_content, width);
+            let rendered = crate::markdown::render_markdown_with_options(
+                &self.raw_content,
+                width,
+                md_base_dir.as_deref(),
+                !self.args.strip_colors,
+            );
             rendered.lines().map(|s| s.to_string()).collect()
         } else if self.args.wrap_text {
             crate::ansi::wrap_text_content(&self.raw_content, width)

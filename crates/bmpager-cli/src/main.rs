@@ -83,8 +83,19 @@ fn main() {
     let term_width = (cols as usize).clamp(20, 500);
 
     // 5. Format and split content into lines
+    let md_base_dir = args
+        .associated_file
+        .as_ref()
+        .or_else(|| args.files.first())
+        .and_then(|p| p.parent())
+        .map(std::path::Path::to_path_buf);
     let mut lines: Vec<String> = if is_markdown {
-        let rendered = markdown::render_markdown(&raw_content, term_width);
+        let rendered = markdown::render_markdown_with_options(
+            &raw_content,
+            term_width,
+            md_base_dir.as_deref(),
+            !args.strip_colors,
+        );
         rendered.lines().map(|s| s.to_string()).collect()
     } else if args.wrap_text {
         ansi::wrap_text_content(&raw_content, term_width)

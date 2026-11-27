@@ -208,3 +208,54 @@ fn test_bmpager_wrap_flag_plain_text() {
     assert!(!lines.is_empty());
     assert!(out_str.contains("soft word-wrapping"));
 }
+
+#[test]
+fn test_bmpager_markdown_image_halfblock_and_fallback() {
+    let dir = std::env::temp_dir().join(format!("bmpager_img_test_{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&dir);
+    let img_path = dir.join("pixel.png");
+    let md_path = dir.join("doc.md");
+
+    // Create a tiny 4x4 PNG (top 2 rows red, bottom 2 rows blue)
+    let mut img = image::RgbaImage::new(4, 4);
+    for y in 0..4 {
+        for x in 0..4 {
+            let px = if y < 2 {
+                image::Rgba([255, 0, 0, 255])
+            } else {
+                image::Rgba([0, 0, 255, 255])
+            };
+            img.put_pixel(x, y, px);
+        }
+    }
+    img.save(&img_path).expect("save temp png");
+
+    let md = "# Image Test\n\n![Red Blue Swatch](pixel.png)\n\n![Missing](nope.png)\n";
+    std::fs::write(&md_path, md).expect("write temp md");
+
+    // 1. Color mode renders TrueColor half-block cells + caption + missing fallback
+    let out = bmpager_cmd()
+        .args(["--markdown", md_path.to_str().unwrap()])
+        .output()
+        .expect("run bmpager --markdown");
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("▀") && stdout.contains("38;2;255;0;0"),
+        "expected TrueColor half-block rendering, got:\n{stdout}"
+    );
+    assert!(stdout.contains("Red Blue Swatch"));
+    assert!(stdout.contains("[Image: Missing (nope.png)]"));
+
+    // 2. --no-color falls back cleanly without half-block pixels
+    let out_nc = bmpager_cmd()
+        .args(["--markdown", "--no-color", md_path.to_str().unwrap()])
+        .output()
+        .expect("run bmpager --markdown --no-color");
+    assert!(out_nc.status.success());
+    let stdout_nc = String::from_utf8_lossy(&out_nc.stdout);
+    assert!(stdout_nc.contains("[Image: Red Blue Swatch (pixel.png)]"));
+    assert!(!stdout_nc.contains('▀'));
+
+    let _ = std::fs::remove_dir_all(&dir);
+}

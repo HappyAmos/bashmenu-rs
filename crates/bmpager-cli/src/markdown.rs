@@ -2,10 +2,24 @@
 //! matching the rich styling of `rich.sh`.
 
 use pulldown_cmark::{Event, HeadingLevel, Options, Parser, Tag, TagEnd};
+use std::path::{Path, PathBuf};
 use unicode_width::UnicodeWidthStr;
 
 /// Render Markdown string into terminal ANSI text wrapped to `terminal_width`.
+#[allow(dead_code)]
 pub fn render_markdown(source: &str, terminal_width: usize) -> String {
+    render_markdown_with_options(source, terminal_width, None, true)
+}
+
+/// Render Markdown string into terminal ANSI text wrapped to `terminal_width`,
+/// resolving relative `![alt](path)` image tags against `base_dir` and rendering
+/// them via Unicode half-block TrueColor ANSI when `allow_images` is `true`.
+pub fn render_markdown_with_options(
+    source: &str,
+    terminal_width: usize,
+    base_dir: Option<&Path>,
+    allow_images: bool,
+) -> String {
     let width = terminal_width.clamp(40, 160);
     let mut options = Options::empty();
     options.insert(Options::ENABLE_TABLES);
@@ -14,7 +28,7 @@ pub fn render_markdown(source: &str, terminal_width: usize) -> String {
     options.insert(Options::ENABLE_HEADING_ATTRIBUTES);
 
     let parser = Parser::new_ext(source, options);
-    let mut renderer = MarkdownRenderer::new(width);
+    let mut renderer = MarkdownRenderer::new(width, base_dir.map(Path::to_path_buf), allow_images);
     renderer.run(parser);
     renderer.finish()
 }
@@ -39,6 +53,14 @@ struct MarkdownRenderer {
     list_stack: Vec<ListState>,
     /// Target URL for markdown links being rendered
     link_url: Option<String>,
+    /// Target path/URL for a markdown image tag currently being parsed
+    image_dest: Option<String>,
+    /// Accumulated alt text for the active markdown image tag
+    image_alt: String,
+    /// Optional base directory for resolving relative image paths
+    base_dir: Option<PathBuf>,
+    /// Whether ANSI half-block image rendering is enabled (false under `--no-color`)
+    allow_images: bool,
     /// Whether parser is inside a markdown table
     in_table: bool,
     /// Whether parser is currently in the table header row
@@ -70,7 +92,7 @@ enum ListState {
 
 impl MarkdownRenderer {
     /// Initializes a new MarkdownRenderer with the given viewport column width.
-    fn new(width: usize) -> Self {
+    fn new(width: usize, base_dir: Option<PathBuf>, allow_images: bool) -> Self {
         Self {
             width,
             output: String::new(),
@@ -81,6 +103,10 @@ impl MarkdownRenderer {
             code_block_text: String::new(),
             list_stack: Vec::new(),
             link_url: None,
+            image_dest: None,
+            image_alt: String::new(),
+            base_dir,
+            allow_images,
             in_table: false,
             table_head: false,
             table_rows: Vec::new(),
@@ -258,8 +284,20 @@ impl MarkdownRenderer {
                 Event::End(TagEnd::Link) => {
                     self.link_url = None;
                 }
+                Event::Start(Tag::Image { dest_url, .. }) => {
+                    self.image_dest = Some(dest_url.to_string());
+                    self.image_alt.clear();
+                }
+                Event::End(TagEnd::Image) => {
+                    if let Some(dest) = self.image_dest.take() {
+                        let alt = std::mem::take(&mut self.image_alt);
+                        self.emit_image(&dest, &alt);
+                    }
+                }
                 Event::Text(text) => {
-                    if self.heading_level.is_some() {
+                    if self.image_dest.is_some() {
+                        self.image_alt.push_str(&text);
+                    } else if self.heading_level.is_some() {
                         self.heading_text.push_str(&text);
                     } else if self.in_code_block {
                         self.code_block_text.push_str(&text);
@@ -619,10 +657,131 @@ impl MarkdownRenderer {
         self.output.push('\n');
     }
 
+    /// Renders a Markdown `![alt](dest)` image using Unicode half-block TrueColor
+    /// ANSI cells (`▀`/`▄`) when a local image file can be decoded, or falls back
+    /// cleanly to a compact `[Image: ...]` badge.
+    fn emit_image(&mut self, dest: &str, alt: &str) {
+        let dest_trimmed = dest.trim();
+        let alt_trimmed = alt.trim();
+        let fallback_label = if alt_trimmed.is_empty() {
+            dest_trimmed.to_string()
+        } else {
+            format!("{alt_trimmed} ({dest_trimmed})")
+        };
+
+        if self.in_table {
+            self.current_cell
+                .push_str(&format!("[Image: {fallback_label}]"));
+            return;
+        }
+
+        let is_remote = dest_trimmed.starts_with("http://")
+            || dest_trimmed.starts_with("https://")
+            || dest_trimmed.starts_with("data:");
+
+        if !self.allow_images || is_remote || dest_trimmed.is_empty() {
+            self.flush_line();
+            self.ensure_blank_line();
+            if dest_trimmed.starts_with("http://") || dest_trimmed.starts_with("https://") {
+                self.output.push_str(&format!(
+                    "\x1b]8;;{dest_trimmed}\x1b\\\x1b[2;36m[Image: {fallback_label}]\x1b[0m\x1b]8;;\x1b\\\n"
+                ));
+            } else {
+                self.output
+                    .push_str(&format!("\x1b[2;33m[Image: {fallback_label}]\x1b[0m\n"));
+            }
+            return;
+        }
+
+        let resolved = resolve_markdown_image_path(dest_trimmed, self.base_dir.as_deref());
+        let Ok(img) = image::open(&resolved) else {
+            self.flush_line();
+            self.ensure_blank_line();
+            self.output
+                .push_str(&format!("\x1b[2;33m[Image: {fallback_label}]\x1b[0m\n"));
+            return;
+        };
+
+        let img_w = img.width().max(1);
+        let img_h = img.height().max(1);
+        let max_cols = self.width.saturating_sub(2).clamp(8, 120);
+        let max_rows = 28usize;
+        let scale_w = max_cols as f64 / img_w as f64;
+        let scale_h = (max_rows * 2) as f64 / img_h as f64;
+        let scale = scale_w.min(scale_h).min(1.0);
+        let target_w = ((img_w as f64 * scale).round() as u32).max(1);
+        let target_h = ((img_h as f64 * scale).round() as u32).max(2);
+
+        let rgba = img
+            .resize_exact(target_w, target_h, image::imageops::FilterType::Triangle)
+            .to_rgba8();
+
+        self.flush_line();
+        self.ensure_blank_line();
+
+        let mut y = 0u32;
+        while y < target_h {
+            let mut row = String::with_capacity(target_w as usize * 24);
+            for x in 0..target_w {
+                let top = rgba.get_pixel(x, y).0;
+                let bot = if y + 1 < target_h {
+                    rgba.get_pixel(x, y + 1).0
+                } else {
+                    [0, 0, 0, 0]
+                };
+                let top_vis = top[3] >= 128;
+                let bot_vis = bot[3] >= 128;
+                match (top_vis, bot_vis) {
+                    (false, false) => row.push_str("\x1b[0m "),
+                    (true, false) => row.push_str(&format!(
+                        "\x1b[0m\x1b[38;2;{};{};{}m▀",
+                        top[0], top[1], top[2]
+                    )),
+                    (false, true) => row.push_str(&format!(
+                        "\x1b[0m\x1b[38;2;{};{};{}m▄",
+                        bot[0], bot[1], bot[2]
+                    )),
+                    (true, true) => row.push_str(&format!(
+                        "\x1b[38;2;{};{};{};48;2;{};{};{}m▀",
+                        top[0], top[1], top[2], bot[0], bot[1], bot[2]
+                    )),
+                }
+            }
+            row.push_str("\x1b[0m\n");
+            self.output.push_str(&row);
+            y += 2;
+        }
+
+        if !alt_trimmed.is_empty() {
+            self.output
+                .push_str(&format!("\x1b[2;3m  {alt_trimmed}\x1b[0m\n"));
+        }
+    }
+
     /// Finalizes rendering, flushing any trailing text line, and returns formatted ANSI text.
     fn finish(mut self) -> String {
         self.flush_line();
         self.output
+    }
+}
+
+/// Resolves a Markdown image path against `base_dir` (expanding leading `~/`).
+fn resolve_markdown_image_path(raw: &str, base_dir: Option<&Path>) -> PathBuf {
+    let expanded = if let Some(rest) = raw.strip_prefix("~/") {
+        if let Ok(home) = std::env::var("HOME") {
+            PathBuf::from(home).join(rest)
+        } else {
+            PathBuf::from(raw)
+        }
+    } else {
+        PathBuf::from(raw)
+    };
+    if expanded.is_absolute() {
+        expanded
+    } else if let Some(dir) = base_dir {
+        dir.join(expanded)
+    } else {
+        expanded
     }
 }
 
