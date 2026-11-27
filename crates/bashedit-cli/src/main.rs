@@ -968,7 +968,8 @@ fn main() -> Result<()> {
                             continue;
                         }
                         KeyCode::F(5) => {
-                            let ph_ctx = MacroContext::new(&config);
+                            let ph_ctx =
+                                MacroContext::new(&config).with_allow_command_macros(false);
                             let ph_text = render_placeholder_help_text(&ph_ctx);
                             active_modal = ActiveModal::PlaceholdersHelp(
                                 HelpModal::new(t!("bashedit.placeholders_title"), &ph_text)
@@ -1513,7 +1514,8 @@ fn main() -> Result<()> {
                                             ));
                                     }
                                     FooterAction::PlaceholdersHelp => {
-                                        let ph_ctx = MacroContext::new(&config);
+                                        let ph_ctx = MacroContext::new(&config)
+                                            .with_allow_command_macros(false);
                                         let ph_text = render_placeholder_help_text(&ph_ctx);
                                         active_modal = ActiveModal::PlaceholdersHelp(
                                             HelpModal::new(

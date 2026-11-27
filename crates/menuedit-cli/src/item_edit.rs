@@ -2965,7 +2965,7 @@ impl FormRow {
 /// Renders a single menu item preview line matching Python `render_menu_item_preview()`
 pub fn render_item_preview_line(item: &MenuItem, avail_w: usize) -> String {
     let cfg = BashMenuConfig::default();
-    let ctx = MacroContext::new(&cfg);
+    let ctx = MacroContext::new(&cfg).with_allow_command_macros(false);
     let expanded_title = interpolate_placeholders(&item.label, &ctx);
     let (left_raw, right_raw) = split_label_brackets(&expanded_title);
     let left_clean = strip_bbcode(left_raw);

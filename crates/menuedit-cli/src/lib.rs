@@ -125,7 +125,7 @@ pub fn format_inspector_text(
 ) -> Vec<String> {
     let default_cfg = BashMenuConfig::default();
     let effective_cfg = cfg.unwrap_or(&default_cfg);
-    let mut ctx = MacroContext::new(effective_cfg);
+    let mut ctx = MacroContext::new(effective_cfg).with_allow_command_macros(false);
     ctx.window_width = avail_w;
 
     if item.is_divider() {
