@@ -587,8 +587,8 @@ impl MarkdownRenderer {
                 self.output.push('\n');
             }
 
-            // Separator line after header row: ├───┼───┤
-            if r_idx == 0 && self.table_rows.len() > 1 {
+            // Separator line between rows (header and each data entry): ├───┼───┤
+            if r_idx + 1 < self.table_rows.len() {
                 let mut sep_line = format!("{}├", border_color);
                 for (i, w) in col_widths.iter().enumerate() {
                     sep_line.push_str(&"─".repeat(w + 2));

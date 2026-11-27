@@ -673,17 +673,17 @@ backticks (\fB`...`\fR) with optional spaces around \fB:\fR and \fB=\fR,
 supports \fB\\n\fR line breaks and nested placeholders, and can be used
 standalone or prepended to a command.
 .TP
-.B {input:default="":id=VAR:width=XX:multiline=false:scrollbar=true:masked=false}
+.B {input:id=VAR:default="":...}
 Embeds an interactive form input field inside an \fBinteractive: true\fR
-Markdown modal (\fB{info:<path>}\fR). Single-line inputs following text render
-inline; \fBwidth\fR defaults to the remaining width to the right margin,
-\fBmultiline\fR defaults to \fBfalse\fR (default \fBheight=5\fR rows when
-\fBtrue\fR), \fBscrollbar\fR defaults to \fBtrue\fR (multiline only), and
-\fBmasked\fR defaults to \fBfalse\fR (masks typed characters with \fB*\fR when
-\fBtrue\fR).
-Pressing \fBEnter\fR (or \fBCtrl+Enter\fR in multiline) soft-refreshes live
-\fB{id:VAR}\fR placeholders; clicking \fB[ OK ]\fR exports every \fBid\fR as a
-Bash variable into \fBbashmenu-bash\fR code blocks.
+Markdown modal (\fB{info:<path>}\fR). Supported attributes: \fBid\fR (Bash
+variable name), \fBdefault\fR (\fB""\fR), \fBwidth\fR (defaults to remaining
+width to right margin), \fBmultiline\fR (\fBfalse\fR), \fBheight\fR (\fB5\fR
+rows when multiline), \fBscrollbar\fR (\fBtrue\fR, multiline only), and
+\fBmasked\fR (\fBfalse\fR, masks typed characters with \fB*\fR). Single-line
+inputs following text render inline. Pressing \fBEnter\fR (or \fBCtrl+Enter\fR
+in multiline) soft-refreshes live \fB{id:VAR}\fR placeholders; activating a
+\fBsubmit\fR/\fBok\fR button exports every \fBid\fR as a Bash variable into
+\fBbashmenu-bash\fR code blocks.
 .TP
 .B {radio:VAR:"Option 1":"Option 2"}
 Embeds a single-choice radio button group inside an \fBinteractive: true\fR

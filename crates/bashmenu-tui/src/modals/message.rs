@@ -411,8 +411,9 @@ fn render_table(
     mid_spans.push(ratatui::text::Span::styled("┤", border_style));
     out_lines.push(ratatui::text::Line::from(mid_spans));
 
-    // 4. Data rows
-    for r in table_rows.iter().skip(1) {
+    // 4. Data rows (with row dividers between entries)
+    let data_count = table_rows.len().saturating_sub(1);
+    for (row_idx, r) in table_rows.iter().skip(1).enumerate() {
         let cell_lines: Vec<Vec<String>> = (0..cols)
             .map(|c| {
                 let cell_text = r.get(c).map(|s| s.as_str()).unwrap_or("");
@@ -437,6 +438,21 @@ fn render_table(
                 row_spans.push(ratatui::text::Span::styled("│", border_style));
             }
             out_lines.push(ratatui::text::Line::from(row_spans));
+        }
+        if row_idx + 1 < data_count {
+            let mut div_spans = Vec::new();
+            div_spans.push(ratatui::text::Span::styled("├", border_style));
+            for (c, &cw) in col_widths.iter().enumerate() {
+                div_spans.push(ratatui::text::Span::styled(
+                    "─".repeat(cw + 2),
+                    border_style,
+                ));
+                if c + 1 < cols {
+                    div_spans.push(ratatui::text::Span::styled("┼", border_style));
+                }
+            }
+            div_spans.push(ratatui::text::Span::styled("┤", border_style));
+            out_lines.push(ratatui::text::Line::from(div_spans));
         }
     }
 
