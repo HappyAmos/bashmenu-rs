@@ -3779,3 +3779,49 @@ fn test_color_picker_apply_to_base_checkbox_and_base_write() {
         );
     }
 }
+
+#[test]
+fn test_input_box_tokens_sidebar_display_matches_color_picker() {
+    use ratatui::style::Color;
+    use themeedit_cli::{PreviewMode, TokenKind};
+
+    let themes_path = get_fixture_path("bashmenu.themes");
+    let mut state = ThemeEditorState::new(themes_path, Some("dracula".to_string()));
+    state.preview_mode = PreviewMode::Modals;
+
+    // Set distinct FG and BG on both focused and unfocused input boxes (including TrueColor)
+    state.set_color_token_value("input_box", Color::Indexed(40));
+    state.set_color_token_value("input_box_text", Color::Rgb(0x1a, 0x2b, 0x3c));
+    state.set_color_token_value("input_box_unfocused", Color::Indexed(28));
+    state.set_color_token_value("input_box_unfocused_text", Color::Indexed(250));
+
+    let find_disp = |key: &str| {
+        let tok = state
+            .tokens
+            .iter()
+            .find(|t| t.kind == TokenKind::Color(key.to_string()))
+            .unwrap();
+        state.get_token_value_display(tok)
+    };
+
+    assert_eq!(find_disp("input_box"), "Color 40");
+    assert_eq!(state.get_color_token_color("input_box"), Color::Indexed(40));
+
+    assert_eq!(find_disp("input_box_text"), "#1a2b3c");
+    assert_eq!(
+        state.get_color_token_color("input_box_text"),
+        Color::Rgb(0x1a, 0x2b, 0x3c)
+    );
+
+    assert_eq!(find_disp("input_box_unfocused"), "Color 28");
+    assert_eq!(
+        state.get_color_token_color("input_box_unfocused"),
+        Color::Indexed(28)
+    );
+
+    assert_eq!(find_disp("input_box_unfocused_text"), "Color 250");
+    assert_eq!(
+        state.get_color_token_color("input_box_unfocused_text"),
+        Color::Indexed(250)
+    );
+}
