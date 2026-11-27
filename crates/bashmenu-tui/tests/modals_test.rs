@@ -3071,3 +3071,34 @@ fn test_color_picker_derive_from_background_image_swatches() {
     assert_eq!(picker.handle_mouse(click_derive_cb, area), None);
     assert!(!picker.derive_from_bg);
 }
+
+#[test]
+fn test_issue_88_theme_picker_footer_uses_help_text_color() {
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::style::{Color, Style};
+
+    let area = Rect::new(0, 0, 80, 24);
+    let custom_help_fg = Color::Indexed(214);
+    let styles = ResolvedThemeStyles {
+        help_text: Style::default().fg(custom_help_fg),
+        gutter: Style::default().fg(Color::Indexed(240)),
+        background: Color::Indexed(235),
+        ..Default::default()
+    };
+
+    let mut picker =
+        ThemePickerModal::new(vec!["dracula".to_string(), "nord".to_string()], "dracula");
+    let mut buf = Buffer::empty(area);
+    let inner = picker.render(area, &styles, &mut buf);
+    let footer_y = inner.y + inner.height.saturating_sub(1);
+
+    let has_help_color = (inner.x..inner.x + inner.width).any(|x| {
+        let cell = &buf[(x, footer_y)];
+        cell.symbol() == "[" && cell.fg == custom_help_fg && cell.bg == Color::Indexed(235)
+    });
+    assert!(
+        has_help_color,
+        "ThemePickerModal help footer must use styles.help_text foreground and styles.background"
+    );
+}

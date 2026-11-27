@@ -6,7 +6,7 @@ use bashmenu_core::t;
 use crossterm::event::{KeyCode, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::Modifier;
+use ratatui::style::{Color, Modifier};
 
 /// Interactive theme selector modal dialog
 #[derive(Debug, Clone)]
@@ -229,11 +229,15 @@ impl ThemePickerModal {
         let avail_footer_w = inner.width.saturating_sub(2) as usize;
         let clipped_footer: String = footer_text.chars().take(avail_footer_w).collect();
         let footer_x = (inner.x + inner.width).saturating_sub(clipped_footer.len() as u16 + 1);
+        let mut footer_style = styles.help_text;
+        if footer_style.bg.is_none() || footer_style.bg == Some(Color::Reset) {
+            footer_style = footer_style.bg(styles.background);
+        }
         buf.set_string(
             footer_x.max(inner.x + 1),
             footer_y,
             &clipped_footer,
-            styles.gutter.add_modifier(Modifier::DIM),
+            footer_style,
         );
 
         inner
