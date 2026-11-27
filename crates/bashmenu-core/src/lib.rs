@@ -36,7 +36,8 @@ pub use macro_engine::{
     full_file_location, interpolate_placeholders, parse_markdown_frontmatter,
     parse_markdown_frontmatter_full, parse_picker_macro, posix_shell_quote,
     resolve_config_dot_path, resolve_dev_dir, resolve_workspace_version, shell_quote_for_context,
-    MacroContext, MarkdownFrontmatter, PickerSpec, ToastNotification, ToastSeverity,
+    MacroContext, MarkdownFrontmatter, MessageMacroData, PickerSpec, ToastNotification,
+    ToastSeverity,
 };
 pub use menu::{
     load_menu, save_menu, ConfirmAction, ConfirmActionDetails, ExecutionMode, MenuItem,

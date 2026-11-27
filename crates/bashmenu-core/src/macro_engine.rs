@@ -1799,12 +1799,229 @@ pub fn extract_toasts(text: &str, ctx: &MacroContext) -> (String, Vec<ToastNotif
     (cleaned.into_owned(), notifications)
 }
 
-/// Finds the byte bounds and unescaped message body of the first `{message:...}`
-/// macro in `text`, skipping double-brace escaped `{{message:...}}` sequences.
+/// Parsed payload of an interactive `{message:...}` macro.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct MessageMacroData {
+    /// Optional modal header title (`title="..."`). `None` means no title badge.
+    pub title: Option<String>,
+    /// Message body text (`text="..."` or shorthand `{message:"..."}`).
+    pub text: String,
+}
+
+/// Parsed fields from an inline `{message:...}` or `{param:...}` macro body.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct InlineMacroFields {
+    pub title: Option<String>,
+    pub text: Option<String>,
+    pub default_value: Option<String>,
+    pub masked: bool,
+    pub raw: bool,
+}
+
+/// Scans a macro span starting at `start` (pointing at `{`) to its matching
+/// closing `}`, respecting `"..."`, `'...'`, `` `...` `` quotes (with backslash
+/// escapes) and nested `{...}` placeholders.
+pub(crate) fn scan_balanced_macro_end(text: &str, start: usize) -> Option<usize> {
+    let mut depth = 0usize;
+    let mut in_quote: Option<char> = None;
+    let mut chars = text[start..].char_indices();
+
+    while let Some((off, ch)) = chars.next() {
+        if let Some(q) = in_quote {
+            if ch == '\\' {
+                let _ = chars.next();
+                continue;
+            }
+            if ch == q {
+                in_quote = None;
+            }
+            continue;
+        }
+        match ch {
+            '"' | '\'' | '`' => in_quote = Some(ch),
+            '{' => depth += 1,
+            '}' => {
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return Some(start + off + 1);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// Parses a single quoted (`"..."`, `'...'`, `` `...` ``) value starting at
+/// `s[0]`, returning `(unescaped_value, remaining_slice_after_closing_quote)`.
+fn parse_quoted_value(s: &str) -> Option<(String, &str)> {
+    let mut chars = s.char_indices();
+    let (_, delim) = chars.next()?;
+    if !matches!(delim, '"' | '\'' | '`') {
+        return None;
+    }
+    let mut out = String::new();
+    while let Some((off, ch)) = chars.next() {
+        if ch == '\\' {
+            if let Some((_, next_ch)) = chars.next() {
+                match next_ch {
+                    'n' => out.push('\n'),
+                    't' => out.push('\t'),
+                    '\\' => out.push('\\'),
+                    c if c == delim => out.push(c),
+                    other => {
+                        out.push('\\');
+                        out.push(other);
+                    }
+                }
+            } else {
+                out.push('\\');
+            }
+            continue;
+        }
+        if ch == delim {
+            return Some((out, &s[off + ch.len_utf8()..]));
+        }
+        out.push(ch);
+    }
+    None
+}
+
+/// Checks if `rest` starts with a recognized inline macro key/flag token.
+fn starts_with_macro_key(rest: &str) -> bool {
+    let trimmed = rest.trim_start();
+    for key in ["title", "text", "prompt", "default", "masked", "raw"] {
+        if let Some(after) = trimmed.strip_prefix(key) {
+            let after_ws = after.trim_start();
+            if after_ws.is_empty() || after_ws.starts_with('=') || after_ws.starts_with(':') {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Reads an unquoted value up to the next `:` that precedes another recognized
+/// macro key/flag (preserving nested `{...}` and trailing colons such as
+/// `prompt=Enter Host or IP:`).
+fn parse_unquoted_value(s: &str) -> (String, &str) {
+    let mut depth = 0usize;
+    for (off, ch) in s.char_indices() {
+        match ch {
+            '{' => depth += 1,
+            '}' => depth = depth.saturating_sub(1),
+            ':' if depth == 0 => {
+                let after_colon = &s[off + 1..];
+                if starts_with_macro_key(after_colon) {
+                    let val = s[..off].trim().replace("\\n", "\n");
+                    return (val, &s[off..]);
+                }
+            }
+            _ => {}
+        }
+    }
+    (s.trim().replace("\\n", "\n"), "")
+}
+
+/// Parses colon-separated `key = value` pairs and flags inside `{message:...}`
+/// or `{param:...}` / `{prompt:...}` payloads.
 ///
-/// Supports `"..."`, `'...'`, `` `...` `` quoted strings (with `\n`, `\\`, and
-/// escaped quote handling) as well as unquoted brace-balanced bodies.
-pub fn find_message_macro_span(text: &str) -> Option<(usize, usize, String)> {
+/// Supports optional spaces around `:` and `=`, quoted values (`"`, `'`, `` ` ``),
+/// shorthand positional text (`{message:"TEXT"}` / `{param:"TEXT"}`), and
+/// legacy flags (`masked`, `masked=true`, `raw`, `raw=true`).
+pub(crate) fn parse_inline_macro_fields(inner: &str) -> InlineMacroFields {
+    let mut fields = InlineMacroFields::default();
+    let mut rest = inner.trim();
+
+    while !rest.is_empty() {
+        rest = rest.trim_start();
+        if let Some(stripped) = rest.strip_prefix(':') {
+            rest = stripped.trim_start();
+            continue;
+        }
+        if rest.is_empty() {
+            break;
+        }
+
+        // Check if this segment begins with a recognized key/flag
+        let mut matched_key: Option<(&str, &str)> = None;
+        for key in ["title", "text", "prompt", "default", "masked", "raw"] {
+            if let Some(after) = rest.strip_prefix(key) {
+                let after_ws = after.trim_start();
+                if after_ws.is_empty() || after_ws.starts_with('=') || after_ws.starts_with(':') {
+                    matched_key = Some((key, after_ws));
+                    break;
+                }
+            }
+        }
+
+        if let Some((key, after_key)) = matched_key {
+            if let Some(after_eq) = after_key.strip_prefix('=') {
+                let val_start = after_eq.trim_start();
+                let (val, next_rest) = if let Some((qval, rem)) = parse_quoted_value(val_start) {
+                    (qval, rem)
+                } else {
+                    parse_unquoted_value(val_start)
+                };
+                match key {
+                    "title" => fields.title = Some(val),
+                    "text" | "prompt" => fields.text = Some(val),
+                    "default" => fields.default_value = Some(val),
+                    "masked" => {
+                        fields.masked = !val.eq_ignore_ascii_case("false") && val != "0";
+                    }
+                    "raw" => {
+                        fields.raw = !val.eq_ignore_ascii_case("false") && val != "0";
+                    }
+                    _ => {}
+                }
+                rest = next_rest.trim_start();
+                if let Some(stripped) = rest.strip_prefix(':') {
+                    rest = stripped;
+                }
+            } else {
+                // Standalone boolean flag (`:masked`, `:raw`)
+                match key {
+                    "masked" => fields.masked = true,
+                    "raw" => fields.raw = true,
+                    _ => {}
+                }
+                rest = after_key.trim_start();
+                if let Some(stripped) = rest.strip_prefix(':') {
+                    rest = stripped;
+                }
+            }
+        } else if let Some((qval, rem)) = parse_quoted_value(rest) {
+            // Positional quoted shorthand: {message:"TEXT"} or {param:"TEXT"}
+            fields.text = Some(qval);
+            rest = rem.trim_start();
+            if let Some(stripped) = rest.strip_prefix(':') {
+                rest = stripped;
+            }
+        } else {
+            // Positional unquoted fallback
+            let (uval, rem) = parse_unquoted_value(rest);
+            if !uval.is_empty() {
+                fields.text = Some(uval);
+            }
+            rest = rem.trim_start();
+            if let Some(stripped) = rest.strip_prefix(':') {
+                rest = stripped;
+            }
+        }
+    }
+
+    fields
+}
+
+/// Finds the byte bounds and parsed [`MessageMacroData`] of the first
+/// `{message:...}` macro in `text`, skipping double-brace escaped
+/// `{{message:...}}` sequences.
+///
+/// Supports `{message:"TEXT"}` (no title) and
+/// `{message:title="Title":text="Body"}` with `"`, `'`, or `` ` `` quotes and
+/// optional whitespace around `:` and `=`.
+pub fn find_message_macro_span(text: &str) -> Option<(usize, usize, MessageMacroData)> {
     const PREFIX: &str = "{message:";
     let bytes = text.as_bytes();
     let mut search_from = 0usize;
@@ -1816,72 +2033,13 @@ pub fn find_message_macro_span(text: &str) -> Option<(usize, usize, String)> {
             search_from = start + PREFIX.len();
             continue;
         }
-
-        let mut i = start + PREFIX.len();
-        while i < bytes.len() && bytes[i].is_ascii_whitespace() {
-            i += 1;
+        if let Some(end) = scan_balanced_macro_end(text, start) {
+            let inner = &text[start + PREFIX.len()..end - 1];
+            let parsed = parse_inline_macro_fields(inner);
+            let title = parsed.title.filter(|t| !t.is_empty());
+            let body = parsed.text.unwrap_or_default();
+            return Some((start, end, MessageMacroData { title, text: body }));
         }
-        if i >= bytes.len() {
-            return None;
-        }
-
-        let first = bytes[i];
-        if first == b'"' || first == b'\'' || first == b'`' {
-            let delim = first as char;
-            let mut body = String::new();
-            let mut chars = text[i + 1..].char_indices();
-            let mut closed_at = None;
-            while let Some((off, ch)) = chars.next() {
-                if ch == '\\' {
-                    if let Some((_, next_ch)) = chars.next() {
-                        match next_ch {
-                            'n' => body.push('\n'),
-                            't' => body.push('\t'),
-                            '\\' => body.push('\\'),
-                            c if c == delim => body.push(c),
-                            other => {
-                                body.push('\\');
-                                body.push(other);
-                            }
-                        }
-                    } else {
-                        body.push('\\');
-                    }
-                    continue;
-                }
-                if ch == delim {
-                    closed_at = Some(i + 1 + off + ch.len_utf8());
-                    break;
-                }
-                body.push(ch);
-            }
-            if let Some(mut after_delim) = closed_at {
-                while after_delim < bytes.len() && bytes[after_delim].is_ascii_whitespace() {
-                    after_delim += 1;
-                }
-                if after_delim < bytes.len() && bytes[after_delim] == b'}' {
-                    return Some((start, after_delim + 1, body));
-                }
-            }
-        } else {
-            // Unquoted brace-balanced body
-            let mut depth = 1usize;
-            for (off, ch) in text[i..].char_indices() {
-                match ch {
-                    '{' => depth += 1,
-                    '}' => {
-                        depth -= 1;
-                        if depth == 0 {
-                            let end = i + off + 1;
-                            let raw = text[i..i + off].trim().replace("\\n", "\n");
-                            return Some((start, end, raw));
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-
         search_from = start + PREFIX.len();
     }
 
@@ -1889,19 +2047,25 @@ pub fn find_message_macro_span(text: &str) -> Option<(usize, usize, String)> {
 }
 
 /// Extracts the first `{message:...}` macro from `text`, interpolates nested
-/// placeholders inside the message body using `ctx`, and returns
-/// `(remaining_text, interpolated_message)`.
-pub fn extract_first_message_macro(text: &str, ctx: &MacroContext) -> Option<(String, String)> {
-    let (start, end, raw_body) = find_message_macro_span(text)?;
-    let interpolated = if raw_body.contains('{') {
-        interpolate_placeholders(&raw_body, ctx)
-    } else {
-        raw_body
-    };
+/// placeholders inside its title and body using `ctx`, and returns
+/// `(remaining_text, MessageMacroData)`.
+pub fn extract_first_message_macro(
+    text: &str,
+    ctx: &MacroContext,
+) -> Option<(String, MessageMacroData)> {
+    let (start, end, mut data) = find_message_macro_span(text)?;
+    if let Some(ref t) = data.title {
+        if t.contains('{') {
+            data.title = Some(interpolate_placeholders(t, ctx));
+        }
+    }
+    if data.text.contains('{') {
+        data.text = interpolate_placeholders(&data.text, ctx);
+    }
     let mut remaining = String::with_capacity(text.len());
     remaining.push_str(&text[..start]);
     remaining.push_str(&text[end..]);
-    Some((remaining.trim().to_string(), interpolated))
+    Some((remaining.trim().to_string(), data))
 }
 
 /// Recursively interpolates macro placeholders within a text string.

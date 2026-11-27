@@ -298,7 +298,7 @@ fn test_menu_item_param_placeholder_and_masked() {
 
     assert!(item.has_param_placeholder());
     assert!(item.masked());
-    assert_eq!(item.param_modal_title(), "Which Command [which [param]]");
+    assert_eq!(item.param_modal_title(), "");
     assert_eq!(item.param_modal_prompt(), "Enter command name to locate:");
 
     item.apply_param_placeholder("cargo");
