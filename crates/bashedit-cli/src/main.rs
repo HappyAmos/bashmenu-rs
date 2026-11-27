@@ -227,11 +227,52 @@ fn make_save_as_modal(tab: &EditorBuffer) -> FilePickerModal {
     picker
 }
 
+/// Builds the localized `clap::Command` for `bashedit`.
+fn build_cli_command() -> clap::Command {
+    use clap::CommandFactory;
+    Cli::command()
+        .about(t!("cli.bashedit.about"))
+        .help_template(t!("cli.help_template"))
+        .disable_help_flag(true)
+        .disable_version_flag(true)
+        .mut_arg("file", |a| a.help(t!("cli.bashedit.file")))
+        .mut_arg("read_only", |a| a.help(t!("cli.bashedit.read_only")))
+        .mut_arg("tabstop", |a| a.help(t!("cli.bashedit.tabstop")))
+        .mut_arg("show_whitespace", |a| {
+            a.help(t!("cli.bashedit.show_whitespace"))
+        })
+        .mut_arg("wrap", |a| a.help(t!("cli.bashedit.wrap")))
+        .mut_arg("tab_to_spaces", |a| {
+            a.help(t!("cli.bashedit.tab_to_spaces"))
+        })
+        .mut_arg("line", |a| a.help(t!("cli.bashedit.line")))
+        .mut_arg("theme", |a| a.help(t!("cli.bashedit.theme")))
+        .mut_arg("local", |a| a.help(t!("cli.bashedit.local")))
+        .mut_arg("locale", |a| a.help(t!("cli.bashedit.locale")))
+        .arg(
+            clap::Arg::new("help")
+                .short('h')
+                .long("help")
+                .action(clap::ArgAction::Help)
+                .help(t!("cli.common.help")),
+        )
+        .arg(
+            clap::Arg::new("version")
+                .short('V')
+                .long("version")
+                .action(clap::ArgAction::Version)
+                .help(t!("cli.common.version")),
+        )
+}
+
 /// Main application entrypoint for `bashedit`.
 fn main() -> Result<()> {
     install_panic_hook();
 
-    let cli = Cli::parse();
+    bashmenu_core::preinit_locale_from_args(false);
+    let matches = build_cli_command().get_matches();
+    let cli =
+        <Cli as clap::FromArgMatches>::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
     let mut guard = TerminalGuard::init()?;
 
     // Load active theme configuration (single source of truth: ~/.config/bashmenu/)

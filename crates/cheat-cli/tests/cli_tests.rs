@@ -87,3 +87,36 @@ fn test_cheat_cli_directory_and_listing() {
 
     assert!(!output.status.success());
 }
+
+#[test]
+fn test_cheat_localized_help_output() {
+    let bin_path = env!("CARGO_BIN_EXE_cheat");
+
+    let es = Command::new(bin_path)
+        .args(["--locale", "es_es", "--help"])
+        .output()
+        .expect("run cheat --locale es_es --help");
+    assert!(es.status.success());
+    let es_stdout = String::from_utf8_lossy(&es.stdout);
+    assert!(
+        es_stdout.contains("Consultar y mostrar hojas de trucos")
+            && es_stdout.contains("Mostrar ayuda")
+            && es_stdout.contains("Uso:"),
+        "Expected Spanish --help output, got:\n{}",
+        es_stdout
+    );
+
+    let en = Command::new(bin_path)
+        .args(["--locale", "en_us", "--help"])
+        .output()
+        .expect("run cheat --locale en_us --help");
+    assert!(en.status.success());
+    let en_stdout = String::from_utf8_lossy(&en.stdout);
+    assert!(
+        en_stdout.contains("Query and display cheatsheets.")
+            && en_stdout.contains("Print help")
+            && en_stdout.contains("Usage:"),
+        "Expected English --help output, got:\n{}",
+        en_stdout
+    );
+}

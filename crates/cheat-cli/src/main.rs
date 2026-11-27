@@ -12,16 +12,48 @@ mod render;
 use args::CliArgs;
 use bashmenu_core::t;
 use cheatsheet::{find_markdown_files, find_single_match, print_file_list, search_cheatsheets};
-use clap::{CommandFactory, Parser};
+use clap::{Arg, ArgAction, Command, CommandFactory, FromArgMatches};
 use config::{get_config_path, get_root_directory};
 use render::display_markdown;
 use std::process::exit;
 
+/// Builds the localized `clap::Command` for `cheat`.
+fn build_cli_command() -> Command {
+    CliArgs::command()
+        .about(t!("cli.cheat.about"))
+        .help_template(t!("cli.help_template"))
+        .disable_help_flag(true)
+        .disable_version_flag(true)
+        .mut_arg("query", |a| a.help(t!("cli.cheat.query")))
+        .mut_arg("list", |a| a.help(t!("cli.cheat.list")))
+        .mut_arg("search", |a| a.help(t!("cli.cheat.search")))
+        .mut_arg("directory", |a| a.help(t!("cli.cheat.directory")))
+        .mut_arg("locale", |a| a.help(t!("cli.cheat.locale")))
+        .arg(
+            Arg::new("help")
+                .short('h')
+                .long("help")
+                .action(ArgAction::Help)
+                .help(t!("cli.common.help")),
+        )
+        .arg(
+            Arg::new("version")
+                .short('V')
+                .long("version")
+                .action(ArgAction::Version)
+                .help(t!("cli.common.version")),
+        )
+}
+
 /// CLI entrypoint for `cheat`.
 fn main() {
-    let args = CliArgs::parse();
+    bashmenu_core::preinit_locale_from_args(false);
+    let matches = build_cli_command().get_matches();
+    let args = CliArgs::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
 
-    bashmenu_core::init_locale_from_env(args.locale.as_deref(), None);
+    if args.locale.is_some() {
+        bashmenu_core::init_locale_from_env(args.locale.as_deref(), None);
+    }
 
     // 1. Locate or create configuration file
     let config_path = match get_config_path() {
@@ -85,7 +117,7 @@ fn main() {
     let query_arg = match args.query {
         Some(q) if !q.trim().is_empty() => q,
         _ => {
-            let _ = CliArgs::command().print_help();
+            let _ = build_cli_command().print_help();
             println!();
             exit(1);
         }
