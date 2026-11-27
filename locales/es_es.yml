@@ -349,6 +349,7 @@ help:
     | Macro / Marcador | Descripción |
     | :--- | :--- |
     | {{param}} | Solicita entrada de texto modal (admite masked=true) |
+    | {{message:"TEXT"}} | Muestra un diálogo emergente centrado con botón Aceptar (admite ", ' o `) |
     | {{file_picker}} | Abre el selector visual de archivos |
     | {{file_picker:path:<dir>}} | Selector de archivos en el directorio especificado |
     | {{file_picker:stem}} | Ruta sin extensión de archivo (/ruta/a/img) |

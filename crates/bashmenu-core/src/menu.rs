@@ -54,8 +54,9 @@
 use crate::error::{BashMenuError, Result};
 use crate::macro_engine::{
     apply_dir_picker_macros, apply_dir_picker_macros_raw, apply_file_picker_macros,
-    apply_file_picker_macros_raw, extract_picker_spec, extract_toasts, interpolate_placeholders,
-    shell_quote_for_context, MacroContext, PickerSpec, ToastNotification,
+    apply_file_picker_macros_raw, extract_first_message_macro, extract_picker_spec, extract_toasts,
+    find_message_macro_span, interpolate_placeholders, shell_quote_for_context, MacroContext,
+    PickerSpec, ToastNotification,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
@@ -341,6 +342,43 @@ impl MenuItem {
     /// Returns true if any executable or target payload field contains `{param...}` or `{prompt...}`
     pub fn has_param_placeholder(&self) -> bool {
         self.inline_param_spec().is_some()
+    }
+
+    /// Extracts and removes the first `{message:...}` interactive macro across
+    /// `command`, `action`, and `script`, returning the interpolated message.
+    pub fn take_first_message_macro(&mut self, ctx: &MacroContext) -> Option<String> {
+        let mut extracted: Option<String> = None;
+        for field in [&mut self.command, &mut self.action, &mut self.script]
+            .into_iter()
+            .flatten()
+        {
+            if extracted.is_none() {
+                if let Some((rem, msg)) = extract_first_message_macro(field, ctx) {
+                    *field = rem;
+                    extracted = Some(msg);
+                }
+            } else if let Some((start, end, _)) = find_message_macro_span(field) {
+                let mut rem = String::with_capacity(field.len());
+                rem.push_str(&field[..start]);
+                rem.push_str(&field[end..]);
+                *field = rem.trim().to_string();
+            }
+        }
+        extracted
+    }
+
+    /// Returns true if any executable or target payload field still has
+    /// non-empty content to run after interactive macro extraction.
+    pub fn has_remaining_payload(&self) -> bool {
+        [
+            self.command.as_deref(),
+            self.action.as_deref(),
+            self.script.as_deref(),
+            self.file.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        .any(|s| !s.trim().is_empty())
     }
 
     /// Returns true when this item executes through a POSIX shell (`/bin/bash -c`).

@@ -200,6 +200,8 @@ enum ActiveModal {
     },
     /// Informational message popup dialog.
     Message(MessageModal),
+    /// Interactive `{message:"..."}` popup dialog with optional remaining item continuation.
+    ItemMessage(Box<bashmenu_core::MenuItem>, MessageModal),
     /// Toggle setting value selection dialog.
     Toggle(String, ToggleModal),
     /// Config value text input dialog.
@@ -234,7 +236,7 @@ impl ActiveModal {
             ActiveModal::ConfirmDeleteNote(_, _, m)
             | ActiveModal::ConfirmItem(_, m)
             | ActiveModal::ConfirmInjectBlock { modal: m, .. } => m.dialog_dimensions(area),
-            ActiveModal::Message(m) => m.dialog_dimensions(area),
+            ActiveModal::Message(m) | ActiveModal::ItemMessage(_, m) => m.dialog_dimensions(area),
             ActiveModal::Toggle(_, m) => m.dialog_dimensions(area),
             ActiveModal::Radio(_, m) => m.dialog_dimensions(area),
             ActiveModal::ItemFilePicker(_, _, m) => m.dialog_dimensions(area),
@@ -772,7 +774,7 @@ fn main() -> Result<()> {
                     ActiveModal::ConfirmInjectBlock { modal, .. } => {
                         modal.render(f.area(), &modal_styles, f.buffer_mut());
                     }
-                    ActiveModal::Message(modal) => {
+                    ActiveModal::Message(modal) | ActiveModal::ItemMessage(_, modal) => {
                         modal.render(f.area(), &modal_styles, f.buffer_mut());
                     }
                     ActiveModal::Toggle(_, modal) => {
@@ -1589,6 +1591,21 @@ fn main() -> Result<()> {
                     };
                     if dismiss {
                         active_modal = ActiveModal::None;
+                    }
+                }
+                ActiveModal::ItemMessage(item, modal) => {
+                    let is_esc = matches!(ev, Event::Key(key) if key.code == KeyCode::Esc);
+                    let dismiss = match ev {
+                        Event::Key(key) => modal.handle_key(key.code),
+                        Event::Mouse(mouse) => modal.handle_mouse(mouse, area),
+                        _ => false,
+                    };
+                    if dismiss {
+                        let next_item = item.clone();
+                        active_modal = ActiveModal::None;
+                        if !is_esc && next_item.has_remaining_payload() {
+                            pending_action = Some(MenuAction::Execute(next_item));
+                        }
                     }
                 }
                 ActiveModal::Toggle(key_path, modal) => {
@@ -2529,7 +2546,7 @@ fn main() -> Result<()> {
                         MenuAction::ActivateLeader => {
                             shortcut_dispatcher.activate_leader();
                         }
-                        MenuAction::Execute(item) => {
+                        MenuAction::Execute(mut item) => {
                             let builtin_target = item
                                 .action
                                 .as_deref()
@@ -2835,6 +2852,23 @@ fn main() -> Result<()> {
                                         }
                                     }
                                 }
+                            } else if let Some(msg) = item.take_first_message_macro(&ctx) {
+                                let raw_title = item.param_modal_title();
+                                let clean_title = if item.extra.contains_key("title") {
+                                    raw_title.to_string()
+                                } else {
+                                    let (main_lbl, _) =
+                                        bashmenu_tui::split_label_brackets(raw_title);
+                                    let trimmed = main_lbl.trim();
+                                    if trimmed.is_empty() {
+                                        "Message".to_string()
+                                    } else {
+                                        trimmed.to_string()
+                                    }
+                                };
+                                let title = interpolate_placeholders(&clean_title, &ctx);
+                                active_modal =
+                                    ActiveModal::ItemMessage(item, MessageModal::new(title, msg));
                             } else if item.has_param_placeholder() {
                                 let raw_title = item.param_modal_title();
                                 let clean_title = if item.extra.contains_key("title") {

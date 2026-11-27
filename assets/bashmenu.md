@@ -1009,6 +1009,7 @@ When targeting shell commands, substituted values are **POSIX single-quote escap
 | Directive | Description | Supported Attributes |
 | :--- | :--- | :--- |
 | `{param}` | Prompts for a single-line parameter value using a text modal. | `title` (modal header), `prompt` (body text), `masked` (mask input with asterisks), `:raw` (opt out of shell quoting) |
+| `{message:"..."}` | Displays an adaptive, centered popup message modal with an **OK** button and top-right `[X]` close button. Accepts `"..."`, `'...'`, or `` `...` `` delimiters, `\n` line breaks, and nested placeholders (e.g. `{message:"Hello {user}!"}`). Can be used standalone or prepended to a command. | `title` (optional modal header) |
 | `{file_picker}` | Launches a visual file chooser dialog. | `title`, `start_dir` |
 | `{file_picker:path:<dir>}` | Launches file chooser defaulting to specified starting directory. | `title`, `start_dir` |
 | `{file_picker_new}` / `{file_picker:new}` | Launches a visual file chooser dialog that permits creating **new files** (by pressing `n` or `N`). | `title`, `start_dir` |

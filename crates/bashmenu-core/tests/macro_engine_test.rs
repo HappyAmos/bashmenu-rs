@@ -946,3 +946,68 @@ fn test_allow_command_macros_guard_local_mode_and_info_file_issue_95() {
 
     let _ = std::fs::remove_dir_all(&tmp);
 }
+
+#[test]
+fn test_interactive_message_macro_delimiters_and_chaining() {
+    use bashmenu_core::{extract_first_message_macro, find_message_macro_span, MenuItem};
+
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../defaults/bashmenu.yml");
+    let mut config = load_config(fixture).expect("load config");
+    config.theme = "cyberpunk".to_string();
+    let ctx = MacroContext::new(&config).with_allow_command_macros(false);
+
+    // 1. Supports double quotes, single quotes, and backticks
+    let (rem_dq, msg_dq) =
+        extract_first_message_macro(r#"{message:"This is a popup message"}"#, &ctx)
+            .expect("double-quoted message");
+    assert_eq!(rem_dq, "");
+    assert_eq!(msg_dq, "This is a popup message");
+
+    let (rem_sq, msg_sq) = extract_first_message_macro("{message:'Single quoted \"text\"'}", &ctx)
+        .expect("single-quoted message");
+    assert_eq!(rem_sq, "");
+    assert_eq!(msg_sq, "Single quoted \"text\"");
+
+    let (rem_bt, msg_bt) =
+        extract_first_message_macro("{message:`Backtick 'quoted' \"text\"`}", &ctx)
+            .expect("backtick-quoted message");
+    assert_eq!(rem_bt, "");
+    assert_eq!(msg_bt, "Backtick 'quoted' \"text\"");
+
+    // 2. Supports \n line breaks, escaped quotes, and nested placeholders
+    let (_, msg_nested) =
+        extract_first_message_macro(r#"{message:"Theme: {theme}\nSay \"Hi\""}"#, &ctx)
+            .expect("nested message");
+    assert_eq!(msg_nested, "Theme: cyberpunk\nSay \"Hi\"");
+
+    // 3. Double-brace escaped {{message:...}} is ignored
+    assert!(find_message_macro_span(r#"{{message:"literal"}}"#).is_none());
+
+    // 4. Standalone MenuItem leaves no remaining payload
+    let mut standalone = MenuItem {
+        label: "Notice".to_string(),
+        action: Some(r#"{message:"Hello popup"}"#.to_string()),
+        command: Some(r#"{message:"Hello popup"}"#.to_string()),
+        ..Default::default()
+    };
+    assert_eq!(
+        standalone.take_first_message_macro(&ctx).as_deref(),
+        Some("Hello popup")
+    );
+    assert!(!standalone.has_remaining_payload());
+
+    // 5. Chained MenuItem preserves the remaining command after stripping {message:...}
+    let mut chained = MenuItem {
+        label: "Backup".to_string(),
+        action: Some("{message:`Insert drive`} echo ok".to_string()),
+        command: Some("{message:`Insert drive`} echo ok".to_string()),
+        ..Default::default()
+    };
+    assert_eq!(
+        chained.take_first_message_macro(&ctx).as_deref(),
+        Some("Insert drive")
+    );
+    assert!(chained.has_remaining_payload());
+    assert_eq!(chained.command.as_deref(), Some("echo ok"));
+    assert_eq!(chained.action.as_deref(), Some("echo ok"));
+}

@@ -351,6 +351,7 @@ help:
     | Macro / Placeholder | Description |
     | :--- | :--- |
     | {{param}} | Prompts for text input modal (masked=true supported) |
+    | {{message:"TEXT"}} | Displays a centered popup message modal with OK button (supports ", ', or `) |
     | {{file_picker}} | Launches visual file chooser dialog |
     | {{file_picker:path:<dir>}} | File chooser opening in specified default directory |
     | {{file_picker:stem}} | Path without file extension (/path/to/img) |
