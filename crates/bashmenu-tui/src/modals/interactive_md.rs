@@ -582,10 +582,12 @@ impl InteractiveMarkdownModal {
                 });
             }
             KeyCode::Tab => {
+                self.soft_refresh();
                 self.cycle_focus(true);
                 return None;
             }
             KeyCode::BackTab => {
+                self.soft_refresh();
                 self.cycle_focus(false);
                 return None;
             }
