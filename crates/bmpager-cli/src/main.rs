@@ -122,7 +122,7 @@ fn main() {
     }
 
     // 7. Interactive full-screen Pager
-    let mut pager = Pager::new(lines, args);
+    let mut pager = Pager::new(lines, args).with_raw_content(raw_content);
     if truncated {
         pager.message = t!("bmpager.stored_lines", count => pager.args.max_lines);
     }
