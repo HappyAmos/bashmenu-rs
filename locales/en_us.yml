@@ -352,6 +352,8 @@ help:
     | :--- | :--- |
     | {{param}} | Prompts for text input modal (supports title="...", text="...", default="...", masked, raw) |
     | {{message:"TEXT"}} | Centered popup modal with OK button (no title; or title="...":text="...", supports ", ', `) |
+    | {{input:default="":id=VAR:width=XX:multiline=false:scrollbar=true}} | Embedded form text field in interactive Markdown (height=5 default for multiline) |
+    | {{id:VAR}} | Live interpolated value from matching {{input:id=VAR}} (refreshes on Enter) |
     | {{file_picker}} | Launches visual file chooser dialog |
     | {{file_picker:path:<dir>}} | File chooser opening in specified default directory |
     | {{file_picker:stem}} | Path without file extension (/path/to/img) |
@@ -489,6 +491,7 @@ help:
     | title: <text> | Popup window title (supports placeholders; defaults to filename) |
     | width: <1..100>[%] | Popup width as % of terminal width (accepts 80, "80", or "80%") |
     | height: <1..100>[%] | Popup height as % of terminal height (accepts 70, "70", or "70%") |
+    | interactive: true | Enables bashmenu-bash code blocks, {{input:...}} forms, and live {{id:...}} refresh |
   markdown_reference: |-
     # Markdown Syntax Reference
 

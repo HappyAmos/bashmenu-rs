@@ -8,7 +8,7 @@ use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEven
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 
 /// Action emitted by [`InteractiveMarkdownModal`] on user input.
@@ -191,6 +191,10 @@ pub struct InteractiveMarkdownModal {
     pub focused_field: Option<usize>,
     /// Outer modal vertical scroll offset in rows.
     pub scroll_offset: usize,
+    /// Maximum outer modal scroll offset recorded during the last render pass.
+    last_max_scroll: Cell<Option<usize>>,
+    /// Outer modal content viewport height recorded during the last render pass.
+    last_content_h: Cell<Option<usize>>,
     /// Cached screen rectangles for each rendered input field (for mouse hit-testing).
     last_field_rects: RefCell<Vec<Rect>>,
     /// Cached `[ OK ]` button screen rectangle.
@@ -225,8 +229,27 @@ impl InteractiveMarkdownModal {
             committed_vars,
             focused_field,
             scroll_offset: 0,
+            last_max_scroll: Cell::new(None),
+            last_content_h: Cell::new(None),
             last_field_rects: RefCell::new(Vec::new()),
             last_ok_rect: RefCell::new(None),
+        }
+    }
+
+    /// Scrolls the outer modal viewport by `delta` rows, clamped to the last
+    /// known `max_scroll` when available.
+    fn scroll_modal_by(&mut self, delta: isize) {
+        if let Some(max_s) = self.last_max_scroll.get() {
+            self.scroll_offset = self.scroll_offset.min(max_s);
+            if delta < 0 {
+                self.scroll_offset = self.scroll_offset.saturating_sub(delta.unsigned_abs());
+            } else {
+                self.scroll_offset = self.scroll_offset.saturating_add(delta as usize).min(max_s);
+            }
+        } else if delta < 0 {
+            self.scroll_offset = self.scroll_offset.saturating_sub(delta.unsigned_abs());
+        } else {
+            self.scroll_offset = self.scroll_offset.saturating_add(delta as usize);
         }
     }
 
@@ -299,6 +322,16 @@ impl InteractiveMarkdownModal {
                 self.soft_refresh();
                 return None;
             }
+            KeyCode::PageUp => {
+                let step = self.last_content_h.get().unwrap_or(10).max(1) as isize;
+                self.scroll_modal_by(-step);
+                return None;
+            }
+            KeyCode::PageDown => {
+                let step = self.last_content_h.get().unwrap_or(10).max(1) as isize;
+                self.scroll_modal_by(step);
+                return None;
+            }
             _ => {}
         }
 
@@ -310,11 +343,11 @@ impl InteractiveMarkdownModal {
                     Some(InteractiveFormAction::Submit(self.committed_vars.clone()))
                 }
                 KeyCode::Up | KeyCode::Char('k') => {
-                    self.scroll_offset = self.scroll_offset.saturating_sub(1);
+                    self.scroll_modal_by(-1);
                     None
                 }
                 KeyCode::Down | KeyCode::Char('j') => {
-                    self.scroll_offset = self.scroll_offset.saturating_add(1);
+                    self.scroll_modal_by(1);
                     None
                 }
                 _ => None,
@@ -328,6 +361,22 @@ impl InteractiveMarkdownModal {
             } else {
                 // Soft-refresh live {id:...} values and keep focus on this field
                 self.soft_refresh();
+            }
+            return None;
+        }
+        if code == KeyCode::Up {
+            if is_multiline && self.fields[idx].cursor_row > 0 {
+                self.fields[idx].move_vertical(-1);
+            } else {
+                self.scroll_modal_by(-1);
+            }
+            return None;
+        }
+        if code == KeyCode::Down {
+            if is_multiline && self.fields[idx].cursor_row + 1 < self.fields[idx].lines.len() {
+                self.fields[idx].move_vertical(1);
+            } else {
+                self.scroll_modal_by(1);
             }
             return None;
         }
@@ -347,8 +396,6 @@ impl InteractiveMarkdownModal {
             KeyCode::End => {
                 field.cursor_col = field.lines[field.cursor_row].chars().count();
             }
-            KeyCode::Up => field.move_vertical(-1),
-            KeyCode::Down => field.move_vertical(1),
             KeyCode::Char(c) if !modifiers.contains(KeyModifiers::CONTROL) => {
                 field.insert_char(c);
             }
@@ -404,7 +451,7 @@ impl InteractiveMarkdownModal {
                         return None;
                     }
                 }
-                self.scroll_offset = self.scroll_offset.saturating_sub(2);
+                self.scroll_modal_by(-2);
                 None
             }
             MouseEventKind::ScrollDown => {
@@ -416,7 +463,7 @@ impl InteractiveMarkdownModal {
                         return None;
                     }
                 }
-                self.scroll_offset = self.scroll_offset.saturating_add(2);
+                self.scroll_modal_by(2);
                 None
             }
             _ => None,
@@ -538,6 +585,8 @@ impl InteractiveMarkdownModal {
 
         let max_scroll = vrows.len().saturating_sub(content_h);
         let eff_scroll = self.scroll_offset.min(max_scroll);
+        self.last_max_scroll.set(Some(max_scroll));
+        self.last_content_h.set(Some(content_h));
 
         let mut field_rects = vec![Rect::default(); self.fields.len()];
 
@@ -777,5 +826,38 @@ According to my records, your name is \"{id:guestName}\".
         modal.handle_key_with_modifiers(KeyCode::Enter, KeyModifiers::NONE);
         assert_eq!(modal.focused_field, Some(0));
         assert!(buffer_text(&modal).contains("your name is \"andrew!\"."));
+    }
+
+    #[test]
+    fn test_interactive_markdown_modal_arrow_and_page_scrolling() {
+        let mut md = String::new();
+        for i in 1..=30 {
+            md.push_str(&format!("Line {i}\n"));
+        }
+        md.push_str("Name: {input: default=\"test\": id=\"name\"}\n");
+        let blocks = parse_markdown_form_blocks(&md);
+        let mut modal = InteractiveMarkdownModal::new("Scrollable", blocks);
+        let styles = ResolvedThemeStyles::default();
+        let area = Rect::new(0, 0, 60, 14);
+        let mut buf = Buffer::empty(area);
+        modal.render(area, &styles, &mut buf);
+
+        assert_eq!(modal.focused_field, Some(0));
+        assert_eq!(modal.scroll_offset, 0);
+
+        // Down arrow scrolls even while single-line input field is focused
+        modal.handle_key_with_modifiers(KeyCode::Down, KeyModifiers::NONE);
+        assert_eq!(modal.scroll_offset, 1);
+
+        // PageDown scrolls by viewport height
+        modal.handle_key_with_modifiers(KeyCode::PageDown, KeyModifiers::NONE);
+        assert!(modal.scroll_offset > 1);
+
+        // Up arrow and PageUp scroll back up
+        let after_pgdn = modal.scroll_offset;
+        modal.handle_key_with_modifiers(KeyCode::Up, KeyModifiers::NONE);
+        assert_eq!(modal.scroll_offset, after_pgdn - 1);
+        modal.handle_key_with_modifiers(KeyCode::PageUp, KeyModifiers::NONE);
+        assert_eq!(modal.scroll_offset, 0);
     }
 }

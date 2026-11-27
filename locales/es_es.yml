@@ -350,6 +350,8 @@ help:
     | :--- | :--- |
     | {{param}} | Solicita entrada de texto modal (admite title="...", text="...", default="...", masked, raw) |
     | {{message:"TEXT"}} | Diálogo emergente centrado con botón Aceptar (sin título; o title="...":text="...", admite ", ', `) |
+    | {{input:default="":id=VAR:width=XX:multiline=false:scrollbar=true}} | Campo de texto integrado en Markdown interactivo (height=5 por defecto en multilínea) |
+    | {{id:VAR}} | Valor interpolado en vivo de {{input:id=VAR}} (se actualiza al pulsar Enter) |
     | {{file_picker}} | Abre el selector visual de archivos |
     | {{file_picker:path:<dir>}} | Selector de archivos en el directorio especificado |
     | {{file_picker:stem}} | Ruta sin extensión de archivo (/ruta/a/img) |
@@ -487,6 +489,7 @@ help:
     | title: <text> | Título de la ventana emergente (admite marcadores; por defecto el archivo) |
     | width: <1..100>[%] | Ancho en % de la terminal (acepta 80, "80" o "80%") |
     | height: <1..100>[%] | Alto en % de la terminal (acepta 70, "70" o "70%") |
+    | interactive: true | Habilita bloques bashmenu-bash, formularios {{input:...}} y {{id:...}} en vivo |
   markdown_reference: |-
     # Referencia de sintaxis Markdown
 
