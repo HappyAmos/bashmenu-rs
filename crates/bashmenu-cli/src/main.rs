@@ -2852,42 +2852,42 @@ fn main() -> Result<()> {
                                         }
                                     }
                                 }
-                            } else if let Some(msg) = item.take_first_message_macro(&ctx) {
-                                let raw_title = item.param_modal_title();
-                                let clean_title = if item.extra.contains_key("title") {
-                                    raw_title.to_string()
-                                } else {
-                                    let (main_lbl, _) =
-                                        bashmenu_tui::split_label_brackets(raw_title);
-                                    let trimmed = main_lbl.trim();
-                                    if trimmed.is_empty() {
-                                        "Message".to_string()
-                                    } else {
-                                        trimmed.to_string()
-                                    }
-                                };
-                                let title = interpolate_placeholders(&clean_title, &ctx);
-                                active_modal =
-                                    ActiveModal::ItemMessage(item, MessageModal::new(title, msg));
+                            } else if let Some(msg_data) = item.take_first_message_macro(&ctx) {
+                                let title = msg_data
+                                    .title
+                                    .or_else(|| {
+                                        item.extra
+                                            .get("title")
+                                            .and_then(|v| v.as_str())
+                                            .filter(|s| !s.trim().is_empty())
+                                            .map(|t| interpolate_placeholders(t, &ctx))
+                                    })
+                                    .unwrap_or_default();
+                                active_modal = ActiveModal::ItemMessage(
+                                    item,
+                                    MessageModal::new(title, msg_data.text),
+                                );
                             } else if item.has_param_placeholder() {
                                 let raw_title = item.param_modal_title();
-                                let clean_title = if item.extra.contains_key("title") {
-                                    raw_title.to_string()
+                                let title = if raw_title.is_empty() {
+                                    String::new()
                                 } else {
-                                    let (main_lbl, _) =
-                                        bashmenu_tui::split_label_brackets(raw_title);
-                                    let trimmed = main_lbl.trim();
-                                    if trimmed.is_empty() {
-                                        raw_title.to_string()
-                                    } else {
-                                        trimmed.to_string()
-                                    }
+                                    interpolate_placeholders(&raw_title, &ctx)
                                 };
-                                let title = interpolate_placeholders(&clean_title, &ctx);
-                                let prompt =
-                                    interpolate_placeholders(&item.param_modal_prompt(), &ctx);
-                                let modal =
-                                    InputModal::new(title, prompt, "").with_masked(item.masked());
+                                let raw_prompt = item.param_modal_prompt();
+                                let prompt = if raw_prompt.is_empty() {
+                                    String::new()
+                                } else {
+                                    interpolate_placeholders(&raw_prompt, &ctx)
+                                };
+                                let raw_default = item.param_modal_default();
+                                let default_val = if raw_default.is_empty() {
+                                    String::new()
+                                } else {
+                                    interpolate_placeholders(&raw_default, &ctx)
+                                };
+                                let modal = InputModal::new(title, prompt, &default_val)
+                                    .with_masked(item.masked());
                                 active_modal = ActiveModal::ParamInput(item, modal);
                             } else if let Some(picker_spec) = item.first_picker_spec(&ctx) {
                                 let default_title = if picker_spec.is_dir {

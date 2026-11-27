@@ -55,8 +55,9 @@ use crate::error::{BashMenuError, Result};
 use crate::macro_engine::{
     apply_dir_picker_macros, apply_dir_picker_macros_raw, apply_file_picker_macros,
     apply_file_picker_macros_raw, extract_first_message_macro, extract_picker_spec, extract_toasts,
-    find_message_macro_span, interpolate_placeholders, shell_quote_for_context, MacroContext,
-    PickerSpec, ToastNotification,
+    find_message_macro_span, interpolate_placeholders, parse_inline_macro_fields,
+    scan_balanced_macro_end, shell_quote_for_context, MacroContext, MessageMacroData, PickerSpec,
+    ToastNotification,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
@@ -345,9 +346,9 @@ impl MenuItem {
     }
 
     /// Extracts and removes the first `{message:...}` interactive macro across
-    /// `command`, `action`, and `script`, returning the interpolated message.
-    pub fn take_first_message_macro(&mut self, ctx: &MacroContext) -> Option<String> {
-        let mut extracted: Option<String> = None;
+    /// `command`, `action`, and `script`, returning the interpolated message data.
+    pub fn take_first_message_macro(&mut self, ctx: &MacroContext) -> Option<MessageMacroData> {
+        let mut extracted: Option<MessageMacroData> = None;
         for field in [&mut self.command, &mut self.action, &mut self.script]
             .into_iter()
             .flatten()
@@ -435,24 +436,30 @@ impl MenuItem {
         }
     }
 
-    /// Modal header title for a `{param}` input dialog
-    pub fn param_modal_title(&self) -> &str {
+    /// Modal header title for a `{param}` input dialog.
+    ///
+    /// Uses inline `title="..."` first, then explicit YAML `title:`, or empty
+    /// string (no title) when neither is assigned.
+    pub fn param_modal_title(&self) -> String {
+        if let Some(spec) = self.inline_param_spec() {
+            if let Some(t) = spec.title {
+                if !t.trim().is_empty() {
+                    return t;
+                }
+            }
+        }
         if let Some(t) = self
             .extra
             .get("title")
             .and_then(|v| v.as_str())
             .filter(|s| !s.trim().is_empty())
         {
-            return t;
+            return t.to_string();
         }
-        let trimmed_label = self.label.trim();
-        if !trimmed_label.is_empty() {
-            return trimmed_label;
-        }
-        "Parameter Input"
+        String::new()
     }
 
-    /// Modal prompt message for a `{param}` input dialog
+    /// Modal prompt message for a `{param}` input dialog.
     pub fn param_modal_prompt(&self) -> String {
         if let Some(p) = self.prompt.as_deref().filter(|s| !s.trim().is_empty()) {
             return p.to_string();
@@ -479,8 +486,18 @@ impl MenuItem {
                     return p;
                 }
             }
+            if spec.title.is_some() {
+                return String::new();
+            }
         }
         "Enter parameter:".to_string()
+    }
+
+    /// Pre-populated default text value for a `{param:default="..."}` input dialog.
+    pub fn param_modal_default(&self) -> String {
+        self.inline_param_spec()
+            .and_then(|s| s.default_value)
+            .unwrap_or_default()
     }
 
     /// Returns the first `{file_picker...}` or `{dir_picker...}` specification found across
@@ -966,8 +983,12 @@ impl Serialize for MenuItem {
 /// Specification for an inline parameter or prompt macro embedded in a command string.
 #[derive(Debug, Clone, Default)]
 struct InlineParamSpec {
-    /// Custom prompt label to display in the input modal
+    /// Optional modal header title (`title="..."`)
+    title: Option<String>,
+    /// Custom prompt label to display in the input modal (`text="..."` / `prompt="..."`)
     prompt: Option<String>,
+    /// Optional pre-populated default text value (`default="..."`)
+    default_value: Option<String>,
     /// Whether user input should be masked (password entry mode)
     masked: bool,
     /// Whether user input should opt out of POSIX shell quoting (`:raw`)
@@ -975,20 +996,25 @@ struct InlineParamSpec {
 }
 
 /// Finds earliest byte bounds and inner payload of `{param...}` or `{prompt...}`
-/// starting at or after `from`.
+/// starting at or after `from`, respecting quoted strings and nested `{...}`.
 fn find_inline_param_span_from(text: &str, from: usize) -> Option<(usize, usize, &str)> {
+    let bytes = text.as_bytes();
     let mut earliest: Option<(usize, usize, &str)> = None;
     for prefix in ["{param", "{prompt"] {
         let mut search_from = from.min(text.len());
         while let Some(rel) = text[search_from..].find(prefix) {
             let start = search_from + rel;
+            // Skip double-brace escaped `{{param...}}`
+            if start > 0 && bytes[start - 1] == b'{' {
+                search_from = start + prefix.len();
+                continue;
+            }
             let after_prefix = &text[start + prefix.len()..];
             if let Some(first_ch) = after_prefix.chars().next() {
                 if first_ch == '}' || first_ch == ':' {
-                    if let Some(end_rel) = after_prefix.find('}') {
-                        let end = start + prefix.len() + end_rel + 1;
+                    if let Some(end) = scan_balanced_macro_end(text, start) {
                         let inner = if first_ch == ':' {
-                            &after_prefix[1..end_rel]
+                            &text[start + prefix.len() + 1..end - 1]
                         } else {
                             ""
                         };
@@ -1010,58 +1036,17 @@ fn find_inline_param_span(text: &str) -> Option<(usize, usize, &str)> {
     find_inline_param_span_from(text, 0)
 }
 
-/// Parses prompt message, masked flag, and raw flag from the inner payload of `{param:...}`.
+/// Parses title, prompt text, default value, masked flag, and raw flag from the
+/// inner payload of `{param:...}` or `{prompt:...}`.
 fn parse_inline_param_inner(inner: &str) -> InlineParamSpec {
-    let mut spec = InlineParamSpec::default();
-    let mut rest = inner.trim();
-    // Repeatedly strip leading/trailing `masked` and `raw` flags in any order.
-    loop {
-        let before = rest;
-        for flag in [":masked=true", ":masked"] {
-            if let Some(stripped) = rest.strip_suffix(flag) {
-                spec.masked = true;
-                rest = stripped;
-            }
-        }
-        for flag in ["masked=true:", "masked:"] {
-            if let Some(stripped) = rest.strip_prefix(flag) {
-                spec.masked = true;
-                rest = stripped;
-            }
-        }
-        for flag in [":raw=true", ":raw"] {
-            if let Some(stripped) = rest.strip_suffix(flag) {
-                spec.raw = true;
-                rest = stripped;
-            }
-        }
-        for flag in ["raw=true:", "raw:"] {
-            if let Some(stripped) = rest.strip_prefix(flag) {
-                spec.raw = true;
-                rest = stripped;
-            }
-        }
-        if rest == before {
-            break;
-        }
+    let parsed = parse_inline_macro_fields(inner);
+    InlineParamSpec {
+        title: parsed.title,
+        prompt: parsed.text,
+        default_value: parsed.default_value,
+        masked: parsed.masked,
+        raw: parsed.raw,
     }
-    if rest.eq_ignore_ascii_case("masked") || rest.eq_ignore_ascii_case("masked=true") {
-        spec.masked = true;
-        rest = "";
-    } else if rest.eq_ignore_ascii_case("raw") || rest.eq_ignore_ascii_case("raw=true") {
-        spec.raw = true;
-        rest = "";
-    }
-    // `title=...` is resolved via item title/label; ignore it here
-    if rest.starts_with("title=") {
-        rest = "";
-    }
-    // Everything after `prompt=` (colons included) is the prompt text
-    let prompt_text = rest.strip_prefix("prompt=").unwrap_or(rest);
-    if !prompt_text.is_empty() {
-        spec.prompt = Some(prompt_text.trim_matches('"').trim_matches('\'').to_string());
-    }
-    spec
 }
 
 /// Parses prompt message and masked flag from an inline `{param:...}` directive.

@@ -1008,8 +1008,8 @@ When targeting shell commands, substituted values are **POSIX single-quote escap
 
 | Directive | Description | Supported Attributes |
 | :--- | :--- | :--- |
-| `{param}` | Prompts for a single-line parameter value using a text modal. | `title` (modal header), `prompt` (body text), `masked` (mask input with asterisks), `:raw` (opt out of shell quoting) |
-| `{message:"..."}` | Displays an adaptive, centered popup message modal with an **OK** button and top-right `[X]` close button. Accepts `"..."`, `'...'`, or `` `...` `` delimiters, `\n` line breaks, and nested placeholders (e.g. `{message:"Hello {user}!"}`). Can be used standalone or prepended to a command. | `title` (optional modal header) |
+| `{param}` | Prompts for a single-line parameter value using a text modal. Supports inline `{param:title="...":text="...":default="..."}` (any subset, `"`, `'`, or `` ` `` quotes, optional spaces around `:` and `=`). Omits the modal title when none is assigned. | `title` (modal header), `text` / `prompt` (body text), `default` (initial input value), `masked` (mask input with asterisks), `:raw` (opt out of shell quoting) |
+| `{message:"..."}` | Displays an adaptive, centered popup message modal with an **OK** button and top-right `[X]` close button. Shorthand `{message:"TEXT"}` shows no title; structured `{message:title="...":text="..."}` allows omitting either field. Accepts `"..."`, `'...'`, or `` `...` `` delimiters, optional spaces around `:` and `=`, `\n` line breaks, and nested placeholders. Can be used standalone or prepended to a command. | `title` (optional modal header), `text` (message body) |
 | `{file_picker}` | Launches a visual file chooser dialog. | `title`, `start_dir` |
 | `{file_picker:path:<dir>}` | Launches file chooser defaulting to specified starting directory. | `title`, `start_dir` |
 | `{file_picker_new}` / `{file_picker:new}` | Launches a visual file chooser dialog that permits creating **new files** (by pressing `n` or `N`). | `title`, `start_dir` |

@@ -348,8 +348,8 @@ help:
     ## Directivas de entrada interactiva
     | Macro / Marcador | Descripción |
     | :--- | :--- |
-    | {{param}} | Solicita entrada de texto modal (admite masked=true) |
-    | {{message:"TEXT"}} | Muestra un diálogo emergente centrado con botón Aceptar (admite ", ' o `) |
+    | {{param}} | Solicita entrada de texto modal (admite title="...", text="...", default="...", masked, raw) |
+    | {{message:"TEXT"}} | Diálogo emergente centrado con botón Aceptar (sin título; o title="...":text="...", admite ", ', `) |
     | {{file_picker}} | Abre el selector visual de archivos |
     | {{file_picker:path:<dir>}} | Selector de archivos en el directorio especificado |
     | {{file_picker:stem}} | Ruta sin extensión de archivo (/ruta/a/img) |

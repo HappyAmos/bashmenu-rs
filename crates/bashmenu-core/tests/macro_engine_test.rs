@@ -878,7 +878,9 @@ fn test_render_placeholder_help_text_tables_and_values() {
     );
 
     // 2-column Interactive Input Directives have no live Value column
-    assert!(rendered.contains("| {param} | Prompts for text input modal (masked=true supported) |"));
+    assert!(rendered.contains(
+        "| {param} | Prompts for text input modal (supports title=\"...\", text=\"...\", default=\"...\", masked, raw) |"
+    ));
 
     // Escaping & Frontmatter documentation sections are present
     assert!(rendered.contains("## Escaping Literal Braces"));
@@ -949,41 +951,75 @@ fn test_allow_command_macros_guard_local_mode_and_info_file_issue_95() {
 
 #[test]
 fn test_interactive_message_macro_delimiters_and_chaining() {
-    use bashmenu_core::{extract_first_message_macro, find_message_macro_span, MenuItem};
+    use bashmenu_core::{
+        extract_first_message_macro, find_message_macro_span, MenuItem, MessageMacroData,
+    };
 
     let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../defaults/bashmenu.yml");
     let mut config = load_config(fixture).expect("load config");
     config.theme = "cyberpunk".to_string();
     let ctx = MacroContext::new(&config).with_allow_command_macros(false);
 
-    // 1. Supports double quotes, single quotes, and backticks
+    // 1. Shorthand {message:"TEXT"} has NO title and supports ", ', and `
     let (rem_dq, msg_dq) =
         extract_first_message_macro(r#"{message:"This is a popup message"}"#, &ctx)
             .expect("double-quoted message");
     assert_eq!(rem_dq, "");
-    assert_eq!(msg_dq, "This is a popup message");
+    assert_eq!(
+        msg_dq,
+        MessageMacroData {
+            title: None,
+            text: "This is a popup message".to_string(),
+        }
+    );
 
     let (rem_sq, msg_sq) = extract_first_message_macro("{message:'Single quoted \"text\"'}", &ctx)
         .expect("single-quoted message");
     assert_eq!(rem_sq, "");
-    assert_eq!(msg_sq, "Single quoted \"text\"");
+    assert_eq!(msg_sq.title, None);
+    assert_eq!(msg_sq.text, "Single quoted \"text\"");
 
     let (rem_bt, msg_bt) =
         extract_first_message_macro("{message:`Backtick 'quoted' \"text\"`}", &ctx)
             .expect("backtick-quoted message");
     assert_eq!(rem_bt, "");
-    assert_eq!(msg_bt, "Backtick 'quoted' \"text\"");
+    assert_eq!(msg_bt.title, None);
+    assert_eq!(msg_bt.text, "Backtick 'quoted' \"text\"");
 
-    // 2. Supports \n line breaks, escaped quotes, and nested placeholders
+    // 2. Structured {message:title=...:text=...} with arbitrary spaces and quotes
+    let (_, msg_both) = extract_first_message_macro(
+        r#"{message: title = "Heads Up ({theme})" : text = 'Line 1\nLine 2' }"#,
+        &ctx,
+    )
+    .expect("title + text message");
+    assert_eq!(msg_both.title.as_deref(), Some("Heads Up (cyberpunk)"));
+    assert_eq!(msg_both.text, "Line 1\nLine 2");
+
+    // Omitted title
+    let (_, msg_only_text) =
+        extract_first_message_macro("{message: text = `Only body here` }", &ctx)
+            .expect("text-only message");
+    assert_eq!(msg_only_text.title, None);
+    assert_eq!(msg_only_text.text, "Only body here");
+
+    // Omitted text
+    let (_, msg_only_title) =
+        extract_first_message_macro(r#"{message: title = "Only Title" }"#, &ctx)
+            .expect("title-only message");
+    assert_eq!(msg_only_title.title.as_deref(), Some("Only Title"));
+    assert_eq!(msg_only_title.text, "");
+
+    // 3. Supports \n line breaks, escaped quotes, and nested placeholders
     let (_, msg_nested) =
         extract_first_message_macro(r#"{message:"Theme: {theme}\nSay \"Hi\""}"#, &ctx)
             .expect("nested message");
-    assert_eq!(msg_nested, "Theme: cyberpunk\nSay \"Hi\"");
+    assert_eq!(msg_nested.title, None);
+    assert_eq!(msg_nested.text, "Theme: cyberpunk\nSay \"Hi\"");
 
-    // 3. Double-brace escaped {{message:...}} is ignored
+    // 4. Double-brace escaped {{message:...}} is ignored
     assert!(find_message_macro_span(r#"{{message:"literal"}}"#).is_none());
 
-    // 4. Standalone MenuItem leaves no remaining payload
+    // 5. Standalone MenuItem leaves no remaining payload
     let mut standalone = MenuItem {
         label: "Notice".to_string(),
         action: Some(r#"{message:"Hello popup"}"#.to_string()),
@@ -991,23 +1027,76 @@ fn test_interactive_message_macro_delimiters_and_chaining() {
         ..Default::default()
     };
     assert_eq!(
-        standalone.take_first_message_macro(&ctx).as_deref(),
-        Some("Hello popup")
+        standalone.take_first_message_macro(&ctx),
+        Some(MessageMacroData {
+            title: None,
+            text: "Hello popup".to_string(),
+        })
     );
     assert!(!standalone.has_remaining_payload());
 
-    // 5. Chained MenuItem preserves the remaining command after stripping {message:...}
+    // 6. Chained MenuItem preserves the remaining command after stripping {message:...}
     let mut chained = MenuItem {
         label: "Backup".to_string(),
-        action: Some("{message:`Insert drive`} echo ok".to_string()),
-        command: Some("{message:`Insert drive`} echo ok".to_string()),
+        action: Some("{message:title=`USB Backup`:text=`Insert drive`} echo ok".to_string()),
+        command: Some("{message:title=`USB Backup`:text=`Insert drive`} echo ok".to_string()),
         ..Default::default()
     };
     assert_eq!(
-        chained.take_first_message_macro(&ctx).as_deref(),
-        Some("Insert drive")
+        chained.take_first_message_macro(&ctx),
+        Some(MessageMacroData {
+            title: Some("USB Backup".to_string()),
+            text: "Insert drive".to_string(),
+        })
     );
     assert!(chained.has_remaining_payload());
     assert_eq!(chained.command.as_deref(), Some("echo ok"));
     assert_eq!(chained.action.as_deref(), Some("echo ok"));
+
+    // 7. {param} variants: title, text, default, flexible spacing, and no title when omitted
+    let mut p_full = MenuItem {
+        label: "Ping Host".to_string(),
+        command: Some(
+            r#"ping -c 4 {param: title = "Ping Target" : text = 'Enter host or IP:' : default = `1.1.1.1` }"#
+                .to_string(),
+        ),
+        ..Default::default()
+    };
+    assert!(p_full.has_param_placeholder());
+    assert_eq!(p_full.param_modal_title(), "Ping Target");
+    assert_eq!(p_full.param_modal_prompt(), "Enter host or IP:");
+    assert_eq!(p_full.param_modal_default(), "1.1.1.1");
+    p_full.apply_param_placeholder("8.8.8.8");
+    assert_eq!(p_full.command.as_deref(), Some("ping -c 4 '8.8.8.8'"));
+
+    // {param} without title has empty title (no fallback to item.label)
+    let p_no_title = MenuItem {
+        label: "Ignored Label".to_string(),
+        command: Some(
+            r#"echo {param: text = "Say something:" : default = "{theme}" }"#.to_string(),
+        ),
+        ..Default::default()
+    };
+    assert_eq!(p_no_title.param_modal_title(), "");
+    assert_eq!(p_no_title.param_modal_prompt(), "Say something:");
+    assert_eq!(p_no_title.param_modal_default(), "{theme}");
+
+    // {param} with only title omits prompt body
+    let p_only_title = MenuItem {
+        label: "Ignored Label".to_string(),
+        command: Some(r#"echo {param: title = "Quick Input" }"#.to_string()),
+        ..Default::default()
+    };
+    assert_eq!(p_only_title.param_modal_title(), "Quick Input");
+    assert_eq!(p_only_title.param_modal_prompt(), "");
+    assert_eq!(p_only_title.param_modal_default(), "");
+
+    // {param} shorthand quoted text has no title
+    let p_shorthand = MenuItem {
+        label: "Ignored Label".to_string(),
+        command: Some(r#"echo {param:"Enter name:"}"#.to_string()),
+        ..Default::default()
+    };
+    assert_eq!(p_shorthand.param_modal_title(), "");
+    assert_eq!(p_shorthand.param_modal_prompt(), "Enter name:");
 }
