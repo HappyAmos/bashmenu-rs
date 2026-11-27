@@ -191,8 +191,8 @@ pub fn resolve_local_file(url: &str) -> Option<std::path::PathBuf> {
 /// Opens an external URL or file in a background process.
 pub fn open_external_url(url: &str) -> anyhow::Result<()> {
     if url.starts_with("http://") || url.starts_with("https://") {
-        if std::path::Path::new("scripts/webopen.sh").is_file() {
-            let _ = Command::new("scripts/webopen.sh").arg(url).spawn();
+        if let Some(script_path) = bashmenu_core::resolve_script_path("webopen.sh") {
+            let _ = Command::new(script_path).arg(url).spawn();
         } else if let Ok(mut child) = Command::new("xdg-open").arg(url).spawn() {
             let _ = child.wait();
         } else {
