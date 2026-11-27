@@ -1,4 +1,4 @@
-# HA Bash Menu Specification & User Manual (v0.1.8)
+# HA Bash Menu Specification & User Manual (v0.1.9)
 
 Welcome to the specification and user manual for HA Bash Menu, a lightweight,
 data-driven Ratatui Text User Interface (TUI) menu engine and configuration
@@ -292,6 +292,7 @@ The `bmpager` standalone pager provides full-screen interactive viewing of files
 | `/` | Search forward for pattern. |
 | `n` / `N` | Jump to next / previous search match. |
 | `l` / `o` | Open interactive hyperlink and section anchor selector. |
+| `w` / `W` | Toggle soft line wrapping for plain and ANSI text. |
 | `e` / `E` | Open active file in configured editor (`bashedit` or `$EDITOR`). |
 | `h` / `?` / `F1` | Display scrollable pager help modal. |
 | `q` / `Q` / `ESC` / `Ctrl+C` | Exit pager (or close active modal). |

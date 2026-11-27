@@ -318,6 +318,9 @@ bmpager:
   unbound_key: "unbound key: {key}"
   jumped_to: "jumped to {target}"
   anchor_not_found: "anchor not found: {target}"
+  wrap_on: "Wrap: ON"
+  wrap_off: "Wrap: OFF"
+  wrap_markdown_always: "Wrap: always ON in Markdown mode"
   opened: "opened {target}"
   viewed: "viewed {target}"
   file_not_found: "file not found: {target}"
@@ -650,4 +653,5 @@ cli:
         g Home            Jump to TOP          G End           Jump to BOT
         /                 Search forward       n / N           Next / prev match
         l o               Follow / open link   e               Open in editor
-        h ? F1            Help manual modal    q Q Ctrl-C Esc  Quit
+        w W               Toggle soft-wrap     h ? F1          Help manual modal
+        q Q Ctrl-C Esc    Quit

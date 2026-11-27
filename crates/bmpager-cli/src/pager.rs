@@ -20,6 +20,8 @@ use std::process::Command;
 pub struct Pager {
     /// Document lines with formatting codes intact
     pub lines: Vec<String>,
+    /// Original raw text content retained for lossless wrap toggling and resize reflow
+    pub raw_content: String,
     /// 1-based index of the line currently at the top of the viewport
     pub top_line: usize,
     /// Total count of document lines
@@ -69,8 +71,10 @@ impl Pager {
             args.associated_file.clone()
         };
 
+        let raw_content = lines.join("\n");
         let mut pager = Self {
             lines,
+            raw_content,
             top_line: 1,
             total,
             args,
@@ -85,6 +89,48 @@ impl Pager {
         pager.resolve_start();
         pager.clamp_top();
         pager
+    }
+
+    /// Attaches the original unformatted raw content so toggling wrap (`w`) or
+    /// resizing the terminal reflows text losslessly.
+    pub fn with_raw_content(mut self, raw_content: String) -> Self {
+        self.raw_content = raw_content;
+        self
+    }
+
+    /// Rebuilds display `lines` from `raw_content` using the current wrap/markdown
+    /// mode and terminal width, clamping `top_line` safely.
+    pub fn rebuild_lines(&mut self) {
+        let width = self.cols.clamp(20, 500);
+        let mut rebuilt: Vec<String> = if self.args.markdown {
+            let rendered = crate::markdown::render_markdown(&self.raw_content, width);
+            rendered.lines().map(|s| s.to_string()).collect()
+        } else if self.args.wrap_text {
+            crate::ansi::wrap_text_content(&self.raw_content, width)
+        } else {
+            self.raw_content.lines().map(|s| s.to_string()).collect()
+        };
+        if rebuilt.len() > self.args.max_lines {
+            rebuilt.truncate(self.args.max_lines);
+        }
+        self.lines = rebuilt;
+        self.total = self.lines.len();
+        self.clamp_top();
+    }
+
+    /// Toggles soft line wrapping (`w` / `W`) for plain and ANSI text documents.
+    pub fn toggle_wrap(&mut self) {
+        if self.args.markdown {
+            self.message = t!("bmpager.wrap_markdown_always");
+            return;
+        }
+        self.args.wrap_text = !self.args.wrap_text;
+        self.rebuild_lines();
+        self.message = if self.args.wrap_text {
+            t!("bmpager.wrap_on")
+        } else {
+            t!("bmpager.wrap_off")
+        };
     }
 
     /// Resolves starting line position from CLI arguments (`+N` or `+/PATTERN`).
@@ -152,8 +198,17 @@ impl Pager {
             self.clamp_top();
             self.render()?;
 
-            if let Event::Key(key) = event::read()? {
-                done = self.handle_key(key)?;
+            match event::read()? {
+                Event::Key(key) => {
+                    done = self.handle_key(key)?;
+                }
+                Event::Resize(_, _) => {
+                    self.query_size();
+                    if self.args.wrap_text || self.args.markdown {
+                        self.rebuild_lines();
+                    }
+                }
+                _ => {}
             }
         }
 
@@ -211,6 +266,10 @@ impl Pager {
             }
             KeyCode::Char('e') | KeyCode::Char('E') => {
                 self.open_in_editor()?;
+                clear_message = false;
+            }
+            KeyCode::Char('w') | KeyCode::Char('W') => {
+                self.toggle_wrap();
                 clear_message = false;
             }
             KeyCode::Char('h') | KeyCode::Char('?') | KeyCode::F(1) => {
@@ -729,9 +788,8 @@ impl Pager {
         if let Some(ref cmd) = self.args.reload_cmd {
             if let Ok(output) = Command::new("sh").arg("-c").arg(cmd).output() {
                 if output.status.success() {
-                    let text = String::from_utf8_lossy(&output.stdout);
-                    self.lines = text.lines().map(|s| s.to_string()).collect();
-                    self.total = self.lines.len();
+                    self.raw_content = String::from_utf8_lossy(&output.stdout).into_owned();
+                    self.rebuild_lines();
                     self.message = "reloaded".to_string();
                     return;
                 }
@@ -739,14 +797,49 @@ impl Pager {
         }
 
         if let Ok(content) = std::fs::read_to_string(target_file) {
-            if self.args.markdown {
-                let rendered = crate::markdown::render_markdown(&content, self.cols);
-                self.lines = rendered.lines().map(|s| s.to_string()).collect();
-            } else {
-                self.lines = content.lines().map(|s| s.to_string()).collect();
-            }
-            self.total = self.lines.len();
+            self.raw_content = content;
+            self.rebuild_lines();
             self.message = "reloaded".to_string();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pager_toggle_wrap_key_reflows_and_restores_lines() {
+        let raw = "one two three four five six seven eight nine ten eleven twelve".to_string();
+        let mut pager = Pager::new(vec![raw.clone()], PagerArgs::default()).with_raw_content(raw);
+        pager.cols = 20;
+        assert!(!pager.args.wrap_text);
+        assert_eq!(pager.total, 1);
+
+        // Press 'w' -> enables soft wrapping and splits long line
+        let exit = pager
+            .handle_key(crossterm::event::KeyEvent::new(
+                KeyCode::Char('w'),
+                KeyModifiers::NONE,
+            ))
+            .unwrap();
+        assert!(!exit);
+        assert!(pager.args.wrap_text);
+        assert!(
+            pager.total > 1,
+            "Enabling wrap must split 62-col line at width 20 (got {} lines)",
+            pager.total
+        );
+        assert!(!pager.message.is_empty());
+
+        // Press 'w' again -> disables soft wrapping and restores single line
+        pager
+            .handle_key(crossterm::event::KeyEvent::new(
+                KeyCode::Char('w'),
+                KeyModifiers::NONE,
+            ))
+            .unwrap();
+        assert!(!pager.args.wrap_text);
+        assert_eq!(pager.total, 1);
     }
 }
