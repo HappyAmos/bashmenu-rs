@@ -661,6 +661,12 @@ Prompts for a single-line text value using a modal input box. Supports
 \fBmasked\fR (boolean to mask input with asterisks for secrets/passwords), and
 \fB:raw\fR (opt out of POSIX shell quoting).
 .TP
+.B {message:"..."}
+Displays an adaptive, centered popup message dialog with an OK button and
+top-right [X] close button. Accepts double quotes (\fB"..."\fR), single quotes
+(\fB'...'\fR), or backticks (\fB`...`\fR), supports \fB\\n\fR line breaks and
+nested placeholders, and can be used standalone or prepended to a command.
+.TP
 .B {file_picker}
 Launches a visual file chooser dialog box.
 .TP

@@ -1799,6 +1799,111 @@ pub fn extract_toasts(text: &str, ctx: &MacroContext) -> (String, Vec<ToastNotif
     (cleaned.into_owned(), notifications)
 }
 
+/// Finds the byte bounds and unescaped message body of the first `{message:...}`
+/// macro in `text`, skipping double-brace escaped `{{message:...}}` sequences.
+///
+/// Supports `"..."`, `'...'`, `` `...` `` quoted strings (with `\n`, `\\`, and
+/// escaped quote handling) as well as unquoted brace-balanced bodies.
+pub fn find_message_macro_span(text: &str) -> Option<(usize, usize, String)> {
+    const PREFIX: &str = "{message:";
+    let bytes = text.as_bytes();
+    let mut search_from = 0usize;
+
+    while let Some(rel) = text[search_from..].find(PREFIX) {
+        let start = search_from + rel;
+        // Skip double-brace escaped `{{message:...}}`
+        if start > 0 && bytes[start - 1] == b'{' {
+            search_from = start + PREFIX.len();
+            continue;
+        }
+
+        let mut i = start + PREFIX.len();
+        while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        if i >= bytes.len() {
+            return None;
+        }
+
+        let first = bytes[i];
+        if first == b'"' || first == b'\'' || first == b'`' {
+            let delim = first as char;
+            let mut body = String::new();
+            let mut chars = text[i + 1..].char_indices();
+            let mut closed_at = None;
+            while let Some((off, ch)) = chars.next() {
+                if ch == '\\' {
+                    if let Some((_, next_ch)) = chars.next() {
+                        match next_ch {
+                            'n' => body.push('\n'),
+                            't' => body.push('\t'),
+                            '\\' => body.push('\\'),
+                            c if c == delim => body.push(c),
+                            other => {
+                                body.push('\\');
+                                body.push(other);
+                            }
+                        }
+                    } else {
+                        body.push('\\');
+                    }
+                    continue;
+                }
+                if ch == delim {
+                    closed_at = Some(i + 1 + off + ch.len_utf8());
+                    break;
+                }
+                body.push(ch);
+            }
+            if let Some(mut after_delim) = closed_at {
+                while after_delim < bytes.len() && bytes[after_delim].is_ascii_whitespace() {
+                    after_delim += 1;
+                }
+                if after_delim < bytes.len() && bytes[after_delim] == b'}' {
+                    return Some((start, after_delim + 1, body));
+                }
+            }
+        } else {
+            // Unquoted brace-balanced body
+            let mut depth = 1usize;
+            for (off, ch) in text[i..].char_indices() {
+                match ch {
+                    '{' => depth += 1,
+                    '}' => {
+                        depth -= 1;
+                        if depth == 0 {
+                            let end = i + off + 1;
+                            let raw = text[i..i + off].trim().replace("\\n", "\n");
+                            return Some((start, end, raw));
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        search_from = start + PREFIX.len();
+    }
+
+    None
+}
+
+/// Extracts the first `{message:...}` macro from `text`, interpolates nested
+/// placeholders inside the message body using `ctx`, and returns
+/// `(remaining_text, interpolated_message)`.
+pub fn extract_first_message_macro(text: &str, ctx: &MacroContext) -> Option<(String, String)> {
+    let (start, end, raw_body) = find_message_macro_span(text)?;
+    let interpolated = if raw_body.contains('{') {
+        interpolate_placeholders(&raw_body, ctx)
+    } else {
+        raw_body
+    };
+    let mut remaining = String::with_capacity(text.len());
+    remaining.push_str(&text[..start]);
+    remaining.push_str(&text[end..]);
+    Some((remaining.trim().to_string(), interpolated))
+}
+
 /// Recursively interpolates macro placeholders within a text string.
 ///
 /// # Supported Directives
