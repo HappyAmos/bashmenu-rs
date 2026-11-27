@@ -355,8 +355,8 @@ help:
     | {{input:default="":id=VAR:width=XX:multiline=false:scrollbar=true:masked=false}} | Embedded form text field in interactive Markdown (height=5 default for multiline) |
     | {{radio:VAR:"Option 1":"Option 2"}} | Single-choice radio list in interactive Markdown (supports id=, default=, layout="horizontal") |
     | {{checkbox:VAR:"Label":false}} | Boolean toggle checkbox in interactive Markdown (exports "true"/"false") |
-    | {{id:VAR}} | Live interpolated value from matching {{input}}/{{radio}}/{{checkbox}} (updates live) |
-    | {{button:type="submit"\|"ok"\|"cancel":action="ID"}} | Action button invoking reserved ```bashmenu-bash:id="ID"``` block (optional text="...") |
+    | {{id:VAR}} | Live interpolated value from matching {{input}}/{{radio}}/{{checkbox}} (in Bash: {{id:VAR="VAL"}} writes back) |
+    | {{button:type="submit"\|"ok"\|"action"\|"cancel":action="ID"}} | Action button invoking reserved ```bashmenu-bash:id="ID"``` block (action stays on page; optional text="...") |
     | {{clear}} | Multi-page break in interactive Markdown; next page renders after Submit/OK |
     | {{file_picker}} | Launches visual file chooser dialog |
     | {{file_picker:path:<dir>}} | File chooser opening in specified default directory |

@@ -161,6 +161,7 @@ struct SuspendedInteractiveForm {
     frontmatter: bashmenu_core::MarkdownFrontmatter,
     fallback_title: String,
     close_after_action: bool,
+    stay_on_page: bool,
 }
 
 /// Active popup modal dialog currently being presented in the main menu loop.
@@ -758,6 +759,20 @@ fn main() -> Result<()> {
                                 cancelled: false,
                             });
                         }
+                        bashmenu_core::UiRpcRequest::SetVar { id, value } => {
+                            let ok = bashmenu_core::is_valid_bash_identifier(&id);
+                            if ok {
+                                if let Some(ref mut suspended) = suspended_interactive_form {
+                                    suspended.modal.set_var(id, value);
+                                }
+                            }
+                            let _ = pending.reply_tx.send(bashmenu_core::UiRpcResponse {
+                                ok,
+                                value: String::new(),
+                                cancelled: false,
+                            });
+                            need_redraw = true;
+                        }
                     }
                 }
             }
@@ -768,7 +783,9 @@ fn main() -> Result<()> {
         if let Some(done) = finished_md {
             active_interactive_md = None;
             if let Some(mut suspended) = suspended_interactive_form.take() {
-                if !suspended.close_after_action && suspended.modal.advance_page() {
+                if suspended.stay_on_page
+                    || (!suspended.close_after_action && suspended.modal.advance_page())
+                {
                     active_modal = ActiveModal::InteractiveForm {
                         modal: suspended.modal,
                         reserved_scripts: suspended.reserved_scripts,
@@ -1896,6 +1913,7 @@ fn main() -> Result<()> {
                                                         frontmatter,
                                                         fallback_title,
                                                         close_after_action,
+                                                        stay_on_page: false,
                                                     });
                                             }
                                             Err(err) => {
@@ -1907,6 +1925,62 @@ fn main() -> Result<()> {
                                             }
                                         }
                                     } else if modal.advance_page() {
+                                        active_modal = ActiveModal::InteractiveForm {
+                                            modal,
+                                            reserved_scripts,
+                                            frontmatter,
+                                            fallback_title,
+                                        };
+                                    }
+                                }
+                                bashmenu_tui::InteractiveFormAction::RunInPlace {
+                                    action,
+                                    vars,
+                                } => {
+                                    let script_opt = match action.as_deref() {
+                                        Some(id) => match reserved_scripts.get(id).cloned() {
+                                            Some(s) => Some(s),
+                                            None => {
+                                                push_error_toast(
+                                                    &mut toast_rack,
+                                                    "Interactive Markdown",
+                                                    format!("Unknown action block '{id}'"),
+                                                    5.0,
+                                                );
+                                                None
+                                            }
+                                        },
+                                        None => None,
+                                    };
+                                    if let Some(script) = script_opt {
+                                        match ui_rpc::spawn_reserved_script_block(
+                                            script,
+                                            frontmatter.clone(),
+                                            fallback_title.clone(),
+                                            ui_rpc::current_bashmenu_exe(),
+                                            vars,
+                                        ) {
+                                            Ok(session) => {
+                                                active_interactive_md = Some(session);
+                                                suspended_interactive_form =
+                                                    Some(SuspendedInteractiveForm {
+                                                        modal,
+                                                        reserved_scripts,
+                                                        frontmatter,
+                                                        fallback_title,
+                                                        close_after_action: false,
+                                                        stay_on_page: true,
+                                                    });
+                                            }
+                                            Err(err) => {
+                                                active_modal =
+                                                    ActiveModal::Message(MessageModal::new(
+                                                        "Interactive Markdown Error",
+                                                        err.to_string(),
+                                                    ));
+                                            }
+                                        }
+                                    } else {
                                         active_modal = ActiveModal::InteractiveForm {
                                             modal,
                                             reserved_scripts,
@@ -1934,6 +2008,7 @@ fn main() -> Result<()> {
                                                             frontmatter,
                                                             fallback_title,
                                                             close_after_action: true,
+                                                            stay_on_page: false,
                                                         });
                                                 }
                                                 Err(err) => {

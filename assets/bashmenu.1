@@ -700,18 +700,22 @@ Toggling updates \fB{id:VAR}\fR live and exports \fB"true"\fR or \fB"false"\fR.
 .TP
 .B {id:VAR}
 Displays the live committed value of the matching \fB{input}\fR, \fB{radio}\fR,
-or \fB{checkbox}\fR field in an \fBinteractive: true\fR Markdown document (and
-expands to \fB${VAR:-}\fR inside \fBbashmenu-bash\fR code blocks).
+or \fB{checkbox}\fR field in an \fBinteractive: true\fR Markdown document.
+Inside \fBbashmenu-bash\fR code blocks, \fB{id:VAR}\fR expands to
+\fB${VAR:-}\fR and \fB{id:VAR="VALUE"}\fR writes a computed value back into the
+document's live \fB{id:VAR}\fR map.
 .TP
-.B {button:type="submit"|"ok"|"cancel":action="ID"}
+.B {button:type="submit"|"ok"|"action"|"cancel":action="ID"}
 Renders an interactive action button inside an \fBinteractive: true\fR Markdown
 modal. Multiple buttons on the same line render horizontally and suppress the
 fallback footer \fB[ OK ]\fR button. \fBtype="submit"\fR (\fB[ Submit ]\fR) and
-\fBtype="ok"\fR (\fB[ OK ]\fR) commit all \fB{input}\fR values, execute the
-optional reserved \fBbashmenu-bash:id="ID"\fR code block (held in reserve and
-never auto-executed on load), and advance to the next \fB{clear}\fR page or
-close on the last page. \fBtype="cancel"\fR (\fB[ Cancel ]\fR) runs its optional
-\fBaction\fR block and closes the modal immediately. Supports optional
+\fBtype="ok"\fR (\fB[ OK ]\fR) commit all form values, execute the optional
+reserved \fBbashmenu-bash:id="ID"\fR code block (held in reserve and never
+auto-executed on load), and advance to the next \fB{clear}\fR page or close on
+the last page. \fBtype="action"\fR (\fB[ Run ]\fR) executes its \fBaction\fR
+block in-place and remains on the current page so \fB{id:VAR="VALUE"}\fR
+write-backs update live. \fBtype="cancel"\fR (\fB[ Cancel ]\fR) runs its
+optional \fBaction\fR block and closes the modal immediately. Supports optional
 \fBtext="..."\fR / \fBlabel="..."\fR label override.
 .TP
 .B {clear}

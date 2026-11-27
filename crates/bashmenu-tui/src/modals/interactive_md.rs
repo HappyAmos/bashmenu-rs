@@ -24,6 +24,13 @@ pub enum InteractiveFormAction {
         /// Committed `id -> value` map across all visited pages.
         vars: HashMap<String, String>,
     },
+    /// An in-place `action` / `button` control was activated (stays on current page).
+    RunInPlace {
+        /// Optional reserved `bashmenu-bash:id="..."` block to run.
+        action: Option<String>,
+        /// Committed `id -> value` map across all visited pages.
+        vars: HashMap<String, String>,
+    },
     /// A `cancel` button (or `Esc` / `[X]`) was activated.
     Cancel {
         /// Optional reserved `bashmenu-bash:id="..."` cleanup block to run.
@@ -431,6 +438,34 @@ impl InteractiveMarkdownModal {
         }
     }
 
+    /// Sets a variable in [`Self::committed_vars`] (e.g. from `{id:var="value"}`
+    /// script write-back) and synchronizes any matching widget on the current page.
+    pub fn set_var(&mut self, id: String, value: String) {
+        for f in &mut self.fields {
+            if f.spec.id == id {
+                let mut spec = f.spec.clone();
+                spec.default_value = value.clone();
+                *f = InputFieldState::from_spec(spec);
+            }
+        }
+        for r in &mut self.radios {
+            if r.spec.id == id {
+                if let Some(idx) = r.spec.options.iter().position(|o| o == &value) {
+                    r.selected = idx;
+                }
+            }
+        }
+        for c in &mut self.checkboxes {
+            if c.spec.id == id {
+                c.checked = matches!(
+                    value.trim().to_ascii_lowercase().as_str(),
+                    "true" | "1" | "yes" | "on"
+                );
+            }
+        }
+        self.committed_vars.insert(id, value);
+    }
+
     /// Returns the display label for a [`ButtonSpec`].
     fn button_label(spec: &ButtonSpec) -> String {
         if let Some(ref lbl) = spec.label {
@@ -439,6 +474,7 @@ impl InteractiveMarkdownModal {
         match spec.button_type {
             ButtonType::Submit => "Submit".to_string(),
             ButtonType::Ok => t!("common.buttons.ok"),
+            ButtonType::Action => "Run".to_string(),
             ButtonType::Cancel => t!("common.buttons.cancel"),
         }
     }
@@ -448,6 +484,10 @@ impl InteractiveMarkdownModal {
         self.soft_refresh();
         match spec.button_type {
             ButtonType::Cancel => InteractiveFormAction::Cancel {
+                action: spec.action.clone(),
+                vars: self.committed_vars.clone(),
+            },
+            ButtonType::Action => InteractiveFormAction::RunInPlace {
                 action: spec.action.clone(),
                 vars: self.committed_vars.clone(),
             },
@@ -1264,7 +1304,7 @@ impl InteractiveMarkdownModal {
                         let clipped: String = rendered.chars().take(max_chars).collect();
                         let base_btn = match spec.button_type {
                             ButtonType::Cancel => styles.modal_cancel_button,
-                            ButtonType::Submit | ButtonType::Ok => {
+                            ButtonType::Submit | ButtonType::Ok | ButtonType::Action => {
                                 styles.modal_yes_button.add_modifier(Modifier::BOLD)
                             }
                         };
@@ -1550,5 +1590,45 @@ Selected: {id:rdoValue} | Logs: {id:enableLogs}
         assert!(rendered.contains("(●) Example 2"));
         assert!(rendered.contains("[x] Enable verbose logging"));
         assert!(rendered.contains("Selected: Example 2 | Logs: true"));
+    }
+
+    #[test]
+    fn test_action_button_run_in_place_and_set_var_writeback() {
+        let md = "\
+Host: {input: default=\"localhost\": id=\"targetHost\"}
+Result: {id:lookupResult}
+{button: type=\"action\": text=\"Lookup\": action=\"doLookup\"} {button: type=\"ok\"}
+";
+        let doc = parse_interactive_markdown_doc(md);
+        let mut modal = InteractiveMarkdownModal::from_pages("Lookup", doc.pages);
+        assert_eq!(modal.focus, FormFocus::Input(0));
+
+        // Tab to Lookup (type="action") button and press Enter -> RunInPlace
+        modal.handle_key_with_modifiers(KeyCode::Tab, KeyModifiers::NONE);
+        assert_eq!(modal.focus, FormFocus::Button(0));
+        let act = modal.handle_key_with_modifiers(KeyCode::Enter, KeyModifiers::NONE);
+        assert_eq!(
+            act,
+            Some(InteractiveFormAction::RunInPlace {
+                action: Some("doLookup".to_string()),
+                vars: HashMap::from([("targetHost".to_string(), "localhost".to_string())]),
+            })
+        );
+
+        // Simulate script write-back via `{id:lookupResult="127.0.0.1"}`
+        modal.set_var("lookupResult".to_string(), "127.0.0.1".to_string());
+        let area = Rect::new(0, 0, 80, 16);
+        let mut buf = Buffer::empty(area);
+        let styles = ResolvedThemeStyles::default();
+        modal.render(area, &styles, &mut buf);
+        let mut rendered = String::new();
+        for y in 0..area.height {
+            for x in 0..area.width {
+                rendered.push_str(buf[(x, y)].symbol());
+            }
+            rendered.push('\n');
+        }
+        assert!(rendered.contains("Result: 127.0.0.1"));
+        assert!(rendered.contains("[ Lookup ]"));
     }
 }

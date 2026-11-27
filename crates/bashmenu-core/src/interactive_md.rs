@@ -53,6 +53,8 @@ pub enum ButtonType {
     Submit,
     /// Pauses/continues (`type="ok"`, default label `"OK"`).
     Ok,
+    /// Runs an action in-place without closing or advancing (`type="action"` / `"button"`, default label `"Run"`).
+    Action,
     /// Exits/cancels the interactive document (`type="cancel"`, default label `"Cancel"`).
     Cancel,
 }
@@ -79,6 +81,7 @@ impl ButtonSpec {
         match self.button_type {
             ButtonType::Submit => "Submit",
             ButtonType::Ok => "OK",
+            ButtonType::Action => "Run",
             ButtonType::Cancel => "Cancel",
         }
     }
@@ -222,6 +225,16 @@ pub enum UiRpcRequest {
     Placeholder {
         /// Raw template string containing `{user}`, `{home}`, etc.
         text: String,
+    },
+    /// Writes a variable value back to the interactive Markdown document's
+    /// `{id:<name>}` map (`{id:var="value"}` / `bm_set`).
+    SetVar {
+        /// Target variable identifier (`^[a-zA-Z_][a-zA-Z0-9_]*$`).
+        #[serde(default)]
+        id: String,
+        /// Value to store for `{id:<name>}` and subsequent script runs.
+        #[serde(default)]
+        value: String,
     },
 }
 
@@ -679,6 +692,7 @@ fn parse_button_macro_fields(inner: &str) -> ButtonSpec {
                     let lower = val.trim().to_ascii_lowercase();
                     spec.button_type = match lower.as_str() {
                         "ok" => ButtonType::Ok,
+                        "action" | "button" | "run" => ButtonType::Action,
                         "cancel" => ButtonType::Cancel,
                         _ => ButtonType::Submit,
                     };
@@ -1290,7 +1304,49 @@ fn transpile_bash_line(line: &str) -> String {
         search_from = start + replacement.len();
     }
 
-    // 3. Rewrite `{id:<VAR>}` into `${<VAR>:-}` so form input variables expand
+    // 3. Rewrite `{id:<VAR> = <VALUE>}` assignments into `__bm_set "<VAR>" <VALUE>`
+    //    so scripts can write computed values back to the Markdown document's `{id:...}`.
+    search_from = 0;
+    while search_from < out.len() {
+        let Some(rel_start) = out[search_from..].find("{id:") else {
+            break;
+        };
+        let start = search_from + rel_start;
+        if start > 0 && out.as_bytes()[start - 1] == b'{' {
+            search_from = start + 4;
+            continue;
+        }
+        let Some(end) = scan_balanced_macro_end(&out, start) else {
+            search_from = start + 4;
+            continue;
+        };
+        let inner = out[start + 4..end - 1].trim();
+        if let Some(eq_idx) = inner.find('=') {
+            let var_name = inner[..eq_idx].trim();
+            if is_valid_bash_identifier(var_name) {
+                let raw_val = inner[eq_idx + 1..].trim();
+                let bash_val = if ((raw_val.starts_with('\'') && raw_val.ends_with('\''))
+                    || (raw_val.starts_with('"') && raw_val.ends_with('"')))
+                    && raw_val.len() >= 2
+                {
+                    raw_val.to_string()
+                } else if raw_val.starts_with('`') && raw_val.ends_with('`') && raw_val.len() >= 2 {
+                    let inner_q = escape_for_bash_double_quotes(&raw_val[1..raw_val.len() - 1]);
+                    format!("\"{inner_q}\"")
+                } else {
+                    let inner_q = escape_for_bash_double_quotes(raw_val);
+                    format!("\"{inner_q}\"")
+                };
+                let replacement = format!("__bm_set \"{var_name}\" {bash_val}");
+                out.replace_range(start..end, &replacement);
+                search_from = start + replacement.len();
+                continue;
+            }
+        }
+        search_from = start + 4;
+    }
+
+    // 4. Rewrite `{id:<VAR>}` reads into `${<VAR>:-}` so form input variables expand
     //    both inside `{param:...}` / `{message:...}` strings and regular Bash lines.
     search_from = 0;
     while search_from < out.len() {
@@ -1330,9 +1386,11 @@ pub fn transpile_bashmenu_bash(raw_code: &str, self_bin: &Path) -> String {
     script.push_str("__bm_message() { \"$__BM_BIN\" --ui-rpc-message \"$1\" \"$2\"; }\n");
     script.push_str("__bm_toast() { \"$__BM_BIN\" --ui-rpc-toast \"$1\" \"$2\"; }\n");
     script.push_str("__bm_placeholder() { \"$__BM_BIN\" --ui-rpc-placeholder \"$1\"; }\n");
+    script.push_str("__bm_set() { \"$__BM_BIN\" --ui-rpc-set-var \"$1\" \"$2\"; }\n");
     script.push_str("bm_param() { __bm_param \"${1:-}\" \"${2:-}\" \"${3:-}\" \"${4:-0}\"; }\n");
     script.push_str("bm_message() { __bm_message \"${1:-}\" \"${2:-}\"; }\n");
     script.push_str("bm_toast() { __bm_toast \"${1:-}\" \"${2:-}\"; }\n");
+    script.push_str("bm_set() { __bm_set \"${1:-}\" \"${2:-}\"; }\n");
 
     let mut first_line = true;
     for line in raw_code.split_inclusive('\n') {
@@ -1404,10 +1462,14 @@ while true; do
         [Qq]*) echo "Aborted."; exit 1;;
         *) {message:"You entered $GUESS. Age: {id: guestAge} (escaped: {{id:guestName}})"} ;;
     esac
+    {id:api_result="$GUESS"}
+    {id:summary="Hi {id:guestName}, last guess: ${GUESS:-none}"}
+    {id:raw_note='Keep $literal'}
 done
 "#;
         let out = transpile_bashmenu_bash(code, Path::new("/usr/local/bin/bashmenu"));
         assert!(out.contains("__BM_BIN='/usr/local/bin/bashmenu'"));
+        assert!(out.contains("__bm_set()"));
         assert!(out.contains("# comment with {param:'ignored'}"));
         assert!(out.contains(
             "GUESS=\"$(__bm_param \"\" \"Guess a number ${guestName:-} (q to quit):\" \"\" \"0\")\""
@@ -1415,6 +1477,11 @@ done
         assert!(out.contains(
             "*) __bm_message \"\" \"You entered $GUESS. Age: ${guestAge:-} (escaped: {{id:guestName}})\" ;;"
         ));
+        assert!(out.contains("__bm_set \"api_result\" \"$GUESS\""));
+        assert!(
+            out.contains("__bm_set \"summary\" \"Hi ${guestName:-}, last guess: ${GUESS:-none}\"")
+        );
+        assert!(out.contains("__bm_set \"raw_note\" 'Keep $literal'"));
     }
 
     #[test]

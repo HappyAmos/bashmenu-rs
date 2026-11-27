@@ -62,6 +62,10 @@ pub fn maybe_run_ui_rpc_client(args: &[String]) -> Option<i32> {
         "--ui-rpc-placeholder" => UiRpcRequest::Placeholder {
             text: args.get(2).cloned().unwrap_or_default(),
         },
+        "--ui-rpc-set-var" => UiRpcRequest::SetVar {
+            id: args.get(2).cloned().unwrap_or_default(),
+            value: args.get(3).cloned().unwrap_or_default(),
+        },
         _ => return None,
     };
 
