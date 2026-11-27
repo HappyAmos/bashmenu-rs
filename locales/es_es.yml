@@ -316,6 +316,9 @@ bmpager:
   unbound_key: "tecla no asignada: {key}"
   jumped_to: "saltó a {target}"
   anchor_not_found: "ancla no encontrada: {target}"
+  wrap_on: "Ajuste de línea: SÍ"
+  wrap_off: "Ajuste de línea: NO"
+  wrap_markdown_always: "Ajuste de línea: siempre activo en modo Markdown"
   opened: "abierto {target}"
   viewed: "visualizado {target}"
   file_not_found: "archivo no encontrado: {target}"
@@ -648,4 +651,5 @@ cli:
         g Inicio          Ir al INICIO         G Fin           Ir al FINAL
         /                 Buscar adelante      n / N           Coincidencia sig./ant.
         l o               Abrir enlace         e               Abrir en editor
-        h ? F1            Manual de ayuda      q Q Ctrl-C Esc  Salir
+        w W               Alternar ajuste      h ? F1          Manual de ayuda
+        q Q Ctrl-C Esc    Salir
