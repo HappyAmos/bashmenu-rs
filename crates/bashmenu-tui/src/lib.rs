@@ -43,7 +43,7 @@ pub use modals::{
     render_animated_modal_frame, render_modal_frame, wrap_prompt_text, AsciiGridModal,
     BackgroundConfigAction, BackgroundConfigModal, BackgroundFocus, ColorGridModal,
     ColorPickerModal, ColorPickerTab, ConfirmChoice, ConfirmModal, FilePickerFocus,
-    FilePickerModal, HelpModal, InputFieldState, InputModal, InteractiveFormAction,
+    FilePickerModal, FormFocus, HelpModal, InputFieldState, InputModal, InteractiveFormAction,
     InteractiveMarkdownModal, MessageModal, NoteConflictChoice, NoteConflictModal,
     NoteEditorAction, NoteEditorModal, NoteViewerAction, NoteViewerModal, RadioModal,
     StreamOutputAction, StreamOutputModal, StreamOutputMsg, ThemePickerModal, ToggleChoice,

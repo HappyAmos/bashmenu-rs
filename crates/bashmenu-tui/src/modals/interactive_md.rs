@@ -1,9 +1,11 @@
-//! Interactive Markdown form modal rendering static Markdown alongside embedded
-//! `{input:...}` single-line and multi-line form controls.
+//! Interactive Markdown form modal rendering multi-page (`{clear}`) static
+//! Markdown alongside embedded `{input:...}` and `{button:...}` controls.
 
 use super::frame::{is_close_button_clicked, render_modal_frame, render_modal_scrollbar};
 use crate::style::ResolvedThemeStyles;
-use bashmenu_core::{substitute_id_placeholders, t, InputFieldSpec, MarkdownFormBlock};
+use bashmenu_core::{
+    substitute_id_placeholders, t, ButtonSpec, ButtonType, InputFieldSpec, MarkdownFormBlock,
+};
 use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -14,10 +16,31 @@ use std::collections::HashMap;
 /// Action emitted by [`InteractiveMarkdownModal`] on user input.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InteractiveFormAction {
-    /// User submitted the form (`[ OK ]` / Enter); maps `id` -> field value.
-    Submit(HashMap<String, String>),
-    /// User cancelled (`Esc` or `[X]` close button).
-    Cancel,
+    /// A `submit` / `ok` button (or fallback `[ OK ]`) was activated.
+    Continue {
+        /// Optional reserved `bashmenu-bash:id="..."` block to run.
+        action: Option<String>,
+        /// Committed `id -> value` map across all visited pages.
+        vars: HashMap<String, String>,
+    },
+    /// A `cancel` button (or `Esc` / `[X]`) was activated.
+    Cancel {
+        /// Optional reserved `bashmenu-bash:id="..."` cleanup block to run.
+        action: Option<String>,
+        /// Committed `id -> value` map across all visited pages.
+        vars: HashMap<String, String>,
+    },
+}
+
+/// Active focus target on the current form page.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FormFocus {
+    /// Focused on `fields[idx]`.
+    Input(usize),
+    /// Focused on `buttons[idx]` (an inline `{button:...}` control).
+    Button(usize),
+    /// Focused on the fallback footer `[ OK ]` button (only when page has no `{button:...}`).
+    FallbackOk,
 }
 
 /// Editable runtime state for a single embedded `{input:...}` widget.
@@ -171,7 +194,7 @@ impl InputFieldState {
     }
 }
 
-/// Interactive Markdown form modal with embedded `{input:...}` widgets.
+/// Interactive multi-page Markdown form modal with `{input:...}` and `{button:...}`.
 #[derive(Debug, Clone)]
 pub struct InteractiveMarkdownModal {
     /// Dialog title header (empty string omits title badge).
@@ -180,15 +203,18 @@ pub struct InteractiveMarkdownModal {
     pub width_percent: Option<u16>,
     /// Optional window height as percentage of terminal height (`1..=100`).
     pub height_percent: Option<u16>,
-    /// Ordered Markdown text and input field blocks.
-    pub blocks: Vec<MarkdownFormBlock>,
-    /// Runtime state for each [`MarkdownFormBlock::Input`] in order.
+    /// Ordered pages separated by `{clear}`.
+    pub pages: Vec<Vec<MarkdownFormBlock>>,
+    /// Index of the currently displayed page (`0..pages.len()`).
+    pub current_page: usize,
+    /// Runtime state for each [`MarkdownFormBlock::Input`] on the current page.
     pub fields: Vec<InputFieldState>,
-    /// Committed `id -> value` map used for live `{id:<name>}` interpolation.
-    /// Seeded from field defaults on load and updated on soft-refresh (`Enter`).
+    /// Flattened list of [`ButtonSpec`] controls on the current page.
+    pub buttons: Vec<ButtonSpec>,
+    /// Committed `id -> value` map persisted across pages for `{id:<name>}` interpolation.
     pub committed_vars: HashMap<String, String>,
-    /// Index of currently focused input field, or `None` when `[ OK ]` button is focused.
-    pub focused_field: Option<usize>,
+    /// Active focus target on the current page.
+    pub focus: FormFocus,
     /// Outer modal vertical scroll offset in rows.
     pub scroll_offset: usize,
     /// Maximum outer modal scroll offset recorded during the last render pass.
@@ -197,47 +223,145 @@ pub struct InteractiveMarkdownModal {
     last_content_h: Cell<Option<usize>>,
     /// Cached screen rectangles for each rendered input field (for mouse hit-testing).
     last_field_rects: RefCell<Vec<Rect>>,
-    /// Cached `[ OK ]` button screen rectangle.
+    /// Cached screen rectangles for each rendered inline button.
+    last_button_rects: RefCell<Vec<Rect>>,
+    /// Cached fallback `[ OK ]` button screen rectangle.
     last_ok_rect: RefCell<Option<Rect>>,
 }
 
 impl InteractiveMarkdownModal {
-    /// Constructs a new interactive Markdown form modal from parsed blocks.
+    /// Constructs a single-page interactive Markdown form modal from parsed blocks.
     pub fn new(title: impl Into<String>, blocks: Vec<MarkdownFormBlock>) -> Self {
-        let fields: Vec<InputFieldState> = blocks
-            .iter()
-            .filter_map(|b| match b {
-                MarkdownFormBlock::Input { spec, .. } => {
-                    Some(InputFieldState::from_spec(spec.clone()))
-                }
-                MarkdownFormBlock::Text(_) => None,
-            })
-            .collect();
-        let mut committed_vars = HashMap::new();
-        for f in &fields {
-            if !f.spec.id.is_empty() {
-                committed_vars.insert(f.spec.id.clone(), f.value());
-            }
+        Self::from_pages(title, vec![blocks])
+    }
+
+    /// Constructs a multi-page interactive Markdown form modal from `{clear}`-delimited pages.
+    pub fn from_pages(title: impl Into<String>, mut pages: Vec<Vec<MarkdownFormBlock>>) -> Self {
+        if pages.is_empty() {
+            pages.push(Vec::new());
         }
-        let focused_field = if fields.is_empty() { None } else { Some(0) };
-        Self {
+        let mut modal = Self {
             title: title.into(),
             width_percent: None,
             height_percent: None,
-            blocks,
-            fields,
-            committed_vars,
-            focused_field,
+            pages,
+            current_page: 0,
+            fields: Vec::new(),
+            buttons: Vec::new(),
+            committed_vars: HashMap::new(),
+            focus: FormFocus::FallbackOk,
             scroll_offset: 0,
             last_max_scroll: Cell::new(None),
             last_content_h: Cell::new(None),
             last_field_rects: RefCell::new(Vec::new()),
+            last_button_rects: RefCell::new(Vec::new()),
             last_ok_rect: RefCell::new(None),
+        };
+        modal.load_current_page();
+        modal
+    }
+
+    /// Sets optional percentage-based width and height overrides (`1..=100`).
+    pub fn with_dimensions(
+        mut self,
+        width_percent: Option<u16>,
+        height_percent: Option<u16>,
+    ) -> Self {
+        self.width_percent = width_percent.map(|w| w.clamp(1, 100));
+        self.height_percent = height_percent.map(|h| h.clamp(1, 100));
+        self
+    }
+
+    /// Populates `fields`, `buttons`, `committed_vars` defaults, and initial focus
+    /// for `self.current_page`.
+    fn load_current_page(&mut self) {
+        self.fields.clear();
+        self.buttons.clear();
+        if let Some(blocks) = self.pages.get(self.current_page) {
+            for b in blocks {
+                match b {
+                    MarkdownFormBlock::Input { spec, .. } => {
+                        let st = InputFieldState::from_spec(spec.clone());
+                        if !st.spec.id.is_empty() {
+                            self.committed_vars
+                                .entry(st.spec.id.clone())
+                                .or_insert_with(|| st.value());
+                        }
+                        self.fields.push(st);
+                    }
+                    MarkdownFormBlock::Buttons(btns) => {
+                        self.buttons.extend(btns.iter().cloned());
+                    }
+                    MarkdownFormBlock::Text(_) => {}
+                }
+            }
+        }
+        self.scroll_offset = 0;
+        self.last_max_scroll.set(None);
+        self.focus = if !self.fields.is_empty() {
+            FormFocus::Input(0)
+        } else if !self.buttons.is_empty() {
+            FormFocus::Button(0)
+        } else {
+            FormFocus::FallbackOk
+        };
+    }
+
+    /// Returns true if another `{clear}` page follows the current page.
+    pub fn has_next_page(&self) -> bool {
+        self.current_page + 1 < self.pages.len()
+    }
+
+    /// Advances to the next `{clear}` page (clearing the visible document while
+    /// preserving `committed_vars`). Returns `false` if already on the last page.
+    pub fn advance_page(&mut self) -> bool {
+        if self.current_page + 1 < self.pages.len() {
+            self.soft_refresh();
+            self.current_page += 1;
+            self.load_current_page();
+            true
+        } else {
+            false
         }
     }
 
-    /// Scrolls the outer modal viewport by `delta` rows, clamped to the last
-    /// known `max_scroll` when available.
+    /// Commits all current page input values into [`Self::committed_vars`].
+    pub fn soft_refresh(&mut self) {
+        for f in &self.fields {
+            if !f.spec.id.is_empty() {
+                self.committed_vars.insert(f.spec.id.clone(), f.value());
+            }
+        }
+    }
+
+    /// Returns the display label for a [`ButtonSpec`].
+    fn button_label(spec: &ButtonSpec) -> String {
+        if let Some(ref lbl) = spec.label {
+            return lbl.clone();
+        }
+        match spec.button_type {
+            ButtonType::Submit => "Submit".to_string(),
+            ButtonType::Ok => t!("common.buttons.ok"),
+            ButtonType::Cancel => t!("common.buttons.cancel"),
+        }
+    }
+
+    /// Emits the [`InteractiveFormAction`] for activating `spec`.
+    fn activate_button(&mut self, spec: &ButtonSpec) -> InteractiveFormAction {
+        self.soft_refresh();
+        match spec.button_type {
+            ButtonType::Cancel => InteractiveFormAction::Cancel {
+                action: spec.action.clone(),
+                vars: self.committed_vars.clone(),
+            },
+            ButtonType::Submit | ButtonType::Ok => InteractiveFormAction::Continue {
+                action: spec.action.clone(),
+                vars: self.committed_vars.clone(),
+            },
+        }
+    }
+
+    /// Scrolls the outer modal viewport by `delta` rows, clamped to `last_max_scroll`.
     fn scroll_modal_by(&mut self, delta: isize) {
         if let Some(max_s) = self.last_max_scroll.get() {
             self.scroll_offset = self.scroll_offset.min(max_s);
@@ -253,53 +377,35 @@ impl InteractiveMarkdownModal {
         }
     }
 
-    /// Commits all current input field values into [`Self::committed_vars`] so
-    /// `{id:<name>}` placeholders in the Markdown body refresh live in-place.
-    pub fn soft_refresh(&mut self) {
-        self.committed_vars = self.collect_values();
-    }
-
-    /// Sets optional percentage-based width and height overrides (`1..=100`).
-    pub fn with_dimensions(
-        mut self,
-        width_percent: Option<u16>,
-        height_percent: Option<u16>,
-    ) -> Self {
-        self.width_percent = width_percent.map(|w| w.clamp(1, 100));
-        self.height_percent = height_percent.map(|h| h.clamp(1, 100));
-        self
-    }
-
-    /// Collects all named (`!id.is_empty()`) input field values into a map.
-    pub fn collect_values(&self) -> HashMap<String, String> {
-        let mut map = HashMap::new();
-        for f in &self.fields {
-            if !f.spec.id.is_empty() {
-                map.insert(f.spec.id.clone(), f.value());
+    fn focus_ring(&self) -> Vec<FormFocus> {
+        let mut ring = Vec::new();
+        for i in 0..self.fields.len() {
+            ring.push(FormFocus::Input(i));
+        }
+        if self.buttons.is_empty() {
+            ring.push(FormFocus::FallbackOk);
+        } else {
+            for i in 0..self.buttons.len() {
+                ring.push(FormFocus::Button(i));
             }
         }
-        map
+        ring
     }
 
     fn cycle_focus(&mut self, forward: bool) {
-        if self.fields.is_empty() {
-            self.focused_field = None;
+        let ring = self.focus_ring();
+        if ring.is_empty() {
             return;
         }
-        let total = self.fields.len() + 1; // fields + [ OK ] button
-        let cur = self.focused_field.unwrap_or(self.fields.len());
+        let pos = ring.iter().position(|&f| f == self.focus).unwrap_or(0);
         let next = if forward {
-            (cur + 1) % total
-        } else if cur == 0 {
-            total - 1
+            (pos + 1) % ring.len()
+        } else if pos == 0 {
+            ring.len() - 1
         } else {
-            cur - 1
+            pos - 1
         };
-        self.focused_field = if next < self.fields.len() {
-            Some(next)
-        } else {
-            None
-        };
+        self.focus = ring[next];
     }
 
     /// Handles keyboard input with modifiers.
@@ -309,7 +415,13 @@ impl InteractiveMarkdownModal {
         modifiers: KeyModifiers,
     ) -> Option<InteractiveFormAction> {
         match code {
-            KeyCode::Esc => return Some(InteractiveFormAction::Cancel),
+            KeyCode::Esc => {
+                self.soft_refresh();
+                return Some(InteractiveFormAction::Cancel {
+                    action: None,
+                    vars: self.committed_vars.clone(),
+                });
+            }
             KeyCode::Tab => {
                 self.cycle_focus(true);
                 return None;
@@ -335,12 +447,14 @@ impl InteractiveMarkdownModal {
             _ => {}
         }
 
-        let Some(idx) = self.focused_field else {
-            // Focus is on the [ OK ] button
-            return match code {
+        match self.focus {
+            FormFocus::FallbackOk => match code {
                 KeyCode::Enter | KeyCode::Char(' ') => {
                     self.soft_refresh();
-                    Some(InteractiveFormAction::Submit(self.committed_vars.clone()))
+                    Some(InteractiveFormAction::Continue {
+                        action: None,
+                        vars: self.committed_vars.clone(),
+                    })
                 }
                 KeyCode::Up | KeyCode::Char('k') => {
                     self.scroll_modal_by(-1);
@@ -351,67 +465,92 @@ impl InteractiveMarkdownModal {
                     None
                 }
                 _ => None,
-            };
-        };
+            },
+            FormFocus::Button(btn_idx) => match code {
+                KeyCode::Enter | KeyCode::Char(' ') => {
+                    let spec = self.buttons.get(btn_idx)?.clone();
+                    Some(self.activate_button(&spec))
+                }
+                KeyCode::Left => {
+                    self.cycle_focus(false);
+                    None
+                }
+                KeyCode::Right => {
+                    self.cycle_focus(true);
+                    None
+                }
+                KeyCode::Up | KeyCode::Char('k') => {
+                    self.scroll_modal_by(-1);
+                    None
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    self.scroll_modal_by(1);
+                    None
+                }
+                _ => None,
+            },
+            FormFocus::Input(idx) => {
+                let is_multiline = self.fields[idx].spec.multiline;
+                if code == KeyCode::Enter {
+                    if is_multiline {
+                        self.fields[idx].insert_char('\n');
+                    } else {
+                        self.soft_refresh();
+                    }
+                    return None;
+                }
+                if code == KeyCode::Up {
+                    if is_multiline && self.fields[idx].cursor_row > 0 {
+                        self.fields[idx].move_vertical(-1);
+                    } else {
+                        self.scroll_modal_by(-1);
+                    }
+                    return None;
+                }
+                if code == KeyCode::Down {
+                    if is_multiline
+                        && self.fields[idx].cursor_row + 1 < self.fields[idx].lines.len()
+                    {
+                        self.fields[idx].move_vertical(1);
+                    } else {
+                        self.scroll_modal_by(1);
+                    }
+                    return None;
+                }
 
-        let is_multiline = self.fields[idx].spec.multiline;
-        if code == KeyCode::Enter {
-            if is_multiline {
-                self.fields[idx].insert_char('\n');
-            } else {
-                // Soft-refresh live {id:...} values and keep focus on this field
-                self.soft_refresh();
+                let field = &mut self.fields[idx];
+                match code {
+                    KeyCode::Backspace => field.backspace(),
+                    KeyCode::Delete => field.delete(),
+                    KeyCode::Left => {
+                        field.cursor_col = field.cursor_col.saturating_sub(1);
+                    }
+                    KeyCode::Right => {
+                        let len = field.lines[field.cursor_row].chars().count();
+                        field.cursor_col = (field.cursor_col + 1).min(len);
+                    }
+                    KeyCode::Home => field.cursor_col = 0,
+                    KeyCode::End => {
+                        field.cursor_col = field.lines[field.cursor_row].chars().count();
+                    }
+                    KeyCode::Char(c) if !modifiers.contains(KeyModifiers::CONTROL) => {
+                        field.insert_char(c);
+                    }
+                    _ => {}
+                }
+                None
             }
-            return None;
         }
-        if code == KeyCode::Up {
-            if is_multiline && self.fields[idx].cursor_row > 0 {
-                self.fields[idx].move_vertical(-1);
-            } else {
-                self.scroll_modal_by(-1);
-            }
-            return None;
-        }
-        if code == KeyCode::Down {
-            if is_multiline && self.fields[idx].cursor_row + 1 < self.fields[idx].lines.len() {
-                self.fields[idx].move_vertical(1);
-            } else {
-                self.scroll_modal_by(1);
-            }
-            return None;
-        }
-
-        let field = &mut self.fields[idx];
-        match code {
-            KeyCode::Backspace => field.backspace(),
-            KeyCode::Delete => field.delete(),
-            KeyCode::Left => {
-                field.cursor_col = field.cursor_col.saturating_sub(1);
-            }
-            KeyCode::Right => {
-                let len = field.lines[field.cursor_row].chars().count();
-                field.cursor_col = (field.cursor_col + 1).min(len);
-            }
-            KeyCode::Home => field.cursor_col = 0,
-            KeyCode::End => {
-                field.cursor_col = field.lines[field.cursor_row].chars().count();
-            }
-            KeyCode::Char(c) if !modifiers.contains(KeyModifiers::CONTROL) => {
-                field.insert_char(c);
-            }
-            _ => {}
-        }
-        None
     }
 
     /// Pastes text into the currently focused input field (if any).
     pub fn paste(&mut self, text: &str) {
-        if let Some(idx) = self.focused_field {
+        if let FormFocus::Input(idx) = self.focus {
             self.fields[idx].paste(text);
         }
     }
 
-    /// Handles mouse clicks (field focus, `[ OK ]`, `[X]`) and wheel scrolling.
+    /// Handles mouse clicks (field focus, buttons, `[ OK ]`, `[X]`) and wheel scrolling.
     pub fn handle_mouse(&mut self, mouse: MouseEvent, area: Rect) -> Option<InteractiveFormAction> {
         let (dialog_w, dialog_h) = self.dialog_dimensions(area);
         let inner = super::frame::compute_modal_inner(area, dialog_w, dialog_h);
@@ -419,8 +558,31 @@ impl InteractiveMarkdownModal {
         match mouse.kind {
             MouseEventKind::Down(MouseButton::Left) => {
                 if is_close_button_clicked(inner, mouse.row, mouse.column) {
-                    return Some(InteractiveFormAction::Cancel);
+                    self.soft_refresh();
+                    return Some(InteractiveFormAction::Cancel {
+                        action: None,
+                        vars: self.committed_vars.clone(),
+                    });
                 }
+
+                // Check inline `{button:...}` clicks
+                let clicked_btn: Option<usize> = {
+                    let rects = self.last_button_rects.borrow();
+                    rects.iter().position(|r| {
+                        r.width > 0
+                            && mouse.row == r.y
+                            && mouse.column >= r.x
+                            && mouse.column < r.x + r.width
+                    })
+                };
+                if let Some(btn_idx) = clicked_btn {
+                    self.focus = FormFocus::Button(btn_idx);
+                    if let Some(spec) = self.buttons.get(btn_idx).cloned() {
+                        return Some(self.activate_button(&spec));
+                    }
+                }
+
+                // Check fallback `[ OK ]` button click
                 let ok_rect_opt = *self.last_ok_rect.borrow();
                 if let Some(ok_rect) = ok_rect_opt {
                     if mouse.row == ok_rect.y
@@ -428,24 +590,31 @@ impl InteractiveMarkdownModal {
                         && mouse.column < ok_rect.x + ok_rect.width
                     {
                         self.soft_refresh();
-                        return Some(InteractiveFormAction::Submit(self.committed_vars.clone()));
+                        return Some(InteractiveFormAction::Continue {
+                            action: None,
+                            vars: self.committed_vars.clone(),
+                        });
                     }
                 }
-                let rects = self.last_field_rects.borrow();
-                for (i, r) in rects.iter().enumerate() {
-                    if mouse.column >= r.x
-                        && mouse.column < r.x + r.width
-                        && mouse.row >= r.y
-                        && mouse.row < r.y + r.height
-                    {
-                        self.focused_field = Some(i);
-                        return None;
-                    }
+
+                // Check `{input:...}` field click
+                let clicked_field: Option<usize> = {
+                    let rects = self.last_field_rects.borrow();
+                    rects.iter().position(|r| {
+                        r.width > 0
+                            && mouse.column >= r.x
+                            && mouse.column < r.x + r.width
+                            && mouse.row >= r.y
+                            && mouse.row < r.y + r.height
+                    })
+                };
+                if let Some(i) = clicked_field {
+                    self.focus = FormFocus::Input(i);
                 }
                 None
             }
             MouseEventKind::ScrollUp => {
-                if let Some(idx) = self.focused_field {
+                if let FormFocus::Input(idx) = self.focus {
                     if self.fields[idx].spec.multiline && self.fields[idx].scroll_y > 0 {
                         self.fields[idx].scroll_y = self.fields[idx].scroll_y.saturating_sub(1);
                         return None;
@@ -455,7 +624,7 @@ impl InteractiveMarkdownModal {
                 None
             }
             MouseEventKind::ScrollDown => {
-                if let Some(idx) = self.focused_field {
+                if let FormFocus::Input(idx) = self.focus {
                     let f = &mut self.fields[idx];
                     let max_y = f.lines.len().saturating_sub(f.visible_rows());
                     if f.spec.multiline && f.scroll_y < max_y {
@@ -492,19 +661,25 @@ impl InteractiveMarkdownModal {
             let avail_w = dialog_w.saturating_sub(6) as usize;
             let mut est_rows = 0usize;
             let mut field_idx = 0usize;
-            for b in &self.blocks {
-                match b {
-                    MarkdownFormBlock::Text(t) => {
-                        for line in t.lines() {
-                            est_rows += super::input::wrap_prompt_text(line, avail_w.max(1)).len();
+            if let Some(blocks) = self.pages.get(self.current_page) {
+                for b in blocks {
+                    match b {
+                        MarkdownFormBlock::Text(t) => {
+                            for line in t.lines() {
+                                est_rows +=
+                                    super::input::wrap_prompt_text(line, avail_w.max(1)).len();
+                            }
+                            est_rows += 1;
                         }
-                        est_rows += 1;
-                    }
-                    MarkdownFormBlock::Input { .. } => {
-                        if let Some(f) = self.fields.get(field_idx) {
-                            est_rows += f.visible_rows() + 1;
+                        MarkdownFormBlock::Input { .. } => {
+                            if let Some(f) = self.fields.get(field_idx) {
+                                est_rows += f.visible_rows() + 1;
+                            }
+                            field_idx += 1;
                         }
-                        field_idx += 1;
+                        MarkdownFormBlock::Buttons(_) => {
+                            est_rows += 2;
+                        }
                     }
                 }
             }
@@ -513,23 +688,31 @@ impl InteractiveMarkdownModal {
         (dialog_w, dialog_h)
     }
 
-    /// Renders the interactive Markdown form modal with full theme adherence.
+    /// Renders the current page of the interactive Markdown form modal.
     pub fn render(&self, area: Rect, styles: &ResolvedThemeStyles, buf: &mut Buffer) -> Rect {
         let (dialog_w, dialog_h) = self.dialog_dimensions(area);
         let inner = render_modal_frame(area, dialog_w, dialog_h, &self.title, styles, buf);
 
+        let has_inline_buttons = !self.buttons.is_empty();
         let left_x = inner.x + 2;
         let avail_w = inner.width.saturating_sub(4) as usize;
         let content_top = inner.y + 1;
-        let content_h = inner.height.saturating_sub(3) as usize;
+        let content_h = if has_inline_buttons {
+            inner.height.saturating_sub(2) as usize
+        } else {
+            inner.height.saturating_sub(3) as usize
+        };
 
-        // Build virtual rows: either a styled text line or a reference to an input field row
         enum VirtualRow {
             Text(String, Style),
             InputRow {
                 field_idx: usize,
                 row_in_field: usize,
                 prefix: Option<String>,
+            },
+            ButtonRow {
+                start_btn_idx: usize,
+                count: usize,
             },
             Blank,
         }
@@ -546,37 +729,51 @@ impl InteractiveMarkdownModal {
 
         let mut vrows: Vec<VirtualRow> = Vec::new();
         let mut field_counter = 0usize;
-        for block in &self.blocks {
-            match block {
-                MarkdownFormBlock::Text(t) => {
-                    let expanded = substitute_id_placeholders(t, &self.committed_vars);
-                    for raw_line in expanded.lines() {
-                        let trimmed = raw_line.trim();
-                        if trimmed.is_empty() {
-                            vrows.push(VirtualRow::Blank);
-                        } else if trimmed.starts_with("# ") {
-                            vrows.push(VirtualRow::Text(trimmed.to_string(), h1_style));
-                        } else if trimmed.starts_with("## ") {
-                            vrows.push(VirtualRow::Text(trimmed.to_string(), h2_style));
-                        } else {
-                            for wl in super::input::wrap_prompt_text(raw_line, avail_w.max(1)) {
-                                vrows.push(VirtualRow::Text(wl, base_style));
+        let mut button_counter = 0usize;
+
+        if let Some(blocks) = self.pages.get(self.current_page) {
+            for block in blocks {
+                match block {
+                    MarkdownFormBlock::Text(t) => {
+                        let expanded = substitute_id_placeholders(t, &self.committed_vars);
+                        for raw_line in expanded.lines() {
+                            let trimmed = raw_line.trim();
+                            if trimmed.is_empty() {
+                                vrows.push(VirtualRow::Blank);
+                            } else if trimmed.starts_with("# ") {
+                                vrows.push(VirtualRow::Text(trimmed.to_string(), h1_style));
+                            } else if trimmed.starts_with("## ") {
+                                vrows.push(VirtualRow::Text(trimmed.to_string(), h2_style));
+                            } else {
+                                for wl in super::input::wrap_prompt_text(raw_line, avail_w.max(1)) {
+                                    vrows.push(VirtualRow::Text(wl, base_style));
+                                }
                             }
                         }
+                        vrows.push(VirtualRow::Blank);
                     }
-                    vrows.push(VirtualRow::Blank);
-                }
-                MarkdownFormBlock::Input { prefix, .. } => {
-                    let f_idx = field_counter;
-                    field_counter += 1;
-                    if let Some(f) = self.fields.get(f_idx) {
-                        for r in 0..f.visible_rows() {
-                            vrows.push(VirtualRow::InputRow {
-                                field_idx: f_idx,
-                                row_in_field: r,
-                                prefix: if r == 0 { prefix.clone() } else { None },
-                            });
+                    MarkdownFormBlock::Input { prefix, .. } => {
+                        let f_idx = field_counter;
+                        field_counter += 1;
+                        if let Some(f) = self.fields.get(f_idx) {
+                            for r in 0..f.visible_rows() {
+                                vrows.push(VirtualRow::InputRow {
+                                    field_idx: f_idx,
+                                    row_in_field: r,
+                                    prefix: if r == 0 { prefix.clone() } else { None },
+                                });
+                            }
+                            vrows.push(VirtualRow::Blank);
                         }
+                    }
+                    MarkdownFormBlock::Buttons(btns) => {
+                        let start_idx = button_counter;
+                        let count = btns.len();
+                        button_counter += count;
+                        vrows.push(VirtualRow::ButtonRow {
+                            start_btn_idx: start_idx,
+                            count,
+                        });
                         vrows.push(VirtualRow::Blank);
                     }
                 }
@@ -589,6 +786,7 @@ impl InteractiveMarkdownModal {
         self.last_content_h.set(Some(content_h));
 
         let mut field_rects = vec![Rect::default(); self.fields.len()];
+        let mut button_rects = vec![Rect::default(); self.buttons.len()];
 
         for (vis_i, vrow) in vrows.iter().skip(eff_scroll).take(content_h).enumerate() {
             let y = content_top + vis_i as u16;
@@ -604,7 +802,7 @@ impl InteractiveMarkdownModal {
                     prefix,
                 } => {
                     let f = &self.fields[*field_idx];
-                    let is_focused = self.focused_field == Some(*field_idx);
+                    let is_focused = self.focus == FormFocus::Input(*field_idx);
 
                     let (input_x, rem_w) = if let Some(ref p) = prefix {
                         let p_expanded = substitute_id_placeholders(p, &self.committed_vars);
@@ -636,7 +834,6 @@ impl InteractiveMarkdownModal {
                         styles.input_box_unfocused
                     };
 
-                    // Fill background of this input row
                     for dx in 0..box_w {
                         buf[(input_x + dx, y)].set_char(' ').set_style(box_style);
                     }
@@ -675,7 +872,6 @@ impl InteractiveMarkdownModal {
                         }
                     }
 
-                    // Render per-field scrollbar on top row of multiline box
                     if show_sb && *row_in_field == 0 {
                         render_modal_scrollbar(
                             input_x + box_w.saturating_sub(1),
@@ -688,12 +884,48 @@ impl InteractiveMarkdownModal {
                         );
                     }
                 }
+                VirtualRow::ButtonRow {
+                    start_btn_idx,
+                    count,
+                } => {
+                    let mut cur_x = left_x;
+                    let right_bound = inner.x + inner.width.saturating_sub(1);
+                    for offset in 0..*count {
+                        let idx = start_btn_idx + offset;
+                        let Some(spec) = self.buttons.get(idx) else {
+                            continue;
+                        };
+                        let label = Self::button_label(spec);
+                        let rendered = format!(" [ {label} ] ");
+                        let btn_w = rendered.chars().count() as u16;
+                        if cur_x >= right_bound {
+                            break;
+                        }
+                        let max_chars = (right_bound - cur_x) as usize;
+                        let clipped: String = rendered.chars().take(max_chars).collect();
+                        let base_btn = match spec.button_type {
+                            ButtonType::Cancel => styles.modal_cancel_button,
+                            ButtonType::Submit | ButtonType::Ok => {
+                                styles.modal_yes_button.add_modifier(Modifier::BOLD)
+                            }
+                        };
+                        let btn_style = if self.focus == FormFocus::Button(idx) {
+                            base_btn.add_modifier(Modifier::BOLD | Modifier::REVERSED)
+                        } else {
+                            base_btn
+                        };
+                        buf.set_string(cur_x, y, &clipped, btn_style);
+                        button_rects[idx] = Rect::new(cur_x, y, clipped.chars().count() as u16, 1);
+                        cur_x = cur_x.saturating_add(btn_w + 1);
+                    }
+                }
             }
         }
 
         *self.last_field_rects.borrow_mut() = field_rects;
+        *self.last_button_rects.borrow_mut() = button_rects;
 
-        // Outer modal scrollbar when total virtual rows overflow
+        // Outer modal scrollbar
         if inner.width >= 4 {
             render_modal_scrollbar(
                 inner.x + inner.width.saturating_sub(1),
@@ -706,26 +938,30 @@ impl InteractiveMarkdownModal {
             );
         }
 
-        // Render [ OK ] button
-        let btn_y = inner.y + inner.height.saturating_sub(2);
-        let ok_str = format!(" [ {} ] ", t!("common.buttons.ok"));
-        let ok_w = ok_str.chars().count() as u16;
-        let center_x = inner.x + inner.width / 2;
-        let ok_x = center_x.saturating_sub(ok_w / 2).max(inner.x + 1);
-        let right_bound = inner.x + inner.width;
-        if ok_x < right_bound {
-            let max_ok = (right_bound - ok_x) as usize;
-            let clipped_ok: String = ok_str.chars().take(max_ok).collect();
-            let ok_style = if self.focused_field.is_none() {
-                styles
-                    .modal_yes_button
-                    .add_modifier(Modifier::BOLD | Modifier::REVERSED)
-            } else {
-                styles.modal_yes_button.add_modifier(Modifier::BOLD)
-            };
-            buf.set_string(ok_x, btn_y, &clipped_ok, ok_style);
-            *self.last_ok_rect.borrow_mut() =
-                Some(Rect::new(ok_x, btn_y, clipped_ok.chars().count() as u16, 1));
+        // Render fallback [ OK ] footer button only when the page defines no {button:...} controls
+        if has_inline_buttons {
+            *self.last_ok_rect.borrow_mut() = None;
+        } else {
+            let btn_y = inner.y + inner.height.saturating_sub(2);
+            let ok_str = format!(" [ {} ] ", t!("common.buttons.ok"));
+            let ok_w = ok_str.chars().count() as u16;
+            let center_x = inner.x + inner.width / 2;
+            let ok_x = center_x.saturating_sub(ok_w / 2).max(inner.x + 1);
+            let right_bound = inner.x + inner.width;
+            if ok_x < right_bound {
+                let max_ok = (right_bound - ok_x) as usize;
+                let clipped_ok: String = ok_str.chars().take(max_ok).collect();
+                let ok_style = if self.focus == FormFocus::FallbackOk {
+                    styles
+                        .modal_yes_button
+                        .add_modifier(Modifier::BOLD | Modifier::REVERSED)
+                } else {
+                    styles.modal_yes_button.add_modifier(Modifier::BOLD)
+                };
+                buf.set_string(ok_x, btn_y, &clipped_ok, ok_style);
+                *self.last_ok_rect.borrow_mut() =
+                    Some(Rect::new(ok_x, btn_y, clipped_ok.chars().count() as u16, 1));
+            }
         }
 
         inner
@@ -735,7 +971,7 @@ impl InteractiveMarkdownModal {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bashmenu_core::parse_markdown_form_blocks;
+    use bashmenu_core::{parse_interactive_markdown_doc, parse_markdown_form_blocks};
 
     #[test]
     fn test_interactive_markdown_modal_input_editing_and_submit() {
@@ -749,7 +985,7 @@ Notes:
         let blocks = parse_markdown_form_blocks(md);
         let mut modal = InteractiveMarkdownModal::new("Form", blocks);
         assert_eq!(modal.fields.len(), 2);
-        assert_eq!(modal.focused_field, Some(0));
+        assert_eq!(modal.focus, FormFocus::Input(0));
 
         // Append to single-line field 0 (typing alone does NOT update committed_vars yet)
         modal.handle_key_with_modifiers(KeyCode::Char('1'), KeyModifiers::NONE);
@@ -762,7 +998,7 @@ Notes:
         assert!(modal
             .handle_key_with_modifiers(KeyCode::Enter, KeyModifiers::NONE)
             .is_none());
-        assert_eq!(modal.focused_field, Some(0));
+        assert_eq!(modal.focus, FormFocus::Input(0));
         assert_eq!(
             modal.committed_vars.get("userName").map(String::as_str),
             Some("andrew1")
@@ -770,23 +1006,23 @@ Notes:
 
         // Tab to multiline field 1 and add a second line
         modal.handle_key_with_modifiers(KeyCode::Tab, KeyModifiers::NONE);
-        assert_eq!(modal.focused_field, Some(1));
+        assert_eq!(modal.focus, FormFocus::Input(1));
         modal.handle_key_with_modifiers(KeyCode::Enter, KeyModifiers::NONE);
         modal.paste("Line 2");
 
-        // Tab to [ OK ] and press Enter to submit
+        // Tab to fallback [ OK ] and press Enter to continue/submit
         modal.handle_key_with_modifiers(KeyCode::Tab, KeyModifiers::NONE);
-        assert_eq!(modal.focused_field, None);
+        assert_eq!(modal.focus, FormFocus::FallbackOk);
         let action = modal.handle_key_with_modifiers(KeyCode::Enter, KeyModifiers::NONE);
         match action {
-            Some(InteractiveFormAction::Submit(vals)) => {
-                assert_eq!(vals.get("userName").map(String::as_str), Some("andrew1"));
+            Some(InteractiveFormAction::Continue { action: None, vars }) => {
+                assert_eq!(vars.get("userName").map(String::as_str), Some("andrew1"));
                 assert_eq!(
-                    vals.get("userNotes").map(String::as_str),
+                    vars.get("userNotes").map(String::as_str),
                     Some("Line 1\nLine 2")
                 );
             }
-            other => panic!("expected Submit, got {other:?}"),
+            other => panic!("expected Continue, got {other:?}"),
         }
     }
 
@@ -815,16 +1051,11 @@ According to my records, your name is \"{id:guestName}\".
             s
         };
 
-        // Initial render shows default value
         assert!(buffer_text(&modal).contains("your name is \"andrew\"."));
-
-        // Typing without Enter does not refresh live {id:guestName}
         modal.handle_key_with_modifiers(KeyCode::Char('!'), KeyModifiers::NONE);
         assert!(buffer_text(&modal).contains("your name is \"andrew\"."));
-
-        // Pressing Enter triggers soft-refresh and updates live text
         modal.handle_key_with_modifiers(KeyCode::Enter, KeyModifiers::NONE);
-        assert_eq!(modal.focused_field, Some(0));
+        assert_eq!(modal.focus, FormFocus::Input(0));
         assert!(buffer_text(&modal).contains("your name is \"andrew!\"."));
     }
 
@@ -842,22 +1073,67 @@ According to my records, your name is \"{id:guestName}\".
         let mut buf = Buffer::empty(area);
         modal.render(area, &styles, &mut buf);
 
-        assert_eq!(modal.focused_field, Some(0));
+        assert_eq!(modal.focus, FormFocus::Input(0));
         assert_eq!(modal.scroll_offset, 0);
-
-        // Down arrow scrolls even while single-line input field is focused
         modal.handle_key_with_modifiers(KeyCode::Down, KeyModifiers::NONE);
         assert_eq!(modal.scroll_offset, 1);
-
-        // PageDown scrolls by viewport height
         modal.handle_key_with_modifiers(KeyCode::PageDown, KeyModifiers::NONE);
         assert!(modal.scroll_offset > 1);
-
-        // Up arrow and PageUp scroll back up
         let after_pgdn = modal.scroll_offset;
         modal.handle_key_with_modifiers(KeyCode::Up, KeyModifiers::NONE);
         assert_eq!(modal.scroll_offset, after_pgdn - 1);
         modal.handle_key_with_modifiers(KeyCode::PageUp, KeyModifiers::NONE);
         assert_eq!(modal.scroll_offset, 0);
+    }
+
+    #[test]
+    fn test_multipage_clear_buttons_and_reserved_scripts() {
+        let md = "\
+```bashmenu-bash:id=\"greetUser\"
+{message:\"Hello $guestName\"}
+```
+
+# Page 1
+Name: {input: default=\"Alice\": id=\"guestName\"}
+
+{button: type=\"submit\": action=\"greetUser\"} {button: type=\"cancel\"}
+
+{clear}
+
+# Page 2
+Welcome back, {id:guestName}!
+
+{button: type=\"ok\"}
+";
+        let doc = parse_interactive_markdown_doc(md);
+        assert!(doc.reserved_scripts.contains_key("greetUser"));
+        assert_eq!(doc.pages.len(), 2);
+
+        let mut modal = InteractiveMarkdownModal::from_pages("Wizard", doc.pages);
+        assert!(modal.has_next_page());
+        assert_eq!(modal.buttons.len(), 2);
+        assert_eq!(modal.focus, FormFocus::Input(0));
+
+        // Tab to Submit button and press Enter
+        modal.handle_key_with_modifiers(KeyCode::Tab, KeyModifiers::NONE);
+        assert_eq!(modal.focus, FormFocus::Button(0));
+        let act = modal.handle_key_with_modifiers(KeyCode::Enter, KeyModifiers::NONE);
+        assert_eq!(
+            act,
+            Some(InteractiveFormAction::Continue {
+                action: Some("greetUser".to_string()),
+                vars: HashMap::from([("guestName".to_string(), "Alice".to_string())]),
+            })
+        );
+
+        // Advance past {clear} to Page 2; committed_vars persists!
+        assert!(modal.advance_page());
+        assert!(!modal.has_next_page());
+        assert_eq!(modal.current_page, 1);
+        assert_eq!(
+            modal.committed_vars.get("guestName").map(String::as_str),
+            Some("Alice")
+        );
+        assert_eq!(modal.focus, FormFocus::Button(0));
     }
 }

@@ -42,6 +42,56 @@ impl Default for InputFieldSpec {
     }
 }
 
+/// Button role for an interactive Markdown `{button:...}` control.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ButtonType {
+    /// Submits/continues (`type="submit"`, default label `"Submit"`).
+    #[default]
+    Submit,
+    /// Pauses/continues (`type="ok"`, default label `"OK"`).
+    Ok,
+    /// Exits/cancels the interactive document (`type="cancel"`, default label `"Cancel"`).
+    Cancel,
+}
+
+/// Specification for an interactive `{button:...}` control in Markdown.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ButtonSpec {
+    /// Button role (`submit`, `ok`, `cancel`).
+    pub button_type: ButtonType,
+    /// Optional reserved code block ID (`action="exampleCodeBlock"`).
+    pub action: Option<String>,
+    /// Optional custom label override (`text="..."` / `label="..."`).
+    pub label: Option<String>,
+}
+
+impl ButtonSpec {
+    /// Returns the visible label text for this button.
+    pub fn display_label(&self) -> &str {
+        if let Some(ref custom) = self.label {
+            if !custom.is_empty() {
+                return custom.as_str();
+            }
+        }
+        match self.button_type {
+            ButtonType::Submit => "Submit",
+            ButtonType::Ok => "OK",
+            ButtonType::Cancel => "Cancel",
+        }
+    }
+}
+
+/// A named executable code block held in reserve (`bashmenu-bash:id="..."`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScriptBlock {
+    /// Language identifier after `bashmenu-` (lowercase, e.g. `"bash"`).
+    pub language: String,
+    /// Block identifier referenced by `{button: action="..."}`.
+    pub id: String,
+    /// Raw script source code inside the fence.
+    pub code: String,
+}
+
 /// A rendered element inside an interactive Markdown form document.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MarkdownFormBlock {
@@ -55,6 +105,18 @@ pub enum MarkdownFormBlock {
         /// Parsed input widget specification.
         spec: InputFieldSpec,
     },
+    /// One or more `{button:...}` controls rendered side-by-side on a single row.
+    Buttons(Vec<ButtonSpec>),
+}
+
+/// A parsed multi-page interactive Markdown document with reserved named
+/// `bashmenu-<lang>:id="..."` script blocks and `{clear}`-delimited pages.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct InteractiveMarkdownDoc {
+    /// Named code blocks held in reserve (never rendered into visible Markdown).
+    pub reserved_scripts: std::collections::HashMap<String, ScriptBlock>,
+    /// Ordered pages separated by `{clear}` (always at least 1 page if non-empty).
+    pub pages: Vec<Vec<MarkdownFormBlock>>,
 }
 
 /// A segment of an interactive Markdown document.
@@ -493,6 +555,340 @@ pub fn substitute_id_placeholders(
     out
 }
 
+/// Parses a `{button:...}` macro inner payload into a [`ButtonSpec`].
+fn parse_button_macro_fields(inner: &str) -> ButtonSpec {
+    let mut spec = ButtonSpec::default();
+    let mut rest = inner.trim();
+
+    while !rest.is_empty() {
+        rest = rest.trim_start();
+        if let Some(stripped) = rest.strip_prefix(':') {
+            rest = stripped.trim_start();
+            continue;
+        }
+        if rest.is_empty() {
+            break;
+        }
+
+        let mut matched_key: Option<(&str, &str)> = None;
+        for key in ["type", "action", "text", "label"] {
+            if let Some(after) = rest.strip_prefix(key) {
+                let after_ws = after.trim_start();
+                if after_ws.is_empty() || after_ws.starts_with('=') || after_ws.starts_with(':') {
+                    matched_key = Some((key, after_ws));
+                    break;
+                }
+            }
+        }
+
+        let Some((key, after_key)) = matched_key else {
+            if let Some(colon) = rest.find(':') {
+                rest = &rest[colon + 1..];
+            } else {
+                break;
+            }
+            continue;
+        };
+
+        if let Some(after_eq) = after_key.strip_prefix('=') {
+            let val_start = after_eq.trim_start();
+            let (val, next_rest) = if let Some((qval, rem)) = parse_input_quoted_value(val_start) {
+                (qval, rem)
+            } else {
+                let mut depth = 0usize;
+                let mut end_off = val_start.len();
+                for (off, ch) in val_start.char_indices() {
+                    match ch {
+                        '{' => depth += 1,
+                        '}' => depth = depth.saturating_sub(1),
+                        ':' if depth == 0 => {
+                            end_off = off;
+                            break;
+                        }
+                        _ => {}
+                    }
+                }
+                (
+                    val_start[..end_off].trim().to_string(),
+                    &val_start[end_off..],
+                )
+            };
+
+            match key {
+                "type" => {
+                    let lower = val.trim().to_ascii_lowercase();
+                    spec.button_type = match lower.as_str() {
+                        "ok" => ButtonType::Ok,
+                        "cancel" => ButtonType::Cancel,
+                        _ => ButtonType::Submit,
+                    };
+                }
+                "action" => {
+                    let trimmed = val.trim();
+                    if !trimmed.is_empty() {
+                        spec.action = Some(trimmed.to_string());
+                    }
+                }
+                "text" | "label" => {
+                    let trimmed = val.trim();
+                    if !trimmed.is_empty() {
+                        spec.label = Some(trimmed.to_string());
+                    }
+                }
+                _ => {}
+            }
+
+            rest = next_rest.trim_start();
+            if let Some(stripped) = rest.strip_prefix(':') {
+                rest = stripped;
+            }
+        } else {
+            rest = after_key.trim_start();
+            if let Some(stripped) = rest.strip_prefix(':') {
+                rest = stripped;
+            }
+        }
+    }
+
+    spec
+}
+
+/// Finds the byte bounds and parsed [`ButtonSpec`] of the first `{button:...}`
+/// (or `{button}`) macro in `text`, skipping double-brace escaped `{{button...}}`.
+pub fn find_button_macro_span(text: &str) -> Option<(usize, usize, ButtonSpec)> {
+    const PREFIX: &str = "{button";
+    let bytes = text.as_bytes();
+    let mut search_from = 0usize;
+
+    while let Some(rel) = text[search_from..].find(PREFIX) {
+        let start = search_from + rel;
+        if start > 0 && bytes[start - 1] == b'{' {
+            search_from = start + PREFIX.len();
+            continue;
+        }
+        let after = &text[start + PREFIX.len()..];
+        if let Some(first_ch) = after.chars().next() {
+            if first_ch == '}' || first_ch == ':' {
+                if let Some(end) = scan_balanced_macro_end(text, start) {
+                    let inner = if first_ch == ':' {
+                        &text[start + PREFIX.len() + 1..end - 1]
+                    } else {
+                        ""
+                    };
+                    return Some((start, end, parse_button_macro_fields(inner)));
+                }
+            }
+        }
+        search_from = start + PREFIX.len();
+    }
+
+    None
+}
+
+/// Parses a `bashmenu-<lang>:id="..."` (or `bashmenu-<lang>:<id>`) fence header.
+/// Returns `Some((language, optional_id))` for any `bashmenu-<lang>` fence.
+fn parse_bashmenu_fence_header(after_ticks: &str) -> Option<(String, Option<String>)> {
+    let trimmed = after_ticks.trim();
+    let lower_prefix = trimmed.get(..9)?.to_ascii_lowercase();
+    if lower_prefix != "bashmenu-" {
+        return None;
+    }
+    let rest = &trimmed[9..];
+    // Language ends at `:`, whitespace, or end of string
+    let lang_end = rest
+        .find(|c: char| c == ':' || c.is_ascii_whitespace())
+        .unwrap_or(rest.len());
+    let lang = rest[..lang_end].to_ascii_lowercase();
+    if lang.is_empty() {
+        return None;
+    }
+    let after_lang = &rest[lang_end..];
+    if let Some(after_colon) = after_lang.strip_prefix(':') {
+        let spec_str = after_colon.trim();
+        let id = if let Some(after_id) = spec_str.strip_prefix("id") {
+            let after_ws = after_id.trim_start();
+            if let Some(after_eq) = after_ws.strip_prefix('=') {
+                let val_start = after_eq.trim_start();
+                if let Some((qval, _)) = parse_input_quoted_value(val_start) {
+                    qval.trim().to_string()
+                } else {
+                    val_start
+                        .split_whitespace()
+                        .next()
+                        .unwrap_or("")
+                        .trim_matches(|c| matches!(c, '"' | '\'' | '`'))
+                        .to_string()
+                }
+            } else {
+                String::new()
+            }
+        } else {
+            spec_str
+                .split_whitespace()
+                .next()
+                .unwrap_or("")
+                .trim_matches(|c| matches!(c, '"' | '\'' | '`'))
+                .to_string()
+        };
+        let id_opt = if id.is_empty() { None } else { Some(id) };
+        return Some((lang, id_opt));
+    }
+    Some((lang, None))
+}
+
+/// Parses an interactive Markdown document into reserved named
+/// `bashmenu-<lang>:id="..."` code blocks and `{clear}`-delimited pages of
+/// [`MarkdownFormBlock`]s (`Text`, `Input`, `Buttons`).
+pub fn parse_interactive_markdown_doc(body: &str) -> InteractiveMarkdownDoc {
+    let mut reserved_scripts = std::collections::HashMap::new();
+    let mut pages: Vec<Vec<MarkdownFormBlock>> = Vec::new();
+    let mut current_page: Vec<MarkdownFormBlock> = Vec::new();
+    let mut text_buf = String::new();
+    let mut in_std_fence: Option<usize> = None;
+
+    let flush_text = |text_buf: &mut String, page: &mut Vec<MarkdownFormBlock>| {
+        if !text_buf.is_empty() {
+            let flushed = text_buf.trim_matches(['\r', '\n']);
+            if !flushed.trim().is_empty() {
+                page.push(MarkdownFormBlock::Text(flushed.to_string()));
+            }
+            text_buf.clear();
+        }
+    };
+
+    let mut lines = body.split_inclusive('\n');
+    while let Some(raw_line) = lines.next() {
+        let line = raw_line.trim_end_matches(['\r', '\n']);
+        let trimmed_start = line.trim_start_matches(' ');
+        let tick_count = trimmed_start.bytes().take_while(|&b| b == b'`').count();
+
+        if let Some(open_ticks) = in_std_fence {
+            text_buf.push_str(raw_line);
+            let trimmed = line.trim();
+            if trimmed.len() >= open_ticks && trimmed.bytes().all(|b| b == b'`') {
+                in_std_fence = None;
+            }
+            continue;
+        }
+
+        if tick_count >= 3 {
+            let after_ticks = &trimmed_start[tick_count..];
+            if let Some((lang, id_opt)) = parse_bashmenu_fence_header(after_ticks) {
+                let mut code_buf = String::new();
+                for inner_line in lines.by_ref() {
+                    let inner_trim = inner_line.trim();
+                    if inner_trim.len() >= tick_count && inner_trim.bytes().all(|b| b == b'`') {
+                        break;
+                    }
+                    code_buf.push_str(inner_line);
+                }
+                if let Some(id) = id_opt {
+                    reserved_scripts.insert(
+                        id.clone(),
+                        ScriptBlock {
+                            language: lang,
+                            id,
+                            code: code_buf,
+                        },
+                    );
+                }
+                continue;
+            } else {
+                in_std_fence = Some(tick_count);
+                text_buf.push_str(raw_line);
+                continue;
+            }
+        }
+
+        // Check for standalone `{clear}` page break (not `{{clear}}`)
+        if line.trim() == "{clear}" {
+            flush_text(&mut text_buf, &mut current_page);
+            pages.push(std::mem::take(&mut current_page));
+            continue;
+        }
+
+        // Check for `{button:...}` row
+        if find_button_macro_span(line).is_some() {
+            flush_text(&mut text_buf, &mut current_page);
+            let mut buttons = Vec::new();
+            let mut cursor = 0usize;
+            let mut leftover = String::new();
+            while cursor < line.len() {
+                if let Some((rel_s, rel_e, bspec)) = find_button_macro_span(&line[cursor..]) {
+                    let before = &line[cursor..cursor + rel_s];
+                    if !before.trim().is_empty() {
+                        leftover.push_str(before);
+                    }
+                    buttons.push(bspec);
+                    cursor += rel_e;
+                } else {
+                    let tail = &line[cursor..];
+                    if !tail.trim().is_empty() {
+                        leftover.push_str(tail);
+                    }
+                    break;
+                }
+            }
+            if !leftover.trim().is_empty() {
+                current_page.push(MarkdownFormBlock::Text(leftover.trim().to_string()));
+            }
+            if !buttons.is_empty() {
+                current_page.push(MarkdownFormBlock::Buttons(buttons));
+            }
+            continue;
+        }
+
+        // Check for `{input:...}` widget
+        if let Some((start, end, spec)) = find_input_macro_span(line) {
+            flush_text(&mut text_buf, &mut current_page);
+            let before = &line[..start];
+            let after = &line[end..];
+            if !spec.multiline && !before.trim().is_empty() {
+                current_page.push(MarkdownFormBlock::Input {
+                    prefix: Some(before.to_string()),
+                    spec,
+                });
+            } else {
+                if !before.trim().is_empty() {
+                    current_page.push(MarkdownFormBlock::Text(before.trim_end().to_string()));
+                }
+                current_page.push(MarkdownFormBlock::Input { prefix: None, spec });
+            }
+            if !after.trim().is_empty() {
+                text_buf.push_str(after.trim_start());
+                text_buf.push('\n');
+            }
+            continue;
+        }
+
+        text_buf.push_str(raw_line);
+    }
+
+    flush_text(&mut text_buf, &mut current_page);
+    if !current_page.is_empty() || pages.is_empty() {
+        pages.push(current_page);
+    }
+
+    InteractiveMarkdownDoc {
+        reserved_scripts,
+        pages,
+    }
+}
+
+/// Returns true if the Markdown body uses interactive form features (`{input}`,
+/// `{button}`, `{clear}`, or reserved `bashmenu-<lang>:id="..."` blocks).
+pub fn has_interactive_markdown_form(body: &str) -> bool {
+    let doc = parse_interactive_markdown_doc(body);
+    !doc.reserved_scripts.is_empty()
+        || doc.pages.len() > 1
+        || doc.pages.iter().flatten().any(|b| {
+            matches!(
+                b,
+                MarkdownFormBlock::Input { .. } | MarkdownFormBlock::Buttons(_)
+            )
+        })
+}
+
 /// Returns true if the Markdown body contains at least one embedded `{input...}` widget.
 pub fn has_markdown_form_inputs(body: &str) -> bool {
     parse_markdown_form_blocks(body)
@@ -740,5 +1136,89 @@ Escaped: {{id:guestName}}
         assert!(rendered.contains("your name is \"Bob\" and age is \"\"."));
         assert!(rendered.contains("# Literal in code fence: {id:guestName}"));
         assert!(rendered.contains("Escaped: {{id:guestName}}"));
+    }
+
+    #[test]
+    fn test_parse_button_macro_and_reserved_scripts_with_clear() {
+        let (_, _, b_sub) =
+            find_button_macro_span(r#"{button: type="submit" : action="saveUser"}"#)
+                .expect("parse submit button");
+        assert_eq!(b_sub.button_type, ButtonType::Submit);
+        assert_eq!(b_sub.display_label(), "Submit");
+        assert_eq!(b_sub.action.as_deref(), Some("saveUser"));
+
+        let (_, _, b_ok) =
+            find_button_macro_span("{button: type='ok': text='Continue'}").expect("parse ok");
+        assert_eq!(b_ok.button_type, ButtonType::Ok);
+        assert_eq!(b_ok.display_label(), "Continue");
+        assert_eq!(b_ok.action, None);
+
+        let (_, _, b_cancel) = find_button_macro_span("{button: type=`cancel`: action=`onAbort`}")
+            .expect("parse cancel");
+        assert_eq!(b_cancel.button_type, ButtonType::Cancel);
+        assert_eq!(b_cancel.display_label(), "Cancel");
+        assert_eq!(b_cancel.action.as_deref(), Some("onAbort"));
+
+        // Fence header parsing
+        assert_eq!(
+            parse_bashmenu_fence_header(r#"bashmenu-bash:id="exampleCodeBlock""#),
+            Some(("bash".to_string(), Some("exampleCodeBlock".to_string())))
+        );
+        assert_eq!(
+            parse_bashmenu_fence_header("bashmenu-bash"),
+            Some(("bash".to_string(), None))
+        );
+        assert_eq!(
+            parse_bashmenu_fence_header("xbashmenu-bash:id=\"no\""),
+            None
+        );
+        assert_eq!(parse_bashmenu_fence_header("bash"), None);
+
+        // Full multi-page document with reserved script, horizontal buttons, and {clear}
+        let md = "\
+```bashmenu-bash:id=\"exampleCodeBlock\"
+{message: \"Hello $userName\"}
+```
+# Page 1
+Name: {input: default=\"World\": id=\"userName\"}
+{button: type=\"submit\": action=\"exampleCodeBlock\"} {button: type=\"cancel\"}
+{clear}
+# Page 2
+Welcome, {id:userName}!
+```xbashmenu-bash:id=\"visibleSample\"
+echo \"shown literally\"
+```
+{button: type=\"ok\"}
+";
+        assert!(has_interactive_markdown_form(md));
+        let doc = parse_interactive_markdown_doc(md);
+        assert_eq!(doc.reserved_scripts.len(), 1);
+        let script = doc
+            .reserved_scripts
+            .get("exampleCodeBlock")
+            .expect("reserved script stored");
+        assert_eq!(script.language, "bash");
+        assert!(script.code.contains("{message: \"Hello $userName\"}"));
+
+        assert_eq!(doc.pages.len(), 2);
+        // Reserved bashmenu-bash block must not leak into page 1 text
+        assert!(!doc.pages[0].iter().any(|b| matches!(
+            b,
+            MarkdownFormBlock::Text(t) if t.contains("exampleCodeBlock")
+        )));
+        // Page 1 has inline button pair
+        assert!(doc.pages[0].iter().any(|b| matches!(
+            b,
+            MarkdownFormBlock::Buttons(btns)
+                if btns.len() == 2
+                    && btns[0].button_type == ButtonType::Submit
+                    && btns[0].action.as_deref() == Some("exampleCodeBlock")
+                    && btns[1].button_type == ButtonType::Cancel
+        )));
+        // Page 2 keeps xbashmenu-bash visible as normal Markdown
+        assert!(doc.pages[1].iter().any(|b| matches!(
+            b,
+            MarkdownFormBlock::Text(t) if t.contains("xbashmenu-bash") && t.contains("shown literally")
+        )));
     }
 }

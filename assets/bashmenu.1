@@ -688,6 +688,22 @@ Displays the live committed value of the matching \fB{input:id=VAR}\fR field in
 an \fBinteractive: true\fR Markdown document, seeded from \fBdefault\fR on load
 and updated on \fBEnter\fR soft-refresh.
 .TP
+.B {button:type="submit"|"ok"|"cancel":action="ID"}
+Renders an interactive action button inside an \fBinteractive: true\fR Markdown
+modal. Multiple buttons on the same line render horizontally and suppress the
+fallback footer \fB[ OK ]\fR button. \fBtype="submit"\fR (\fB[ Submit ]\fR) and
+\fBtype="ok"\fR (\fB[ OK ]\fR) commit all \fB{input}\fR values, execute the
+optional reserved \fBbashmenu-bash:id="ID"\fR code block (held in reserve and
+never auto-executed on load), and advance to the next \fB{clear}\fR page or
+close on the last page. \fBtype="cancel"\fR (\fB[ Cancel ]\fR) runs its optional
+\fBaction\fR block and closes the modal immediately. Supports optional
+\fBtext="..."\fR / \fBlabel="..."\fR label override.
+.TP
+.B {clear}
+Splits an \fBinteractive: true\fR Markdown document into sequential pages.
+Activating a \fBsubmit\fR or \fBok\fR button clears the current page and shows
+the next page while preserving committed \fB{input:id=...}\fR variables.
+.TP
 .B {file_picker}
 Launches a visual file chooser dialog box.
 .TP

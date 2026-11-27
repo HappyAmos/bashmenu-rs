@@ -31,7 +31,9 @@ pub use frame::{
 pub use grid_picker::{AsciiGridModal, ColorGridModal};
 pub use help::HelpModal;
 pub use input::{wrap_prompt_text, InputModal};
-pub use interactive_md::{InputFieldState, InteractiveFormAction, InteractiveMarkdownModal};
+pub use interactive_md::{
+    FormFocus, InputFieldState, InteractiveFormAction, InteractiveMarkdownModal,
+};
 pub use message::MessageModal;
 pub use note_conflict::{NoteConflictChoice, NoteConflictModal};
 pub use note_editor::{NoteEditorAction, NoteEditorModal};

@@ -3,7 +3,8 @@
 
 use bashmenu_core::{
     is_valid_bash_identifier, parse_interactive_markdown, transpile_bashmenu_bash,
-    MarkdownFrontmatter, MarkdownSegment, UiRpcRequest, UiRpcResponse, UI_RPC_SOCKET_ENV,
+    MarkdownFrontmatter, MarkdownSegment, ScriptBlock, UiRpcRequest, UiRpcResponse,
+    UI_RPC_SOCKET_ENV,
 };
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -327,6 +328,19 @@ pub fn spawn_interactive_markdown(
         markdown_body: raw_body,
     });
     Ok(InteractiveMdSession { rpc_rx, done_rx })
+}
+
+/// Spawns a background runner for a single named reserved `bashmenu-<lang>:id="..."`
+/// script block triggered by a `{button: action="..."}` press.
+pub fn spawn_reserved_script_block(
+    script: ScriptBlock,
+    frontmatter: MarkdownFrontmatter,
+    fallback_title: String,
+    self_bin: PathBuf,
+    initial_vars: HashMap<String, String>,
+) -> std::io::Result<InteractiveMdSession> {
+    let wrapped = format!("````bashmenu-{}\n{}\n````\n", script.language, script.code);
+    spawn_interactive_markdown(frontmatter, fallback_title, wrapped, self_bin, initial_vars)
 }
 
 /// Resolves the path to the currently running `bashmenu` executable for UI-RPC callbacks.
