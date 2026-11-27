@@ -5,6 +5,7 @@ pub mod constants;
 pub mod error;
 pub mod glyph;
 pub mod i18n;
+pub mod interactive_md;
 pub mod macro_engine;
 pub mod menu;
 pub mod menu_merge;
@@ -27,6 +28,10 @@ pub use i18n::{
     current_locale, discover_locales, extract_locale_from_args, init_locale_from_env,
     interpolate_string, parse_and_flatten_yaml, preinit_locale_from_args, resolve_locale_path,
     set_locale, translate, translate_with, LocaleCatalog, LocaleInfo, DEFAULT_EN_US_YAML,
+};
+pub use interactive_md::{
+    parse_interactive_markdown, transpile_bashmenu_bash, MarkdownSegment, UiRpcRequest,
+    UiRpcResponse, UI_RPC_SOCKET_ENV,
 };
 pub use macro_engine::{
     apply_dir_picker_macros, apply_dir_picker_macros_raw, apply_file_picker_macros,

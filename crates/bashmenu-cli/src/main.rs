@@ -19,6 +19,8 @@
 //! 6. [`ToastRack`]: Displays and auto-dismisses non-blocking bottom-right
 //!    notifications.
 
+mod ui_rpc;
+
 use anyhow::Result;
 use bashmenu_core::pick_random_theme;
 use bashmenu_core::{
@@ -202,6 +204,16 @@ enum ActiveModal {
     Message(MessageModal),
     /// Interactive `{message:"..."}` popup dialog with optional remaining item continuation.
     ItemMessage(Box<bashmenu_core::MenuItem>, MessageModal),
+    /// Live UI-RPC `{param:...}` input modal triggered by an interactive Markdown script.
+    RpcParam(
+        std::sync::mpsc::Sender<bashmenu_core::UiRpcResponse>,
+        InputModal,
+    ),
+    /// Live UI-RPC `{message:...}` popup modal triggered by an interactive Markdown script.
+    RpcMessage(
+        std::sync::mpsc::Sender<bashmenu_core::UiRpcResponse>,
+        MessageModal,
+    ),
     /// Toggle setting value selection dialog.
     Toggle(String, ToggleModal),
     /// Config value text input dialog.
@@ -229,14 +241,17 @@ impl ActiveModal {
             | ActiveModal::NewNoteTitle(_, m)
             | ActiveModal::RenameNoteTitle(_, _, m)
             | ActiveModal::ConfigInput(_, m)
-            | ActiveModal::ParamInput(_, m) => m.dialog_dimensions(area),
+            | ActiveModal::ParamInput(_, m)
+            | ActiveModal::RpcParam(_, m) => m.dialog_dimensions(area),
             ActiveModal::NoteViewer(m) => m.dialog_dimensions(area),
             ActiveModal::NoteEditor(m) => m.dialog_dimensions(area),
             ActiveModal::NoteMarkdownRef { help, .. } => help.dialog_dimensions(area),
             ActiveModal::ConfirmDeleteNote(_, _, m)
             | ActiveModal::ConfirmItem(_, m)
             | ActiveModal::ConfirmInjectBlock { modal: m, .. } => m.dialog_dimensions(area),
-            ActiveModal::Message(m) | ActiveModal::ItemMessage(_, m) => m.dialog_dimensions(area),
+            ActiveModal::Message(m)
+            | ActiveModal::ItemMessage(_, m)
+            | ActiveModal::RpcMessage(_, m) => m.dialog_dimensions(area),
             ActiveModal::Toggle(_, m) => m.dialog_dimensions(area),
             ActiveModal::Radio(_, m) => m.dialog_dimensions(area),
             ActiveModal::ItemFilePicker(_, _, m) => m.dialog_dimensions(area),
@@ -309,6 +324,12 @@ fn build_cli_command() -> clap::Command {
 
 /// Main application entrypoint for `bashmenu`.
 fn main() -> Result<()> {
+    // 0. Fast-path UI-RPC client mode (invoked by interactive Markdown scripts)
+    let raw_args: Vec<String> = std::env::args().collect();
+    if let Some(code) = ui_rpc::maybe_run_ui_rpc_client(&raw_args) {
+        std::process::exit(code);
+    }
+
     // 1. Terminal Panic Recovery Hook Invariant
     install_panic_hook();
 
@@ -565,6 +586,7 @@ fn main() -> Result<()> {
         menu_view.set_show_shortcuts(show);
     }
     let mut active_modal = ActiveModal::None;
+    let mut active_interactive_md: Option<ui_rpc::InteractiveMdSession> = None;
     let mut pending_action: Option<MenuAction> = None;
     let mut last_plugin_check = Instant::now();
     let mut last_marquee_tick = Instant::now();
@@ -627,6 +649,123 @@ fn main() -> Result<()> {
             let div_ch = styles.divider_char.chars().next().unwrap_or('─');
             let rows = plugin_engine.format_display_rows(&config, avail_w, div_ch);
             menu_view.set_plugin_rows(rows);
+            need_redraw = true;
+        }
+
+        // Poll active interactive Markdown runner for UI-RPC modal requests or completion
+        if let Some(ref session) = active_interactive_md {
+            if matches!(active_modal, ActiveModal::None) {
+                while let Ok(pending) = session.rpc_rx.try_recv() {
+                    match pending.request {
+                        bashmenu_core::UiRpcRequest::Param {
+                            title,
+                            text,
+                            default_value,
+                            masked,
+                        } => {
+                            let mut ctx = make_macro_ctx!(&config);
+                            ctx.window_width = size.width as usize;
+                            ctx.window_height = size.height as usize;
+                            ctx.screen_width = size.width as usize;
+                            let t = if title.is_empty() {
+                                String::new()
+                            } else {
+                                interpolate_placeholders(&title, &ctx)
+                            };
+                            let p = if text.is_empty() {
+                                String::new()
+                            } else {
+                                interpolate_placeholders(&text, &ctx)
+                            };
+                            let d = if default_value.is_empty() {
+                                String::new()
+                            } else {
+                                interpolate_placeholders(&default_value, &ctx)
+                            };
+                            active_modal = ActiveModal::RpcParam(
+                                pending.reply_tx,
+                                InputModal::new(t, p, &d).with_masked(masked),
+                            );
+                            need_redraw = true;
+                            break;
+                        }
+                        bashmenu_core::UiRpcRequest::Message { title, text } => {
+                            let mut ctx = make_macro_ctx!(&config);
+                            ctx.window_width = size.width as usize;
+                            ctx.window_height = size.height as usize;
+                            ctx.screen_width = size.width as usize;
+                            let t = if title.is_empty() {
+                                String::new()
+                            } else {
+                                interpolate_placeholders(&title, &ctx)
+                            };
+                            let body = interpolate_placeholders(&text, &ctx);
+                            active_modal = ActiveModal::RpcMessage(
+                                pending.reply_tx,
+                                MessageModal::new(t, body),
+                            );
+                            need_redraw = true;
+                            break;
+                        }
+                        bashmenu_core::UiRpcRequest::Toast {
+                            text,
+                            duration_secs,
+                        } => {
+                            let mut ctx = make_macro_ctx!(&config);
+                            ctx.window_width = size.width as usize;
+                            ctx.window_height = size.height as usize;
+                            ctx.screen_width = size.width as usize;
+                            let msg = interpolate_placeholders(&text, &ctx);
+                            toast_rack.add(ToastNotification::new(
+                                msg,
+                                None,
+                                duration_secs.unwrap_or(styles.toast_timeout),
+                            ));
+                            let _ = pending.reply_tx.send(bashmenu_core::UiRpcResponse {
+                                ok: true,
+                                value: String::new(),
+                                cancelled: false,
+                            });
+                            need_redraw = true;
+                        }
+                        bashmenu_core::UiRpcRequest::Placeholder { text } => {
+                            let mut ctx = make_macro_ctx!(&config);
+                            ctx.window_width = size.width as usize;
+                            ctx.window_height = size.height as usize;
+                            ctx.screen_width = size.width as usize;
+                            let expanded = interpolate_placeholders(&text, &ctx);
+                            let _ = pending.reply_tx.send(bashmenu_core::UiRpcResponse {
+                                ok: true,
+                                value: expanded,
+                                cancelled: false,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        let finished_md = active_interactive_md
+            .as_ref()
+            .and_then(|s| s.done_rx.try_recv().ok());
+        if let Some(done) = finished_md {
+            active_interactive_md = None;
+            let mut ctx = make_macro_ctx!(&config).with_allow_command_macros(false);
+            ctx.window_width = size.width as usize;
+            ctx.window_height = size.height as usize;
+            ctx.screen_width = size.width as usize;
+            let title = done
+                .frontmatter
+                .title
+                .as_deref()
+                .map(|t| interpolate_placeholders(t, &ctx))
+                .unwrap_or(done.fallback_title);
+            let rendered_body = interpolate_placeholders(&done.markdown_body, &ctx);
+            if !rendered_body.trim().is_empty() {
+                active_modal = ActiveModal::Message(
+                    MessageModal::new(title, rendered_body)
+                        .with_dimensions(done.frontmatter.width, done.frontmatter.height),
+                );
+            }
             need_redraw = true;
         }
 
@@ -774,7 +913,9 @@ fn main() -> Result<()> {
                     ActiveModal::ConfirmInjectBlock { modal, .. } => {
                         modal.render(f.area(), &modal_styles, f.buffer_mut());
                     }
-                    ActiveModal::Message(modal) | ActiveModal::ItemMessage(_, modal) => {
+                    ActiveModal::Message(modal)
+                    | ActiveModal::ItemMessage(_, modal)
+                    | ActiveModal::RpcMessage(_, modal) => {
                         modal.render(f.area(), &modal_styles, f.buffer_mut());
                     }
                     ActiveModal::Toggle(_, modal) => {
@@ -783,7 +924,7 @@ fn main() -> Result<()> {
                     ActiveModal::ConfigInput(_, modal) => {
                         modal.render(f.area(), &modal_styles, f.buffer_mut());
                     }
-                    ActiveModal::ParamInput(_, modal) => {
+                    ActiveModal::ParamInput(_, modal) | ActiveModal::RpcParam(_, modal) => {
                         modal.render(f.area(), &modal_styles, f.buffer_mut());
                     }
                     ActiveModal::Radio(_, modal) => {
@@ -862,8 +1003,9 @@ fn main() -> Result<()> {
             .as_ref()
             .and_then(|t| t.milliseconds.filter(|&ms| ms > 0))
             .map(|ms| Duration::from_millis(ms).saturating_sub(last_interaction.elapsed()));
-        let has_fast_activity =
-            !toast_rack.is_empty() || matches!(active_modal, ActiveModal::StreamOutput(_));
+        let has_fast_activity = !toast_rack.is_empty()
+            || matches!(active_modal, ActiveModal::StreamOutput(_))
+            || active_interactive_md.is_some();
         let has_plugins = config.settings.plugins.as_ref().is_some_and(|v| match v {
             serde_json::Value::Array(arr) => !arr.is_empty(),
             serde_json::Value::Object(map) => !map.is_empty(),
@@ -1606,6 +1748,49 @@ fn main() -> Result<()> {
                         if !is_esc && next_item.has_remaining_payload() {
                             pending_action = Some(MenuAction::Execute(next_item));
                         }
+                    }
+                }
+                ActiveModal::RpcMessage(reply_tx, modal) => {
+                    let is_esc = matches!(ev, Event::Key(key) if key.code == KeyCode::Esc);
+                    let dismiss = match ev {
+                        Event::Key(key) => modal.handle_key(key.code),
+                        Event::Mouse(mouse) => modal.handle_mouse(mouse, area),
+                        _ => false,
+                    };
+                    if dismiss {
+                        let _ = reply_tx.send(bashmenu_core::UiRpcResponse {
+                            ok: !is_esc,
+                            value: String::new(),
+                            cancelled: is_esc,
+                        });
+                        active_modal = ActiveModal::None;
+                    }
+                }
+                ActiveModal::RpcParam(reply_tx, modal) => {
+                    let submitted = match ev {
+                        Event::Key(key) => modal.handle_key_with_modifiers(key.code, key.modifiers),
+                        Event::Mouse(mouse) => modal.handle_mouse(mouse, area),
+                        Event::Paste(text) => {
+                            modal.paste(text.as_str());
+                            None
+                        }
+                        _ => None,
+                    };
+                    if let Some(opt_val) = submitted {
+                        let resp = match opt_val {
+                            Some(val) => bashmenu_core::UiRpcResponse {
+                                ok: true,
+                                value: val,
+                                cancelled: false,
+                            },
+                            None => bashmenu_core::UiRpcResponse {
+                                ok: false,
+                                value: String::new(),
+                                cancelled: true,
+                            },
+                        };
+                        let _ = reply_tx.send(resp);
+                        active_modal = ActiveModal::None;
                     }
                 }
                 ActiveModal::Toggle(key_path, modal) => {
@@ -2624,19 +2809,62 @@ fn main() -> Result<()> {
                                         .with_dimensions(fm.width, fm.height),
                                 );
                             } else if let Some(info_path) = info_macro_path {
-                                match ctx.render_info_file(&info_path) {
-                                    Ok((fm, body)) => {
-                                        let title = fm.title.unwrap_or_else(|| "Info".to_string());
-                                        active_modal = ActiveModal::Message(
-                                            MessageModal::new(title, body)
-                                                .with_dimensions(fm.width, fm.height),
-                                        );
+                                let resolved_info = ctx.resolve_info_file_path(&info_path);
+                                let interactive_launch = if ctx.allow_command_macros {
+                                    std::fs::read_to_string(&resolved_info)
+                                        .ok()
+                                        .and_then(|raw| {
+                                            let (fm, body) =
+                                                bashmenu_core::parse_markdown_frontmatter_full(
+                                                    &raw,
+                                                );
+                                            if fm.interactive {
+                                                let fallback_title = resolved_info
+                                                    .file_name()
+                                                    .and_then(|n| n.to_str())
+                                                    .unwrap_or("Info")
+                                                    .to_string();
+                                                Some((fm, fallback_title, body.to_string()))
+                                            } else {
+                                                None
+                                            }
+                                        })
+                                } else {
+                                    None
+                                };
+                                if let Some((fm, fallback_title, body)) = interactive_launch {
+                                    match ui_rpc::spawn_interactive_markdown(
+                                        fm,
+                                        fallback_title,
+                                        body,
+                                        ui_rpc::current_bashmenu_exe(),
+                                    ) {
+                                        Ok(session) => {
+                                            active_interactive_md = Some(session);
+                                        }
+                                        Err(err) => {
+                                            active_modal = ActiveModal::Message(MessageModal::new(
+                                                "Interactive Markdown Error",
+                                                err.to_string(),
+                                            ));
+                                        }
                                     }
-                                    Err(err) => {
-                                        active_modal = ActiveModal::Message(MessageModal::new(
-                                            "Info Error",
-                                            err,
-                                        ));
+                                } else {
+                                    match ctx.render_info_file(&info_path) {
+                                        Ok((fm, body)) => {
+                                            let title =
+                                                fm.title.unwrap_or_else(|| "Info".to_string());
+                                            active_modal = ActiveModal::Message(
+                                                MessageModal::new(title, body)
+                                                    .with_dimensions(fm.width, fm.height),
+                                            );
+                                        }
+                                        Err(err) => {
+                                            active_modal = ActiveModal::Message(MessageModal::new(
+                                                "Info Error",
+                                                err,
+                                            ));
+                                        }
                                     }
                                 }
                             } else if item.r#type == MenuItemType::Toggle
