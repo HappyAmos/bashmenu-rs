@@ -45,10 +45,16 @@ impl Default for InputFieldSpec {
 /// A rendered element inside an interactive Markdown form document.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MarkdownFormBlock {
-    /// Standard static Markdown text.
+    /// Standard static Markdown text (may contain live `{id:<name>}` placeholders).
     Text(String),
-    /// Embedded interactive `{input:...}` widget.
-    Input(InputFieldSpec),
+    /// Embedded interactive `{input:...}` widget with optional same-line label prefix.
+    Input {
+        /// Preceding text on the same line for single-line inline inputs
+        /// (e.g. `"What is your name: "`). `None` for standalone or multi-line inputs.
+        prefix: Option<String>,
+        /// Parsed input widget specification.
+        spec: InputFieldSpec,
+    },
 }
 
 /// A segment of an interactive Markdown document.
@@ -357,28 +363,70 @@ pub fn find_input_macro_span(text: &str) -> Option<(usize, usize, InputFieldSpec
 
 /// Parses a Markdown document body (ignoring `bashmenu-<lang>` script blocks)
 /// into ordered [`MarkdownFormBlock`]s of static text and `{input:...}` widgets.
+///
+/// Single-line `{input:...}` widgets following text on the same line preserve
+/// that text as `prefix` so label and input render inline. `{input:...}` inside
+/// standard non-`bashmenu-*` code fences stays literal Markdown text.
 pub fn parse_markdown_form_blocks(body: &str) -> Vec<MarkdownFormBlock> {
     let mut blocks: Vec<MarkdownFormBlock> = Vec::new();
     for seg in parse_interactive_markdown(body) {
         if let MarkdownSegment::Markdown(md_chunk) = seg {
-            let mut cursor = 0usize;
-            while cursor < md_chunk.len() {
-                if let Some((rel_start, rel_end, spec)) = find_input_macro_span(&md_chunk[cursor..])
-                {
-                    let start = cursor + rel_start;
-                    let end = cursor + rel_end;
-                    let before = md_chunk[cursor..start].trim_matches(['\r', '\n']);
-                    if !before.trim().is_empty() {
-                        blocks.push(MarkdownFormBlock::Text(before.to_string()));
+            let mut text_buf = String::new();
+            let mut in_code_fence: Option<usize> = None;
+
+            for raw_line in md_chunk.split_inclusive('\n') {
+                let line = raw_line.trim_end_matches(['\r', '\n']);
+                let trimmed_start = line.trim_start_matches(' ');
+                let tick_count = trimmed_start.bytes().take_while(|&b| b == b'`').count();
+
+                if let Some(open_ticks) = in_code_fence {
+                    text_buf.push_str(raw_line);
+                    let trimmed = line.trim();
+                    if trimmed.len() >= open_ticks && trimmed.bytes().all(|b| b == b'`') {
+                        in_code_fence = None;
                     }
-                    blocks.push(MarkdownFormBlock::Input(spec));
-                    cursor = end;
+                    continue;
+                } else if tick_count >= 3 {
+                    in_code_fence = Some(tick_count);
+                    text_buf.push_str(raw_line);
+                    continue;
+                }
+
+                if let Some((start, end, spec)) = find_input_macro_span(line) {
+                    if !text_buf.is_empty() {
+                        let flushed = text_buf.trim_matches(['\r', '\n']);
+                        if !flushed.trim().is_empty() {
+                            blocks.push(MarkdownFormBlock::Text(flushed.to_string()));
+                        }
+                        text_buf.clear();
+                    }
+
+                    let before = &line[..start];
+                    let after = &line[end..];
+                    if !spec.multiline && !before.trim().is_empty() {
+                        blocks.push(MarkdownFormBlock::Input {
+                            prefix: Some(before.to_string()),
+                            spec,
+                        });
+                    } else {
+                        if !before.trim().is_empty() {
+                            blocks.push(MarkdownFormBlock::Text(before.trim_end().to_string()));
+                        }
+                        blocks.push(MarkdownFormBlock::Input { prefix: None, spec });
+                    }
+                    if !after.trim().is_empty() {
+                        text_buf.push_str(after.trim_start());
+                        text_buf.push('\n');
+                    }
                 } else {
-                    let tail = md_chunk[cursor..].trim_matches(['\r', '\n']);
-                    if !tail.trim().is_empty() {
-                        blocks.push(MarkdownFormBlock::Text(tail.to_string()));
-                    }
-                    break;
+                    text_buf.push_str(raw_line);
+                }
+            }
+
+            if !text_buf.is_empty() {
+                let flushed = text_buf.trim_matches(['\r', '\n']);
+                if !flushed.trim().is_empty() {
+                    blocks.push(MarkdownFormBlock::Text(flushed.to_string()));
                 }
             }
         }
@@ -386,11 +434,70 @@ pub fn parse_markdown_form_blocks(body: &str) -> Vec<MarkdownFormBlock> {
     blocks
 }
 
+/// Replaces `{id:<name>}` placeholders in `text` using `vars` (resolving unknown
+/// IDs to `""`), while skipping double-brace escaped `{{id:...}}` and lines
+/// inside fenced code blocks.
+pub fn substitute_id_placeholders(
+    text: &str,
+    vars: &std::collections::HashMap<String, String>,
+) -> String {
+    if !text.contains("{id:") {
+        return text.to_string();
+    }
+
+    let mut out = String::with_capacity(text.len());
+    let mut in_code_fence: Option<usize> = None;
+
+    for raw_line in text.split_inclusive('\n') {
+        let line = raw_line.trim_end_matches(['\r', '\n']);
+        let trimmed_start = line.trim_start_matches(' ');
+        let tick_count = trimmed_start.bytes().take_while(|&b| b == b'`').count();
+
+        if let Some(open_ticks) = in_code_fence {
+            out.push_str(raw_line);
+            let trimmed = line.trim();
+            if trimmed.len() >= open_ticks && trimmed.bytes().all(|b| b == b'`') {
+                in_code_fence = None;
+            }
+            continue;
+        } else if tick_count >= 3 {
+            in_code_fence = Some(tick_count);
+            out.push_str(raw_line);
+            continue;
+        }
+
+        let mut cursor = 0usize;
+        let bytes = raw_line.as_bytes();
+        while let Some(rel) = raw_line[cursor..].find("{id:") {
+            let start = cursor + rel;
+            if start > 0 && bytes[start - 1] == b'{' {
+                out.push_str(&raw_line[cursor..start + 4]);
+                cursor = start + 4;
+                continue;
+            }
+            if let Some(end_rel) = raw_line[start + 4..].find('}') {
+                let end = start + 4 + end_rel + 1;
+                let var_name = raw_line[start + 4..start + 4 + end_rel].trim();
+                out.push_str(&raw_line[cursor..start]);
+                if let Some(val) = vars.get(var_name) {
+                    out.push_str(val);
+                }
+                cursor = end;
+            } else {
+                break;
+            }
+        }
+        out.push_str(&raw_line[cursor..]);
+    }
+
+    out
+}
+
 /// Returns true if the Markdown body contains at least one embedded `{input...}` widget.
 pub fn has_markdown_form_inputs(body: &str) -> bool {
     parse_markdown_form_blocks(body)
         .iter()
-        .any(|b| matches!(b, MarkdownFormBlock::Input(_)))
+        .any(|b| matches!(b, MarkdownFormBlock::Input { .. }))
 }
 
 /// Escapes `s` for inclusion inside a Bash double-quoted string while keeping
@@ -605,5 +712,33 @@ done
         assert!(!is_valid_bash_identifier("1bad"));
         assert!(!is_valid_bash_identifier("bad-name"));
         assert!(!is_valid_bash_identifier(""));
+
+        // Inline label prefix & {id:...} live placeholder substitution
+        let md = "\
+What is your name: {input: default=\"andrew\": id=\"guestName\"}
+According to my records, your name is \"{id:guestName}\" and age is \"{id: guestAge}\".
+```bash
+# Literal in code fence: {id:guestName} {input: id=\"ignored\"}
+```
+Escaped: {{id:guestName}}
+";
+        let blocks = parse_markdown_form_blocks(md);
+        assert!(matches!(
+            &blocks[0],
+            MarkdownFormBlock::Input { prefix: Some(p), spec }
+                if p == "What is your name: " && spec.id == "guestName"
+        ));
+        let mut vars = std::collections::HashMap::new();
+        vars.insert("guestName".to_string(), "Bob".to_string());
+        let rendered = substitute_id_placeholders(
+            match &blocks[1] {
+                MarkdownFormBlock::Text(t) => t,
+                _ => panic!("expected text block"),
+            },
+            &vars,
+        );
+        assert!(rendered.contains("your name is \"Bob\" and age is \"\"."));
+        assert!(rendered.contains("# Literal in code fence: {id:guestName}"));
+        assert!(rendered.contains("Escaped: {{id:guestName}}"));
     }
 }

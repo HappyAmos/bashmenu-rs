@@ -2917,9 +2917,13 @@ fn main() -> Result<()> {
                                                             interpolate_placeholders(&t, &safe_ctx),
                                                         )
                                                     }
-                                                    bashmenu_core::MarkdownFormBlock::Input(
+                                                    bashmenu_core::MarkdownFormBlock::Input {
+                                                        prefix,
                                                         mut spec,
-                                                    ) => {
+                                                    } => {
+                                                        let prefix = prefix.map(|p| {
+                                                            interpolate_placeholders(&p, &safe_ctx)
+                                                        });
                                                         if spec.default_value.contains('{') {
                                                             spec.default_value =
                                                                 interpolate_placeholders(
@@ -2927,9 +2931,10 @@ fn main() -> Result<()> {
                                                                     &safe_ctx,
                                                                 );
                                                         }
-                                                        bashmenu_core::MarkdownFormBlock::Input(
+                                                        bashmenu_core::MarkdownFormBlock::Input {
+                                                            prefix,
                                                             spec,
-                                                        )
+                                                        }
                                                     }
                                                 })
                                                 .collect();

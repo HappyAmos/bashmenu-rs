@@ -3,7 +3,7 @@
 
 use super::frame::{is_close_button_clicked, render_modal_frame, render_modal_scrollbar};
 use crate::style::ResolvedThemeStyles;
-use bashmenu_core::{t, InputFieldSpec, MarkdownFormBlock};
+use bashmenu_core::{substitute_id_placeholders, t, InputFieldSpec, MarkdownFormBlock};
 use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -184,6 +184,9 @@ pub struct InteractiveMarkdownModal {
     pub blocks: Vec<MarkdownFormBlock>,
     /// Runtime state for each [`MarkdownFormBlock::Input`] in order.
     pub fields: Vec<InputFieldState>,
+    /// Committed `id -> value` map used for live `{id:<name>}` interpolation.
+    /// Seeded from field defaults on load and updated on soft-refresh (`Enter`).
+    pub committed_vars: HashMap<String, String>,
     /// Index of currently focused input field, or `None` when `[ OK ]` button is focused.
     pub focused_field: Option<usize>,
     /// Outer modal vertical scroll offset in rows.
@@ -200,10 +203,18 @@ impl InteractiveMarkdownModal {
         let fields: Vec<InputFieldState> = blocks
             .iter()
             .filter_map(|b| match b {
-                MarkdownFormBlock::Input(spec) => Some(InputFieldState::from_spec(spec.clone())),
+                MarkdownFormBlock::Input { spec, .. } => {
+                    Some(InputFieldState::from_spec(spec.clone()))
+                }
                 MarkdownFormBlock::Text(_) => None,
             })
             .collect();
+        let mut committed_vars = HashMap::new();
+        for f in &fields {
+            if !f.spec.id.is_empty() {
+                committed_vars.insert(f.spec.id.clone(), f.value());
+            }
+        }
         let focused_field = if fields.is_empty() { None } else { Some(0) };
         Self {
             title: title.into(),
@@ -211,11 +222,18 @@ impl InteractiveMarkdownModal {
             height_percent: None,
             blocks,
             fields,
+            committed_vars,
             focused_field,
             scroll_offset: 0,
             last_field_rects: RefCell::new(Vec::new()),
             last_ok_rect: RefCell::new(None),
         }
+    }
+
+    /// Commits all current input field values into [`Self::committed_vars`] so
+    /// `{id:<name>}` placeholders in the Markdown body refresh live in-place.
+    pub fn soft_refresh(&mut self) {
+        self.committed_vars = self.collect_values();
     }
 
     /// Sets optional percentage-based width and height overrides (`1..=100`).
@@ -278,7 +296,8 @@ impl InteractiveMarkdownModal {
                 return None;
             }
             KeyCode::Enter if modifiers.contains(KeyModifiers::CONTROL) => {
-                return Some(InteractiveFormAction::Submit(self.collect_values()));
+                self.soft_refresh();
+                return None;
             }
             _ => {}
         }
@@ -287,7 +306,8 @@ impl InteractiveMarkdownModal {
             // Focus is on the [ OK ] button
             return match code {
                 KeyCode::Enter | KeyCode::Char(' ') => {
-                    Some(InteractiveFormAction::Submit(self.collect_values()))
+                    self.soft_refresh();
+                    Some(InteractiveFormAction::Submit(self.committed_vars.clone()))
                 }
                 KeyCode::Up | KeyCode::Char('k') => {
                     self.scroll_offset = self.scroll_offset.saturating_sub(1);
@@ -301,15 +321,19 @@ impl InteractiveMarkdownModal {
             };
         };
 
+        let is_multiline = self.fields[idx].spec.multiline;
+        if code == KeyCode::Enter {
+            if is_multiline {
+                self.fields[idx].insert_char('\n');
+            } else {
+                // Soft-refresh live {id:...} values and keep focus on this field
+                self.soft_refresh();
+            }
+            return None;
+        }
+
         let field = &mut self.fields[idx];
         match code {
-            KeyCode::Enter => {
-                if field.spec.multiline {
-                    field.insert_char('\n');
-                } else {
-                    self.cycle_focus(true);
-                }
-            }
             KeyCode::Backspace => field.backspace(),
             KeyCode::Delete => field.delete(),
             KeyCode::Left => {
@@ -350,12 +374,14 @@ impl InteractiveMarkdownModal {
                 if is_close_button_clicked(inner, mouse.row, mouse.column) {
                     return Some(InteractiveFormAction::Cancel);
                 }
-                if let Some(ok_rect) = *self.last_ok_rect.borrow() {
+                let ok_rect_opt = *self.last_ok_rect.borrow();
+                if let Some(ok_rect) = ok_rect_opt {
                     if mouse.row == ok_rect.y
                         && mouse.column >= ok_rect.x
                         && mouse.column < ok_rect.x + ok_rect.width
                     {
-                        return Some(InteractiveFormAction::Submit(self.collect_values()));
+                        self.soft_refresh();
+                        return Some(InteractiveFormAction::Submit(self.committed_vars.clone()));
                     }
                 }
                 let rects = self.last_field_rects.borrow();
@@ -427,7 +453,7 @@ impl InteractiveMarkdownModal {
                         }
                         est_rows += 1;
                     }
-                    MarkdownFormBlock::Input(_) => {
+                    MarkdownFormBlock::Input { .. } => {
                         if let Some(f) = self.fields.get(field_idx) {
                             est_rows += f.visible_rows() + 1;
                         }
@@ -456,6 +482,7 @@ impl InteractiveMarkdownModal {
             InputRow {
                 field_idx: usize,
                 row_in_field: usize,
+                prefix: Option<String>,
             },
             Blank,
         }
@@ -475,7 +502,8 @@ impl InteractiveMarkdownModal {
         for block in &self.blocks {
             match block {
                 MarkdownFormBlock::Text(t) => {
-                    for raw_line in t.lines() {
+                    let expanded = substitute_id_placeholders(t, &self.committed_vars);
+                    for raw_line in expanded.lines() {
                         let trimmed = raw_line.trim();
                         if trimmed.is_empty() {
                             vrows.push(VirtualRow::Blank);
@@ -489,8 +517,9 @@ impl InteractiveMarkdownModal {
                             }
                         }
                     }
+                    vrows.push(VirtualRow::Blank);
                 }
-                MarkdownFormBlock::Input(_) => {
+                MarkdownFormBlock::Input { prefix, .. } => {
                     let f_idx = field_counter;
                     field_counter += 1;
                     if let Some(f) = self.fields.get(f_idx) {
@@ -498,6 +527,7 @@ impl InteractiveMarkdownModal {
                             vrows.push(VirtualRow::InputRow {
                                 field_idx: f_idx,
                                 row_in_field: r,
+                                prefix: if r == 0 { prefix.clone() } else { None },
                             });
                         }
                         vrows.push(VirtualRow::Blank);
@@ -522,18 +552,33 @@ impl InteractiveMarkdownModal {
                 VirtualRow::InputRow {
                     field_idx,
                     row_in_field,
+                    prefix,
                 } => {
                     let f = &self.fields[*field_idx];
                     let is_focused = self.focused_field == Some(*field_idx);
+
+                    let (input_x, rem_w) = if let Some(ref p) = prefix {
+                        let p_expanded = substitute_id_placeholders(p, &self.committed_vars);
+                        let spans = crate::bbcode::parse_bbcode_spans(&p_expanded, base_style);
+                        let p_vis = unicode_width::UnicodeWidthStr::width(
+                            crate::bbcode::strip_bbcode(&p_expanded).as_str(),
+                        )
+                        .min(avail_w.saturating_sub(4));
+                        buf.set_line(left_x, y, &ratatui::text::Line::from(spans), p_vis as u16);
+                        (left_x + p_vis as u16, avail_w.saturating_sub(p_vis))
+                    } else {
+                        (left_x, avail_w)
+                    };
+
                     let box_w = f
                         .spec
                         .width
-                        .map(|w| (w as usize).min(avail_w).max(4))
-                        .unwrap_or(avail_w) as u16;
+                        .map(|w| (w as usize).min(rem_w).max(4.min(rem_w)))
+                        .unwrap_or(rem_w) as u16;
 
                     if field_rects[*field_idx].width == 0 {
                         field_rects[*field_idx] =
-                            Rect::new(left_x, y, box_w, f.visible_rows() as u16);
+                            Rect::new(input_x, y, box_w, f.visible_rows() as u16);
                     }
 
                     let box_style = if is_focused {
@@ -544,7 +589,7 @@ impl InteractiveMarkdownModal {
 
                     // Fill background of this input row
                     for dx in 0..box_w {
-                        buf[(left_x + dx, y)].set_char(' ').set_style(box_style);
+                        buf[(input_x + dx, y)].set_char(' ').set_style(box_style);
                     }
 
                     let show_sb = f.spec.multiline
@@ -567,12 +612,12 @@ impl InteractiveMarkdownModal {
                             0
                         };
                         let visible: String = chars.iter().skip(h_scroll).take(text_w).collect();
-                        buf.set_string(left_x, y, &visible, box_style);
+                        buf.set_string(input_x, y, &visible, box_style);
 
                         if is_focused && line_idx == f.cursor_row {
                             let cur_vis_x = f.cursor_col.saturating_sub(h_scroll);
                             if cur_vis_x < text_w {
-                                let cx = left_x + cur_vis_x as u16;
+                                let cx = input_x + cur_vis_x as u16;
                                 let cur_ch = chars.get(f.cursor_col).copied().unwrap_or(' ');
                                 buf[(cx, y)]
                                     .set_char(cur_ch)
@@ -584,7 +629,7 @@ impl InteractiveMarkdownModal {
                     // Render per-field scrollbar on top row of multiline box
                     if show_sb && *row_in_field == 0 {
                         render_modal_scrollbar(
-                            left_x + box_w.saturating_sub(1),
+                            input_x + box_w.saturating_sub(1),
                             y,
                             f.visible_rows(),
                             f.lines.len(),
@@ -657,8 +702,23 @@ Notes:
         assert_eq!(modal.fields.len(), 2);
         assert_eq!(modal.focused_field, Some(0));
 
-        // Append to single-line field 0
+        // Append to single-line field 0 (typing alone does NOT update committed_vars yet)
         modal.handle_key_with_modifiers(KeyCode::Char('1'), KeyModifiers::NONE);
+        assert_eq!(
+            modal.committed_vars.get("userName").map(String::as_str),
+            Some("andrew")
+        );
+
+        // Pressing Enter soft-refreshes committed_vars and stays on field 0
+        assert!(modal
+            .handle_key_with_modifiers(KeyCode::Enter, KeyModifiers::NONE)
+            .is_none());
+        assert_eq!(modal.focused_field, Some(0));
+        assert_eq!(
+            modal.committed_vars.get("userName").map(String::as_str),
+            Some("andrew1")
+        );
+
         // Tab to multiline field 1 and add a second line
         modal.handle_key_with_modifiers(KeyCode::Tab, KeyModifiers::NONE);
         assert_eq!(modal.focused_field, Some(1));
@@ -679,5 +739,43 @@ Notes:
             }
             other => panic!("expected Submit, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn test_live_id_interpolation_soft_refresh_render() {
+        let md = "\
+What is your name: {input: default=\"andrew\": id=\"guestName\"}
+
+According to my records, your name is \"{id:guestName}\".
+";
+        let blocks = parse_markdown_form_blocks(md);
+        let mut modal = InteractiveMarkdownModal::new("Live", blocks);
+        let styles = ResolvedThemeStyles::default();
+        let area = Rect::new(0, 0, 80, 20);
+
+        let buffer_text = |m: &InteractiveMarkdownModal| -> String {
+            let mut buf = Buffer::empty(area);
+            m.render(area, &styles, &mut buf);
+            let mut s = String::new();
+            for y in 0..area.height {
+                for x in 0..area.width {
+                    s.push_str(buf[(x, y)].symbol());
+                }
+                s.push('\n');
+            }
+            s
+        };
+
+        // Initial render shows default value
+        assert!(buffer_text(&modal).contains("your name is \"andrew\"."));
+
+        // Typing without Enter does not refresh live {id:guestName}
+        modal.handle_key_with_modifiers(KeyCode::Char('!'), KeyModifiers::NONE);
+        assert!(buffer_text(&modal).contains("your name is \"andrew\"."));
+
+        // Pressing Enter triggers soft-refresh and updates live text
+        modal.handle_key_with_modifiers(KeyCode::Enter, KeyModifiers::NONE);
+        assert_eq!(modal.focused_field, Some(0));
+        assert!(buffer_text(&modal).contains("your name is \"andrew!\"."));
     }
 }
