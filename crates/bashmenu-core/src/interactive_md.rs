@@ -980,6 +980,32 @@ fn transpile_bash_line(line: &str) -> String {
         search_from = start + replacement.len();
     }
 
+    // 3. Rewrite `{id:<VAR>}` into `${<VAR>:-}` so form input variables expand
+    //    both inside `{param:...}` / `{message:...}` strings and regular Bash lines.
+    search_from = 0;
+    while search_from < out.len() {
+        let Some(rel_start) = out[search_from..].find("{id:") else {
+            break;
+        };
+        let start = search_from + rel_start;
+        if start > 0 && out.as_bytes()[start - 1] == b'{' {
+            search_from = start + 4;
+            continue;
+        }
+        let after_prefix = &out[start + 4..];
+        if let Some(rel_close) = after_prefix.find('}') {
+            let var_name = after_prefix[..rel_close].trim();
+            if is_valid_bash_identifier(var_name) {
+                let end = start + 4 + rel_close + 1;
+                let replacement = format!("${{{var_name}:-}}");
+                out.replace_range(start..end, &replacement);
+                search_from = start + replacement.len();
+                continue;
+            }
+        }
+        search_from = start + 4;
+    }
+
     out
 }
 
@@ -1063,20 +1089,22 @@ You are user: {user}
         let code = r#"#!/usr/bin/env bash
 # comment with {param:'ignored'}
 while true; do
-    GUESS="{param:'Guess a number (q to quit):'}"
+    GUESS="{param:'Guess a number {id:guestName} (q to quit):'}"
     case "$GUESS" in
         [Qq]*) echo "Aborted."; exit 1;;
-        *) {message:"You entered $GUESS"} ;;
+        *) {message:"You entered $GUESS. Age: {id: guestAge} (escaped: {{id:guestName}})"} ;;
     esac
 done
 "#;
         let out = transpile_bashmenu_bash(code, Path::new("/usr/local/bin/bashmenu"));
         assert!(out.contains("__BM_BIN='/usr/local/bin/bashmenu'"));
         assert!(out.contains("# comment with {param:'ignored'}"));
-        assert!(
-            out.contains("GUESS=\"$(__bm_param \"\" \"Guess a number (q to quit):\" \"\" \"0\")\"")
-        );
-        assert!(out.contains("*) __bm_message \"\" \"You entered $GUESS\" ;;"));
+        assert!(out.contains(
+            "GUESS=\"$(__bm_param \"\" \"Guess a number ${guestName:-} (q to quit):\" \"\" \"0\")\""
+        ));
+        assert!(out.contains(
+            "*) __bm_message \"\" \"You entered $GUESS. Age: ${guestAge:-} (escaped: {{id:guestName}})\" ;;"
+        ));
     }
 
     #[test]
