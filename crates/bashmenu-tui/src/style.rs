@@ -452,8 +452,12 @@ impl Default for ResolvedThemeStyles {
                 .add_modifier(Modifier::BOLD),
             modal_no_button: Style::default().fg(Color::LightRed),
             modal_cancel_button: Style::default().fg(Color::DarkGray),
-            input_box: Style::default().fg(Color::White).bg(Color::Indexed(236)),
-            input_box_unfocused: Style::default().fg(Color::Gray).bg(Color::Indexed(234)),
+            input_box: Style::default()
+                .fg(Color::Indexed(254))
+                .bg(Color::Indexed(236)),
+            input_box_unfocused: Style::default()
+                .fg(Color::Indexed(244))
+                .bg(Color::Indexed(234)),
             selected_tab: Style::default()
                 .fg(Color::Black)
                 .bg(Color::Cyan)
