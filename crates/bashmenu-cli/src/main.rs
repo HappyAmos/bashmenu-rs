@@ -641,7 +641,11 @@ fn main() -> Result<()> {
             4.5,
         ));
     }
-    guard.set_default_bg(styles.background);
+    guard.set_default_bg(if cli.imarkdown.is_some() {
+        ratatui::style::Color::Reset
+    } else {
+        styles.background
+    });
 
     // 6b. Optional standalone `--imarkdown <FILE>` mode
     let standalone_imarkdown = cli.imarkdown.is_some();
@@ -1070,7 +1074,8 @@ fn main() -> Result<()> {
 
             let render_fn = |f: &mut ratatui::Frame<'_>| {
                 if standalone_imarkdown {
-                    let bg_style = ratatui::style::Style::default().bg(styles.background);
+                    let bg_style =
+                        ratatui::style::Style::default().bg(ratatui::style::Color::Reset);
                     let area = f.area();
                     let buf = f.buffer_mut();
                     for y in area.y..area.y + area.height {
@@ -1342,7 +1347,11 @@ fn main() -> Result<()> {
                                     config.settings.toast_timeout,
                                 );
                                 menu_view.set_styles(styles.clone());
-                                guard.set_default_bg(styles.background);
+                                guard.set_default_bg(if cli.imarkdown.is_some() {
+                                    ratatui::style::Color::Reset
+                                } else {
+                                    styles.background
+                                });
                                 let wp_config = config.resolve_wallpaper(Some(t));
                                 if let Some(fb) = guard.framebuffer_mut() {
                                     fb.set_wallpaper(wp_config.as_ref(), styles.background);
@@ -2917,7 +2926,11 @@ fn main() -> Result<()> {
                                 config.settings.toast_timeout,
                             );
                             menu_view.set_styles(styles.clone());
-                            guard.set_default_bg(styles.background);
+                            guard.set_default_bg(if cli.imarkdown.is_some() {
+                                ratatui::style::Color::Reset
+                            } else {
+                                styles.background
+                            });
 
                             let wp_config = config.resolve_wallpaper(active_theme);
                             if let Some(fb) = guard.framebuffer_mut() {
