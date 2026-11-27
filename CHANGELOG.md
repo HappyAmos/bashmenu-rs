@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-11-27
+
+### Added
+- feat(bmpager): add live `<w>`/`<W>` soft-wrap toggle and resize reflow (#102)
+
 ## [0.1.8] - 2026-11-27
 
 ### Added
@@ -87,7 +92,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial tagged release of the BashMenu-RS workspace and companion CLI tools (`bashmenu`, `menuedit`, `shortcutedit`, `themeedit`, `bashedit`, `bmpager`, `cheat`, `ymlcheck`).
 
-[Unreleased]: https://github.com/HappyAmos/bashmenu-rs/compare/v0.1.8...HEAD
+[Unreleased]: https://github.com/HappyAmos/bashmenu-rs/compare/v0.1.9...HEAD
+[0.1.9]: https://github.com/HappyAmos/bashmenu-rs/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/HappyAmos/bashmenu-rs/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/HappyAmos/bashmenu-rs/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/HappyAmos/bashmenu-rs/compare/v0.1.5...v0.1.6
