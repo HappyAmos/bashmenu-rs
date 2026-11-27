@@ -143,14 +143,15 @@ Quick summary:
 
 ---
 
-## Release Cycle
+## Branching & Release Cycle
 
-BashMenu-RS follows **trunk-based development** and [Semantic Versioning](https://semver.org/):
+BashMenu-RS uses a **`dev` → `main` two-branch model** and [Semantic Versioning](https://semver.org/):
 
-- **`main` is the live development branch:** Every PR merged into `main` passes full CI checks (Linux, macOS, Windows, and ShellCheck), keeping `main` continuously buildable.
-- **Weekly Friday Evening Release PRs:** Every Friday at `23:00 UTC` (6:00 PM EST / 7:00 PM EDT), [`.github/workflows/weekly-release.yml`](.github/workflows/weekly-release.yml) checks for new user-facing commits (`feat:`, `fix:`, `perf:`, `refactor:`) since the latest `v*.*.*` tag.
+- **`main` is the stable release branch:** `main` strictly tracks published releases so users cloning the default branch always receive the latest stable version.
+- **`dev` is the active integration branch:** All feature, bug-fix, documentation, and dependency PRs should branch from and target **`dev`**. Every PR merged into `dev` passes full CI checks (Linux, macOS, Windows, and ShellCheck).
+- **Weekly Friday Evening Release PRs:** Every Friday at `23:00 UTC` (6:00 PM EST / 7:00 PM EDT), [`.github/workflows/weekly-release.yml`](.github/workflows/weekly-release.yml) inspects `dev` for new user-facing commits (`feat:`, `fix:`, `perf:`, `refactor:`) since the latest `v*.*.*` tag.
   - If none exist, the week is skipped automatically (no empty releases).
-  - If releasable changes exist, the workflow bumps version files (`Cargo.toml`, `Cargo.lock`, `assets/bashmenu.md`, `assets/bashmenu.1`), updates [`CHANGELOG.md`](CHANGELOG.md), and opens a `chore(release): prepare vX.Y.Z` PR for review.
-- **Automated Tagging & Publishing:** Squash-merging a Release PR automatically creates and pushes the immutable `vX.Y.Z` tag and runs [`.github/workflows/release.yml`](.github/workflows/release.yml) to build and publish release archives with `SHA256SUMS.txt`. Published release tags are never moved retroactively.
+  - If releasable changes exist, the workflow bumps version files (`Cargo.toml`, `Cargo.lock`, `assets/bashmenu.md`, `assets/bashmenu.1`), updates [`CHANGELOG.md`](CHANGELOG.md), and opens a `chore(release): prepare vX.Y.Z` PR into **`main`** for review.
+- **Automated Tagging & Publishing:** Merging a Release PR into `main` automatically creates and pushes the immutable `vX.Y.Z` tag and runs [`.github/workflows/release.yml`](.github/workflows/release.yml) to build and publish release archives with `SHA256SUMS.txt`. Published release tags are never moved retroactively.
 
 Thank you for helping make BashMenu-RS better!
