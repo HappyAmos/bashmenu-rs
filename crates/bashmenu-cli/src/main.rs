@@ -555,7 +555,8 @@ fn main() -> Result<()> {
     let mut menu_view = MenuView::new(menu, styles.clone(), use_nerd, status_gutter)
         .with_config(config.clone())
         .with_shortcuts(shortcuts_cfg.shortcuts.clone())
-        .with_leader_key(shortcuts_cfg.leader_key.clone());
+        .with_leader_key(shortcuts_cfg.leader_key.clone())
+        .with_allow_command_macros(!cli.local);
     let initial_wallpaper = config.resolve_wallpaper(active_theme);
     menu_view.set_wallpaper(initial_wallpaper.clone());
     if let Some(show) = config.settings.show_menu_shortcuts {

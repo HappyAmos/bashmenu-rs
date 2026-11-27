@@ -93,7 +93,7 @@ pub fn resolve_wallpaper_path(path_str: &str) -> Option<PathBuf> {
 
     // Expand macros like {bashmenu_dir} if present
     let cfg = bashmenu_core::BashMenuConfig::default();
-    let macro_ctx = MacroContext::new(&cfg);
+    let macro_ctx = MacroContext::new(&cfg).with_allow_command_macros(false);
     let expanded = interpolate_placeholders(path_str.trim(), &macro_ctx);
 
     // Expand ~ home directory

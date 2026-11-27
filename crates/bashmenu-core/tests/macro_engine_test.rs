@@ -893,3 +893,56 @@ fn test_render_placeholder_help_text_tables_and_values() {
         assert!(rendered.contains("| {appdata} | Windows AppData roaming directory | na |"));
     }
 }
+
+#[test]
+fn test_allow_command_macros_guard_local_mode_and_info_file_issue_95() {
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../defaults/bashmenu.yml");
+    let config = load_config(fixture).expect("load config");
+
+    // 1. Disabling allow_command_macros prevents {command:...} and {cmd:...} execution
+    let safe_ctx = MacroContext::new(&config).with_allow_command_macros(false);
+    assert!(!safe_ctx.allow_command_macros);
+    assert_eq!(
+        interpolate_placeholders("Val: {command:printf 'SHOULD_NOT_RUN'}", &safe_ctx),
+        "Val: {command:printf 'SHOULD_NOT_RUN'}"
+    );
+    assert_eq!(
+        interpolate_placeholders("Val: {cmd:printf 'SHOULD_NOT_RUN'}", &safe_ctx),
+        "Val: {cmd:printf 'SHOULD_NOT_RUN'}"
+    );
+
+    // 2. --local mode automatically disables {command:...} unless explicitly re-enabled
+    let local_ctx = MacroContext::new(&config).with_local_mode(true);
+    assert!(local_ctx.local_mode);
+    assert!(!local_ctx.allow_command_macros);
+    assert_eq!(
+        interpolate_placeholders("{command:printf 'LOCAL_BLOCKED'}", &local_ctx),
+        "{command:printf 'LOCAL_BLOCKED'}"
+    );
+
+    // 3. {info:<path>} markdown bodies never execute passive {command:...} macros
+    let tmp = std::env::temp_dir().join(format!("bashmenu_issue95_info_{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&tmp);
+    let info_file = tmp.join("untrusted.md");
+    std::fs::write(
+        &info_file,
+        "---\ntitle: Info {command:printf 'TITLE_PWN'}\n---\nBody {command:printf 'BODY_PWN'}\n",
+    )
+    .expect("write untrusted info.md");
+
+    let trusted_ctx = MacroContext::new(&config).with_bashmenu_dir(tmp.clone());
+    let (fm, body) = trusted_ctx
+        .render_info_file("{bashmenu_dir}/untrusted.md")
+        .expect("render info");
+    assert_eq!(
+        fm.title.as_deref(),
+        Some("Info {command:printf 'TITLE_PWN'}")
+    );
+    assert!(
+        body.contains("{command:printf 'BODY_PWN'}"),
+        "Expected unexecuted command macro in info body, got: {body}"
+    );
+    assert!(!body.contains("BODY_PWN\n"));
+
+    let _ = std::fs::remove_dir_all(&tmp);
+}

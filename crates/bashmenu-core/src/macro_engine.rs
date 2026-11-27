@@ -45,6 +45,8 @@ pub struct MacroContext<'a> {
     pub repo_mode: bool,
     /// Whether running in local isolation mode (`--local`)
     pub local_mode: bool,
+    /// Whether `{command:...}` / `{cmd:...}` shell macro evaluation is permitted
+    pub allow_command_macros: bool,
     /// Terminal viewport width
     pub window_width: usize,
     /// Terminal viewport height
@@ -116,6 +118,7 @@ impl<'a> MacroContext<'a> {
             version,
             repo_mode: false,
             local_mode: false,
+            allow_command_macros: true,
             window_width: 80,
             window_height: 24,
             screen_width: 80,
@@ -136,8 +139,20 @@ impl<'a> MacroContext<'a> {
     }
 
     /// Sets whether the context is running in local isolation mode (`--local`).
+    ///
+    /// Disables `{command:...}` macro evaluation when `local_mode` is `true`
+    /// to prevent passive command execution from untrusted directories.
     pub fn with_local_mode(mut self, local_mode: bool) -> Self {
         self.local_mode = local_mode;
+        if local_mode {
+            self.allow_command_macros = false;
+        }
+        self
+    }
+
+    /// Controls whether `{command:...}` / `{cmd:...}` shell macros are evaluated.
+    pub fn with_allow_command_macros(mut self, allow: bool) -> Self {
+        self.allow_command_macros = allow;
         self
     }
 
@@ -380,8 +395,9 @@ impl<'a> MacroContext<'a> {
         })?;
 
         let (mut fm, body) = parse_markdown_frontmatter_full(&raw);
+        let safe_ctx = self.clone().with_allow_command_macros(false);
         if let Some(ref t) = fm.title {
-            fm.title = Some(interpolate_placeholders(t, self));
+            fm.title = Some(interpolate_placeholders(t, &safe_ctx));
         } else {
             let fallback_title = resolved
                 .file_name()
@@ -390,7 +406,7 @@ impl<'a> MacroContext<'a> {
                 .to_string();
             fm.title = Some(fallback_title);
         }
-        let rendered_body = interpolate_placeholders(body, self);
+        let rendered_body = interpolate_placeholders(body, &safe_ctx);
         Ok((fm, rendered_body))
     }
 
@@ -2259,7 +2275,7 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
     }
 
     // 7. Command substitution: {command:<cmd>} / {cmd:<cmd>} with 30s TTL caching
-    if res.contains("{command:") || res.contains("{cmd:") {
+    if ctx.allow_command_macros && (res.contains("{command:") || res.contains("{cmd:")) {
         res = COMMAND_RE
             .replace_all(&res, |caps: &Captures| {
                 let raw_cmd = &caps[1];

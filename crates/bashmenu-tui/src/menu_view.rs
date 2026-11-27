@@ -119,6 +119,8 @@ pub struct MenuView {
     leader_key: String,
     /// Stationary mouse hover tracker for help gutter expansion
     pub gutter_hover: HelpGutterHover,
+    /// Whether `{command:...}` macro evaluation is allowed during menu rendering
+    allow_command_macros: bool,
 }
 
 impl MenuView {
@@ -158,9 +160,16 @@ impl MenuView {
             shortcuts: Vec::new(),
             leader_key: "ctrl+space".to_string(),
             gutter_hover: HelpGutterHover::with_duration(hover_duration),
+            allow_command_macros: true,
         };
         view.ensure_selectable();
         view
+    }
+
+    /// Controls whether `{command:...}` macros are evaluated during menu rendering.
+    pub fn with_allow_command_macros(mut self, allow: bool) -> Self {
+        self.allow_command_macros = allow;
+        self
     }
 
     /// Sets configured shortcuts from the shortcut manager
@@ -1242,7 +1251,8 @@ impl MenuView {
 
         // 2. Render Header (Top Border) at area.y
         let cfg = self.config.clone();
-        let mut macro_ctx = MacroContext::new(&cfg);
+        let mut macro_ctx =
+            MacroContext::new(&cfg).with_allow_command_macros(self.allow_command_macros);
         macro_ctx.window_width = w;
         macro_ctx.screen_width = w;
         macro_ctx.window_height = area.height as usize;
