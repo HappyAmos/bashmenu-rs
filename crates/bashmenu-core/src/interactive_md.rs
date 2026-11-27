@@ -27,6 +27,8 @@ pub struct InputFieldSpec {
     pub scrollbar: bool,
     /// Visible row height when `multiline` is true (`height=N`, default `5`).
     pub height: u16,
+    /// Mask typed characters with `*` (`masked=true`, default `false`).
+    pub masked: bool,
 }
 
 impl Default for InputFieldSpec {
@@ -38,6 +40,7 @@ impl Default for InputFieldSpec {
             multiline: false,
             scrollbar: true,
             height: 5,
+            masked: false,
         }
     }
 }
@@ -346,7 +349,15 @@ fn parse_input_macro_fields(inner: &str) -> InputFieldSpec {
         }
 
         let mut matched_key: Option<(&str, &str)> = None;
-        for key in ["default", "id", "width", "multiline", "scrollbar", "height"] {
+        for key in [
+            "default",
+            "id",
+            "width",
+            "multiline",
+            "scrollbar",
+            "height",
+            "masked",
+        ] {
             if let Some(after) = rest.strip_prefix(key) {
                 let after_ws = after.trim_start();
                 if after_ws.is_empty() || after_ws.starts_with('=') || after_ws.starts_with(':') {
@@ -413,6 +424,9 @@ fn parse_input_macro_fields(inner: &str) -> InputFieldSpec {
                         }
                     }
                 }
+                "masked" => {
+                    spec.masked = val.eq_ignore_ascii_case("true") || val == "1";
+                }
                 _ => {}
             }
 
@@ -424,6 +438,7 @@ fn parse_input_macro_fields(inner: &str) -> InputFieldSpec {
             match key {
                 "multiline" => spec.multiline = true,
                 "scrollbar" => spec.scrollbar = true,
+                "masked" => spec.masked = true,
                 _ => {}
             }
             rest = after_key.trim_start();
@@ -1424,6 +1439,17 @@ done
         assert!(!minimal.multiline);
         assert!(minimal.scrollbar);
         assert_eq!(minimal.height, 5);
+        assert!(!minimal.masked);
+
+        let (_, _, masked_kv) =
+            find_input_macro_span(r#"{input: id="apiKey": masked=true}"#).expect("masked=true");
+        assert_eq!(masked_kv.id, "apiKey");
+        assert!(masked_kv.masked);
+
+        let (_, _, masked_flag) =
+            find_input_macro_span(r#"{input: id="pin": masked}"#).expect("bare masked");
+        assert_eq!(masked_flag.id, "pin");
+        assert!(masked_flag.masked);
 
         // Identifier validation
         assert!(is_valid_bash_identifier("bashVariableName"));

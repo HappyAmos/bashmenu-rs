@@ -352,7 +352,7 @@ help:
     | :--- | :--- |
     | {{param}} | Prompts for text input modal (supports title="...", text="...", default="...", masked, raw) |
     | {{message:"TEXT"}} | Centered popup modal with OK button (no title; or title="...":text="...", supports ", ', `) |
-    | {{input:default="":id=VAR:width=XX:multiline=false:scrollbar=true}} | Embedded form text field in interactive Markdown (height=5 default for multiline) |
+    | {{input:default="":id=VAR:width=XX:multiline=false:scrollbar=true:masked=false}} | Embedded form text field in interactive Markdown (height=5 default for multiline) |
     | {{radio:VAR:"Option 1":"Option 2"}} | Single-choice radio list in interactive Markdown (supports id=, default=, layout="horizontal") |
     | {{checkbox:VAR:"Label":false}} | Boolean toggle checkbox in interactive Markdown (exports "true"/"false") |
     | {{id:VAR}} | Live interpolated value from matching {{input}}/{{radio}}/{{checkbox}} (updates live) |

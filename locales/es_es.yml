@@ -350,7 +350,7 @@ help:
     | :--- | :--- |
     | {{param}} | Solicita entrada de texto modal (admite title="...", text="...", default="...", masked, raw) |
     | {{message:"TEXT"}} | Diálogo emergente centrado con botón Aceptar (sin título; o title="...":text="...", admite ", ', `) |
-    | {{input:default="":id=VAR:width=XX:multiline=false:scrollbar=true}} | Campo de texto integrado en Markdown interactivo (height=5 por defecto en multilínea) |
+    | {{input:default="":id=VAR:width=XX:multiline=false:scrollbar=true:masked=false}} | Campo de texto integrado en Markdown interactivo (height=5 por defecto en multilínea) |
     | {{radio:VAR:"Option 1":"Option 2"}} | Lista de selección única en Markdown interactivo (admite id=, default=, layout="horizontal") |
     | {{checkbox:VAR:"Label":false}} | Casilla de verificación booleana en Markdown interactivo (exporta "true"/"false") |
     | {{id:VAR}} | Valor interpolado en vivo de {{input}}/{{radio}}/{{checkbox}} (se actualiza al instante) |

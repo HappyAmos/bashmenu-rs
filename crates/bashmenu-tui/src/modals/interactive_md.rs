@@ -1127,14 +1127,22 @@ impl InteractiveMarkdownModal {
                         } else {
                             0
                         };
-                        let visible: String = chars.iter().skip(h_scroll).take(text_w).collect();
+                        let visible: String = if f.spec.masked {
+                            "*".repeat(chars.iter().skip(h_scroll).take(text_w).count())
+                        } else {
+                            chars.iter().skip(h_scroll).take(text_w).collect()
+                        };
                         buf.set_string(input_x, y, &visible, box_style);
 
                         if is_focused && line_idx == f.cursor_row {
                             let cur_vis_x = f.cursor_col.saturating_sub(h_scroll);
                             if cur_vis_x < text_w {
                                 let cx = input_x + cur_vis_x as u16;
-                                let cur_ch = chars.get(f.cursor_col).copied().unwrap_or(' ');
+                                let cur_ch = if f.spec.masked && f.cursor_col < chars.len() {
+                                    '*'
+                                } else {
+                                    chars.get(f.cursor_col).copied().unwrap_or(' ')
+                                };
                                 buf[(cx, y)]
                                     .set_char(cur_ch)
                                     .set_style(box_style.add_modifier(Modifier::REVERSED));
