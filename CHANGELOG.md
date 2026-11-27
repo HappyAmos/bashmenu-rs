@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-11-27
+
+### Added
+- feat(cli,i18n): localize --help output across all 8 workspace binaries (#90)
+- feat(tui,themeedit): add Derive From Background Image checkbox to ColorPickerModal (#84)
+- feat(tui,menuedit): add Show Command option for Streaming/Interactive floating consoles (#83)
+- feat(tui): embed vt100 terminal screen, live cursor, and full key forwarding in interactive floating windows (#81)
+- feat(tui): allocate POSIX PTY for interactive StreamOutputModal floating windows (#80)
+- feat(themeedit): add Apply to Base checkbox in color picker and use Nerd Font preview icons (#79)
+- feat(themeedit): fix live chrome toasts/modals/tabs and add focused/unfocused input tokens (#77)
+- feat(themeedit): add Input Box Text and Background tokens and 3:Modals faux input (#76)
+- feat(themeedit): add Selected Tab Text and Selected Tab Background tokens (#74)
+- feat(i18n): move multi-line help modal texts into YAML locale files (#73)
+
+### Fixed
+- fix(tui): use styles.help_text for ThemePickerModal help footer (#89)
+- fix(tui,themeedit): align input_box text defaults (254/244) and ColorPickerModal ANSI index mapping (#87)
+- fix(themeedit): preserve full sidebar color codes and fix input_box/selected_tab display (#86)
+- fix(tui): answer VT100 terminal queries and normalize HVP in interactive PTY (#82)
+- fix(themeedit,menuedit): fix 3:Modals text/help colors, tab bar clipping, and suite input boxes (#78)
+- fix(notes): theme modal help gutters and add F8 Markdown reference in editor (#71)
+- fix(themeedit): align 6:ThemeEdit preview hit-testing and highlight split (#70)
+- fix(themeedit): isolate editor chrome theme from preview theme (#69)
+- fix: package templates, fix Unicode help wrap, surface save errors, and fix remaining test races (#68)
+
+### Changed
+- chore(docs,themes): update README and default themes with ymlcheck token parity (#97)
+- chore(defaults): update bashmenu.yml settings and plugin list (#75)
+- docs: move ARCHITECTURE.md to repository root (#72)
+- test: replace tautological/zero-assertion tests and serialize env-mutating tests (#67)
+- refactor(cli): deduplicate locale/path/tool helpers and remove runtime unwraps (#66)
+- refactor(core,tui): fix regex/backup/unwrap bugs and deduplicate shared modal helpers (#65)
+- chore: clean up stale docs, manuals, defaults, and shell script slop (#64)
+
 ## [0.1.7] - 2026-11-25
 
 ### Added
@@ -53,7 +87,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial tagged release of the BashMenu-RS workspace and companion CLI tools (`bashmenu`, `menuedit`, `shortcutedit`, `themeedit`, `bashedit`, `bmpager`, `cheat`, `ymlcheck`).
 
-[Unreleased]: https://github.com/HappyAmos/bashmenu-rs/compare/v0.1.7...HEAD
+[Unreleased]: https://github.com/HappyAmos/bashmenu-rs/compare/v0.1.8...HEAD
+[0.1.8]: https://github.com/HappyAmos/bashmenu-rs/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/HappyAmos/bashmenu-rs/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/HappyAmos/bashmenu-rs/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/HappyAmos/bashmenu-rs/compare/v0.1.3...v0.1.5

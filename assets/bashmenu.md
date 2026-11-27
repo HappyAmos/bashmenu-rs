@@ -1,4 +1,4 @@
-# HA Bash Menu Specification & User Manual (v0.1.7)
+# HA Bash Menu Specification & User Manual (v0.1.8)
 
 Welcome to the specification and user manual for HA Bash Menu, a lightweight,
 data-driven Ratatui Text User Interface (TUI) menu engine and configuration
