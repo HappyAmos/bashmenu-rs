@@ -1,7 +1,6 @@
 //! Horizontal scrolling marquee ticker and text slice calculator.
 //!
-//! Provides 1:1 parity with the Python reference implementation for
-//! horizontal text marquees when label text overflows available width.
+//! Horizontal text marquees when label text overflows available width.
 
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
