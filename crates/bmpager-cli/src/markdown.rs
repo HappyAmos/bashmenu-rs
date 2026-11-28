@@ -4,13 +4,37 @@
 use pulldown_cmark::{Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use unicode_width::UnicodeWidthStr;
 
 /// Maximum bytes downloaded for a single remote Markdown image (10 MiB).
 const MAX_REMOTE_IMAGE_BYTES: u64 = 10 * 1024 * 1024;
 /// Global HTTP timeout for fetching a single remote Markdown image.
 const REMOTE_IMAGE_TIMEOUT_SECS: u64 = 5;
+/// Maximum decoded frames retained for a single animated GIF.
+const MAX_GIF_FRAMES: usize = 60;
+
+/// Pre-rendered multi-frame GIF animation anchored at a line index in the document.
+#[derive(Debug, Clone)]
+pub struct AnimatedImage {
+    /// 0-based starting line index in the rendered document.
+    pub start_line: usize,
+    /// Pre-rendered half-block ANSI frames paired with per-frame display durations.
+    pub frames: Vec<(Vec<String>, Duration)>,
+    /// Active frame index (`0..frames.len()`).
+    pub current_frame: usize,
+    /// Next scheduled frame advance time.
+    pub next_tick: Instant,
+}
+
+/// Rendered Markdown output paired with any embedded animated GIFs.
+#[derive(Debug, Clone)]
+pub struct RenderedMarkdown {
+    /// Full ANSI-formatted Markdown document (with frame 0 embedded for GIFs).
+    pub text: String,
+    /// Multi-frame animated GIFs present in the document.
+    pub animations: Vec<AnimatedImage>,
+}
 
 /// Render Markdown string into terminal ANSI text wrapped to `terminal_width`.
 #[allow(dead_code)]
@@ -22,6 +46,7 @@ pub fn render_markdown(source: &str, terminal_width: usize) -> String {
 /// resolving relative `![alt](path)` image tags against `base_dir` and rendering
 /// them via Unicode half-block TrueColor ANSI when `allow_images` is `true`.
 /// Remote `http(s)://` images are only fetched when `allow_remote_images` is `true`.
+#[allow(dead_code)]
 pub fn render_markdown_with_options(
     source: &str,
     terminal_width: usize,
@@ -29,6 +54,24 @@ pub fn render_markdown_with_options(
     allow_images: bool,
     allow_remote_images: bool,
 ) -> String {
+    render_markdown_full(
+        source,
+        terminal_width,
+        base_dir,
+        allow_images,
+        allow_remote_images,
+    )
+    .text
+}
+
+/// Render Markdown string into ANSI text plus any decoded multi-frame GIF animations.
+pub fn render_markdown_full(
+    source: &str,
+    terminal_width: usize,
+    base_dir: Option<&Path>,
+    allow_images: bool,
+    allow_remote_images: bool,
+) -> RenderedMarkdown {
     let width = terminal_width.clamp(40, 160);
     let mut options = Options::empty();
     options.insert(Options::ENABLE_TABLES);
@@ -44,7 +87,7 @@ pub fn render_markdown_with_options(
         allow_remote_images,
     );
     renderer.run(parser);
-    renderer.finish()
+    renderer.finish_full()
 }
 
 /// Stateful Markdown stream renderer converting Pulldown-Cmark events to ANSI-styled terminal text.
@@ -79,6 +122,8 @@ struct MarkdownRenderer {
     allow_remote_images: bool,
     /// Pending 3-row crisp SVG badges (`([top, mid, bot], visual_width)`) to render side-by-side
     pending_badges: Vec<([String; 3], usize)>,
+    /// Multi-frame animated GIFs collected during rendering
+    animations: Vec<AnimatedImage>,
     /// Whether parser is inside a markdown table
     in_table: bool,
     /// Whether parser is currently in the table header row
@@ -132,6 +177,7 @@ impl MarkdownRenderer {
             allow_images,
             allow_remote_images,
             pending_badges: Vec::new(),
+            animations: Vec::new(),
             in_table: false,
             table_head: false,
             table_rows: Vec::new(),
@@ -811,49 +857,45 @@ impl MarkdownRenderer {
 
         let max_cols = self.width.saturating_sub(2).clamp(8, 120);
         let max_rows = 28usize;
+
+        // Check for multi-frame animated GIFs
+        if let Some(frames) = try_decode_animated_gif(&raw_bytes, max_cols, max_rows) {
+            self.flush_line();
+            self.ensure_blank_line();
+            let start_line = self.output.bytes().filter(|&b| b == b'\n').count();
+            if let Some((first_lines, first_delay)) = frames.first() {
+                for line in first_lines {
+                    self.output.push_str(line);
+                    self.output.push('\n');
+                }
+                let next_tick = Instant::now() + *first_delay;
+                self.animations.push(AnimatedImage {
+                    start_line,
+                    frames,
+                    current_frame: 0,
+                    next_tick,
+                });
+            }
+            if !alt_trimmed.is_empty() {
+                self.output
+                    .push_str(&format!("\x1b[2;3m  {alt_trimmed}\x1b[0m\n"));
+            }
+            return;
+        }
+
         let Some(rgba) = decode_image_or_svg(&raw_bytes, max_cols, max_rows) else {
             self.flush_line();
             self.ensure_blank_line();
             emit_fallback(&mut self.output);
             return;
         };
-        let target_w = rgba.width();
-        let target_h = rgba.height();
 
         self.flush_line();
         self.ensure_blank_line();
 
-        let mut y = 0u32;
-        while y < target_h {
-            let mut row = String::with_capacity(target_w as usize * 24);
-            for x in 0..target_w {
-                let top = rgba.get_pixel(x, y).0;
-                let bot = if y + 1 < target_h {
-                    rgba.get_pixel(x, y + 1).0
-                } else {
-                    [0, 0, 0, 0]
-                };
-                let top_vis = top[3] >= 128;
-                let bot_vis = bot[3] >= 128;
-                match (top_vis, bot_vis) {
-                    (false, false) => row.push_str("\x1b[0m "),
-                    (true, false) => row.push_str(&format!(
-                        "\x1b[0m\x1b[38;2;{};{};{}m▀",
-                        top[0], top[1], top[2]
-                    )),
-                    (false, true) => row.push_str(&format!(
-                        "\x1b[0m\x1b[38;2;{};{};{}m▄",
-                        bot[0], bot[1], bot[2]
-                    )),
-                    (true, true) => row.push_str(&format!(
-                        "\x1b[38;2;{};{};{};48;2;{};{};{}m▀",
-                        top[0], top[1], top[2], bot[0], bot[1], bot[2]
-                    )),
-                }
-            }
-            row.push_str("\x1b[0m\n");
+        for row in render_rgba_to_halfblocks(&rgba) {
             self.output.push_str(&row);
-            y += 2;
+            self.output.push('\n');
         }
 
         if !alt_trimmed.is_empty() {
@@ -862,11 +904,107 @@ impl MarkdownRenderer {
         }
     }
 
-    /// Finalizes rendering, flushing any trailing text line, and returns formatted ANSI text.
-    fn finish(mut self) -> String {
+    /// Finalizes rendering, flushing any trailing text line, and returns formatted ANSI text
+    /// alongside any decoded animated GIFs.
+    fn finish_full(mut self) -> RenderedMarkdown {
         self.flush_line();
-        self.output
+        RenderedMarkdown {
+            text: self.output,
+            animations: self.animations,
+        }
     }
+}
+
+/// Converts an RGBA bitmap into TrueColor Unicode half-block (`▀`/`▄`) ANSI lines.
+fn render_rgba_to_halfblocks(rgba: &image::RgbaImage) -> Vec<String> {
+    let target_w = rgba.width();
+    let target_h = rgba.height();
+    let mut rows = Vec::with_capacity((target_h as usize).div_ceil(2));
+    let mut y = 0u32;
+    while y < target_h {
+        let mut row = String::with_capacity(target_w as usize * 24);
+        for x in 0..target_w {
+            let top = rgba.get_pixel(x, y).0;
+            let bot = if y + 1 < target_h {
+                rgba.get_pixel(x, y + 1).0
+            } else {
+                [0, 0, 0, 0]
+            };
+            let top_vis = top[3] >= 128;
+            let bot_vis = bot[3] >= 128;
+            match (top_vis, bot_vis) {
+                (false, false) => row.push_str("\x1b[0m "),
+                (true, false) => row.push_str(&format!(
+                    "\x1b[0m\x1b[38;2;{};{};{}m▀",
+                    top[0], top[1], top[2]
+                )),
+                (false, true) => row.push_str(&format!(
+                    "\x1b[0m\x1b[38;2;{};{};{}m▄",
+                    bot[0], bot[1], bot[2]
+                )),
+                (true, true) => row.push_str(&format!(
+                    "\x1b[38;2;{};{};{};48;2;{};{};{}m▀",
+                    top[0], top[1], top[2], bot[0], bot[1], bot[2]
+                )),
+            }
+        }
+        row.push_str("\x1b[0m");
+        rows.push(row);
+        y += 2;
+    }
+    rows
+}
+
+/// Decodes a multi-frame animated GIF into pre-rendered half-block ANSI frames
+/// paired with their frame delays. Returns `None` for non-GIFs or single-frame GIFs.
+fn try_decode_animated_gif(
+    bytes: &[u8],
+    max_cols: usize,
+    max_rows: usize,
+) -> Option<Vec<(Vec<String>, Duration)>> {
+    if !(bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a")) {
+        return None;
+    }
+    use image::AnimationDecoder;
+    let decoder = image::codecs::gif::GifDecoder::new(std::io::Cursor::new(bytes)).ok()?;
+    let raw_frames: Vec<image::Frame> = decoder
+        .into_frames()
+        .take(MAX_GIF_FRAMES)
+        .filter_map(Result::ok)
+        .collect();
+    if raw_frames.len() <= 1 {
+        return None;
+    }
+
+    let first_buf = raw_frames[0].buffer();
+    let (target_w, target_h) = compute_target_dimensions(
+        first_buf.width() as f64,
+        first_buf.height() as f64,
+        max_cols,
+        max_rows,
+        false,
+    );
+
+    let mut out = Vec::with_capacity(raw_frames.len());
+    for frame in raw_frames {
+        let (numer, denom) = frame.delay().numer_denom_ms();
+        let ms = if denom == 0 {
+            100u64
+        } else {
+            (numer as u64 / denom as u64).clamp(50, 5000)
+        };
+        let resized = image::imageops::resize(
+            frame.buffer(),
+            target_w,
+            target_h,
+            image::imageops::FilterType::Triangle,
+        );
+        out.push((
+            render_rgba_to_halfblocks(&resized),
+            Duration::from_millis(ms),
+        ));
+    }
+    Some(out)
 }
 
 /// Resolves a Markdown image path against `base_dir` (expanding leading `~/`).

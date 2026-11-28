@@ -15,6 +15,7 @@ use crossterm::terminal::{
 use std::io::{stdout, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::{Duration, Instant};
 
 /// Interactive terminal pager state machine.
 pub struct Pager {
@@ -22,6 +23,8 @@ pub struct Pager {
     pub lines: Vec<String>,
     /// Original raw text content retained for lossless wrap toggling and resize reflow
     pub raw_content: String,
+    /// Multi-frame animated GIFs anchored to line offsets in `lines`
+    pub animations: Vec<crate::markdown::AnimatedImage>,
     /// 1-based index of the line currently at the top of the viewport
     pub top_line: usize,
     /// Total count of document lines
@@ -75,6 +78,7 @@ impl Pager {
         let mut pager = Self {
             lines,
             raw_content,
+            animations: Vec::new(),
             top_line: 1,
             total,
             args,
@@ -98,6 +102,71 @@ impl Pager {
         self
     }
 
+    /// Attaches decoded animated GIF metadata for viewport-aware playback.
+    pub fn with_animations(mut self, animations: Vec<crate::markdown::AnimatedImage>) -> Self {
+        self.animations = animations;
+        self
+    }
+
+    /// Returns the shortest wait duration until the next visible animated GIF
+    /// frame should advance, or `None` if no animations are currently visible.
+    fn next_animation_timeout(&self) -> Option<Duration> {
+        if self.animations.is_empty() {
+            return None;
+        }
+        let view_start = self.top_line.saturating_sub(1);
+        let view_end = view_start + self.page_rows;
+        let now = Instant::now();
+        let mut earliest: Option<Duration> = None;
+        for anim in &self.animations {
+            let h = anim.frames.first().map(|(l, _)| l.len()).unwrap_or(0);
+            if h == 0 {
+                continue;
+            }
+            let anim_end = anim.start_line + h;
+            if anim.start_line < view_end && anim_end > view_start {
+                let wait = anim.next_tick.saturating_duration_since(now);
+                earliest = Some(match earliest {
+                    Some(cur) => cur.min(wait),
+                    None => wait,
+                });
+            }
+        }
+        earliest
+    }
+
+    /// Advances any visible animated GIF whose frame deadline has elapsed,
+    /// swapping its pre-rendered lines in place. Returns `true` if any frame changed.
+    pub fn tick_animations(&mut self) -> bool {
+        if self.animations.is_empty() {
+            return false;
+        }
+        let view_start = self.top_line.saturating_sub(1);
+        let view_end = view_start + self.page_rows;
+        let now = Instant::now();
+        let mut changed = false;
+
+        for anim in &mut self.animations {
+            if anim.frames.len() <= 1 {
+                continue;
+            }
+            let h = anim.frames[0].0.len();
+            let anim_end = anim.start_line + h;
+            if anim.start_line < view_end && anim_end > view_start && now >= anim.next_tick {
+                anim.current_frame = (anim.current_frame + 1) % anim.frames.len();
+                let (ref frame_lines, delay) = anim.frames[anim.current_frame];
+                for (offset, line) in frame_lines.iter().enumerate() {
+                    if let Some(slot) = self.lines.get_mut(anim.start_line + offset) {
+                        *slot = line.clone();
+                    }
+                }
+                anim.next_tick = now + delay;
+                changed = true;
+            }
+        }
+        changed
+    }
+
     /// Rebuilds display `lines` from `raw_content` using the current wrap/markdown
     /// mode and terminal width, clamping `top_line` safely.
     pub fn rebuild_lines(&mut self) {
@@ -110,17 +179,20 @@ impl Pager {
             .and_then(|p| p.parent())
             .map(std::path::Path::to_path_buf);
         let mut rebuilt: Vec<String> = if self.args.markdown {
-            let rendered = crate::markdown::render_markdown_with_options(
+            let rendered = crate::markdown::render_markdown_full(
                 &self.raw_content,
                 width,
                 md_base_dir.as_deref(),
                 !self.args.strip_colors,
                 self.args.remote_images,
             );
-            rendered.lines().map(|s| s.to_string()).collect()
+            self.animations = rendered.animations;
+            rendered.text.lines().map(|s| s.to_string()).collect()
         } else if self.args.wrap_text {
+            self.animations.clear();
             crate::ansi::wrap_text_content(&self.raw_content, width)
         } else {
+            self.animations.clear();
             self.raw_content.lines().map(|s| s.to_string()).collect()
         };
         if rebuilt.len() > self.args.max_lines {
@@ -210,6 +282,13 @@ impl Pager {
             self.query_size();
             self.clamp_top();
             self.render()?;
+
+            if let Some(wait) = self.next_animation_timeout() {
+                if !event::poll(wait)? {
+                    self.tick_animations();
+                    continue;
+                }
+            }
 
             match event::read()? {
                 Event::Key(key) => {
@@ -854,5 +933,63 @@ mod tests {
             .unwrap();
         assert!(!pager.args.wrap_text);
         assert_eq!(pager.total, 1);
+    }
+
+    #[test]
+    fn test_pager_animated_gif_frame_tick() {
+        let dir = std::env::temp_dir().join(format!("bmpager_anim_gif_{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let gif_path = dir.join("pulse.gif");
+
+        // Build a 2-frame 4x4 animated GIF (frame 0 red, frame 1 blue)
+        {
+            let file = std::fs::File::create(&gif_path).expect("create gif");
+            let mut enc = image::codecs::gif::GifEncoder::new(file);
+            let mut f0_img = image::RgbaImage::new(4, 4);
+            for px in f0_img.pixels_mut() {
+                *px = image::Rgba([255, 0, 0, 255]);
+            }
+            let mut f1_img = image::RgbaImage::new(4, 4);
+            for px in f1_img.pixels_mut() {
+                *px = image::Rgba([0, 0, 255, 255]);
+            }
+            let delay = image::Delay::from_numer_denom_ms(100, 1);
+            enc.encode_frame(image::Frame::from_parts(f0_img, 0, 0, delay))
+                .expect("encode f0");
+            enc.encode_frame(image::Frame::from_parts(f1_img, 0, 0, delay))
+                .expect("encode f1");
+        }
+
+        let rendered = crate::markdown::render_markdown_full(
+            "# Anim\n\n![Pulse](pulse.gif)\n",
+            80,
+            Some(&dir),
+            true,
+            false,
+        );
+        assert_eq!(rendered.animations.len(), 1);
+        assert_eq!(rendered.animations[0].frames.len(), 2);
+
+        let lines: Vec<String> = rendered.text.lines().map(String::from).collect();
+        let mut pager =
+            Pager::new(lines, PagerArgs::default()).with_animations(rendered.animations);
+        let start = pager.animations[0].start_line;
+        assert!(
+            pager.lines[start].contains("38;2;255;0;0"),
+            "frame 0 should be red: {}",
+            pager.lines[start]
+        );
+
+        // Force deadline to now and tick -> frame 1 (blue) swaps in place
+        pager.animations[0].next_tick = Instant::now();
+        assert!(pager.tick_animations());
+        assert_eq!(pager.animations[0].current_frame, 1);
+        assert!(
+            pager.lines[start].contains("38;2;0;0;255"),
+            "frame 1 should be blue: {}",
+            pager.lines[start]
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
