@@ -735,30 +735,23 @@ impl MarkdownRenderer {
         } else {
             resolve_markdown_image_path(dest_trimmed, self.base_dir.as_deref())
         };
-        let decoded = image::ImageReader::open(&resolved)
-            .ok()
-            .and_then(|r| r.with_guessed_format().ok())
-            .and_then(|r| r.decode().ok());
-        let Some(img) = decoded else {
+        let Ok(raw_bytes) = std::fs::read(&resolved) else {
             self.flush_line();
             self.ensure_blank_line();
             emit_fallback(&mut self.output);
             return;
         };
 
-        let img_w = img.width().max(1);
-        let img_h = img.height().max(1);
         let max_cols = self.width.saturating_sub(2).clamp(8, 120);
         let max_rows = 28usize;
-        let scale_w = max_cols as f64 / img_w as f64;
-        let scale_h = (max_rows * 2) as f64 / img_h as f64;
-        let scale = scale_w.min(scale_h).min(1.0);
-        let target_w = ((img_w as f64 * scale).round() as u32).max(1);
-        let target_h = ((img_h as f64 * scale).round() as u32).max(2);
-
-        let rgba = img
-            .resize_exact(target_w, target_h, image::imageops::FilterType::Triangle)
-            .to_rgba8();
+        let Some(rgba) = decode_image_or_svg(&raw_bytes, max_cols, max_rows) else {
+            self.flush_line();
+            self.ensure_blank_line();
+            emit_fallback(&mut self.output);
+            return;
+        };
+        let target_w = rgba.width();
+        let target_h = rgba.height();
 
         self.flush_line();
         self.ensure_blank_line();
@@ -886,8 +879,8 @@ fn fetch_remote_image_cached(url: &str, cache_dir: &Path) -> Option<PathBuf> {
         .read_to_vec()
         .ok()?;
 
-    // Verify the payload is a supported raster image before persisting to cache.
-    if image::load_from_memory(&bytes).is_err() {
+    // Verify the payload is a supported raster image or valid SVG before caching.
+    if image::load_from_memory(&bytes).is_err() && !is_valid_svg_bytes(&bytes) {
         return None;
     }
 
@@ -904,6 +897,88 @@ fn fetch_remote_image_cached(url: &str, cache_dir: &Path) -> Option<PathBuf> {
         return None;
     }
     Some(cache_path)
+}
+
+/// Shared lazily-loaded system font database for SVG `<text>` rendering.
+fn svg_fontdb() -> std::sync::Arc<resvg::usvg::fontdb::Database> {
+    static DB: std::sync::OnceLock<std::sync::Arc<resvg::usvg::fontdb::Database>> =
+        std::sync::OnceLock::new();
+    std::sync::Arc::clone(DB.get_or_init(|| {
+        let mut db = resvg::usvg::fontdb::Database::new();
+        db.load_system_fonts();
+        std::sync::Arc::new(db)
+    }))
+}
+
+/// Returns `true` if `bytes` parses as a valid SVG / SVGZ document.
+fn is_valid_svg_bytes(bytes: &[u8]) -> bool {
+    let opt = resvg::usvg::Options::default();
+    resvg::usvg::Tree::from_data(bytes, &opt).is_ok()
+}
+
+/// Decodes raster image bytes (PNG/JPEG/WebP/GIF) or rasterizes an SVG/SVGZ
+/// into an RGBA buffer sized to fit `(max_cols, max_rows * 2)` pixels.
+fn decode_image_or_svg(bytes: &[u8], max_cols: usize, max_rows: usize) -> Option<image::RgbaImage> {
+    if let Ok(img) = image::load_from_memory(bytes) {
+        let img_w = img.width().max(1);
+        let img_h = img.height().max(1);
+        let scale_w = max_cols as f64 / img_w as f64;
+        let scale_h = (max_rows * 2) as f64 / img_h as f64;
+        let scale = scale_w.min(scale_h).min(1.0);
+        let target_w = ((img_w as f64 * scale).round() as u32).max(1);
+        let target_h = ((img_h as f64 * scale).round() as u32).max(2);
+        return Some(
+            img.resize_exact(target_w, target_h, image::imageops::FilterType::Triangle)
+                .to_rgba8(),
+        );
+    }
+
+    let opt = resvg::usvg::Options {
+        fontdb: svg_fontdb(),
+        ..Default::default()
+    };
+    let tree = resvg::usvg::Tree::from_data(bytes, &opt).ok()?;
+    let size = tree.size();
+    let svg_w = (size.width() as f64).max(1.0);
+    let svg_h = (size.height() as f64).max(1.0);
+    let scale_w = max_cols as f64 / svg_w;
+    let scale_h = (max_rows * 2) as f64 / svg_h;
+    let scale = scale_w.min(scale_h).min(1.0);
+    let target_w = ((svg_w * scale).round() as u32).max(1);
+    let target_h = ((svg_h * scale).round() as u32).max(2);
+
+    let mut pixmap = resvg::tiny_skia::Pixmap::new(target_w, target_h)?;
+    let sx = target_w as f32 / size.width().max(1.0);
+    let sy = target_h as f32 / size.height().max(1.0);
+    resvg::render(
+        &tree,
+        resvg::tiny_skia::Transform::from_scale(sx, sy),
+        &mut pixmap.as_mut(),
+    );
+
+    // Un-premultiply tiny-skia's premultiplied RGBA pixels into straight RGBA.
+    let mut out = image::RgbaImage::new(target_w, target_h);
+    let src = pixmap.data();
+    for y in 0..target_h {
+        for x in 0..target_w {
+            let idx = ((y * target_w + x) * 4) as usize;
+            let a = src[idx + 3];
+            let (r, g, b) = if a == 0 {
+                (0, 0, 0)
+            } else if a == 255 {
+                (src[idx], src[idx + 1], src[idx + 2])
+            } else {
+                let af = a as f32 / 255.0;
+                (
+                    (src[idx] as f32 / af).round().min(255.0) as u8,
+                    (src[idx + 1] as f32 / af).round().min(255.0) as u8,
+                    (src[idx + 2] as f32 / af).round().min(255.0) as u8,
+                )
+            };
+            out.put_pixel(x, y, image::Rgba([r, g, b, a]));
+        }
+    }
+    Some(out)
 }
 
 /// Word-wraps a table cell string to fit within `max_width` visual terminal cells,

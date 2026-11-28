@@ -338,3 +338,32 @@ fn test_bmpager_remote_images_opt_in_and_cache() {
 
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn test_bmpager_markdown_svg_rendering() {
+    let dir = std::env::temp_dir().join(format!("bmpager_svg_test_{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&dir);
+    let svg_path = dir.join("badge.svg");
+    let md_path = dir.join("doc.md");
+
+    let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="20" height="10">
+  <rect x="0" y="0" width="20" height="5" fill="#ff0000"/>
+  <rect x="0" y="5" width="20" height="5" fill="#0000ff"/>
+</svg>"##;
+    std::fs::write(&svg_path, svg).expect("write svg");
+    std::fs::write(&md_path, "# SVG Test\n\n![Vector Swatch](badge.svg)\n").expect("write md");
+
+    let out = bmpager_cmd()
+        .args(["--markdown", md_path.to_str().unwrap()])
+        .output()
+        .expect("run bmpager --markdown on svg");
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains('▀') && stdout.contains("38;2;255;0;0"),
+        "expected TrueColor half-block SVG rendering, got:\n{stdout}"
+    );
+    assert!(stdout.contains("Vector Swatch"));
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
