@@ -11,8 +11,9 @@ use unicode_width::UnicodeWidthStr;
 const MAX_REMOTE_IMAGE_BYTES: u64 = 10 * 1024 * 1024;
 /// Global HTTP timeout for fetching a single remote Markdown image.
 const REMOTE_IMAGE_TIMEOUT_SECS: u64 = 5;
-/// Maximum decoded frames retained for a single animated GIF.
-const MAX_GIF_FRAMES: usize = 60;
+/// Maximum decoded frames retained for a single animated GIF (longer GIFs are
+/// evenly stride-sampled across their full duration rather than truncated).
+const MAX_GIF_FRAMES: usize = 1000;
 
 /// Pre-rendered multi-frame GIF animation anchored at a line index in the document.
 #[derive(Debug, Clone)]
@@ -906,14 +907,24 @@ impl MarkdownRenderer {
     }
 }
 
-/// Converts an RGBA bitmap into TrueColor Unicode half-block (`▀`/`▄`) ANSI lines.
+/// Converts an RGBA bitmap into TrueColor Unicode half-block (`▀`/`▄`) ANSI lines,
+/// deduplicating consecutive identical color escape sequences for fast rendering
+/// and low memory usage on animated GIFs.
 fn render_rgba_to_halfblocks(rgba: &image::RgbaImage) -> Vec<String> {
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    enum CellStyle {
+        Reset,
+        FgOnly(u8, u8, u8),
+        FgBg(u8, u8, u8, u8, u8, u8),
+    }
+
     let target_w = rgba.width();
     let target_h = rgba.height();
     let mut rows = Vec::with_capacity((target_h as usize).div_ceil(2));
     let mut y = 0u32;
     while y < target_h {
-        let mut row = String::with_capacity(target_w as usize * 24);
+        let mut row = String::with_capacity(target_w as usize * 8);
+        let mut last_style: Option<CellStyle> = None;
         for x in 0..target_w {
             let top = rgba.get_pixel(x, y).0;
             let bot = if y + 1 < target_h {
@@ -923,21 +934,28 @@ fn render_rgba_to_halfblocks(rgba: &image::RgbaImage) -> Vec<String> {
             };
             let top_vis = top[3] >= 128;
             let bot_vis = bot[3] >= 128;
-            match (top_vis, bot_vis) {
-                (false, false) => row.push_str("\x1b[0m "),
-                (true, false) => row.push_str(&format!(
-                    "\x1b[0m\x1b[38;2;{};{};{}m▀",
-                    top[0], top[1], top[2]
-                )),
-                (false, true) => row.push_str(&format!(
-                    "\x1b[0m\x1b[38;2;{};{};{}m▄",
-                    bot[0], bot[1], bot[2]
-                )),
-                (true, true) => row.push_str(&format!(
-                    "\x1b[38;2;{};{};{};48;2;{};{};{}m▀",
-                    top[0], top[1], top[2], bot[0], bot[1], bot[2]
-                )),
+            let (style, ch) = match (top_vis, bot_vis) {
+                (false, false) => (CellStyle::Reset, ' '),
+                (true, false) => (CellStyle::FgOnly(top[0], top[1], top[2]), '▀'),
+                (false, true) => (CellStyle::FgOnly(bot[0], bot[1], bot[2]), '▄'),
+                (true, true) => (
+                    CellStyle::FgBg(top[0], top[1], top[2], bot[0], bot[1], bot[2]),
+                    '▀',
+                ),
+            };
+            if last_style != Some(style) {
+                match style {
+                    CellStyle::Reset => row.push_str("\x1b[0m"),
+                    CellStyle::FgOnly(r, g, b) => {
+                        row.push_str(&format!("\x1b[0m\x1b[38;2;{r};{g};{b}m"));
+                    }
+                    CellStyle::FgBg(tr, tg, tb, br, bg, bb) => {
+                        row.push_str(&format!("\x1b[38;2;{tr};{tg};{tb};48;2;{br};{bg};{bb}m"));
+                    }
+                }
+                last_style = Some(style);
             }
+            row.push(ch);
         }
         row.push_str("\x1b[0m");
         rows.push(row);
@@ -958,11 +976,7 @@ fn try_decode_animated_gif(
     }
     use image::AnimationDecoder;
     let decoder = image::codecs::gif::GifDecoder::new(std::io::Cursor::new(bytes)).ok()?;
-    let raw_frames: Vec<image::Frame> = decoder
-        .into_frames()
-        .take(MAX_GIF_FRAMES)
-        .filter_map(Result::ok)
-        .collect();
+    let raw_frames: Vec<image::Frame> = decoder.into_frames().filter_map(Result::ok).collect();
     if raw_frames.len() <= 1 {
         return None;
     }
@@ -976,24 +990,34 @@ fn try_decode_animated_gif(
         false,
     );
 
-    let mut out = Vec::with_capacity(raw_frames.len());
-    for frame in raw_frames {
-        let (numer, denom) = frame.delay().numer_denom_ms();
-        let ms = if denom == 0 {
-            100u64
-        } else {
-            (numer as u64 / denom as u64).clamp(50, 5000)
-        };
+    // If a GIF exceeds MAX_GIF_FRAMES, stride-sample evenly across its entire
+    // duration (accumulating skipped delays) instead of cutting off early.
+    let stride = raw_frames.len().div_ceil(MAX_GIF_FRAMES).max(1);
+    let mut out = Vec::with_capacity(raw_frames.len().min(MAX_GIF_FRAMES));
+    let mut i = 0usize;
+    while i < raw_frames.len() {
+        let mut total_ms = 0u64;
+        let end = (i + stride).min(raw_frames.len());
+        for f in &raw_frames[i..end] {
+            let (numer, denom) = f.delay().numer_denom_ms();
+            let ms = if denom == 0 {
+                100u64
+            } else {
+                (numer as u64 / denom as u64).clamp(20, 5000)
+            };
+            total_ms = total_ms.saturating_add(ms);
+        }
         let resized = image::imageops::resize(
-            frame.buffer(),
+            raw_frames[i].buffer(),
             target_w,
             target_h,
-            image::imageops::FilterType::Triangle,
+            image::imageops::FilterType::Nearest,
         );
         out.push((
             render_rgba_to_halfblocks(&resized),
-            Duration::from_millis(ms),
+            Duration::from_millis(total_ms.clamp(50, 5000)),
         ));
+        i = end;
     }
     Some(out)
 }
@@ -1024,23 +1048,28 @@ fn resolve_image_cache_dir() -> PathBuf {
     let cfg_path = cfg_dir.join("bashmenu.yml");
     let base_cache = bashmenu_core::load_config(&cfg_path)
         .ok()
-        .and_then(|c| c.settings.cache_dir)
-        .filter(|s| !s.trim().is_empty())
-        .map(|s| {
-            let expanded = if let Some(rest) = s.strip_prefix("~/") {
+        .and_then(|cfg| {
+            let raw = cfg.settings.cache_dir.clone()?;
+            let trimmed = raw.trim();
+            if trimmed.is_empty() {
+                return None;
+            }
+            let ctx = bashmenu_core::MacroContext::new(&cfg).with_allow_command_macros(false);
+            let interpolated = bashmenu_core::interpolate_placeholders(trimmed, &ctx);
+            let expanded = if let Some(rest) = interpolated.strip_prefix("~/") {
                 if let Ok(home) = std::env::var("HOME") {
                     PathBuf::from(home).join(rest)
                 } else {
-                    PathBuf::from(&s)
+                    PathBuf::from(&interpolated)
                 }
             } else {
-                PathBuf::from(&s)
+                PathBuf::from(&interpolated)
             };
-            if expanded.is_absolute() {
+            Some(if expanded.is_absolute() {
                 expanded
             } else {
                 cfg_dir.join(expanded)
-            }
+            })
         })
         .unwrap_or_else(|| cfg_dir.join("cache"));
     base_cache.join("images")
