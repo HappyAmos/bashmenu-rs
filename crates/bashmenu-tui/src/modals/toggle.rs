@@ -19,7 +19,7 @@ pub enum ToggleChoice {
     Cancel,
 }
 
-/// Interactive Toggle modal dialog matching Python Textual `ToggleModalScreen`
+/// Interactive boolean toggle modal dialog (True / False / Cancel).
 #[derive(Debug, Clone)]
 pub struct ToggleModal {
     /// Dialog title header

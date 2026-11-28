@@ -632,7 +632,7 @@ pub const DEFAULT_ITEM_ICON: &str = "{nf:>:#f105}";
 pub const RANDOM_THEME_LABEL: &str = "[ Random ]";
 
 /// Checks if a theme string specifies random theme selection.
-/// Matches "[ Random ]", "[Random]", or "Random" (case-insensitively).
+/// Matches `"[ Random ]"`, `"[Random]"`, or `"Random"` (case-insensitively).
 pub fn is_random_theme_spec(name: &str) -> bool {
     let trimmed = name.trim();
     trimmed.eq_ignore_ascii_case("[ Random ]")

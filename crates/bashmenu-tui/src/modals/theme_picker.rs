@@ -37,8 +37,8 @@ impl ThemePickerModal {
         }
     }
 
-    /// Builder method to ensure '[ Random ]' option is present at the top of
-    /// the theme list.
+    /// Builder method to ensure the `"[ Random ]"` option is present at the top
+    /// of the theme list.
     pub fn with_random_option(mut self) -> Self {
         self.themes
             .retain(|t| !bashmenu_core::is_random_theme_spec(t));

@@ -176,7 +176,7 @@ pub struct BashMenuConfig {
     #[serde(default = "default_theme")]
     pub theme: String,
 
-    /// User-defined custom variables accessible via {user.<key>}
+    /// User-defined custom variables accessible via `{user.<key>}`
     #[serde(default)]
     pub user: HashMap<String, serde_json::Value>,
 

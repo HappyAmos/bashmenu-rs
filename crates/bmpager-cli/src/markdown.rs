@@ -1,5 +1,4 @@
-//! Markdown renderer using pulldown-cmark producing ANSI terminal formatted output
-//! matching the rich styling of `rich.sh`.
+//! Markdown renderer using `pulldown-cmark` producing styled ANSI terminal output.
 
 use pulldown_cmark::{Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 use sha2::{Digest, Sha256};
