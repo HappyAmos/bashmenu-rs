@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-11-28
+
+### Added
+- feat(bmpager): inline Markdown images, SVG badges, animated GIFs, and raw view toggle (#119)
+- feat: add {imarkdown:<path>} alias and info/imarkdown types in menuedit (#117)
+- feat: interactive Markdown engine (--imarkdown, forms, buttons, UI-RPC) (#115)
+- feat(macro): add title/text/default key-value variants and no-title defaults for {message} and {param} (#113)
+- feat(macro): add interactive {message:"..."/'...'/\`...\`} popup modal macro (#111)
+- feat(bmpager): add live <w>/<W> soft-wrap toggle and resize reflow (#102)
+
+### Fixed
+- fix(tui): apply modal_yes_button and title theme tokens in MessageModal (#112)
+- fix(security): download and SHA256-verify bootstrap installer scripts (#110)
+- fix(security): guard {command:...} macros in previews, info files, and --local mode (#109)
+- fix(security): anchor webopen.sh and resolve_script_path to trusted dirs only (#108)
+- fix(security): use O_EXCL 0600 random temp file for bashedit Markdown preview (#107)
+- fix(security): validate FRAMEBUFFER char device and remove chmod 0666 fallback (#106)
+- fix(security): POSIX shell-quote param/picker substitutions and block recursive macro injection (#105)
+
+### Changed
+- docs: add Interactive Markdown guide and example to bashmenu.md and bashmenu.1 (#116)
+
 ## [0.1.9] - 2026-11-27
 
 ### Added
@@ -92,7 +114,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial tagged release of the BashMenu-RS workspace and companion CLI tools (`bashmenu`, `menuedit`, `shortcutedit`, `themeedit`, `bashedit`, `bmpager`, `cheat`, `ymlcheck`).
 
-[Unreleased]: https://github.com/HappyAmos/bashmenu-rs/compare/v0.1.9...HEAD
+[Unreleased]: https://github.com/HappyAmos/bashmenu-rs/compare/v0.1.10...HEAD
+[0.1.10]: https://github.com/HappyAmos/bashmenu-rs/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/HappyAmos/bashmenu-rs/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/HappyAmos/bashmenu-rs/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/HappyAmos/bashmenu-rs/compare/v0.1.6...v0.1.7
