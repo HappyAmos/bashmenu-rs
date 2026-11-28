@@ -25,5 +25,6 @@ Missing local files and remote URLs degrade cleanly without making network reque
 | Feature | Behavior |
 | :--- | :--- |
 | Local PNG / JPEG / WebP / GIF / BMP | Rendered inline via TrueColor `▀`/`▄` half-blocks with aspect-ratio scaling |
+| Remote `http(s)://` image | Clickable OSC 8 fallback by default; pass `--remote-images` to download and cache in `{cache_dir}/images/` |
 | `--no-color` | Falls back cleanly to `[Image: <alt> (<path>)]` |
-| Missing or remote URL | Displays `[Image: <alt> (<url>)]` (clickable OSC 8 link for `http(s)://`) |
+| Missing file | Displays `[Image: <alt> (<path>)]` |

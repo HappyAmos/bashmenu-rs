@@ -642,6 +642,7 @@ cli:
         -V, --version     Print the version and exit.
         -m, --markdown    Render input formatted as Markdown.
         -w, --wrap        Soft-wrap non-markdown text lines to window width.
+        --remote-images   Download and cache remote http(s) Markdown images (opt-in).
         +N                Start with line N at the top of the window.
         +/PATTERN         Start at the first line containing PATTERN.
         -c, --no-color    Discard ANSI escape sequences instead of rendering them.

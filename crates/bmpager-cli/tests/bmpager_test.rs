@@ -259,3 +259,82 @@ fn test_bmpager_markdown_image_halfblock_and_fallback() {
 
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn test_bmpager_remote_images_opt_in_and_cache() {
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+
+    let dir = std::env::temp_dir().join(format!("bmpager_remote_img_test_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+
+    // Encode a tiny 4x4 green PNG in memory
+    let mut img = image::RgbaImage::new(4, 4);
+    for px in img.pixels_mut() {
+        *px = image::Rgba([0, 200, 50, 255]);
+    }
+    let mut png_bytes = Vec::new();
+    img.write_to(
+        &mut std::io::Cursor::new(&mut png_bytes),
+        image::ImageFormat::Png,
+    )
+    .expect("encode png");
+
+    // Serve the PNG once over local HTTP
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind loopback");
+    let addr = listener.local_addr().unwrap();
+    let payload = png_bytes.clone();
+    let server = std::thread::spawn(move || {
+        if let Ok((mut stream, _)) = listener.accept() {
+            let mut req_buf = [0u8; 1024];
+            let _ = stream.read(&mut req_buf);
+            let header = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                payload.len()
+            );
+            let _ = stream.write_all(header.as_bytes());
+            let _ = stream.write_all(&payload);
+            let _ = stream.flush();
+        }
+    });
+
+    let url = format!("http://{addr}/swatch.png");
+    let md_path = dir.join("remote.md");
+    std::fs::write(&md_path, format!("# Remote\n\n![Web Swatch]({url})\n")).unwrap();
+
+    // 1. Default (without --remote-images): does NOT fetch, shows fallback link
+    let out_default = bmpager_cmd()
+        .env("XDG_CONFIG_HOME", &dir)
+        .args(["--markdown", md_path.to_str().unwrap()])
+        .output()
+        .expect("run bmpager default");
+    assert!(out_default.status.success());
+    let stdout_default = String::from_utf8_lossy(&out_default.stdout);
+    assert!(stdout_default.contains(&format!("[Image: Web Swatch ({url})]")));
+    assert!(!stdout_default.contains('▀'));
+
+    // 2. With --remote-images: downloads natively, caches in cache/images/, renders half-blocks
+    let out_remote = bmpager_cmd()
+        .env("XDG_CONFIG_HOME", &dir)
+        .args(["--markdown", "--remote-images", md_path.to_str().unwrap()])
+        .output()
+        .expect("run bmpager --remote-images");
+    assert!(out_remote.status.success());
+    let stdout_remote = String::from_utf8_lossy(&out_remote.stdout);
+    assert!(
+        stdout_remote.contains('▀') && stdout_remote.contains("38;2;0;200;50"),
+        "expected TrueColor remote image rendering, got:\n{stdout_remote}"
+    );
+    assert!(stdout_remote.contains("Web Swatch"));
+
+    let _ = server.join();
+    let cache_images = dir.join("bashmenu").join("cache").join("images");
+    assert!(
+        cache_images.is_dir() && std::fs::read_dir(&cache_images).unwrap().next().is_some(),
+        "expected cached image file in {}",
+        cache_images.display()
+    );
+
+    let _ = std::fs::remove_dir_all(&dir);
+}

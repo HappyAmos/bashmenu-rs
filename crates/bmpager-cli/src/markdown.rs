@@ -2,23 +2,32 @@
 //! matching the rich styling of `rich.sh`.
 
 use pulldown_cmark::{Event, HeadingLevel, Options, Parser, Tag, TagEnd};
+use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 use unicode_width::UnicodeWidthStr;
+
+/// Maximum bytes downloaded for a single remote Markdown image (10 MiB).
+const MAX_REMOTE_IMAGE_BYTES: u64 = 10 * 1024 * 1024;
+/// Global HTTP timeout for fetching a single remote Markdown image.
+const REMOTE_IMAGE_TIMEOUT_SECS: u64 = 5;
 
 /// Render Markdown string into terminal ANSI text wrapped to `terminal_width`.
 #[allow(dead_code)]
 pub fn render_markdown(source: &str, terminal_width: usize) -> String {
-    render_markdown_with_options(source, terminal_width, None, true)
+    render_markdown_with_options(source, terminal_width, None, true, false)
 }
 
 /// Render Markdown string into terminal ANSI text wrapped to `terminal_width`,
 /// resolving relative `![alt](path)` image tags against `base_dir` and rendering
 /// them via Unicode half-block TrueColor ANSI when `allow_images` is `true`.
+/// Remote `http(s)://` images are only fetched when `allow_remote_images` is `true`.
 pub fn render_markdown_with_options(
     source: &str,
     terminal_width: usize,
     base_dir: Option<&Path>,
     allow_images: bool,
+    allow_remote_images: bool,
 ) -> String {
     let width = terminal_width.clamp(40, 160);
     let mut options = Options::empty();
@@ -28,7 +37,12 @@ pub fn render_markdown_with_options(
     options.insert(Options::ENABLE_HEADING_ATTRIBUTES);
 
     let parser = Parser::new_ext(source, options);
-    let mut renderer = MarkdownRenderer::new(width, base_dir.map(Path::to_path_buf), allow_images);
+    let mut renderer = MarkdownRenderer::new(
+        width,
+        base_dir.map(Path::to_path_buf),
+        allow_images,
+        allow_remote_images,
+    );
     renderer.run(parser);
     renderer.finish()
 }
@@ -61,6 +75,8 @@ struct MarkdownRenderer {
     base_dir: Option<PathBuf>,
     /// Whether ANSI half-block image rendering is enabled (false under `--no-color`)
     allow_images: bool,
+    /// Whether remote `http(s)://` image fetching into `{cache_dir}/images` is enabled
+    allow_remote_images: bool,
     /// Whether parser is inside a markdown table
     in_table: bool,
     /// Whether parser is currently in the table header row
@@ -92,7 +108,12 @@ enum ListState {
 
 impl MarkdownRenderer {
     /// Initializes a new MarkdownRenderer with the given viewport column width.
-    fn new(width: usize, base_dir: Option<PathBuf>, allow_images: bool) -> Self {
+    fn new(
+        width: usize,
+        base_dir: Option<PathBuf>,
+        allow_images: bool,
+        allow_remote_images: bool,
+    ) -> Self {
         Self {
             width,
             output: String::new(),
@@ -107,6 +128,7 @@ impl MarkdownRenderer {
             image_alt: String::new(),
             base_dir,
             allow_images,
+            allow_remote_images,
             in_table: false,
             table_head: false,
             table_rows: Vec::new(),
@@ -675,30 +697,52 @@ impl MarkdownRenderer {
             return;
         }
 
-        let is_remote = dest_trimmed.starts_with("http://")
-            || dest_trimmed.starts_with("https://")
-            || dest_trimmed.starts_with("data:");
+        let is_http = dest_trimmed.starts_with("http://") || dest_trimmed.starts_with("https://");
+        let is_data = dest_trimmed.starts_with("data:");
 
-        if !self.allow_images || is_remote || dest_trimmed.is_empty() {
-            self.flush_line();
-            self.ensure_blank_line();
-            if dest_trimmed.starts_with("http://") || dest_trimmed.starts_with("https://") {
-                self.output.push_str(&format!(
+        let emit_fallback = |out: &mut String| {
+            if is_http {
+                out.push_str(&format!(
                     "\x1b]8;;{dest_trimmed}\x1b\\\x1b[2;36m[Image: {fallback_label}]\x1b[0m\x1b]8;;\x1b\\\n"
                 ));
             } else {
-                self.output
-                    .push_str(&format!("\x1b[2;33m[Image: {fallback_label}]\x1b[0m\n"));
+                out.push_str(&format!("\x1b[2;33m[Image: {fallback_label}]\x1b[0m\n"));
             }
+        };
+
+        if !self.allow_images
+            || is_data
+            || dest_trimmed.is_empty()
+            || (is_http && !self.allow_remote_images)
+        {
+            self.flush_line();
+            self.ensure_blank_line();
+            emit_fallback(&mut self.output);
             return;
         }
 
-        let resolved = resolve_markdown_image_path(dest_trimmed, self.base_dir.as_deref());
-        let Ok(img) = image::open(&resolved) else {
+        let resolved = if is_http {
+            let cache_dir = resolve_image_cache_dir();
+            match fetch_remote_image_cached(dest_trimmed, &cache_dir) {
+                Some(path) => path,
+                None => {
+                    self.flush_line();
+                    self.ensure_blank_line();
+                    emit_fallback(&mut self.output);
+                    return;
+                }
+            }
+        } else {
+            resolve_markdown_image_path(dest_trimmed, self.base_dir.as_deref())
+        };
+        let decoded = image::ImageReader::open(&resolved)
+            .ok()
+            .and_then(|r| r.with_guessed_format().ok())
+            .and_then(|r| r.decode().ok());
+        let Some(img) = decoded else {
             self.flush_line();
             self.ensure_blank_line();
-            self.output
-                .push_str(&format!("\x1b[2;33m[Image: {fallback_label}]\x1b[0m\n"));
+            emit_fallback(&mut self.output);
             return;
         };
 
@@ -783,6 +827,83 @@ fn resolve_markdown_image_path(raw: &str, base_dir: Option<&Path>) -> PathBuf {
     } else {
         expanded
     }
+}
+
+/// Resolves the `{cache_dir}/images` directory used to cache downloaded web images.
+fn resolve_image_cache_dir() -> PathBuf {
+    let cfg_dir = bashmenu_core::get_user_config_dir();
+    let cfg_path = cfg_dir.join("bashmenu.yml");
+    let base_cache = bashmenu_core::load_config(&cfg_path)
+        .ok()
+        .and_then(|c| c.settings.cache_dir)
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| {
+            let expanded = if let Some(rest) = s.strip_prefix("~/") {
+                if let Ok(home) = std::env::var("HOME") {
+                    PathBuf::from(home).join(rest)
+                } else {
+                    PathBuf::from(&s)
+                }
+            } else {
+                PathBuf::from(&s)
+            };
+            if expanded.is_absolute() {
+                expanded
+            } else {
+                cfg_dir.join(expanded)
+            }
+        })
+        .unwrap_or_else(|| cfg_dir.join("cache"));
+    base_cache.join("images")
+}
+
+/// Downloads an `http(s)://` image natively via `ureq` (rustls) into
+/// `cache_dir/<sha256>.img`, returning the cached file path on success.
+fn fetch_remote_image_cached(url: &str, cache_dir: &Path) -> Option<PathBuf> {
+    let mut hasher = Sha256::new();
+    hasher.update(url.as_bytes());
+    let digest = hasher.finalize();
+    let hash_hex: String = digest.iter().map(|b| format!("{b:02x}")).collect();
+    let cache_path = cache_dir.join(format!("{hash_hex}.img"));
+    if cache_path.is_file() {
+        return Some(cache_path);
+    }
+
+    let config = ureq::Agent::config_builder()
+        .timeout_global(Some(Duration::from_secs(REMOTE_IMAGE_TIMEOUT_SECS)))
+        .max_redirects(5)
+        .build();
+    let agent = ureq::Agent::new_with_config(config);
+    let mut resp = agent
+        .get(url)
+        .header("User-Agent", concat!("bmpager/", env!("CARGO_PKG_VERSION")))
+        .call()
+        .ok()?;
+    let bytes = resp
+        .body_mut()
+        .with_config()
+        .limit(MAX_REMOTE_IMAGE_BYTES)
+        .read_to_vec()
+        .ok()?;
+
+    // Verify the payload is a supported raster image before persisting to cache.
+    if image::load_from_memory(&bytes).is_err() {
+        return None;
+    }
+
+    if std::fs::create_dir_all(cache_dir).is_err() {
+        return None;
+    }
+    let tmp_path = cache_dir.join(format!("{hash_hex}.tmp.{}", std::process::id()));
+    if std::fs::write(&tmp_path, &bytes).is_err() {
+        let _ = std::fs::remove_file(&tmp_path);
+        return None;
+    }
+    if std::fs::rename(&tmp_path, &cache_path).is_err() {
+        let _ = std::fs::remove_file(&tmp_path);
+        return None;
+    }
+    Some(cache_path)
 }
 
 /// Word-wraps a table cell string to fit within `max_width` visual terminal cells,

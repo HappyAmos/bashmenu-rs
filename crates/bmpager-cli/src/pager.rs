@@ -115,6 +115,7 @@ impl Pager {
                 width,
                 md_base_dir.as_deref(),
                 !self.args.strip_colors,
+                self.args.remote_images,
             );
             rendered.lines().map(|s| s.to_string()).collect()
         } else if self.args.wrap_text {

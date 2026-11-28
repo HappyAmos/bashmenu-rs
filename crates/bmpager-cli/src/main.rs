@@ -95,6 +95,7 @@ fn main() {
             term_width,
             md_base_dir.as_deref(),
             !args.strip_colors,
+            args.remote_images,
         );
         rendered.lines().map(|s| s.to_string()).collect()
     } else if args.wrap_text {
