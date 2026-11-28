@@ -216,7 +216,7 @@ pub fn format_shortcut_inspector(
     let raw_target = entry.target_summary();
     lines.push(format!("  Target (Raw)    : {}", raw_target));
 
-    let ctx = MacroContext::new(app_cfg);
+    let ctx = MacroContext::new(app_cfg).with_allow_command_macros(false);
     let expanded = interpolate_placeholders(raw_target, &ctx);
     if expanded != raw_target {
         lines.push(format!("  Target (Expand) : {}", expanded));
@@ -2075,7 +2075,8 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                 if let Event::Mouse(m) = ev {
                     match modal.handle_mouse(m, area) {
                         ShortcutEditAction::ShowMacros => {
-                            let ph_ctx = MacroContext::new(&app_config);
+                            let ph_ctx =
+                                MacroContext::new(&app_config).with_allow_command_macros(false);
                             let ph_text = render_placeholder_help_text(&ph_ctx);
                             *child_help = Some(
                                 HelpModal::new(t!("bashedit.placeholders_title"), &ph_text)
@@ -2128,7 +2129,8 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                     if k.modifiers.contains(KeyModifiers::CONTROL)
                         && matches!(k.code, KeyCode::Char('p') | KeyCode::Char('P'))
                     {
-                        let ph_ctx = MacroContext::new(&app_config);
+                        let ph_ctx =
+                            MacroContext::new(&app_config).with_allow_command_macros(false);
                         let ph_text = render_placeholder_help_text(&ph_ctx);
                         *child_help = Some(
                             HelpModal::new("BashMenu Placeholders & Macros", &ph_text)
@@ -2344,7 +2346,8 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                                 continue;
                             }
                             KeyCode::Char('p') | KeyCode::Char('P') => {
-                                let ph_ctx = MacroContext::new(&app_config);
+                                let ph_ctx =
+                                    MacroContext::new(&app_config).with_allow_command_macros(false);
                                 let ph_text = render_placeholder_help_text(&ph_ctx);
                                 active_modal = ActiveShortcutModal::Help(
                                     HelpModal::new(t!("bashedit.placeholders_title"), &ph_text)
@@ -2464,7 +2467,8 @@ pub fn run_shortcut_editor(shortcuts_path: PathBuf) -> Result<()> {
                         }
                         // [F1] / [?] Placeholders & Macros reference modal
                         KeyCode::F(1) | KeyCode::Char('?') => {
-                            let ph_ctx = MacroContext::new(&app_config);
+                            let ph_ctx =
+                                MacroContext::new(&app_config).with_allow_command_macros(false);
                             let ph_text = render_placeholder_help_text(&ph_ctx);
                             active_modal = ActiveShortcutModal::Help(
                                 HelpModal::new(t!("bashedit.placeholders_title"), &ph_text)

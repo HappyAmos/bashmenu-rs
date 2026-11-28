@@ -106,6 +106,8 @@ pub fn get_type_badge(item: &MenuItem) -> &'static str {
         MenuItemType::Other(s) => match s.as_str() {
             "confirm" => "[CNF]",
             "message" => "[MSG]",
+            "info" => "[INF]",
+            "imarkdown" => "[IMD]",
             "inject_block" => "[INJ]",
             "theme_selector" => "[THM]",
             "notebook" => "[NBK]",
@@ -125,7 +127,7 @@ pub fn format_inspector_text(
 ) -> Vec<String> {
     let default_cfg = BashMenuConfig::default();
     let effective_cfg = cfg.unwrap_or(&default_cfg);
-    let mut ctx = MacroContext::new(effective_cfg);
+    let mut ctx = MacroContext::new(effective_cfg).with_allow_command_macros(false);
     ctx.window_width = avail_w;
 
     if item.is_divider() {

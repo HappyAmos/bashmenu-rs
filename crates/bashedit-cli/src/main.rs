@@ -170,14 +170,100 @@ enum ActiveModal {
     ViewColors(ColorGridModal),
 }
 
+/// Generates a 128-bit unpredictable hex token for temporary filenames.
+fn generate_random_hex_token() -> String {
+    use std::collections::hash_map::RandomState;
+    use std::hash::{BuildHasher, Hasher};
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let mut bytes = [0u8; 16];
+
+    #[cfg(unix)]
+    let filled_from_os = std::fs::File::open("/dev/urandom")
+        .and_then(|mut f| std::io::Read::read_exact(&mut f, &mut bytes))
+        .is_ok();
+    #[cfg(not(unix))]
+    let filled_from_os = false;
+
+    if !filled_from_os {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let seq = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let mut h1 = RandomState::new().build_hasher();
+        h1.write_u32(std::process::id());
+        h1.write_u128(nanos);
+        h1.write_u64(seq);
+        let mut h2 = RandomState::new().build_hasher();
+        h2.write_u64(h1.finish());
+        h2.write_u64(seq.wrapping_mul(0x9E37_79B9_7F4A_7C15));
+        bytes[..8].copy_from_slice(&h1.finish().to_ne_bytes());
+        bytes[8..].copy_from_slice(&h2.finish().to_ne_bytes());
+    }
+
+    let mut hex = String::with_capacity(32);
+    for b in bytes {
+        use std::fmt::Write;
+        let _ = write!(&mut hex, "{b:02x}");
+    }
+    hex
+}
+
+/// Resolves the preferred temporary directory for Markdown preview files,
+/// favoring `$XDG_RUNTIME_DIR` when available and falling back to `temp_dir()`.
+fn preview_base_dir() -> PathBuf {
+    if let Ok(runtime_dir) = std::env::var("XDG_RUNTIME_DIR") {
+        let trimmed = runtime_dir.trim();
+        if !trimmed.is_empty() {
+            let p = PathBuf::from(trimmed);
+            if p.is_dir() {
+                return p;
+            }
+        }
+    }
+    std::env::temp_dir()
+}
+
+/// Creates an exclusive (`O_EXCL`), owner-only (`0600` on Unix) temporary
+/// Markdown file with an unpredictable random suffix and writes `md_text`.
+fn create_secure_preview_file(md_text: &str) -> std::io::Result<PathBuf> {
+    use std::io::Write;
+    #[cfg(unix)]
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let base_dir = preview_base_dir();
+    for _ in 0..16 {
+        let token = generate_random_hex_token();
+        let candidate = base_dir.join(format!("bashedit_md_preview_{token}.md"));
+        let mut opts = std::fs::OpenOptions::new();
+        opts.write(true).create_new(true);
+        #[cfg(unix)]
+        opts.mode(0o600);
+        match opts.open(&candidate) {
+            Ok(mut file) => {
+                file.write_all(md_text.as_bytes())?;
+                file.flush()?;
+                return Ok(candidate);
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(e),
+        }
+    }
+    Err(std::io::Error::new(
+        std::io::ErrorKind::AlreadyExists,
+        "failed to allocate unique preview temp file",
+    ))
+}
+
 /// Spawns `bmpager` in markdown mode via `TerminalGuard::suspend_keep_alt`
 /// to preview document.
 fn launch_markdown_preview(guard: &mut TerminalGuard, tab: &EditorBuffer) {
     let pager_bin = bashmenu_core::locate_companion_tool("bmpager");
-    let temp_dir = std::env::temp_dir();
-    let temp_file = temp_dir.join(format!("bashedit_md_preview_{}.md", std::process::id()));
     let md_text = tab.lines.join("\n");
-    if std::fs::write(&temp_file, &md_text).is_ok() {
+    if let Ok(temp_file) = create_secure_preview_file(&md_text) {
         let _ = guard.suspend_keep_alt(|| {
             let _ = Command::new(&pager_bin)
                 .arg("--markdown")
@@ -882,7 +968,8 @@ fn main() -> Result<()> {
                             continue;
                         }
                         KeyCode::F(5) => {
-                            let ph_ctx = MacroContext::new(&config);
+                            let ph_ctx =
+                                MacroContext::new(&config).with_allow_command_macros(false);
                             let ph_text = render_placeholder_help_text(&ph_ctx);
                             active_modal = ActiveModal::PlaceholdersHelp(
                                 HelpModal::new(t!("bashedit.placeholders_title"), &ph_text)
@@ -1427,7 +1514,8 @@ fn main() -> Result<()> {
                                             ));
                                     }
                                     FooterAction::PlaceholdersHelp => {
-                                        let ph_ctx = MacroContext::new(&config);
+                                        let ph_ctx = MacroContext::new(&config)
+                                            .with_allow_command_macros(false);
                                         let ph_text = render_placeholder_help_text(&ph_ctx);
                                         active_modal = ActiveModal::PlaceholdersHelp(
                                             HelpModal::new(
@@ -2175,5 +2263,45 @@ fn handle_active_modal(
             true
         }
         ActiveModal::None => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_create_secure_preview_file_random_exclusive_0600_issue_93() {
+        let p1 = create_secure_preview_file("# Secret Draft 1").expect("create preview 1");
+        let p2 = create_secure_preview_file("# Secret Draft 2").expect("create preview 2");
+
+        assert_ne!(p1, p2, "preview filenames must be unique and unpredictable");
+        let predictable = format!("bashedit_md_preview_{}.md", std::process::id());
+        assert_ne!(
+            p1.file_name().and_then(|n| n.to_str()),
+            Some(predictable.as_str())
+        );
+        assert_eq!(
+            std::fs::read_to_string(&p1).expect("read preview 1"),
+            "# Secret Draft 1"
+        );
+        assert_eq!(
+            std::fs::read_to_string(&p2).expect("read preview 2"),
+            "# Secret Draft 2"
+        );
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(&p1)
+                .expect("metadata")
+                .permissions()
+                .mode()
+                & 0o777;
+            assert_eq!(mode, 0o600, "preview file must be owner-only (0600)");
+        }
+
+        let _ = std::fs::remove_file(&p1);
+        let _ = std::fs::remove_file(&p2);
     }
 }

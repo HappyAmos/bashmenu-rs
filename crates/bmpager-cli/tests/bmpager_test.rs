@@ -208,3 +208,245 @@ fn test_bmpager_wrap_flag_plain_text() {
     assert!(!lines.is_empty());
     assert!(out_str.contains("soft word-wrapping"));
 }
+
+#[test]
+fn test_bmpager_markdown_image_halfblock_and_fallback() {
+    let dir = std::env::temp_dir().join(format!("bmpager_img_test_{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&dir);
+    let img_path = dir.join("pixel.png");
+    let md_path = dir.join("doc.md");
+
+    // Create a tiny 4x4 PNG (top 2 rows red, bottom 2 rows blue)
+    let mut img = image::RgbaImage::new(4, 4);
+    for y in 0..4 {
+        for x in 0..4 {
+            let px = if y < 2 {
+                image::Rgba([255, 0, 0, 255])
+            } else {
+                image::Rgba([0, 0, 255, 255])
+            };
+            img.put_pixel(x, y, px);
+        }
+    }
+    img.save(&img_path).expect("save temp png");
+
+    let md = "# Image Test\n\n![Red Blue Swatch](pixel.png)\n\n![Missing](nope.png)\n";
+    std::fs::write(&md_path, md).expect("write temp md");
+
+    // 1. Color mode renders TrueColor half-block cells + caption + missing fallback
+    let out = bmpager_cmd()
+        .args(["--markdown", md_path.to_str().unwrap()])
+        .output()
+        .expect("run bmpager --markdown");
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("▀") && stdout.contains("38;2;255;0;0"),
+        "expected TrueColor half-block rendering, got:\n{stdout}"
+    );
+    assert!(
+        !stdout.contains("Red Blue Swatch"),
+        "alt text should not display when image renders successfully"
+    );
+    assert!(stdout.contains("[Image: Missing (nope.png)]"));
+
+    // 2. --no-color falls back cleanly without half-block pixels
+    let out_nc = bmpager_cmd()
+        .args(["--markdown", "--no-color", md_path.to_str().unwrap()])
+        .output()
+        .expect("run bmpager --markdown --no-color");
+    assert!(out_nc.status.success());
+    let stdout_nc = String::from_utf8_lossy(&out_nc.stdout);
+    assert!(stdout_nc.contains("[Image: Red Blue Swatch (pixel.png)]"));
+    assert!(!stdout_nc.contains('▀'));
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_bmpager_remote_images_opt_in_and_cache() {
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+
+    let dir = std::env::temp_dir().join(format!("bmpager_remote_img_test_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+
+    // Encode a tiny 4x4 green PNG in memory
+    let mut img = image::RgbaImage::new(4, 4);
+    for px in img.pixels_mut() {
+        *px = image::Rgba([0, 200, 50, 255]);
+    }
+    let mut png_bytes = Vec::new();
+    img.write_to(
+        &mut std::io::Cursor::new(&mut png_bytes),
+        image::ImageFormat::Png,
+    )
+    .expect("encode png");
+
+    // Serve the PNG once over local HTTP
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind loopback");
+    let addr = listener.local_addr().unwrap();
+    let payload = png_bytes.clone();
+    let server = std::thread::spawn(move || {
+        if let Ok((mut stream, _)) = listener.accept() {
+            let mut req_buf = [0u8; 1024];
+            let _ = stream.read(&mut req_buf);
+            let header = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                payload.len()
+            );
+            let _ = stream.write_all(header.as_bytes());
+            let _ = stream.write_all(&payload);
+            let _ = stream.flush();
+        }
+    });
+
+    let url = format!("http://{addr}/swatch.png");
+    let md_path = dir.join("remote.md");
+    std::fs::write(&md_path, format!("# Remote\n\n![Web Swatch]({url})\n")).unwrap();
+
+    // 1. Default (without --remote-images): does NOT fetch, shows fallback link
+    let out_default = bmpager_cmd()
+        .env("XDG_CONFIG_HOME", &dir)
+        .args(["--markdown", md_path.to_str().unwrap()])
+        .output()
+        .expect("run bmpager default");
+    assert!(out_default.status.success());
+    let stdout_default = String::from_utf8_lossy(&out_default.stdout);
+    assert!(stdout_default.contains(&format!("[Image: Web Swatch ({url})]")));
+    assert!(!stdout_default.contains('▀'));
+
+    // 2. With --remote-images: downloads natively, caches in cache/images/, renders half-blocks
+    let out_remote = bmpager_cmd()
+        .env("XDG_CONFIG_HOME", &dir)
+        .args(["--markdown", "--remote-images", md_path.to_str().unwrap()])
+        .output()
+        .expect("run bmpager --remote-images");
+    assert!(out_remote.status.success());
+    let stdout_remote = String::from_utf8_lossy(&out_remote.stdout);
+    assert!(
+        stdout_remote.contains('▀') && stdout_remote.contains("38;2;0;200;50"),
+        "expected TrueColor remote image rendering, got:\n{stdout_remote}"
+    );
+    assert!(
+        !stdout_remote.contains("Web Swatch"),
+        "alt text should not display when remote image renders successfully"
+    );
+
+    let _ = server.join();
+    let cache_images = dir.join("bashmenu").join("cache").join("images");
+    assert!(
+        cache_images.is_dir() && std::fs::read_dir(&cache_images).unwrap().next().is_some(),
+        "expected cached image file in {}",
+        cache_images.display()
+    );
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_bmpager_markdown_svg_rendering() {
+    let dir = std::env::temp_dir().join(format!("bmpager_svg_test_{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&dir);
+    let svg_path = dir.join("badge.svg");
+    let md_path = dir.join("doc.md");
+
+    let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="20" height="10">
+  <rect x="0" y="0" width="20" height="5" fill="#ff0000"/>
+  <rect x="0" y="5" width="20" height="5" fill="#0000ff"/>
+</svg>"##;
+    std::fs::write(&svg_path, svg).expect("write svg");
+    std::fs::write(&md_path, "# SVG Test\n\n![Vector Swatch](badge.svg)\n").expect("write md");
+
+    let out = bmpager_cmd()
+        .args(["--markdown", md_path.to_str().unwrap()])
+        .output()
+        .expect("run bmpager --markdown on svg");
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains('▀') && stdout.contains("38;2;255;0;0"),
+        "expected TrueColor half-block SVG rendering, got:\n{stdout}"
+    );
+    assert!(
+        !stdout.contains("Vector Swatch"),
+        "alt text should not display when SVG renders successfully"
+    );
+
+    // Shields.io-style SVG badge renders as crisp 3-row Option B badge (▄ / text / ▀)
+    let badge_svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="110" height="20">
+  <rect width="70" height="20" fill="#555555"/>
+  <rect x="70" width="40" height="20" fill="#fe7d37"/>
+  <g fill="#fff" text-anchor="middle" font-family="sans-serif" font-size="110">
+    <text x="350" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)">bashmenu</text>
+    <text x="350" y="140" transform="scale(.1)">bashmenu</text>
+    <text x="900" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)">rust</text>
+    <text x="900" y="140" transform="scale(.1)">rust</text>
+  </g>
+</svg>"##;
+    let shields_path = dir.join("shields.svg");
+    let badge_md = dir.join("badges.md");
+    std::fs::write(&shields_path, badge_svg).expect("write shields svg");
+    std::fs::write(&badge_md, "![Build](shields.svg)\n").expect("write badges md");
+
+    let out_badge = bmpager_cmd()
+        .args(["--markdown", badge_md.to_str().unwrap()])
+        .output()
+        .expect("run bmpager on shields badge");
+    assert!(out_badge.status.success());
+    let badge_out = String::from_utf8_lossy(&out_badge.stdout);
+    assert!(badge_out.contains("▄"), "expected top cap ▄:\n{badge_out}");
+    assert!(
+        badge_out.contains(" bashmenu ") && badge_out.contains(" rust "),
+        "expected crisp badge text:\n{badge_out}"
+    );
+    assert!(
+        badge_out.contains("48;2;85;85;85") && badge_out.contains("48;2;254;125;55"),
+        "expected exact #555555 and #fe7d37 TrueColor backgrounds:\n{badge_out}"
+    );
+    assert!(
+        badge_out.contains("▀"),
+        "expected bottom cap ▀:\n{badge_out}"
+    );
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_bmpager_markdown_image_before_setext_rule_no_orphan_heading() {
+    let dir = std::env::temp_dir().join(format!("bmpager_setext_test_{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&dir);
+    let svg_path = dir.join("preview.svg");
+    let md_path = dir.join("doc.md");
+
+    let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="20" height="10">
+  <rect x="0" y="0" width="20" height="10" fill="#00ff00"/>
+</svg>"##;
+    std::fs::write(&svg_path, svg).expect("write svg");
+    // CommonMark parses `![...](...)\n---` (no blank line) as a Setext H2 containing only an image.
+    // The renderer must not emit an orphan `## ` heading line after the image.
+    std::fs::write(
+        &md_path,
+        "---\n![Preview](preview.svg)\n---\n\n## What On Earth Is This?\n",
+    )
+    .expect("write md");
+
+    let out = bmpager_cmd()
+        .args(["--markdown", md_path.to_str().unwrap()])
+        .output()
+        .expect("run bmpager --markdown on setext image");
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains('▀'), "expected image to render:\n{stdout}");
+    assert!(
+        stdout.contains("## What On Earth Is This?"),
+        "expected real H2 heading to render:\n{stdout}"
+    );
+    assert!(
+        !stdout.contains("## \x1b[0m"),
+        "must not emit orphan empty `## ` heading:\n{stdout}"
+    );
+
+    let _ = std::fs::remove_dir_all(&dir);
+}

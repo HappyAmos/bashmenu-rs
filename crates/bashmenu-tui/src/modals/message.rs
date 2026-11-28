@@ -278,7 +278,7 @@ impl MessageModal {
                 ok_x,
                 btn_y,
                 &clipped_ok,
-                styles.highlight.add_modifier(Modifier::BOLD),
+                styles.modal_yes_button.add_modifier(Modifier::BOLD),
             );
         }
 
@@ -411,8 +411,9 @@ fn render_table(
     mid_spans.push(ratatui::text::Span::styled("┤", border_style));
     out_lines.push(ratatui::text::Line::from(mid_spans));
 
-    // 4. Data rows
-    for r in table_rows.iter().skip(1) {
+    // 4. Data rows (with row dividers between entries)
+    let data_count = table_rows.len().saturating_sub(1);
+    for (row_idx, r) in table_rows.iter().skip(1).enumerate() {
         let cell_lines: Vec<Vec<String>> = (0..cols)
             .map(|c| {
                 let cell_text = r.get(c).map(|s| s.as_str()).unwrap_or("");
@@ -437,6 +438,21 @@ fn render_table(
                 row_spans.push(ratatui::text::Span::styled("│", border_style));
             }
             out_lines.push(ratatui::text::Line::from(row_spans));
+        }
+        if row_idx + 1 < data_count {
+            let mut div_spans = Vec::new();
+            div_spans.push(ratatui::text::Span::styled("├", border_style));
+            for (c, &cw) in col_widths.iter().enumerate() {
+                div_spans.push(ratatui::text::Span::styled(
+                    "─".repeat(cw + 2),
+                    border_style,
+                ));
+                if c + 1 < cols {
+                    div_spans.push(ratatui::text::Span::styled("┼", border_style));
+                }
+            }
+            div_spans.push(ratatui::text::Span::styled("┤", border_style));
+            out_lines.push(ratatui::text::Line::from(div_spans));
         }
     }
 
@@ -466,9 +482,13 @@ fn parse_markdown_message_lines(
     let raw_lines: Vec<&str> = message.lines().collect();
     let mut idx = 0;
 
-    let h1_style = Style::default()
-        .fg(Color::Cyan)
-        .add_modifier(Modifier::BOLD);
+    let h1_style = styles
+        .map(|s| s.title.bg(s.background).add_modifier(Modifier::BOLD))
+        .unwrap_or_else(|| {
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD)
+        });
     let h2_style = styles
         .map(|s| s.accent.bg(s.background).add_modifier(Modifier::BOLD))
         .unwrap_or_else(|| {
@@ -523,4 +543,47 @@ fn parse_markdown_message_lines(
     }
 
     out_lines
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_message_modal_adheres_to_theme_tokens() {
+        let styles = ResolvedThemeStyles {
+            background: Color::Indexed(17),
+            border: Color::Indexed(51),
+            title: Style::default().fg(Color::Indexed(213)),
+            text: Style::default().fg(Color::Indexed(229)),
+            modal_yes_button: Style::default()
+                .fg(Color::Indexed(46))
+                .bg(Color::Indexed(22)),
+            window_close_button: Style::default().fg(Color::Indexed(196)),
+            ..Default::default()
+        };
+
+        let modal = MessageModal::new("Notice", "# Heading\nBody text");
+        let area = Rect::new(0, 0, 60, 20);
+        let mut buf = Buffer::empty(area);
+        let inner = modal.render(area, &styles, &mut buf);
+
+        // 1. Heading (# Heading) uses styles.title fg + styles.background bg
+        let h1_cell = &buf[(inner.x + 2, inner.y + 1)];
+        assert_eq!(h1_cell.fg, Color::Indexed(213));
+        assert_eq!(h1_cell.bg, Color::Indexed(17));
+
+        // 2. Body text uses styles.text fg + styles.background bg
+        let body_cell = &buf[(inner.x + 2, inner.y + 2)];
+        assert_eq!(body_cell.fg, Color::Indexed(229));
+        assert_eq!(body_cell.bg, Color::Indexed(17));
+
+        // 3. [ OK ] button uses styles.modal_yes_button fg + bg
+        let btn_y = inner.y + inner.height.saturating_sub(2);
+        let center_x = inner.x + inner.width / 2;
+        let ok_x = center_x.saturating_sub(4).max(inner.x + 1);
+        let ok_cell = &buf[(ok_x + 2, btn_y)];
+        assert_eq!(ok_cell.fg, Color::Indexed(46));
+        assert_eq!(ok_cell.bg, Color::Indexed(22));
+    }
 }

@@ -1,4 +1,4 @@
-.TH BASHMENU 1 "2026-11-27" "v0.1.9" "HA Bash Menu Manual"
+.TH BASHMENU 1 "2026-11-28" "v0.1.10" "HA Bash Menu Manual"
 .SH NAME
 bashmenu \- lightweight Ratatui TUI menu engine and settings manager
 .SH SYNOPSIS
@@ -649,12 +649,78 @@ Shuts down the menu interface completely.
 .SH DYNAMIC DIRECTIVES & SYSTEM PLACEHOLDERS
 .SS Dynamic Input Directives
 These directives prompt the user inside modal dialogs, replacing the placeholder
-with the chosen value prior to action execution.
+with the chosen value prior to action execution. Shell-targeted substitutions
+are POSIX single-quote escaped by default to prevent shell injection; append
+\fB:raw\fR (e.g. \fB{param:raw}\fR or \fB{file_picker:raw}\fR) only when
+unquoted shell expansion is intentionally required. Non-shell targets such as
+\fBtype: editor\fR file paths remain unquoted.
 .TP
 .B {param}
-Prompts for a single-line text value using a modal input box. Supports
-\fBtitle\fR (modal header), \fBprompt\fR (body prompt text), and
-\fBmasked\fR (boolean to mask input with asterisks for secrets/passwords).
+Prompts for a single-line text value using a modal input box. Supports inline
+key-value tokens \fBtitle="..."\fR (modal header; omitted when unassigned),
+\fBtext="..."\fR / \fBprompt="..."\fR (body prompt text),
+\fBdefault="..."\fR (pre-populated input text),
+\fBmasked\fR (mask input with asterisks for secrets/passwords), and
+\fB:raw\fR (opt out of POSIX shell quoting). Accepts \fB"\fR, \fB'\fR, or
+\fB`\fR delimiters with optional spaces around \fB:\fR and \fB=\fR.
+.TP
+.B {message:"..."}, {message:title="...":text="..."}
+Displays an adaptive, centered popup message dialog with an OK button and
+top-right [X] close button. Shorthand \fB{message:"TEXT"}\fR displays no title;
+structured \fB{message:title="...":text="..."}\fR supports omitting either
+field. Accepts double quotes (\fB"..."\fR), single quotes (\fB'...'\fR), or
+backticks (\fB`...`\fR) with optional spaces around \fB:\fR and \fB=\fR,
+supports \fB\\n\fR line breaks and nested placeholders, and can be used
+standalone or prepended to a command.
+.TP
+.B {input:id=VAR:default="":...}
+Embeds an interactive form input field inside an \fBinteractive: true\fR
+Markdown modal (\fB{info:<path>}\fR). Supported attributes: \fBid\fR (Bash
+variable name), \fBdefault\fR (\fB""\fR), \fBwidth\fR (defaults to remaining
+width to right margin), \fBmultiline\fR (\fBfalse\fR), \fBheight\fR (\fB5\fR
+rows when multiline), \fBscrollbar\fR (\fBtrue\fR, multiline only), and
+\fBmasked\fR (\fBfalse\fR, masks typed characters with \fB*\fR). Single-line
+inputs following text render inline. Pressing \fBEnter\fR (or \fBCtrl+Enter\fR
+in multiline) soft-refreshes live \fB{id:VAR}\fR placeholders; activating a
+\fBsubmit\fR/\fBok\fR button exports every \fBid\fR as a Bash variable into
+\fBbashmenu-bash\fR code blocks.
+.TP
+.B {radio:VAR:"Option 1":"Option 2"}
+Embeds a single-choice radio button group inside an \fBinteractive: true\fR
+Markdown modal. Supports positional shorthand or \fBid="..."\fR,
+\fBdefault="..."\fR, and \fBlayout="vertical"|"horizontal"\fR attributes.
+Changing selection via arrow keys or mouse click updates \fB{id:VAR}\fR live
+and exports the selected option text as \fB$VAR\fR to reserved scripts.
+.TP
+.B {checkbox:VAR:"Label":false}
+Embeds a boolean \fB[x]\fR/\fB[ ]\fR checkbox inside an \fBinteractive: true\fR
+Markdown modal. Supports positional shorthand or \fBid="..."\fR,
+\fBlabel="..."\fR/\fBtext="..."\fR, and \fBdefault=true|false\fR attributes.
+Toggling updates \fB{id:VAR}\fR live and exports \fB"true"\fR or \fB"false"\fR.
+.TP
+.B {id:VAR}
+Displays the live committed value of the matching \fB{input}\fR, \fB{radio}\fR,
+or \fB{checkbox}\fR field in an \fBinteractive: true\fR Markdown document.
+Inside \fBbashmenu-bash\fR code blocks, \fB{id:VAR}\fR expands to
+\fB${VAR:-}\fR and \fB{id:VAR="VALUE"}\fR writes a computed value back into the
+document's live \fB{id:VAR}\fR map.
+.TP
+.B {button:type="submit"|"ok"|"action"|"cancel":action="ID"}
+Renders an interactive action button inside an \fBinteractive: true\fR Markdown
+modal. Multiple buttons on the same line render horizontally and suppress the
+fallback footer \fB[ OK ]\fR button. \fBtype="submit"\fR (\fB[ Submit ]\fR) and
+\fBtype="ok"\fR (\fB[ OK ]\fR) commit all form values, execute the optional
+reserved \fBbashmenu-bash:id="ID"\fR code block (held in reserve and never
+auto-executed on load), and advance to the next \fB{clear}\fR page or close on
+the last page. \fBtype="action"\fR (\fB[ Run ]\fR) executes its \fBaction\fR
+block in-place and remains on the current page so \fB{id:VAR="VALUE"}\fR
+write-backs update live. \fBtype="cancel"\fR (\fB[ Cancel ]\fR) runs its
+optional \fBaction\fR block and closes the modal immediately. Supports optional
+\fBtext="..."\fR / \fBlabel="..."\fR label override.
+.TP
+.B {clear}
+Clears the interactive Markdown screen before rendering subsequent content
+while preserving committed \fB{id:...}\fR variables.
 .TP
 .B {file_picker}
 Launches a visual file chooser dialog box.
@@ -1069,6 +1135,56 @@ lines and the active menu layout.
 .B Automatic Restoration:
 When the screensaver command terminates, the menu interface is restored
 and the inactivity timer is automatically re-armed.
+.SS Interactive Markdown Applications (interactive: true & --imarkdown)
+Markdown files containing \fBinteractive: true\fR in their YAML frontmatter
+(\fB--- ... ---\fR) render as interactive TUI forms with embedded widgets and
+on-demand Bash execution. Launch them either inside BashMenu via
+\fB{imarkdown:<path>}\fR or \fB{info:<path>}\fR (or \fBtype: imarkdown\fR /
+\fBtype: info\fR in \fBmenuedit\fR) or directly from the terminal with
+\fBbashmenu --imarkdown <FILE>\fR (or make the file executable with a
+\fB#!/usr/bin/env -S bashmenu --imarkdown\fR shebang line). Standalone mode
+preserves the terminal's native default background behind the themed popup,
+restores the pre-launch terminal on exit, and exits \fB0\fR on Submit/OK or
+\fB1\fR on Cancel/Esc.
+.IP \(bu 2
+.B Reserved Script Blocks (bashmenu-bash:id="..."):
+Fenced blocks starting with \fBbashmenu-bash: id="NAME"\fR are held in reserve
+(omitted from visible Markdown and never auto-executed on load) and invoked by
+\fB{button: ...: action="NAME"}\fR. Standard fences (\fB```bash\fR) render
+normally.
+.IP \(bu 2
+.B Live UI-RPC & Bidirectional Data Binding:
+Every \fB{input}\fR, \fB{radio}\fR, and \fB{checkbox}\fR exports its \fBid\fR
+as a Bash environment variable (\fB$VAR\fR) and expands \fB{id:VAR}\fR inside
+both Markdown text and \fBbashmenu-bash\fR blocks. Scripts can open live
+\fB{param:...}\fR, \fB{message:...}\fR, and \fB{toast:...}\fR popups and write
+computed values back to the document via \fB{id:VAR="VALUE"}\fR.
+.IP \(bu 2
+.B Soft-Refresh & Controls:
+Pressing \fBEnter\fR, \fBTab\fR, or \fBShift+Tab\fR in an input (or toggling a
+radio/checkbox) soft-refreshes \fB{id:...}\fR live. \fBtype="action"\fR buttons
+run scripts in-place without closing; \fBtype="submit"\fR/\fB"ok"\fR run their
+optional action and clear/continue past \fB{clear}\fR (or close);
+\fBtype="cancel"\fR exits immediately.
+.PP
+.B Example Interactive Markdown File:
+.RS
+.nf
+#!/usr/bin/env -S bashmenu --imarkdown
+---
+title: Interactive Demo ({host})
+width: 80%
+height: 70%
+interactive: true
+---
+````bashmenu-bash: id="lookup"
+{id:result="Hello $guestName ($(date '+%H:%M:%S'))"}
+````
+Name: {input: default="{user}": id="guestName"}
+Result: {id:result}
+{button: type="action": text="Compute": action="lookup"} {button: type="ok"}
+.fi
+.RE
 .SS Multi-Platform Support & Environment Detection
 HA Bash Menu detects terminal capabilities, color depth, and host platform at runtime. Root installer and launcher scripts use POSIX /bin/sh while companion scripts in scripts/ use /usr/bin/env bash. Cross-platform package wrappers translate dependency installs to the local package manager (apt, dnf, pacman, pkg, or brew) and add or omit sudo depending on Linux, macOS, WSL, or Termux.
 .SH AUTHOR

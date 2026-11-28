@@ -274,18 +274,32 @@ pub(crate) fn is_markdown_table_delimiter(line: &str) -> bool {
     })
 }
 
-/// Extracts trimmed cell strings from a pipe-delimited Markdown table row.
+/// Extracts trimmed cell strings from a pipe-delimited Markdown table row,
+/// treating escaped `\|` as a literal `|` inside a cell rather than a column separator.
 pub(crate) fn parse_markdown_table_cells(line: &str) -> Vec<String> {
     let trimmed = line.trim();
-    let parts: Vec<&str> = trimmed.split('|').collect();
-    if parts.len() >= 2 {
-        parts[1..parts.len() - 1]
-            .iter()
-            .map(|s| s.trim().to_string())
-            .collect()
-    } else {
-        Vec::new()
+    let inner = trimmed.strip_prefix('|').unwrap_or(trimmed);
+    let inner = inner
+        .strip_suffix('|')
+        .filter(|s| !s.ends_with('\\'))
+        .unwrap_or(inner);
+
+    let mut cells = Vec::new();
+    let mut cur = String::new();
+    let mut chars = inner.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch == '\\' && chars.peek() == Some(&'|') {
+            chars.next();
+            cur.push('|');
+        } else if ch == '|' {
+            cells.push(cur.trim().to_string());
+            cur.clear();
+        } else {
+            cur.push(ch);
+        }
     }
+    cells.push(cur.trim().to_string());
+    cells
 }
 
 /// Iteratively shrinks the widest columns until total width fits in `avail_w`.

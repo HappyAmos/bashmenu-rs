@@ -44,6 +44,53 @@ run_root() {
     fi
 }
 
+compute_sha256() {
+    local file="$1"
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$file" | awk '{print $1}'
+    elif command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 "$file" | awk '{print $1}'
+    else
+        echo ""
+    fi
+}
+
+# Downloads an installer script to a temporary file, verifies an expected SHA256
+# checksum when provided, executes it with bash, and removes the temporary file.
+run_verified_installer() {
+    local name="$1"
+    local url="$2"
+    local expected_sha="$3"
+    local manual_url="$4"
+    local tmp_script
+    tmp_script="$(mktemp "${TMPDIR:-/tmp}/${name}-install.XXXXXX.sh")"
+
+    if ! curl --proto '=https' --tlsv1.2 -fsSL "$url" -o "$tmp_script" || [ ! -s "$tmp_script" ]; then
+        rm -f "$tmp_script"
+        echo "Error: Failed to download ${name} installer. Install manually via ${manual_url}" >&2
+        return 1
+    fi
+
+    local actual_sha
+    actual_sha="$(compute_sha256 "$tmp_script")"
+    if [ -n "$expected_sha" ]; then
+        if [ -z "$actual_sha" ] || [ "$actual_sha" != "$expected_sha" ]; then
+            rm -f "$tmp_script"
+            echo "Error: ${name} installer SHA256 mismatch (expected ${expected_sha}, got ${actual_sha:-unavailable})." >&2
+            echo "Install manually from ${manual_url}" >&2
+            return 1
+        fi
+        echo "  [+] Verified ${name} installer SHA256: ${actual_sha}"
+    elif [ -n "$actual_sha" ]; then
+        echo "  [*] Downloaded ${name} installer (SHA256: ${actual_sha}; manual install: ${manual_url})"
+    fi
+
+    /bin/bash "$tmp_script"
+    local rc=$?
+    rm -f "$tmp_script"
+    return "$rc"
+}
+
 if [ "$OS_TYPE" = "Darwin" ]; then
     echo "=========================================="
     echo "🍏 macOS detected. Setting up via Homebrew..."
@@ -52,7 +99,11 @@ if [ "$OS_TYPE" = "Darwin" ]; then
     # Check if Homebrew is installed
     if ! command -v brew &> /dev/null; then
         echo "Homebrew not found. Installing Homebrew..."
-        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        run_verified_installer \
+            "homebrew" \
+            "https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh" \
+            "${HOMEBREW_INSTALL_SHA256:-}" \
+            "https://brew.sh" || exit 1
         
         # Add Homebrew to PATH for the current session depending on architecture
         if [ -f /opt/homebrew/bin/brew ]; then
@@ -104,9 +155,14 @@ elif [ "$OS_TYPE" = "Linux" ]; then
         echo "Warning: Unknown package manager. Proceeding with NVM install anyway..."
     fi
 
-    # Install NVM
+    # Install NVM (pinned v0.40.1 with SHA256 verification)
     echo "Installing NVM (Node Version Manager)..."
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+    NVM_V0_40_1_SHA256="abdb525ee9f5b48b34d8ed9fc67c6013fb0f659712e401ecd88ab989b3af8f53"
+    run_verified_installer \
+        "nvm" \
+        "https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh" \
+        "$NVM_V0_40_1_SHA256" \
+        "https://github.com/nvm-sh/nvm#installing-and-updating" || exit 1
 
     # Load NVM into current session
     export NVM_DIR="$HOME/.nvm"

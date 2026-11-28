@@ -2,10 +2,77 @@
 //! matching the rich styling of `rich.sh`.
 
 use pulldown_cmark::{Event, HeadingLevel, Options, Parser, Tag, TagEnd};
+use sha2::{Digest, Sha256};
+use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 use unicode_width::UnicodeWidthStr;
 
+/// Maximum bytes downloaded for a single remote Markdown image (10 MiB).
+const MAX_REMOTE_IMAGE_BYTES: u64 = 10 * 1024 * 1024;
+/// Global HTTP timeout for fetching a single remote Markdown image.
+const REMOTE_IMAGE_TIMEOUT_SECS: u64 = 5;
+/// Maximum decoded frames retained for a single animated GIF (longer GIFs are
+/// evenly stride-sampled across their full duration rather than truncated).
+const MAX_GIF_FRAMES: usize = 1000;
+
+/// Pre-rendered multi-frame GIF animation anchored at a line index in the document.
+#[derive(Debug, Clone)]
+pub struct AnimatedImage {
+    /// 0-based starting line index in the rendered document.
+    pub start_line: usize,
+    /// Pre-rendered half-block ANSI frames paired with per-frame display durations.
+    pub frames: Vec<(Vec<String>, Duration)>,
+    /// Active frame index (`0..frames.len()`).
+    pub current_frame: usize,
+    /// Next scheduled frame advance time.
+    pub next_tick: Instant,
+}
+
+/// Rendered Markdown output paired with any embedded animated GIFs.
+#[derive(Debug, Clone)]
+pub struct RenderedMarkdown {
+    /// Full ANSI-formatted Markdown document (with frame 0 embedded for GIFs).
+    pub text: String,
+    /// Multi-frame animated GIFs present in the document.
+    pub animations: Vec<AnimatedImage>,
+}
+
 /// Render Markdown string into terminal ANSI text wrapped to `terminal_width`.
+#[allow(dead_code)]
 pub fn render_markdown(source: &str, terminal_width: usize) -> String {
+    render_markdown_with_options(source, terminal_width, None, true, false)
+}
+
+/// Render Markdown string into terminal ANSI text wrapped to `terminal_width`,
+/// resolving relative `![alt](path)` image tags against `base_dir` and rendering
+/// them via Unicode half-block TrueColor ANSI when `allow_images` is `true`.
+/// Remote `http(s)://` images are only fetched when `allow_remote_images` is `true`.
+#[allow(dead_code)]
+pub fn render_markdown_with_options(
+    source: &str,
+    terminal_width: usize,
+    base_dir: Option<&Path>,
+    allow_images: bool,
+    allow_remote_images: bool,
+) -> String {
+    render_markdown_full(
+        source,
+        terminal_width,
+        base_dir,
+        allow_images,
+        allow_remote_images,
+    )
+    .text
+}
+
+/// Render Markdown string into ANSI text plus any decoded multi-frame GIF animations.
+pub fn render_markdown_full(
+    source: &str,
+    terminal_width: usize,
+    base_dir: Option<&Path>,
+    allow_images: bool,
+    allow_remote_images: bool,
+) -> RenderedMarkdown {
     let width = terminal_width.clamp(40, 160);
     let mut options = Options::empty();
     options.insert(Options::ENABLE_TABLES);
@@ -14,9 +81,14 @@ pub fn render_markdown(source: &str, terminal_width: usize) -> String {
     options.insert(Options::ENABLE_HEADING_ATTRIBUTES);
 
     let parser = Parser::new_ext(source, options);
-    let mut renderer = MarkdownRenderer::new(width);
+    let mut renderer = MarkdownRenderer::new(
+        width,
+        base_dir.map(Path::to_path_buf),
+        allow_images,
+        allow_remote_images,
+    );
     renderer.run(parser);
-    renderer.finish()
+    renderer.finish_full()
 }
 
 /// Stateful Markdown stream renderer converting Pulldown-Cmark events to ANSI-styled terminal text.
@@ -39,6 +111,20 @@ struct MarkdownRenderer {
     list_stack: Vec<ListState>,
     /// Target URL for markdown links being rendered
     link_url: Option<String>,
+    /// Target path/URL for a markdown image tag currently being parsed
+    image_dest: Option<String>,
+    /// Accumulated alt text for the active markdown image tag
+    image_alt: String,
+    /// Optional base directory for resolving relative image paths
+    base_dir: Option<PathBuf>,
+    /// Whether ANSI half-block image rendering is enabled (false under `--no-color`)
+    allow_images: bool,
+    /// Whether remote `http(s)://` image fetching into `{cache_dir}/images` is enabled
+    allow_remote_images: bool,
+    /// Pending 3-row crisp SVG badges (`([top, mid, bot], visual_width)`) to render side-by-side
+    pending_badges: Vec<([String; 3], usize)>,
+    /// Multi-frame animated GIFs collected during rendering
+    animations: Vec<AnimatedImage>,
     /// Whether parser is inside a markdown table
     in_table: bool,
     /// Whether parser is currently in the table header row
@@ -70,7 +156,12 @@ enum ListState {
 
 impl MarkdownRenderer {
     /// Initializes a new MarkdownRenderer with the given viewport column width.
-    fn new(width: usize) -> Self {
+    fn new(
+        width: usize,
+        base_dir: Option<PathBuf>,
+        allow_images: bool,
+        allow_remote_images: bool,
+    ) -> Self {
         Self {
             width,
             output: String::new(),
@@ -81,6 +172,13 @@ impl MarkdownRenderer {
             code_block_text: String::new(),
             list_stack: Vec::new(),
             link_url: None,
+            image_dest: None,
+            image_alt: String::new(),
+            base_dir,
+            allow_images,
+            allow_remote_images,
+            pending_badges: Vec::new(),
+            animations: Vec::new(),
             in_table: false,
             table_head: false,
             table_rows: Vec::new(),
@@ -93,12 +191,61 @@ impl MarkdownRenderer {
         }
     }
 
+    /// Flushes any accumulated 3-row Option B SVG badges horizontally side-by-side,
+    /// wrapping to a new 3-row strip if the row exceeds `self.width`.
+    fn flush_badges(&mut self) {
+        if self.pending_badges.is_empty() {
+            return;
+        }
+        let badges = std::mem::take(&mut self.pending_badges);
+        if !self.output.is_empty() && !self.output.ends_with("\n\n") {
+            if !self.output.ends_with('\n') {
+                self.output.push('\n');
+            }
+            self.output.push('\n');
+        }
+
+        let mut row0 = String::new();
+        let mut row1 = String::new();
+        let mut row2 = String::new();
+        let mut cur_w = 0usize;
+
+        for (rows, bw) in badges {
+            let sep_w = if cur_w > 0 { 1 } else { 0 };
+            if cur_w > 0 && cur_w + sep_w + bw > self.width {
+                self.output
+                    .push_str(&format!("{row0}\x1b[0m\n{row1}\x1b[0m\n{row2}\x1b[0m\n"));
+                row0.clear();
+                row1.clear();
+                row2.clear();
+                cur_w = 0;
+            }
+            if cur_w > 0 {
+                row0.push_str("\x1b[0m ");
+                row1.push_str("\x1b[0m ");
+                row2.push_str("\x1b[0m ");
+                cur_w += 1;
+            }
+            row0.push_str(&rows[0]);
+            row1.push_str(&rows[1]);
+            row2.push_str(&rows[2]);
+            cur_w += bw;
+        }
+        if cur_w > 0 {
+            self.output
+                .push_str(&format!("{row0}\x1b[0m\n{row1}\x1b[0m\n{row2}\x1b[0m\n"));
+        }
+    }
+
     /// Appends the current accumulated line to the formatted output and clears the buffer.
     fn flush_line(&mut self) {
         if !self.current_line.is_empty() {
+            self.flush_badges();
             self.output.push_str(&self.current_line);
             self.output.push('\n');
             self.current_line.clear();
+        } else {
+            self.flush_badges();
         }
     }
 
@@ -112,6 +259,7 @@ impl MarkdownRenderer {
 
     /// Emits a word to the active line, soft-wrapping to a continuation line if line width is exceeded.
     fn emit_word(&mut self, word: &str) {
+        self.flush_badges();
         let prefix = if self.in_blockquote {
             "\x1b[38;5;244m│ \x1b[0m"
         } else if let Some(state) = self.list_stack.last() {
@@ -258,8 +406,20 @@ impl MarkdownRenderer {
                 Event::End(TagEnd::Link) => {
                     self.link_url = None;
                 }
+                Event::Start(Tag::Image { dest_url, .. }) => {
+                    self.image_dest = Some(dest_url.to_string());
+                    self.image_alt.clear();
+                }
+                Event::End(TagEnd::Image) => {
+                    if let Some(dest) = self.image_dest.take() {
+                        let alt = std::mem::take(&mut self.image_alt);
+                        self.emit_image(&dest, &alt);
+                    }
+                }
                 Event::Text(text) => {
-                    if self.heading_level.is_some() {
+                    if self.image_dest.is_some() {
+                        self.image_alt.push_str(&text);
+                    } else if self.heading_level.is_some() {
                         self.heading_text.push_str(&text);
                     } else if self.in_code_block {
                         self.code_block_text.push_str(&text);
@@ -364,7 +524,11 @@ impl MarkdownRenderer {
 
     /// Renders heading levels H1..H6 with rich box borders and colored markers.
     fn render_heading(&mut self, level: HeadingLevel) {
+        self.flush_badges();
         let text = self.heading_text.trim();
+        if text.is_empty() {
+            return;
+        }
         match level {
             HeadingLevel::H1 => {
                 // Match rich.sh heavy box panel:
@@ -587,8 +751,8 @@ impl MarkdownRenderer {
                 self.output.push('\n');
             }
 
-            // Separator line after header row: ├───┼───┤
-            if r_idx == 0 && self.table_rows.len() > 1 {
+            // Separator line between rows (header and each data entry): ├───┼───┤
+            if r_idx + 1 < self.table_rows.len() {
                 let mut sep_line = format!("{}├", border_color);
                 for (i, w) in col_widths.iter().enumerate() {
                     sep_line.push_str(&"─".repeat(w + 2));
@@ -619,11 +783,647 @@ impl MarkdownRenderer {
         self.output.push('\n');
     }
 
-    /// Finalizes rendering, flushing any trailing text line, and returns formatted ANSI text.
-    fn finish(mut self) -> String {
+    /// Renders a Markdown `![alt](dest)` image using Unicode half-block TrueColor
+    /// ANSI cells (`▀`/`▄`) when a local image file can be decoded, or falls back
+    /// cleanly to a compact `[Image: ...]` badge.
+    fn emit_image(&mut self, dest: &str, alt: &str) {
+        let dest_trimmed = dest.trim();
+        let alt_trimmed = alt.trim();
+        let fallback_label = if alt_trimmed.is_empty() {
+            dest_trimmed.to_string()
+        } else {
+            format!("{alt_trimmed} ({dest_trimmed})")
+        };
+
+        if self.in_table {
+            self.current_cell
+                .push_str(&format!("[Image: {fallback_label}]"));
+            return;
+        }
+
+        let is_http = dest_trimmed.starts_with("http://") || dest_trimmed.starts_with("https://");
+        let is_data = dest_trimmed.starts_with("data:");
+
+        let emit_fallback = |out: &mut String| {
+            if is_http {
+                out.push_str(&format!(
+                    "\x1b]8;;{dest_trimmed}\x1b\\\x1b[2;36m[Image: {fallback_label}]\x1b[0m\x1b]8;;\x1b\\\n"
+                ));
+            } else {
+                out.push_str(&format!("\x1b[2;33m[Image: {fallback_label}]\x1b[0m\n"));
+            }
+        };
+
+        if !self.allow_images
+            || is_data
+            || dest_trimmed.is_empty()
+            || (is_http && !self.allow_remote_images)
+        {
+            self.flush_line();
+            self.ensure_blank_line();
+            emit_fallback(&mut self.output);
+            return;
+        }
+
+        let resolved = if is_http {
+            let cache_dir = resolve_image_cache_dir();
+            match fetch_remote_image_cached(dest_trimmed, &cache_dir) {
+                Some(path) => path,
+                None => {
+                    self.flush_line();
+                    self.ensure_blank_line();
+                    emit_fallback(&mut self.output);
+                    return;
+                }
+            }
+        } else {
+            resolve_markdown_image_path(dest_trimmed, self.base_dir.as_deref())
+        };
+        let Ok(raw_bytes) = std::fs::read(&resolved) else {
+            self.flush_line();
+            self.ensure_blank_line();
+            emit_fallback(&mut self.output);
+            return;
+        };
+
+        // Try crisp 3-row Option B badge rendering first for badge-like SVGs with text
+        if let Some((mut badge_rows, badge_w)) = try_render_svg_badge(&raw_bytes) {
+            if let Some(ref url) = self.link_url {
+                for row in &mut badge_rows {
+                    *row = format!("\x1b]8;;{url}\x1b\\{row}\x1b]8;;\x1b\\");
+                }
+            }
+            if !self.current_line.is_empty() {
+                self.flush_line();
+            }
+            self.pending_badges.push((badge_rows, badge_w));
+            return;
+        }
+
+        let max_cols = self.width.saturating_sub(2).clamp(8, 120);
+        let max_rows = 28usize;
+
+        // Check for multi-frame animated GIFs
+        if let Some(frames) = try_decode_animated_gif(&raw_bytes, max_cols, max_rows) {
+            self.flush_line();
+            self.ensure_blank_line();
+            let start_line = self.output.bytes().filter(|&b| b == b'\n').count();
+            if let Some((first_lines, first_delay)) = frames.first() {
+                for line in first_lines {
+                    self.output.push_str(line);
+                    self.output.push('\n');
+                }
+                let next_tick = Instant::now() + *first_delay;
+                self.animations.push(AnimatedImage {
+                    start_line,
+                    frames,
+                    current_frame: 0,
+                    next_tick,
+                });
+            }
+            return;
+        }
+
+        let Some(rgba) = decode_image_or_svg(&raw_bytes, max_cols, max_rows) else {
+            self.flush_line();
+            self.ensure_blank_line();
+            emit_fallback(&mut self.output);
+            return;
+        };
+
         self.flush_line();
-        self.output
+        self.ensure_blank_line();
+
+        for row in render_rgba_to_halfblocks(&rgba) {
+            self.output.push_str(&row);
+            self.output.push('\n');
+        }
     }
+
+    /// Finalizes rendering, flushing any trailing text line, and returns formatted ANSI text
+    /// alongside any decoded animated GIFs.
+    fn finish_full(mut self) -> RenderedMarkdown {
+        self.flush_line();
+        RenderedMarkdown {
+            text: self.output,
+            animations: self.animations,
+        }
+    }
+}
+
+/// Converts an RGBA bitmap into TrueColor Unicode half-block (`▀`/`▄`) ANSI lines,
+/// deduplicating consecutive identical color escape sequences for fast rendering
+/// and low memory usage on animated GIFs.
+fn render_rgba_to_halfblocks(rgba: &image::RgbaImage) -> Vec<String> {
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    enum CellStyle {
+        Reset,
+        FgOnly(u8, u8, u8),
+        FgBg(u8, u8, u8, u8, u8, u8),
+    }
+
+    let target_w = rgba.width();
+    let target_h = rgba.height();
+    let mut rows = Vec::with_capacity((target_h as usize).div_ceil(2));
+    let mut y = 0u32;
+    while y < target_h {
+        let mut row = String::with_capacity(target_w as usize * 8);
+        let mut last_style: Option<CellStyle> = None;
+        for x in 0..target_w {
+            let top = rgba.get_pixel(x, y).0;
+            let bot = if y + 1 < target_h {
+                rgba.get_pixel(x, y + 1).0
+            } else {
+                [0, 0, 0, 0]
+            };
+            let top_vis = top[3] >= 128;
+            let bot_vis = bot[3] >= 128;
+            let (style, ch) = match (top_vis, bot_vis) {
+                (false, false) => (CellStyle::Reset, ' '),
+                (true, false) => (CellStyle::FgOnly(top[0], top[1], top[2]), '▀'),
+                (false, true) => (CellStyle::FgOnly(bot[0], bot[1], bot[2]), '▄'),
+                (true, true) => (
+                    CellStyle::FgBg(top[0], top[1], top[2], bot[0], bot[1], bot[2]),
+                    '▀',
+                ),
+            };
+            if last_style != Some(style) {
+                match style {
+                    CellStyle::Reset => row.push_str("\x1b[0m"),
+                    CellStyle::FgOnly(r, g, b) => {
+                        row.push_str(&format!("\x1b[0m\x1b[38;2;{r};{g};{b}m"));
+                    }
+                    CellStyle::FgBg(tr, tg, tb, br, bg, bb) => {
+                        row.push_str(&format!("\x1b[38;2;{tr};{tg};{tb};48;2;{br};{bg};{bb}m"));
+                    }
+                }
+                last_style = Some(style);
+            }
+            row.push(ch);
+        }
+        row.push_str("\x1b[0m");
+        rows.push(row);
+        y += 2;
+    }
+    rows
+}
+
+/// Decodes a multi-frame animated GIF into pre-rendered half-block ANSI frames
+/// paired with their frame delays. Returns `None` for non-GIFs or single-frame GIFs.
+fn try_decode_animated_gif(
+    bytes: &[u8],
+    max_cols: usize,
+    max_rows: usize,
+) -> Option<Vec<(Vec<String>, Duration)>> {
+    if !(bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a")) {
+        return None;
+    }
+    use image::AnimationDecoder;
+    let decoder = image::codecs::gif::GifDecoder::new(std::io::Cursor::new(bytes)).ok()?;
+    let raw_frames: Vec<image::Frame> = decoder.into_frames().filter_map(Result::ok).collect();
+    if raw_frames.len() <= 1 {
+        return None;
+    }
+
+    let first_buf = raw_frames[0].buffer();
+    let (target_w, target_h) = compute_target_dimensions(
+        first_buf.width() as f64,
+        first_buf.height() as f64,
+        max_cols,
+        max_rows,
+        false,
+    );
+
+    // If a GIF exceeds MAX_GIF_FRAMES, stride-sample evenly across its entire
+    // duration (accumulating skipped delays) instead of cutting off early.
+    let stride = raw_frames.len().div_ceil(MAX_GIF_FRAMES).max(1);
+    let mut out = Vec::with_capacity(raw_frames.len().min(MAX_GIF_FRAMES));
+    let mut i = 0usize;
+    while i < raw_frames.len() {
+        let mut total_ms = 0u64;
+        let end = (i + stride).min(raw_frames.len());
+        for f in &raw_frames[i..end] {
+            let (numer, denom) = f.delay().numer_denom_ms();
+            let ms = if denom == 0 {
+                100u64
+            } else {
+                (numer as u64 / denom as u64).clamp(20, 5000)
+            };
+            total_ms = total_ms.saturating_add(ms);
+        }
+        let resized = image::imageops::resize(
+            raw_frames[i].buffer(),
+            target_w,
+            target_h,
+            image::imageops::FilterType::Triangle,
+        );
+        out.push((
+            render_rgba_to_halfblocks(&resized),
+            Duration::from_millis(total_ms.clamp(50, 5000)),
+        ));
+        i = end;
+    }
+    Some(out)
+}
+
+/// Resolves a Markdown image path against `base_dir` (expanding leading `~/`).
+fn resolve_markdown_image_path(raw: &str, base_dir: Option<&Path>) -> PathBuf {
+    let expanded = if let Some(rest) = raw.strip_prefix("~/") {
+        if let Ok(home) = std::env::var("HOME") {
+            PathBuf::from(home).join(rest)
+        } else {
+            PathBuf::from(raw)
+        }
+    } else {
+        PathBuf::from(raw)
+    };
+    if expanded.is_absolute() {
+        expanded
+    } else if let Some(dir) = base_dir {
+        dir.join(expanded)
+    } else {
+        expanded
+    }
+}
+
+/// Resolves the `{cache_dir}/images` directory used to cache downloaded web images.
+fn resolve_image_cache_dir() -> PathBuf {
+    let cfg_dir = bashmenu_core::get_user_config_dir();
+    let cfg_path = cfg_dir.join("bashmenu.yml");
+    let base_cache = bashmenu_core::load_config(&cfg_path)
+        .ok()
+        .and_then(|cfg| {
+            let raw = cfg.settings.cache_dir.clone()?;
+            let trimmed = raw.trim();
+            if trimmed.is_empty() {
+                return None;
+            }
+            let ctx = bashmenu_core::MacroContext::new(&cfg).with_allow_command_macros(false);
+            let interpolated = bashmenu_core::interpolate_placeholders(trimmed, &ctx);
+            let expanded = if let Some(rest) = interpolated.strip_prefix("~/") {
+                if let Ok(home) = std::env::var("HOME") {
+                    PathBuf::from(home).join(rest)
+                } else {
+                    PathBuf::from(&interpolated)
+                }
+            } else {
+                PathBuf::from(&interpolated)
+            };
+            Some(if expanded.is_absolute() {
+                expanded
+            } else {
+                cfg_dir.join(expanded)
+            })
+        })
+        .unwrap_or_else(|| cfg_dir.join("cache"));
+    base_cache.join("images")
+}
+
+/// Downloads an `http(s)://` image natively via `ureq` (rustls) into
+/// `cache_dir/<sha256>.img`, returning the cached file path on success.
+fn fetch_remote_image_cached(url: &str, cache_dir: &Path) -> Option<PathBuf> {
+    let mut hasher = Sha256::new();
+    hasher.update(url.as_bytes());
+    let digest = hasher.finalize();
+    let hash_hex: String = digest.iter().map(|b| format!("{b:02x}")).collect();
+    let cache_path = cache_dir.join(format!("{hash_hex}.img"));
+    if cache_path.is_file() {
+        return Some(cache_path);
+    }
+
+    let config = ureq::Agent::config_builder()
+        .timeout_global(Some(Duration::from_secs(REMOTE_IMAGE_TIMEOUT_SECS)))
+        .max_redirects(5)
+        .build();
+    let agent = ureq::Agent::new_with_config(config);
+    let mut resp = agent
+        .get(url)
+        .header("User-Agent", concat!("bmpager/", env!("CARGO_PKG_VERSION")))
+        .call()
+        .ok()?;
+    let bytes = resp
+        .body_mut()
+        .with_config()
+        .limit(MAX_REMOTE_IMAGE_BYTES)
+        .read_to_vec()
+        .ok()?;
+
+    // Verify the payload is a supported raster image or valid SVG before caching.
+    if image::load_from_memory(&bytes).is_err() && !is_valid_svg_bytes(&bytes) {
+        return None;
+    }
+
+    if std::fs::create_dir_all(cache_dir).is_err() {
+        return None;
+    }
+    let tmp_path = cache_dir.join(format!("{hash_hex}.tmp.{}", std::process::id()));
+    if std::fs::write(&tmp_path, &bytes).is_err() {
+        let _ = std::fs::remove_file(&tmp_path);
+        return None;
+    }
+    if std::fs::rename(&tmp_path, &cache_path).is_err() {
+        let _ = std::fs::remove_file(&tmp_path);
+        return None;
+    }
+    Some(cache_path)
+}
+
+/// Shared lazily-loaded system font database for SVG `<text>` rendering.
+fn svg_fontdb() -> std::sync::Arc<resvg::usvg::fontdb::Database> {
+    static DB: std::sync::OnceLock<std::sync::Arc<resvg::usvg::fontdb::Database>> =
+        std::sync::OnceLock::new();
+    std::sync::Arc::clone(DB.get_or_init(|| {
+        let mut db = resvg::usvg::fontdb::Database::new();
+        db.load_system_fonts();
+        // Ensure generic CSS font families (e.g. `sans-serif` used by shields.io)
+        // always resolve even on minimal Linux systems.
+        let first_family = db
+            .faces()
+            .find_map(|f| f.families.first().map(|(name, _)| name.clone()));
+        if let Some(first_family) = first_family {
+            let preferred_sans = ["DejaVu Sans", "Liberation Sans", "Noto Sans", "Arial"]
+                .into_iter()
+                .find(|cand| {
+                    db.faces()
+                        .any(|f| f.families.iter().any(|(n, _)| n == cand))
+                })
+                .map(String::from)
+                .unwrap_or_else(|| first_family.clone());
+            db.set_sans_serif_family(&preferred_sans);
+            db.set_serif_family(&preferred_sans);
+            db.set_monospace_family(&first_family);
+        }
+        std::sync::Arc::new(db)
+    }))
+}
+
+/// Returns `true` if `bytes` parses as a valid SVG / SVGZ document.
+fn is_valid_svg_bytes(bytes: &[u8]) -> bool {
+    let opt = resvg::usvg::Options::default();
+    resvg::usvg::Tree::from_data(bytes, &opt).is_ok()
+}
+
+/// Extracted text segment from a badge-like SVG (`shields.io`, GitHub Actions, etc.).
+struct SvgBadgeSegment {
+    text: String,
+    center_x: f32,
+    fg_rgb: Option<(u8, u8, u8)>,
+    opacity: f32,
+}
+
+fn collect_svg_text_segments(group: &resvg::usvg::Group, out: &mut Vec<SvgBadgeSegment>) {
+    for node in group.children() {
+        match node {
+            resvg::usvg::Node::Group(g) => collect_svg_text_segments(g, out),
+            resvg::usvg::Node::Text(text) => {
+                let mut label = String::new();
+                let mut fg_rgb: Option<(u8, u8, u8)> = None;
+                let mut best_opacity = 0.0f32;
+                for chunk in text.chunks() {
+                    let s = chunk.text().trim();
+                    if !s.is_empty() {
+                        if !label.is_empty() {
+                            label.push(' ');
+                        }
+                        label.push_str(s);
+                    }
+                    for span in chunk.spans() {
+                        if let Some(fill) = span.fill() {
+                            let op = fill.opacity().get();
+                            if op > best_opacity {
+                                best_opacity = op;
+                                if let resvg::usvg::Paint::Color(c) = fill.paint() {
+                                    fg_rgb = Some((c.red, c.green, c.blue));
+                                }
+                            }
+                        }
+                    }
+                }
+                if !label.is_empty() && best_opacity >= 0.5 {
+                    let bbox = text.abs_bounding_box();
+                    let center_x = bbox.x() + bbox.width() * 0.5;
+                    out.push(SvgBadgeSegment {
+                        text: label,
+                        center_x,
+                        fg_rgb,
+                        opacity: best_opacity,
+                    });
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Detects badge-like SVGs (`height <= 48px`, wide aspect ratio, containing
+/// legible `<text>` elements) and renders them as a crisp 3-row Option B badge
+/// (`▄` top cap, bold TrueColor terminal text middle row, `▀` bottom cap) using
+/// the exact background and foreground colors sampled from the SVG.
+fn try_render_svg_badge(bytes: &[u8]) -> Option<([String; 3], usize)> {
+    let opt = resvg::usvg::Options {
+        fontdb: svg_fontdb(),
+        ..Default::default()
+    };
+    let tree = resvg::usvg::Tree::from_data(bytes, &opt).ok()?;
+    let size = tree.size();
+    let w = size.width();
+    let h = size.height();
+    if h > 48.0 || h < 8.0 || w < h * 1.5 {
+        return None;
+    }
+
+    let mut raw_segs = Vec::new();
+    collect_svg_text_segments(tree.root(), &mut raw_segs);
+    if raw_segs.is_empty() {
+        return None;
+    }
+
+    raw_segs.sort_by(|a, b| {
+        a.center_x
+            .partial_cmp(&b.center_x)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    // Deduplicate identical text at nearly the same x (e.g., shadow/duplicate layers)
+    let mut segs: Vec<SvgBadgeSegment> = Vec::new();
+    for seg in raw_segs {
+        if let Some(prev) = segs.last_mut() {
+            if prev.text == seg.text && (prev.center_x - seg.center_x).abs() < 6.0 {
+                if seg.opacity >= prev.opacity {
+                    *prev = seg;
+                }
+                continue;
+            }
+        }
+        segs.push(seg);
+    }
+    if segs.is_empty() || segs.len() > 6 {
+        return None;
+    }
+
+    // Rasterize at native CSS resolution to sample exact segment background colors
+    let pw = (w.round() as u32).max(4);
+    let ph = (h.round() as u32).max(4);
+    let mut pixmap = resvg::tiny_skia::Pixmap::new(pw, ph)?;
+    resvg::render(
+        &tree,
+        resvg::tiny_skia::Transform::identity(),
+        &mut pixmap.as_mut(),
+    );
+    let data = pixmap.data();
+    let sample_rgb = |x: u32, y: u32| -> Option<(u8, u8, u8)> {
+        let sx = x.min(pw - 1);
+        let sy = y.min(ph - 1);
+        let idx = ((sy * pw + sx) * 4) as usize;
+        let a = data[idx + 3];
+        if a < 128 {
+            return None;
+        }
+        let af = a as f32 / 255.0;
+        Some((
+            (data[idx] as f32 / af).round().min(255.0) as u8,
+            (data[idx + 1] as f32 / af).round().min(255.0) as u8,
+            (data[idx + 2] as f32 / af).round().min(255.0) as u8,
+        ))
+    };
+
+    let mut row0 = String::new();
+    let mut row1 = String::new();
+    let mut row2 = String::new();
+    let mut total_w = 0usize;
+
+    for seg in segs {
+        let sx = (seg.center_x.round().max(2.0) as u32).min(pw.saturating_sub(2));
+        // Sample near top/bottom edge (2px inset) where pure background rect sits
+        let (br, bg, bb) = sample_rgb(sx, 2.min(ph - 1))
+            .or_else(|| sample_rgb(sx, ph.saturating_sub(3)))
+            .unwrap_or((85, 85, 85));
+        let (fr, fg, fb) = seg.fg_rgb.unwrap_or_else(|| {
+            let luma = 0.299 * br as f32 + 0.587 * bg as f32 + 0.114 * bb as f32;
+            if luma > 160.0 {
+                (20, 20, 20)
+            } else {
+                (255, 255, 255)
+            }
+        });
+
+        let padded = format!(" {} ", seg.text);
+        let seg_w = UnicodeWidthStr::width(padded.as_str());
+        row0.push_str(&format!(
+            "\x1b[0m\x1b[38;2;{br};{bg};{bb}m{}",
+            "▄".repeat(seg_w)
+        ));
+        row1.push_str(&format!(
+            "\x1b[38;2;{fr};{fg};{fb};48;2;{br};{bg};{bb};1m{padded}\x1b[0m"
+        ));
+        row2.push_str(&format!(
+            "\x1b[0m\x1b[38;2;{br};{bg};{bb}m{}",
+            "▀".repeat(seg_w)
+        ));
+        total_w += seg_w;
+    }
+
+    Some(([row0, row1, row2], total_w))
+}
+
+/// Computes natural half-block pixel dimensions `(target_w, target_h)` for an
+/// image of intrinsic size `(src_w, src_h)` within `(max_cols, max_rows * 2)`.
+///
+/// Uses ~3 CSS pixels per half-block cell (`~2.5x` typical browser display size
+/// so badges and icons stay compact yet legible, while large photos/diagrams
+/// still scale cleanly up to the viewport bounds).
+fn compute_target_dimensions(
+    src_w: f64,
+    src_h: f64,
+    max_cols: usize,
+    max_rows: usize,
+    is_svg: bool,
+) -> (u32, u32) {
+    let w = src_w.max(1.0);
+    let h = src_h.max(1.0);
+    let max_px_w = max_cols.max(1) as f64;
+    let max_px_h = (max_rows.max(1) * 2) as f64;
+
+    // For SVGs and small raster badges/icons (<= 64px tall), map ~3 source px
+    // to 1 half-block pixel so shields.io badges (e.g. 110x20) render at ~37x3
+    // terminal cells instead of 110x10. Tiny swatches (<= 24px) keep 1:1 scale.
+    let natural_scale: f64 = if (is_svg || h <= 64.0) && (w > 24.0 || h > 24.0) {
+        1.0 / 3.0
+    } else {
+        1.0
+    };
+
+    let fit_scale = (max_px_w / w).min(max_px_h / h);
+    let scale = natural_scale.min(fit_scale);
+
+    let target_w = ((w * scale).round() as u32).max(1);
+    let target_h = ((h * scale).round() as u32).max(2);
+    (target_w, target_h)
+}
+
+/// Decodes raster image bytes (PNG/JPEG/WebP/GIF) or rasterizes an SVG/SVGZ
+/// into an RGBA buffer sized to fit `(max_cols, max_rows * 2)` pixels.
+fn decode_image_or_svg(bytes: &[u8], max_cols: usize, max_rows: usize) -> Option<image::RgbaImage> {
+    if let Ok(img) = image::load_from_memory(bytes) {
+        let (target_w, target_h) = compute_target_dimensions(
+            img.width() as f64,
+            img.height() as f64,
+            max_cols,
+            max_rows,
+            false,
+        );
+        return Some(
+            img.resize_exact(target_w, target_h, image::imageops::FilterType::Triangle)
+                .to_rgba8(),
+        );
+    }
+
+    let opt = resvg::usvg::Options {
+        fontdb: svg_fontdb(),
+        ..Default::default()
+    };
+    let tree = resvg::usvg::Tree::from_data(bytes, &opt).ok()?;
+    let size = tree.size();
+    let (target_w, target_h) = compute_target_dimensions(
+        size.width() as f64,
+        size.height() as f64,
+        max_cols,
+        max_rows,
+        true,
+    );
+
+    let mut pixmap = resvg::tiny_skia::Pixmap::new(target_w, target_h)?;
+    let sx = target_w as f32 / size.width().max(1.0);
+    let sy = target_h as f32 / size.height().max(1.0);
+    resvg::render(
+        &tree,
+        resvg::tiny_skia::Transform::from_scale(sx, sy),
+        &mut pixmap.as_mut(),
+    );
+
+    // Un-premultiply tiny-skia's premultiplied RGBA pixels into straight RGBA.
+    let mut out = image::RgbaImage::new(target_w, target_h);
+    let src = pixmap.data();
+    for y in 0..target_h {
+        for x in 0..target_w {
+            let idx = ((y * target_w + x) * 4) as usize;
+            let a = src[idx + 3];
+            let (r, g, b) = if a == 0 {
+                (0, 0, 0)
+            } else if a == 255 {
+                (src[idx], src[idx + 1], src[idx + 2])
+            } else {
+                let af = a as f32 / 255.0;
+                (
+                    (src[idx] as f32 / af).round().min(255.0) as u8,
+                    (src[idx + 1] as f32 / af).round().min(255.0) as u8,
+                    (src[idx + 2] as f32 / af).round().min(255.0) as u8,
+                )
+            };
+            out.put_pixel(x, y, image::Rgba([r, g, b, a]));
+        }
+    }
+    Some(out)
 }
 
 /// Word-wraps a table cell string to fit within `max_width` visual terminal cells,

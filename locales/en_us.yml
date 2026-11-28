@@ -321,6 +321,9 @@ bmpager:
   wrap_on: "Wrap: ON"
   wrap_off: "Wrap: OFF"
   wrap_markdown_always: "Wrap: always ON in Markdown mode"
+  raw_on: "View: RAW source"
+  raw_off: "View: Rendered"
+  raw_already: "Already in raw text view"
   opened: "opened {target}"
   viewed: "viewed {target}"
   file_not_found: "file not found: {target}"
@@ -350,7 +353,14 @@ help:
     ## Interactive Input Directives
     | Macro / Placeholder | Description |
     | :--- | :--- |
-    | {{param}} | Prompts for text input modal (masked=true supported) |
+    | {{param}} | Prompts for text input modal (supports title="...", text="...", default="...", masked, raw) |
+    | {{message:"TEXT"}} | Centered popup modal with OK button (no title; or title="...":text="...", supports ", ', `) |
+    | {{input:id=VAR:default="":...}} | Embedded form text field in interactive Markdown (width, multiline, scrollbar, height=5, masked) |
+    | {{radio:VAR:"Option 1":"Option 2"}} | Single-choice radio list in interactive Markdown (supports id=, default=, layout="horizontal") |
+    | {{checkbox:VAR:"Label":false}} | Boolean toggle checkbox in interactive Markdown (exports "true"/"false") |
+    | {{id:VAR}} | Live interpolated value from matching {{input}}/{{radio}}/{{checkbox}} (in Bash: {{id:VAR="VAL"}} writes back) |
+    | {{button:type="submit"\|"ok"\|"action"\|"cancel":action="ID"}} | Action button invoking reserved ```bashmenu-bash:id="ID"``` block (action stays on page; optional text="...") |
+    | {{clear}} | Clears the interactive Markdown screen before rendering subsequent content |
     | {{file_picker}} | Launches visual file chooser dialog |
     | {{file_picker:path:<dir>}} | File chooser opening in specified default directory |
     | {{file_picker:stem}} | Path without file extension (/path/to/img) |
@@ -460,7 +470,7 @@ help:
     | {{app.<key.path>}} | Configuration key in bashmenu.yml (e.g. {{app.theme}}) |
     | {{env:<var_name>}} | Environment variable value (e.g. {{env:USER}}) |
     | {{env}} / {{environment}} | Environment inspection modal / overview table |
-    | {{info:<path>}} | Renders Markdown file with YAML frontmatter (title, width, height) |
+    | {{info:<path>}} / {{imarkdown:<path>}} | Renders Markdown / interactive Markdown file with YAML frontmatter (title, width, height, interactive) |
     | {{help}} | Built-in action: opens BashMenu documentation manual |
     | {{theme_picker}} | Built-in action: opens interactive theme selector modal |
     | {{text_editor}} | Built-in action: launches bashedit text editor |
@@ -488,6 +498,7 @@ help:
     | title: <text> | Popup window title (supports placeholders; defaults to filename) |
     | width: <1..100>[%] | Popup width as % of terminal width (accepts 80, "80", or "80%") |
     | height: <1..100>[%] | Popup height as % of terminal height (accepts 70, "70", or "70%") |
+    | interactive: true | Enables reserved bashmenu-bash:id="..." blocks, {{input:...}}, {{button:...}}, {{clear}}, and live {{id:...}} |
   markdown_reference: |-
     # Markdown Syntax Reference
 
@@ -572,6 +583,7 @@ cli:
     repo: "Load configuration files from the repository defaults directory"
     image: "Render full-resolution TrueColor background images directly via framebuffer"
     locale: "Override active locale (e.g. \"en_US\", \"es_ES\", or path to YAML locale file)"
+    imarkdown: "Run an interactive Markdown document directly as a standalone TUI"
   bashedit:
     about: "Terminal text editor with crash recovery, tabs, and colocated swap files"
     file: "File to edit (leave blank for empty unsaved buffer)"
@@ -633,6 +645,7 @@ cli:
         -V, --version     Print the version and exit.
         -m, --markdown    Render input formatted as Markdown.
         -w, --wrap        Soft-wrap non-markdown text lines to window width.
+        --remote-images   Download and cache remote http(s) Markdown images (opt-in).
         +N                Start with line N at the top of the window.
         +/PATTERN         Start at the first line containing PATTERN.
         -c, --no-color    Discard ANSI escape sequences instead of rendering them.
@@ -653,5 +666,5 @@ cli:
         g Home            Jump to TOP          G End           Jump to BOT
         /                 Search forward       n / N           Next / prev match
         l o               Follow / open link   e               Open in editor
-        w W               Toggle soft-wrap     h ? F1          Help manual modal
-        q Q Ctrl-C Esc    Quit
+        w W               Toggle soft-wrap     r R             Toggle raw view
+        h ? F1            Help manual modal    q Q Ctrl-C Esc  Quit

@@ -1,4 +1,4 @@
-# HA Bash Menu Specification & User Manual (v0.1.9)
+# HA Bash Menu Specification & User Manual (v0.1.10)
 
 Welcome to the specification and user manual for HA Bash Menu, a lightweight,
 data-driven Ratatui Text User Interface (TUI) menu engine and configuration
@@ -33,6 +33,7 @@ editor for Linux systems.
   - [6.2 System & Path Placeholders](#62-system--path-placeholders)
   - [6.3 Nerd Fonts & Emoji Adaptive Resolution](#63-nerd-fonts--emoji-adaptive-resolution)
   - [6.4 Console Tag Rich Formatting](#64-console-tag-rich-formatting)
+  - [6.5 Interactive Markdown Applications (`interactive: true` & `--imarkdown`)](#65-interactive-markdown-applications-interactive-true--imarkdown)
 - [7. Advanced Integration Use Cases](#7-advanced-integration-use-cases)
   - [7.1 Modular Block Injection (`type: inject_block`)](#71-modular-block-injection-type-inject_block)
   - [7.2 Subprocess Execution Modes (`execution_mode`, `stream`, `interactive`)](#72-subprocess-execution-modes-execution_mode-stream-interactive)
@@ -82,6 +83,7 @@ HA Bash Menu is comprised of modular scripts and configuration files:
 | `--repo` | `-r` | Load configuration files (`bashmenu.yml`, `bashmenu.mnu`, `bashmenu.themes`, `shortcuts.yml`, `cheat.yml`, `notes.yml`) from repository `defaults/` directory. |
 | `--image` | `-i` | Render full-resolution TrueColor background images directly via the Linux framebuffer (`/dev/fb0`) instead of character-block translation. |
 | `--local` | | Load and save configuration files in current working directory. |
+| `--imarkdown <FILE>` | | Run an interactive (or static) Markdown document directly as a standalone TUI without launching the main menu (supports `#!/usr/bin/env -S bashmenu --imarkdown` shebangs; exits `0` on submit/OK and `1` on cancel). |
 
 ---
 
@@ -267,7 +269,8 @@ The `bmpager` standalone pager provides full-screen interactive viewing of files
 
 | Option | Description |
 | :--- | :--- |
-| `-m`, `--markdown` | Render input formatted as CommonMark Markdown (wrapped to window width). |
+| `-m`, `--markdown` | Render input formatted as CommonMark Markdown (wrapped to window width, with inline local PNG/JPEG/WebP/GIF/SVG image rendering via Unicode half-blocks). |
+| `--remote-images` | Opt-in flag to download and cache remote `http(s)://` Markdown images (including SVGs) into `{cache_dir}/images/` (5s timeout, 10 MiB cap; disabled by default). |
 | `-w`, `--wrap`, `--wrap-text` | Soft-wrap non-markdown plain and ANSI text lines to terminal width. |
 | `-c`, `--no-color` | Discard ANSI escape sequences instead of rendering colors. |
 | `--no-help` | Hide the bottom help bar for maximum content lines. |
@@ -278,6 +281,8 @@ The `bmpager` standalone pager provides full-screen interactive viewing of files
 | `--max-lines=N` | Cap in-memory line buffer to `N` lines (ring buffer). |
 | `--file=PATH`, `--edit-target=PATH` | Associate an explicit file path for editing when paging a stream. |
 | `--reload-cmd=CMD` | Re-run `CMD` to refresh buffer contents after editing. |
+
+Inside `bmpager`, press `r` / `R` to toggle between the rendered view (e.g., Markdown) and the raw unformatted source text, and `w` / `W` to toggle soft word wrapping on plain/raw text.
 | `+N` | Start viewing with line `N` at the top of the window. |
 | `+/PATTERN` | Jump to the first line matching search pattern. |
 
@@ -1003,11 +1008,19 @@ Menu items can trigger non-blocking, self-dismissing toast notifications rendere
 
 ### 6.1 Dynamic Input Directives
 Dynamic input directives trigger modal dialogs when selected,
-substituting the placeholder in the action string prior to execution:
+substituting the placeholder in the action string prior to execution.
+When targeting shell commands, substituted values are **POSIX single-quote escaped by default** to prevent shell injection (append `:raw` such as `{param:raw}` or `{file_picker:raw}` only when unquoted expansion is intentionally desired). Non-shell targets such as `type: editor` file paths are passed unquoted directly to the editor binary.
 
 | Directive | Description | Supported Attributes |
 | :--- | :--- | :--- |
-| `{param}` | Prompts for a single-line parameter value using a text modal. | `title` (modal header), `prompt` (body text), `masked` (mask input with asterisks) |
+| `{param}` | Prompts for a single-line parameter value using a text modal. Supports inline `{param:title="...":text="...":default="..."}` (any subset, `"`, `'`, or `` ` `` quotes, optional spaces around `:` and `=`). Omits the modal title when none is assigned. | `title` (modal header), `text` / `prompt` (body text), `default` (initial input value), `masked` (mask input with asterisks), `:raw` (opt out of shell quoting) |
+| `{message:"..."}` | Displays an adaptive, centered popup message modal with an **OK** button and top-right `[X]` close button. Shorthand `{message:"TEXT"}` shows no title; structured `{message:title="...":text="..."}` allows omitting either field. Accepts `"..."`, `'...'`, or `` `...` `` delimiters, optional spaces around `:` and `=`, `\n` line breaks, and nested placeholders. Can be used standalone or prepended to a command. | `title` (optional modal header), `text` (message body) |
+| `{input:...}` | Embeds an interactive text field inside an `interactive: true` Markdown document (`{info:<path>}`). Single-line fields following text render inline; default `width` fills to the right margin. Pressing `Enter` (or `Ctrl+Enter` when `multiline=true`) soft-refreshes all `{id:...}` placeholders live; activating a `submit`/`ok` button exports each `id` as a Bash variable to its target `bashmenu-bash:id="..."` block. | `default` (`""`), `id` (Bash variable name), `width` (cols, optional), `multiline` (`false`), `scrollbar` (`true`, multiline only), `height` (`5`, multiline only), `masked` (`false`, masks characters with `*`) |
+| `{radio:...}` | Embeds a single-choice radio option group inside an `interactive: true` Markdown document. Supports positional shorthand (`{radio: rdoValue: "Option 1": "Option 2"}`) or `key=value` options. Selecting an option via arrow keys or mouse click immediately soft-refreshes `{id:...}` and exports the chosen text to Bash. | `id` (Bash variable name), `default` (initial option text), `layout` (`"vertical"` or `"horizontal"`), quoted option labels |
+| `{checkbox:...}` | Embeds a boolean `[x]`/`[ ]` toggle inside an `interactive: true` Markdown document. Supports positional shorthand (`{checkbox: flag: "Enable logs": true}`) or `key=value` options. Toggling via `Space`/`Enter`/click updates `{id:...}` live and exports `"true"` or `"false"` to Bash. | `id` (Bash variable name), `label`/`text` (display label), `default`/`checked` (`false`) |
+| `{id:<name>}` | Live data interpolation placeholder inside an `interactive: true` Markdown document (and inside `bashmenu-bash:id="..."` code blocks) referencing an `{input}`, `{radio}`, or `{checkbox}` field. Inside `bashmenu-bash` scripts, `{id:<name>="<value>"}` writes a computed value back to the document's `{id:<name>}` map live. | `<name>` matching a form control or script variable `id` |
+| `{button:...}` | Renders an interactive button inside an `interactive: true` Markdown document. Multiple `{button:...}` macros on the same line render side-by-side and replace the default footer `[ OK ]` button. `submit` (`[ Submit ]`) and `ok` (`[ OK ]`) commit form inputs, run the optional reserved ```` ```bashmenu-bash:id="<name>" ```` code block, and advance past `{clear}` (or close on the last page). `action` (`[ Run ]`, or custom `text="..."`) runs its `action` block in-place and stays on the current page (ideal for live `{id:var="..."}` updates). `cancel` (`[ Cancel ]`) runs its optional `action` block and exits the modal immediately. | `type` (`"submit"`, `"ok"`, `"action"`, or `"cancel"`), `action` (reserved `bashmenu-bash:id="..."` block name, optional), `text`/`label` (custom button label, optional) |
+| `{clear}` | Clears the interactive Markdown screen before rendering subsequent content while preserving committed `{id:...}` values. | *(none)* |
 | `{file_picker}` | Launches a visual file chooser dialog. | `title`, `start_dir` |
 | `{file_picker:path:<dir>}` | Launches file chooser defaulting to specified starting directory. | `title`, `start_dir` |
 | `{file_picker_new}` / `{file_picker:new}` | Launches a visual file chooser dialog that permits creating **new files** (by pressing `n` or `N`). | `title`, `start_dir` |
@@ -1128,16 +1141,19 @@ These variables are dynamically resolved using active configuration and environm
 | `{color_mode}` | Current terminal color depth mode (e.g., `3-bit (8 color)`, `16 color`, `256 color`, `truecolor`). |
 | `{tty_mode}` | Current TTY session mode (e.g., `virtual console (tty)`, `pty`, `serial console (tty)`). |
 
-#### Markdown Modal YAML Frontmatter (`{info:<path>}`)
-Custom Markdown files loaded via `{info:<path>}` (and `assets/about.md`) support an optional YAML frontmatter header delimited by `---` lines:
+#### Markdown Modal YAML Frontmatter (`{info:<path>}` / `{imarkdown:<path>}`)
+Custom Markdown files loaded via `{info:<path>}` or its alias `{imarkdown:<path>}` (or launched directly with `bashmenu --imarkdown <file>`) support an optional YAML frontmatter header delimited by `---` lines (and an optional leading `#!/usr/bin/env -S bashmenu --imarkdown` shebang line):
 
 ```yaml
 ---
 title: Custom Modal Title ({host})   # Optional; supports placeholders (defaults to filename)
 width: 80%                           # Optional; 1..=100 (% of terminal width; accepts 80, "80", "80%")
 height: 70%                          # Optional; 1..=100 (% of terminal height; accepts 70, "70", "70%")
+interactive: true                    # Optional; enables forms, buttons, live {id:...}, and bashmenu-bash blocks
 ---
 ```
+
+See [Section 6.5: Interactive Markdown Applications](#65-interactive-markdown-applications-interactive-true--imarkdown) for the full guide and a complete runnable example.
 
 ### 6.3 Nerd Fonts & Emoji Adaptive Resolution
 The application resolves icons dynamically according to terminal features and
@@ -1208,6 +1224,98 @@ The application includes a rich formatting parser allowing developers to use inl
 * **Backslash Tag Escaping:** Preceding a tag bracket with a backslash (`\[b]`, `\[red]`) escapes the formatting parser, rendering the literal bracketed text.
 * **`no_formatting` Directive / Flag:** Menu items and dialog displays accept an optional `no_formatting: true` attribute to disable tag processing entirely when displaying literal bracketed text.
 * **Native Markdown Tables & Headings:** Pipe-delimited Markdown tables (`| Col1 | Col2 |`) and headings (`## Heading`) are parsed and rendered natively by `MessageModal` (such as `{info:<path>}` and `{env}`) rather than BBCode tags.
+
+### 6.5 Interactive Markdown Applications (`interactive: true` & `--imarkdown`)
+
+When a Markdown file includes `interactive: true` in its YAML frontmatter, BashMenu turns it into an interactive TUI form and script runner. The exact same `.md` file can be launched either:
+
+1. **Inside BashMenu** via a menu item referencing `{imarkdown:<path>}` or `{info:<path>}` (or `type: imarkdown` / `type: info` in `menuedit`'s type picker with the file path in `action:`/`message:`).
+2. **Standalone from the terminal** via `bashmenu --imarkdown <file>` (or directly as an executable script with `#!/usr/bin/env -S bashmenu --imarkdown` on line 1 and `chmod +x`). Standalone mode renders the themed popup over your terminal's native default background (`Color::Reset`), restores the pre-launch terminal cleanly on exit, and returns exit code `0` on `Submit`/`OK` or `1` on `Cancel`/`Esc`.
+
+#### How Execution Works
+- **Reserved Bash Code Blocks (`bashmenu-bash:id="..."`):**
+  Fenced blocks starting with ```` ```bashmenu-bash: id="<name>" ```` are **held in reserve**—they are never rendered into visible Markdown and never auto-executed when the file opens. Instead, they act like Bash functions invoked on demand by `{button: ...: action="<name>"}`. Any non-`bashmenu-*` fence (such as ```` ```bash ```` or ```` ```xbashmenu-bash ````) renders as a normal visible Markdown code block.
+- **Form-to-Bash Data Binding:**
+  Every `{input}`, `{radio}`, and `{checkbox}` widget with an `id` exports its committed value as a Bash environment variable (`$VAR`) when an action runs. Inside `bashmenu-bash` blocks, `{id:VAR}` also expands to `${VAR:-}`.
+- **Live UI-RPC & Script-to-Page Write-Back (`{id:VAR="VALUE"}`):**
+  Running `bashmenu-bash` blocks communicate with the live BashMenu TUI over a private `0600` Unix domain socket:
+  - `{param:...}` / `{message:...}` / `{toast:...}` inside Bash open real TUI modals/toasts mid-script.
+  - `{id:VAR="VALUE"}` writes a computed value from Bash back into the document's live `{id:VAR}` map (and updates any matching form widget on screen).
+- **Soft-Refresh, Buttons & `{clear}`:**
+  - Pressing `Enter`, `Tab`, or `Shift+Tab` in an `{input}` field (or changing a `{radio}` / `{checkbox}`) triggers a soft-refresh that updates all `{id:...}` placeholders live on the page.
+  - `{button: type="action": text="Compute": action="..."}` runs its Bash block **in-place** and stays on the current view so `{id:VAR="VALUE"}` updates appear immediately.
+  - `{button: type="submit": action="..."}` and `{button: type="ok": action="..."}` run their optional Bash block, then clear/advance past `{clear}` (if present) or close the modal.
+  - `{button: type="cancel": action="..."}` runs its optional cleanup block and closes the modal immediately.
+  - `{clear}` clears the interactive Markdown screen before rendering subsequent content while preserving all committed `{id:...}` values.
+  - `Up`/`Down` arrows (when not moving inside a multiline input or radio group), `PageUp`/`PageDown`, and mouse wheel scroll the modal viewport.
+
+#### Complete In-Document Example
+
+`````markdown
+#!/usr/bin/env -S bashmenu --imarkdown
+---
+title: Interactive Demo ({host})
+width: 80%
+height: 75%
+interactive: true
+---
+
+````bashmenu-bash: id="computeSummary"
+#!/usr/bin/env bash
+NOW=$(date '+%H:%M:%S')
+UPPER_NAME=$(printf '%s' "$guestName" | tr '[:lower:]' '[:upper:]')
+
+if [ "$includeHost" = "true" ]; then
+    SUMMARY="Hello $UPPER_NAME on $(hostname) ($favTheme)"
+else
+    SUMMARY="Hello $UPPER_NAME ($favTheme)"
+fi
+
+# Write computed values back to the live Markdown document:
+{id:lastRun="$NOW"}
+{id:computedSummary="$SUMMARY"}
+````
+
+````bashmenu-bash: id="runConfirm"
+#!/usr/bin/env bash
+NOTE="{param:title='Quick Note':text='Add an optional note for {id:guestName}:'}"
+{id:userNote="${NOTE:-None}"}
+{message:"Saved settings for {id:guestName} ({id:favTheme})!"}
+````
+
+# Interactive Markdown Demo
+
+Welcome, **{user}**! Fill out the fields below and press `Tab` or `Enter` to refresh `{id:...}` values live.
+
+Name: {input: default="{user}": id="guestName"}
+
+Secret PIN: {input: default="": id="secretPin": width=16: masked=true}
+
+Pick a style:
+{radio: favTheme: "Retro Terminal": "Modern Minimal": "Cyberpunk Neon"}
+
+{checkbox: includeHost: "Include hostname in summary": true}
+
+Current values: **{id:guestName}** | **{id:favTheme}** | Include host: **{id:includeHost}**
+
+**Live script output** (click **Compute** to update in-place):
+- Last run: `{id:lastRun}`
+- Summary: {id:computedSummary}
+
+{button: type="action": text="Compute": action="computeSummary"}    {button: type="submit": action="runConfirm"}    {button: type="cancel"}
+
+{clear}
+
+# Summary
+
+All done, **{id:guestName}**!
+
+- **Style:** {id:favTheme}
+- **Computed summary:** {id:computedSummary}
+- **Note:** {id:userNote}
+
+{button: type="ok"}
+`````
 
 ---
 

@@ -550,7 +550,7 @@ fn main() -> Result<()> {
                         .filter(|s| !s.trim().is_empty())
                         .unwrap_or(default_icon_str);
                     let exp_icon = if let Some(ref c) = cfg {
-                        let ctx = MacroContext::new(c);
+                        let ctx = MacroContext::new(c).with_allow_command_macros(false);
                         interpolate_placeholders(raw_icon, &ctx)
                     } else {
                         raw_icon.to_string()
@@ -1020,7 +1020,8 @@ fn main() -> Result<()> {
                             }
                             ItemEditResult::ShowPlaceholders => {
                                 let ph_cfg = cfg.clone().unwrap_or_default();
-                                let ph_ctx = MacroContext::new(&ph_cfg);
+                                let ph_ctx =
+                                    MacroContext::new(&ph_cfg).with_allow_command_macros(false);
                                 let ph_text = render_placeholder_help_text(&ph_ctx);
                                 *child_opt = Some(Box::new(ChildModal::Help(
                                     HelpModal::new(t!("bashedit.placeholders_title"), &ph_text)
@@ -1227,7 +1228,8 @@ fn main() -> Result<()> {
                                         }
                                         MenuEditFooterAction::Placeholders => {
                                             let ph_cfg = cfg.clone().unwrap_or_default();
-                                            let ph_ctx = MacroContext::new(&ph_cfg);
+                                            let ph_ctx = MacroContext::new(&ph_cfg)
+                                                .with_allow_command_macros(false);
                                             let ph_text = render_placeholder_help_text(&ph_ctx);
                                             active_modal = ActiveModal::Help(
                                                 HelpModal::new(
@@ -1513,7 +1515,8 @@ fn main() -> Result<()> {
                                     }
                                     KeyCode::Char('p') => {
                                         let ph_cfg = cfg.clone().unwrap_or_default();
-                                        let ph_ctx = MacroContext::new(&ph_cfg);
+                                        let ph_ctx = MacroContext::new(&ph_cfg)
+                                            .with_allow_command_macros(false);
                                         let ph_text = render_placeholder_help_text(&ph_ctx);
                                         active_modal = ActiveModal::Help(
                                             HelpModal::new(
@@ -1607,7 +1610,8 @@ fn main() -> Result<()> {
                                 }
                                 KeyCode::F(5) => {
                                     let ph_cfg = cfg.clone().unwrap_or_default();
-                                    let ph_ctx = MacroContext::new(&ph_cfg);
+                                    let ph_ctx =
+                                        MacroContext::new(&ph_cfg).with_allow_command_macros(false);
                                     let ph_text = render_placeholder_help_text(&ph_ctx);
                                     active_modal = ActiveModal::Help(
                                         HelpModal::new(t!("bashedit.placeholders_title"), &ph_text)

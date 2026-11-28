@@ -83,9 +83,23 @@ fn main() {
     let term_width = (cols as usize).clamp(20, 500);
 
     // 5. Format and split content into lines
+    let md_base_dir = args
+        .associated_file
+        .as_ref()
+        .or_else(|| args.files.first())
+        .and_then(|p| p.parent())
+        .map(std::path::Path::to_path_buf);
+    let mut md_animations = Vec::new();
     let mut lines: Vec<String> = if is_markdown {
-        let rendered = markdown::render_markdown(&raw_content, term_width);
-        rendered.lines().map(|s| s.to_string()).collect()
+        let rendered = markdown::render_markdown_full(
+            &raw_content,
+            term_width,
+            md_base_dir.as_deref(),
+            !args.strip_colors,
+            args.remote_images,
+        );
+        md_animations = rendered.animations;
+        rendered.text.lines().map(|s| s.to_string()).collect()
     } else if args.wrap_text {
         ansi::wrap_text_content(&raw_content, term_width)
     } else {
@@ -122,7 +136,9 @@ fn main() {
     }
 
     // 7. Interactive full-screen Pager
-    let mut pager = Pager::new(lines, args).with_raw_content(raw_content);
+    let mut pager = Pager::new(lines, args)
+        .with_raw_content(raw_content)
+        .with_animations(md_animations);
     if truncated {
         pager.message = t!("bmpager.stored_lines", count => pager.args.max_lines);
     }

@@ -29,6 +29,8 @@ pub struct PagerArgs {
     pub markdown: bool,
     /// Whether to soft-wrap non-markdown plain/ANSI text to terminal width
     pub wrap_text: bool,
+    /// Whether to download and cache remote `http(s)://` Markdown images (opt-in)
+    pub remote_images: bool,
     /// Override active locale (e.g. "en_US", "es_ES")
     pub locale: Option<String>,
 }
@@ -49,6 +51,7 @@ impl Default for PagerArgs {
             start_pattern: None,
             markdown: false,
             wrap_text: false,
+            remote_images: false,
             locale: None,
         }
     }
@@ -79,6 +82,8 @@ pub fn parse_cli_args() -> Result<PagerArgs, String> {
             args.markdown = true;
         } else if arg == "-w" || arg == "--wrap" || arg == "--wrap-text" {
             args.wrap_text = true;
+        } else if arg == "--remote-images" {
+            args.remote_images = true;
         } else if arg == "-c" || arg == "--no-color" || arg == "--no-colour" {
             args.strip_colors = true;
         } else if arg == "--no-help" {

@@ -341,50 +341,62 @@ fn test_file_and_dir_picker_macros_and_modifiers() {
         PathBuf::from("/home/testuser/.config/bashmenu/scripts")
     );
 
-    // 2. Apply file_picker modifiers
+    // 2. Apply file_picker modifiers (POSIX shell-quoted by default, :raw opt-in)
     let chosen_file = Path::new("/tmp/photos/vacation.png");
     assert_eq!(
         apply_file_picker_macros("open {file_picker}", chosen_file, Some(&ctx)),
+        "open '/tmp/photos/vacation.png'"
+    );
+    assert_eq!(
+        apply_file_picker_macros("open {file_picker:raw}", chosen_file, Some(&ctx)),
         "open /tmp/photos/vacation.png"
     );
     assert_eq!(
         apply_file_picker_macros("stem={file_picker:stem}", chosen_file, Some(&ctx)),
-        "stem=/tmp/photos/vacation"
+        "stem='/tmp/photos/vacation'"
     );
     assert_eq!(
         apply_file_picker_macros("name={file_picker:name}", chosen_file, Some(&ctx)),
-        "name=vacation.png"
+        "name='vacation.png'"
     );
     assert_eq!(
         apply_file_picker_macros("base={file_picker:base}", chosen_file, Some(&ctx)),
-        "base=vacation"
+        "base='vacation'"
     );
     assert_eq!(
         apply_file_picker_macros("dir={file_picker:dir}", chosen_file, Some(&ctx)),
-        "dir=/tmp/photos"
+        "dir='/tmp/photos'"
     );
     assert_eq!(
         apply_file_picker_macros("ext={file_picker:ext}", chosen_file, Some(&ctx)),
-        "ext=.png"
+        "ext='.png'"
     );
 
-    // 3. Apply dir_picker modifiers
+    // 3. Apply dir_picker modifiers (POSIX shell-quoted by default, :raw opt-in)
     let chosen_dir = Path::new("/home/testuser/github/bashmenu-rs");
     assert_eq!(
         apply_dir_picker_macros("cd {dir_picker_new} && opencode", chosen_dir, Some(&ctx)),
+        "cd '/home/testuser/github/bashmenu-rs' && opencode"
+    );
+    assert_eq!(
+        apply_dir_picker_macros(
+            "cd {dir_picker_new:raw} && opencode",
+            chosen_dir,
+            Some(&ctx)
+        ),
         "cd /home/testuser/github/bashmenu-rs && opencode"
     );
     assert_eq!(
         apply_dir_picker_macros("folder={dir_picker:name}", chosen_dir, Some(&ctx)),
-        "folder=bashmenu-rs"
+        "folder='bashmenu-rs'"
     );
     assert_eq!(
         apply_dir_picker_macros("parent={dir_picker:dir}", chosen_dir, Some(&ctx)),
-        "parent=/home/testuser/github"
+        "parent='/home/testuser/github'"
     );
     assert_eq!(
         apply_dir_picker_macros("parent={dir_picker:parent}", chosen_dir, Some(&ctx)),
-        "parent=/home/testuser/github"
+        "parent='/home/testuser/github'"
     );
 
     // 4. MenuItem helper methods
@@ -402,8 +414,127 @@ fn test_file_and_dir_picker_macros_and_modifiers() {
     assert!(item.first_picker_spec(&ctx).is_none());
     assert_eq!(
         item.command.as_deref(),
-        Some("cd /home/testuser/github/bashmenu-rs && opencode")
+        Some("cd '/home/testuser/github/bashmenu-rs' && opencode")
     );
+}
+
+#[test]
+fn test_shell_and_macro_injection_defense_issue_91() {
+    use bashmenu_core::{
+        apply_file_picker_macros, posix_shell_quote, shell_quote_for_context, MenuItem,
+        MenuItemType,
+    };
+    use std::path::PathBuf;
+
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../defaults/bashmenu.yml");
+    let config = load_config(fixture).expect("load config");
+    let mut ctx = MacroContext::new(&config);
+    ctx.home_dir = PathBuf::from("/home/testuser");
+    ctx.bashmenu_dir = PathBuf::from("/home/testuser/.config/bashmenu");
+
+    // 1. POSIX single-quote helper & quote-context preservation
+    assert_eq!(
+        posix_shell_quote("a'b $(id); rm -rf /"),
+        "'a'\\''b $(id); rm -rf /'"
+    );
+    assert_eq!(
+        shell_quote_for_context("echo {param}", 5, "$(id)"),
+        "'$(id)'"
+    );
+    assert_eq!(
+        shell_quote_for_context("echo '{param}'", 6, "it's $(id)"),
+        "it'\\''s $(id)"
+    );
+    assert_eq!(
+        shell_quote_for_context("echo \"hello {param}\"", 12, "$(id)"),
+        "\"'$(id)'\""
+    );
+
+    // 2. {param} shell-escapes metacharacters by default; :raw opts out
+    let mut cmd_item = MenuItem {
+        label: "Ping".to_string(),
+        command: Some("ping -c 1 {param:prompt=Host:} && echo {param:raw}".to_string()),
+        ..Default::default()
+    };
+    cmd_item.apply_param_placeholder("127.0.0.1; touch /tmp/pwned");
+    assert_eq!(
+        cmd_item.command.as_deref(),
+        Some("ping -c 1 '127.0.0.1; touch /tmp/pwned' && echo 127.0.0.1; touch /tmp/pwned")
+    );
+
+    // 3. Self-referential {param} input must not infinite-loop
+    let mut loop_item = MenuItem {
+        label: "Echo".to_string(),
+        command: Some("echo {param}".to_string()),
+        ..Default::default()
+    };
+    loop_item.apply_param_placeholder("{param}");
+    assert_eq!(loop_item.command.as_deref(), Some("echo '{param}'"));
+
+    // 4. Editor items and `file` fields stay unquoted (passed via Command::arg, not bash -c)
+    let mut editor_item = MenuItem {
+        label: "Edit".to_string(),
+        r#type: MenuItemType::Editor,
+        file: Some("{file_picker_new}".to_string()),
+        action: Some("{file_picker_new}".to_string()),
+        ..Default::default()
+    };
+    let tricky_file = Path::new("/tmp/my file $(id)'s.txt");
+    editor_item.apply_picker_result(tricky_file, false, Some(&ctx));
+    assert_eq!(
+        editor_item.file.as_deref(),
+        Some("/tmp/my file $(id)'s.txt")
+    );
+    assert_eq!(
+        editor_item.action.as_deref(),
+        Some("/tmp/my file $(id)'s.txt")
+    );
+
+    // 5. Double-quoted picker template (e.g. convert "{file_picker:stem}.pixel.png")
+    //    evaluates safely in /bin/bash -c without executing $(...) in filename
+    let tricky_img = Path::new("/tmp/$(echo PWNED)/a'b\"c.jpg");
+    let convert_cmd = apply_file_picker_macros(
+        "printf '%s' \"{file_picker:stem}.pixel.png\"",
+        tricky_img,
+        Some(&ctx),
+    );
+    assert!(convert_cmd.contains("'/tmp/$(echo PWNED)/a'\\''b\"c'"));
+    #[cfg(unix)]
+    {
+        let out = std::process::Command::new("/bin/bash")
+            .arg("-c")
+            .arg(&convert_cmd)
+            .output()
+            .expect("run bash -c");
+        assert!(out.status.success());
+        assert_eq!(
+            String::from_utf8_lossy(&out.stdout),
+            "/tmp/$(echo PWNED)/a'b\"c.pixel.png"
+        );
+    }
+
+    // 6. Recursive macro injection defense: template macros interpolate BEFORE
+    //    user input is applied, so {command:...} and {toast:...} in user input
+    //    are never evaluated.
+    let mut macro_item = MenuItem {
+        label: "Run".to_string(),
+        command: Some("{toast:2:\"Running\"}{scripts_dir}/tool.sh {param}".to_string()),
+        ..Default::default()
+    };
+    macro_item.interpolate_template_macros(&ctx);
+    assert!(macro_item.macros_interpolated);
+    assert_eq!(macro_item.pending_toasts.len(), 1);
+    assert_eq!(macro_item.pending_toasts[0].message, "Running");
+    macro_item.apply_param_placeholder("{command:echo PWNED}{toast:5:\"Fake\"}");
+    let expected = format!(
+        "{}/scripts/tool.sh '{{command:echo PWNED}}{{toast:5:\"Fake\"}}'",
+        ctx.bashmenu_dir.display()
+    );
+    assert_eq!(macro_item.command.as_deref(), Some(expected.as_str()));
+    // Idempotent second call must NOT evaluate {command:...} from user input
+    macro_item.interpolate_template_macros(&ctx);
+    assert_eq!(macro_item.command.as_deref(), Some(expected.as_str()));
+    assert_eq!(macro_item.pending_toasts.len(), 1);
 }
 
 #[test]
@@ -638,6 +769,20 @@ fn test_info_macro_and_frontmatter_dimensions() {
         bashmenu_core::extract_info_macro_path("{info:~/.config/bashmenu/info.md}").as_deref(),
         Some("~/.config/bashmenu/info.md")
     );
+    assert_eq!(
+        bashmenu_core::extract_info_macro_path("{imarkdown:~/.config/bashmenu/playground.md}")
+            .as_deref(),
+        Some("~/.config/bashmenu/playground.md")
+    );
+    assert_eq!(
+        bashmenu_core::extract_info_macro_path("open {imarkdown:{bashmenu_dir}/wizard.md}")
+            .as_deref(),
+        Some("{bashmenu_dir}/wizard.md")
+    );
+    assert_eq!(
+        bashmenu_core::extract_info_macro_path("{{imarkdown:escaped.md}}"),
+        None
+    );
 
     let td = std::env::temp_dir().join(format!(
         "bashmenu_info_macro_test_{}_{}",
@@ -747,7 +892,9 @@ fn test_render_placeholder_help_text_tables_and_values() {
     );
 
     // 2-column Interactive Input Directives have no live Value column
-    assert!(rendered.contains("| {param} | Prompts for text input modal (masked=true supported) |"));
+    assert!(rendered.contains(
+        "| {param} | Prompts for text input modal (supports title=\"...\", text=\"...\", default=\"...\", masked, raw) |"
+    ));
 
     // Escaping & Frontmatter documentation sections are present
     assert!(rendered.contains("## Escaping Literal Braces"));
@@ -761,4 +908,209 @@ fn test_render_placeholder_help_text_tables_and_values() {
     if !cfg!(windows) && std::env::var("APPDATA").is_err() {
         assert!(rendered.contains("| {appdata} | Windows AppData roaming directory | na |"));
     }
+}
+
+#[test]
+fn test_allow_command_macros_guard_local_mode_and_info_file_issue_95() {
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../defaults/bashmenu.yml");
+    let config = load_config(fixture).expect("load config");
+
+    // 1. Disabling allow_command_macros prevents {command:...} and {cmd:...} execution
+    let safe_ctx = MacroContext::new(&config).with_allow_command_macros(false);
+    assert!(!safe_ctx.allow_command_macros);
+    assert_eq!(
+        interpolate_placeholders("Val: {command:printf 'SHOULD_NOT_RUN'}", &safe_ctx),
+        "Val: {command:printf 'SHOULD_NOT_RUN'}"
+    );
+    assert_eq!(
+        interpolate_placeholders("Val: {cmd:printf 'SHOULD_NOT_RUN'}", &safe_ctx),
+        "Val: {cmd:printf 'SHOULD_NOT_RUN'}"
+    );
+
+    // 2. --local mode automatically disables {command:...} unless explicitly re-enabled
+    let local_ctx = MacroContext::new(&config).with_local_mode(true);
+    assert!(local_ctx.local_mode);
+    assert!(!local_ctx.allow_command_macros);
+    assert_eq!(
+        interpolate_placeholders("{command:printf 'LOCAL_BLOCKED'}", &local_ctx),
+        "{command:printf 'LOCAL_BLOCKED'}"
+    );
+
+    // 3. {info:<path>} markdown bodies never execute passive {command:...} macros
+    let tmp = std::env::temp_dir().join(format!("bashmenu_issue95_info_{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&tmp);
+    let info_file = tmp.join("untrusted.md");
+    std::fs::write(
+        &info_file,
+        "---\ntitle: Info {command:printf 'TITLE_PWN'}\n---\nBody {command:printf 'BODY_PWN'}\n",
+    )
+    .expect("write untrusted info.md");
+
+    let trusted_ctx = MacroContext::new(&config).with_bashmenu_dir(tmp.clone());
+    let (fm, body) = trusted_ctx
+        .render_info_file("{bashmenu_dir}/untrusted.md")
+        .expect("render info");
+    assert_eq!(
+        fm.title.as_deref(),
+        Some("Info {command:printf 'TITLE_PWN'}")
+    );
+    assert!(
+        body.contains("{command:printf 'BODY_PWN'}"),
+        "Expected unexecuted command macro in info body, got: {body}"
+    );
+    assert!(!body.contains("BODY_PWN\n"));
+
+    let _ = std::fs::remove_dir_all(&tmp);
+}
+
+#[test]
+fn test_interactive_message_macro_delimiters_and_chaining() {
+    use bashmenu_core::{
+        extract_first_message_macro, find_message_macro_span, MenuItem, MessageMacroData,
+    };
+
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../defaults/bashmenu.yml");
+    let mut config = load_config(fixture).expect("load config");
+    config.theme = "cyberpunk".to_string();
+    let ctx = MacroContext::new(&config).with_allow_command_macros(false);
+
+    // 1. Shorthand {message:"TEXT"} has NO title and supports ", ', and `
+    let (rem_dq, msg_dq) =
+        extract_first_message_macro(r#"{message:"This is a popup message"}"#, &ctx)
+            .expect("double-quoted message");
+    assert_eq!(rem_dq, "");
+    assert_eq!(
+        msg_dq,
+        MessageMacroData {
+            title: None,
+            text: "This is a popup message".to_string(),
+        }
+    );
+
+    let (rem_sq, msg_sq) = extract_first_message_macro("{message:'Single quoted \"text\"'}", &ctx)
+        .expect("single-quoted message");
+    assert_eq!(rem_sq, "");
+    assert_eq!(msg_sq.title, None);
+    assert_eq!(msg_sq.text, "Single quoted \"text\"");
+
+    let (rem_bt, msg_bt) =
+        extract_first_message_macro("{message:`Backtick 'quoted' \"text\"`}", &ctx)
+            .expect("backtick-quoted message");
+    assert_eq!(rem_bt, "");
+    assert_eq!(msg_bt.title, None);
+    assert_eq!(msg_bt.text, "Backtick 'quoted' \"text\"");
+
+    // 2. Structured {message:title=...:text=...} with arbitrary spaces and quotes
+    let (_, msg_both) = extract_first_message_macro(
+        r#"{message: title = "Heads Up ({theme})" : text = 'Line 1\nLine 2' }"#,
+        &ctx,
+    )
+    .expect("title + text message");
+    assert_eq!(msg_both.title.as_deref(), Some("Heads Up (cyberpunk)"));
+    assert_eq!(msg_both.text, "Line 1\nLine 2");
+
+    // Omitted title
+    let (_, msg_only_text) =
+        extract_first_message_macro("{message: text = `Only body here` }", &ctx)
+            .expect("text-only message");
+    assert_eq!(msg_only_text.title, None);
+    assert_eq!(msg_only_text.text, "Only body here");
+
+    // Omitted text
+    let (_, msg_only_title) =
+        extract_first_message_macro(r#"{message: title = "Only Title" }"#, &ctx)
+            .expect("title-only message");
+    assert_eq!(msg_only_title.title.as_deref(), Some("Only Title"));
+    assert_eq!(msg_only_title.text, "");
+
+    // 3. Supports \n line breaks, escaped quotes, and nested placeholders
+    let (_, msg_nested) =
+        extract_first_message_macro(r#"{message:"Theme: {theme}\nSay \"Hi\""}"#, &ctx)
+            .expect("nested message");
+    assert_eq!(msg_nested.title, None);
+    assert_eq!(msg_nested.text, "Theme: cyberpunk\nSay \"Hi\"");
+
+    // 4. Double-brace escaped {{message:...}} is ignored
+    assert!(find_message_macro_span(r#"{{message:"literal"}}"#).is_none());
+
+    // 5. Standalone MenuItem leaves no remaining payload
+    let mut standalone = MenuItem {
+        label: "Notice".to_string(),
+        action: Some(r#"{message:"Hello popup"}"#.to_string()),
+        command: Some(r#"{message:"Hello popup"}"#.to_string()),
+        ..Default::default()
+    };
+    assert_eq!(
+        standalone.take_first_message_macro(&ctx),
+        Some(MessageMacroData {
+            title: None,
+            text: "Hello popup".to_string(),
+        })
+    );
+    assert!(!standalone.has_remaining_payload());
+
+    // 6. Chained MenuItem preserves the remaining command after stripping {message:...}
+    let mut chained = MenuItem {
+        label: "Backup".to_string(),
+        action: Some("{message:title=`USB Backup`:text=`Insert drive`} echo ok".to_string()),
+        command: Some("{message:title=`USB Backup`:text=`Insert drive`} echo ok".to_string()),
+        ..Default::default()
+    };
+    assert_eq!(
+        chained.take_first_message_macro(&ctx),
+        Some(MessageMacroData {
+            title: Some("USB Backup".to_string()),
+            text: "Insert drive".to_string(),
+        })
+    );
+    assert!(chained.has_remaining_payload());
+    assert_eq!(chained.command.as_deref(), Some("echo ok"));
+    assert_eq!(chained.action.as_deref(), Some("echo ok"));
+
+    // 7. {param} variants: title, text, default, flexible spacing, and no title when omitted
+    let mut p_full = MenuItem {
+        label: "Ping Host".to_string(),
+        command: Some(
+            r#"ping -c 4 {param: title = "Ping Target" : text = 'Enter host or IP:' : default = `1.1.1.1` }"#
+                .to_string(),
+        ),
+        ..Default::default()
+    };
+    assert!(p_full.has_param_placeholder());
+    assert_eq!(p_full.param_modal_title(), "Ping Target");
+    assert_eq!(p_full.param_modal_prompt(), "Enter host or IP:");
+    assert_eq!(p_full.param_modal_default(), "1.1.1.1");
+    p_full.apply_param_placeholder("8.8.8.8");
+    assert_eq!(p_full.command.as_deref(), Some("ping -c 4 '8.8.8.8'"));
+
+    // {param} without title has empty title (no fallback to item.label)
+    let p_no_title = MenuItem {
+        label: "Ignored Label".to_string(),
+        command: Some(
+            r#"echo {param: text = "Say something:" : default = "{theme}" }"#.to_string(),
+        ),
+        ..Default::default()
+    };
+    assert_eq!(p_no_title.param_modal_title(), "");
+    assert_eq!(p_no_title.param_modal_prompt(), "Say something:");
+    assert_eq!(p_no_title.param_modal_default(), "{theme}");
+
+    // {param} with only title omits prompt body
+    let p_only_title = MenuItem {
+        label: "Ignored Label".to_string(),
+        command: Some(r#"echo {param: title = "Quick Input" }"#.to_string()),
+        ..Default::default()
+    };
+    assert_eq!(p_only_title.param_modal_title(), "Quick Input");
+    assert_eq!(p_only_title.param_modal_prompt(), "");
+    assert_eq!(p_only_title.param_modal_default(), "");
+
+    // {param} shorthand quoted text has no title
+    let p_shorthand = MenuItem {
+        label: "Ignored Label".to_string(),
+        command: Some(r#"echo {param:"Enter name:"}"#.to_string()),
+        ..Default::default()
+    };
+    assert_eq!(p_shorthand.param_modal_title(), "");
+    assert_eq!(p_shorthand.param_modal_prompt(), "Enter name:");
 }

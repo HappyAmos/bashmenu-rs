@@ -5,6 +5,7 @@ pub mod constants;
 pub mod error;
 pub mod glyph;
 pub mod i18n;
+pub mod interactive_md;
 pub mod macro_engine;
 pub mod menu;
 pub mod menu_merge;
@@ -28,13 +29,24 @@ pub use i18n::{
     interpolate_string, parse_and_flatten_yaml, preinit_locale_from_args, resolve_locale_path,
     set_locale, translate, translate_with, LocaleCatalog, LocaleInfo, DEFAULT_EN_US_YAML,
 };
+pub use interactive_md::{
+    find_button_macro_span, find_checkbox_macro_span, find_input_macro_span, find_radio_macro_span,
+    has_interactive_markdown_form, has_markdown_form_inputs, is_valid_bash_identifier,
+    parse_interactive_markdown, parse_interactive_markdown_doc, parse_markdown_form_blocks,
+    substitute_id_placeholders, transpile_bashmenu_bash, ButtonSpec, ButtonType, CheckboxSpec,
+    InputFieldSpec, InteractiveMarkdownDoc, MarkdownFormBlock, MarkdownSegment, RadioLayout,
+    RadioSpec, ScriptBlock, UiRpcRequest, UiRpcResponse, UI_RPC_SOCKET_ENV,
+};
 pub use macro_engine::{
-    apply_dir_picker_macros, apply_file_picker_macros, clear_command_cache, detect_color_mode,
-    detect_tty_mode, evaluate_color_mode, evaluate_tty_mode, extract_info_macro_path,
-    extract_picker_spec, extract_toasts, find_info_macro_span, full_file_location,
-    interpolate_placeholders, parse_markdown_frontmatter, parse_markdown_frontmatter_full,
-    parse_picker_macro, resolve_config_dot_path, resolve_dev_dir, resolve_workspace_version,
-    MacroContext, MarkdownFrontmatter, PickerSpec, ToastNotification, ToastSeverity,
+    apply_dir_picker_macros, apply_dir_picker_macros_raw, apply_file_picker_macros,
+    apply_file_picker_macros_raw, clear_command_cache, detect_color_mode, detect_tty_mode,
+    evaluate_color_mode, evaluate_tty_mode, extract_first_message_macro, extract_info_macro_path,
+    extract_picker_spec, extract_toasts, find_info_macro_span, find_message_macro_span,
+    full_file_location, interpolate_placeholders, parse_markdown_frontmatter,
+    parse_markdown_frontmatter_full, parse_picker_macro, posix_shell_quote,
+    resolve_config_dot_path, resolve_dev_dir, resolve_workspace_version, shell_quote_for_context,
+    MacroContext, MarkdownFrontmatter, MessageMacroData, PickerSpec, ToastNotification,
+    ToastSeverity,
 };
 pub use menu::{
     load_menu, save_menu, ConfirmAction, ConfirmActionDetails, ExecutionMode, MenuItem,

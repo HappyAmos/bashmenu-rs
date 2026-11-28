@@ -53,8 +53,11 @@
 
 use crate::error::{BashMenuError, Result};
 use crate::macro_engine::{
-    apply_dir_picker_macros, apply_file_picker_macros, extract_picker_spec, MacroContext,
-    PickerSpec,
+    apply_dir_picker_macros, apply_dir_picker_macros_raw, apply_file_picker_macros,
+    apply_file_picker_macros_raw, extract_first_message_macro, extract_picker_spec, extract_toasts,
+    find_message_macro_span, interpolate_placeholders, parse_inline_macro_fields,
+    scan_balanced_macro_end, shell_quote_for_context, MacroContext, MessageMacroData, PickerSpec,
+    ToastNotification,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
@@ -230,6 +233,10 @@ pub struct MenuItem {
     pub submenu: Option<Submenu>,
     /// Additional custom keys
     pub extra: HashMap<String, serde_json::Value>,
+    /// True once trusted template macros have been interpolated prior to user input.
+    pub macros_interpolated: bool,
+    /// Toast notifications extracted during pre-substitution template interpolation.
+    pub pending_toasts: Vec<ToastNotification>,
 }
 
 impl MenuItem {
@@ -338,40 +345,121 @@ impl MenuItem {
         self.inline_param_spec().is_some()
     }
 
-    /// Substitutes `{param...}` / `{prompt...}` with `value` across all executable and target payload fields
-    pub fn apply_param_placeholder(&mut self, value: &str) {
-        if let Some(ref mut s) = self.command {
-            *s = replace_inline_param_tokens(s, value);
+    /// Extracts and removes the first `{message:...}` interactive macro across
+    /// `command`, `action`, and `script`, returning the interpolated message data.
+    pub fn take_first_message_macro(&mut self, ctx: &MacroContext) -> Option<MessageMacroData> {
+        let mut extracted: Option<MessageMacroData> = None;
+        for field in [&mut self.command, &mut self.action, &mut self.script]
+            .into_iter()
+            .flatten()
+        {
+            if extracted.is_none() {
+                if let Some((rem, msg)) = extract_first_message_macro(field, ctx) {
+                    *field = rem;
+                    extracted = Some(msg);
+                }
+            } else if let Some((start, end, _)) = find_message_macro_span(field) {
+                let mut rem = String::with_capacity(field.len());
+                rem.push_str(&field[..start]);
+                rem.push_str(&field[end..]);
+                *field = rem.trim().to_string();
+            }
         }
-        if let Some(ref mut s) = self.action {
-            *s = replace_inline_param_tokens(s, value);
+        extracted
+    }
+
+    /// Returns true if any executable or target payload field still has
+    /// non-empty content to run after interactive macro extraction.
+    pub fn has_remaining_payload(&self) -> bool {
+        [
+            self.command.as_deref(),
+            self.action.as_deref(),
+            self.script.as_deref(),
+            self.file.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        .any(|s| !s.trim().is_empty())
+    }
+
+    /// Returns true when this item executes through a POSIX shell (`/bin/bash -c`).
+    pub fn is_shell_target(&self) -> bool {
+        !matches!(self.r#type, MenuItemType::Editor)
+            && !matches!(self.r#type, MenuItemType::Other(ref s) if s == "toast")
+    }
+
+    /// Interpolates trusted template macros and extracts `{toast:...}` directives
+    /// before user-supplied `{param}` or picker values are substituted.
+    ///
+    /// Idempotent: subsequent calls on the same item are no-ops so user-entered
+    /// values containing `{command:...}` or `{toast:...}` can never be evaluated.
+    pub fn interpolate_template_macros(&mut self, ctx: &MacroContext) {
+        if self.macros_interpolated {
+            return;
         }
-        if let Some(ref mut s) = self.script {
-            *s = replace_inline_param_tokens(s, value);
+        let mut toasts_captured = false;
+        for s in [&mut self.command, &mut self.action, &mut self.script]
+            .into_iter()
+            .flatten()
+        {
+            let (clean, toasts) = extract_toasts(s, ctx);
+            if !toasts_captured && !toasts.is_empty() {
+                self.pending_toasts.extend(toasts);
+                toasts_captured = true;
+            }
+            *s = interpolate_placeholders(&clean, ctx);
         }
         if let Some(ref mut s) = self.file {
-            *s = replace_inline_param_tokens(s, value);
+            *s = interpolate_placeholders(s, ctx);
+        }
+        self.macros_interpolated = true;
+    }
+
+    /// Substitutes `{param...}` / `{prompt...}` with `value` across all payload fields.
+    ///
+    /// Shell-targeted fields (`command`, `action`, `script`) are POSIX shell-quoted
+    /// by default unless the placeholder includes `:raw`. Non-shell fields (`file`,
+    /// or `Editor`/`toast` items) receive the unquoted value.
+    pub fn apply_param_placeholder(&mut self, value: &str) {
+        let shell_escape = self.is_shell_target();
+        if let Some(ref mut s) = self.command {
+            *s = replace_inline_param_tokens(s, value, shell_escape);
+        }
+        if let Some(ref mut s) = self.action {
+            *s = replace_inline_param_tokens(s, value, shell_escape);
+        }
+        if let Some(ref mut s) = self.script {
+            *s = replace_inline_param_tokens(s, value, shell_escape);
+        }
+        if let Some(ref mut s) = self.file {
+            *s = replace_inline_param_tokens(s, value, false);
         }
     }
 
-    /// Modal header title for a `{param}` input dialog
-    pub fn param_modal_title(&self) -> &str {
+    /// Modal header title for a `{param}` input dialog.
+    ///
+    /// Uses inline `title="..."` first, then explicit YAML `title:`, or empty
+    /// string (no title) when neither is assigned.
+    pub fn param_modal_title(&self) -> String {
+        if let Some(spec) = self.inline_param_spec() {
+            if let Some(t) = spec.title {
+                if !t.trim().is_empty() {
+                    return t;
+                }
+            }
+        }
         if let Some(t) = self
             .extra
             .get("title")
             .and_then(|v| v.as_str())
             .filter(|s| !s.trim().is_empty())
         {
-            return t;
+            return t.to_string();
         }
-        let trimmed_label = self.label.trim();
-        if !trimmed_label.is_empty() {
-            return trimmed_label;
-        }
-        "Parameter Input"
+        String::new()
     }
 
-    /// Modal prompt message for a `{param}` input dialog
+    /// Modal prompt message for a `{param}` input dialog.
     pub fn param_modal_prompt(&self) -> String {
         if let Some(p) = self.prompt.as_deref().filter(|s| !s.trim().is_empty()) {
             return p.to_string();
@@ -398,8 +486,18 @@ impl MenuItem {
                     return p;
                 }
             }
+            if spec.title.is_some() {
+                return String::new();
+            }
         }
         "Enter parameter:".to_string()
+    }
+
+    /// Pre-populated default text value for a `{param:default="..."}` input dialog.
+    pub fn param_modal_default(&self) -> String {
+        self.inline_param_spec()
+            .and_then(|s| s.default_value)
+            .unwrap_or_default()
     }
 
     /// Returns the first `{file_picker...}` or `{dir_picker...}` specification found across
@@ -424,29 +522,44 @@ impl MenuItem {
         None
     }
 
-    /// Substitutes `{file_picker...}` or `{dir_picker...}` macros across `file`, `action`, `command`, and `script`.
+    /// Substitutes `{file_picker...}` or `{dir_picker...}` macros across
+    /// `file`, `action`, `command`, and `script`.
+    ///
+    /// Shell-targeted fields are POSIX shell-quoted by default unless `:raw` is set.
     pub fn apply_picker_result(
         &mut self,
         chosen_path: &Path,
         is_dir: bool,
         ctx: Option<&MacroContext>,
     ) {
-        let apply_fn = if is_dir {
-            apply_dir_picker_macros
-        } else {
+        let shell_escape = self.is_shell_target();
+        let apply_shell = if is_dir {
+            if shell_escape {
+                apply_dir_picker_macros
+            } else {
+                apply_dir_picker_macros_raw
+            }
+        } else if shell_escape {
             apply_file_picker_macros
+        } else {
+            apply_file_picker_macros_raw
+        };
+        let apply_raw = if is_dir {
+            apply_dir_picker_macros_raw
+        } else {
+            apply_file_picker_macros_raw
         };
         if let Some(ref mut s) = self.file {
-            *s = apply_fn(s, chosen_path, ctx);
+            *s = apply_raw(s, chosen_path, ctx);
         }
         if let Some(ref mut s) = self.action {
-            *s = apply_fn(s, chosen_path, ctx);
+            *s = apply_shell(s, chosen_path, ctx);
         }
         if let Some(ref mut s) = self.command {
-            *s = apply_fn(s, chosen_path, ctx);
+            *s = apply_shell(s, chosen_path, ctx);
         }
         if let Some(ref mut s) = self.script {
-            *s = apply_fn(s, chosen_path, ctx);
+            *s = apply_shell(s, chosen_path, ctx);
         }
     }
 
@@ -767,6 +880,7 @@ impl<'de> Deserialize<'de> for MenuItem {
                     on_no: raw_props.on_no,
                     submenu: raw_props.submenu,
                     extra: raw_props.extra,
+                    ..Default::default()
                 });
             }
 
@@ -817,6 +931,7 @@ impl<'de> Deserialize<'de> for MenuItem {
                         on_no: raw_props.on_no,
                         submenu: raw_props.submenu,
                         extra: raw_props.extra,
+                        ..Default::default()
                     });
                 }
             }
@@ -868,77 +983,93 @@ impl Serialize for MenuItem {
 /// Specification for an inline parameter or prompt macro embedded in a command string.
 #[derive(Debug, Clone, Default)]
 struct InlineParamSpec {
-    /// Custom prompt label to display in the input modal
+    /// Optional modal header title (`title="..."`)
+    title: Option<String>,
+    /// Custom prompt label to display in the input modal (`text="..."` / `prompt="..."`)
     prompt: Option<String>,
+    /// Optional pre-populated default text value (`default="..."`)
+    default_value: Option<String>,
     /// Whether user input should be masked (password entry mode)
     masked: bool,
+    /// Whether user input should opt out of POSIX shell quoting (`:raw`)
+    raw: bool,
 }
 
-/// Finds byte bounds and inner directive payload of `{param...}` or `{prompt...}` in text.
-fn find_inline_param_span(text: &str) -> Option<(usize, usize, &str)> {
+/// Finds earliest byte bounds and inner payload of `{param...}` or `{prompt...}`
+/// starting at or after `from`, respecting quoted strings and nested `{...}`.
+fn find_inline_param_span_from(text: &str, from: usize) -> Option<(usize, usize, &str)> {
+    let bytes = text.as_bytes();
+    let mut earliest: Option<(usize, usize, &str)> = None;
     for prefix in ["{param", "{prompt"] {
-        let mut search_from = 0;
+        let mut search_from = from.min(text.len());
         while let Some(rel) = text[search_from..].find(prefix) {
             let start = search_from + rel;
+            // Skip double-brace escaped `{{param...}}`
+            if start > 0 && bytes[start - 1] == b'{' {
+                search_from = start + prefix.len();
+                continue;
+            }
             let after_prefix = &text[start + prefix.len()..];
             if let Some(first_ch) = after_prefix.chars().next() {
                 if first_ch == '}' || first_ch == ':' {
-                    if let Some(end_rel) = after_prefix.find('}') {
-                        let end = start + prefix.len() + end_rel + 1;
+                    if let Some(end) = scan_balanced_macro_end(text, start) {
                         let inner = if first_ch == ':' {
-                            &after_prefix[1..end_rel]
+                            &text[start + prefix.len() + 1..end - 1]
                         } else {
                             ""
                         };
-                        return Some((start, end, inner));
+                        if earliest.map(|e| start < e.0).unwrap_or(true) {
+                            earliest = Some((start, end, inner));
+                        }
+                        break;
                     }
                 }
             }
             search_from = start + prefix.len();
         }
     }
-    None
+    earliest
+}
+
+/// Finds byte bounds and inner directive payload of `{param...}` or `{prompt...}` in text.
+fn find_inline_param_span(text: &str) -> Option<(usize, usize, &str)> {
+    find_inline_param_span_from(text, 0)
+}
+
+/// Parses title, prompt text, default value, masked flag, and raw flag from the
+/// inner payload of `{param:...}` or `{prompt:...}`.
+fn parse_inline_param_inner(inner: &str) -> InlineParamSpec {
+    let parsed = parse_inline_macro_fields(inner);
+    InlineParamSpec {
+        title: parsed.title,
+        prompt: parsed.text,
+        default_value: parsed.default_value,
+        masked: parsed.masked,
+        raw: parsed.raw,
+    }
 }
 
 /// Parses prompt message and masked flag from an inline `{param:...}` directive.
 fn parse_inline_param_spec(text: &str) -> Option<InlineParamSpec> {
     let (_, _, inner) = find_inline_param_span(text)?;
-    let mut spec = InlineParamSpec::default();
-    let mut rest = inner.trim();
-    // Strip trailing/leading `masked` flags (`:masked`, `masked:`, `:masked=true`)
-    for flag in [":masked=true", ":masked"] {
-        if let Some(stripped) = rest.strip_suffix(flag) {
-            spec.masked = true;
-            rest = stripped;
-        }
-    }
-    for flag in ["masked=true:", "masked:"] {
-        if let Some(stripped) = rest.strip_prefix(flag) {
-            spec.masked = true;
-            rest = stripped;
-        }
-    }
-    if rest.eq_ignore_ascii_case("masked") || rest.eq_ignore_ascii_case("masked=true") {
-        spec.masked = true;
-        rest = "";
-    }
-    // `title=...` is resolved via item title/label; ignore it here
-    if rest.starts_with("title=") {
-        rest = "";
-    }
-    // Everything after `prompt=` (colons included) is the prompt text
-    let prompt_text = rest.strip_prefix("prompt=").unwrap_or(rest);
-    if !prompt_text.is_empty() {
-        spec.prompt = Some(prompt_text.trim_matches('"').trim_matches('\'').to_string());
-    }
-    Some(spec)
+    Some(parse_inline_param_inner(inner))
 }
 
-/// Replaces all occurrences of `{param...}` or `{prompt...}` in text with the user-provided value.
-fn replace_inline_param_tokens(text: &str, value: &str) -> String {
+/// Replaces all occurrences of `{param...}` or `{prompt...}` in text with the
+/// user-provided value, POSIX shell-quoting by default when `shell_escape` is true
+/// unless the placeholder opts out with `:raw`.
+fn replace_inline_param_tokens(text: &str, value: &str, shell_escape: bool) -> String {
     let mut out = text.to_string();
-    while let Some((start, end, _)) = find_inline_param_span(&out) {
-        out.replace_range(start..end, value);
+    let mut search_from = 0usize;
+    while let Some((start, end, inner)) = find_inline_param_span_from(&out, search_from) {
+        let spec = parse_inline_param_inner(inner);
+        let replacement = if shell_escape && !spec.raw {
+            shell_quote_for_context(&out, start, value)
+        } else {
+            value.to_string()
+        };
+        out.replace_range(start..end, &replacement);
+        search_from = start + replacement.len();
     }
     out
 }

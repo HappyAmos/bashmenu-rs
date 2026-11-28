@@ -45,6 +45,8 @@ pub struct MacroContext<'a> {
     pub repo_mode: bool,
     /// Whether running in local isolation mode (`--local`)
     pub local_mode: bool,
+    /// Whether `{command:...}` / `{cmd:...}` shell macro evaluation is permitted
+    pub allow_command_macros: bool,
     /// Terminal viewport width
     pub window_width: usize,
     /// Terminal viewport height
@@ -116,6 +118,7 @@ impl<'a> MacroContext<'a> {
             version,
             repo_mode: false,
             local_mode: false,
+            allow_command_macros: true,
             window_width: 80,
             window_height: 24,
             screen_width: 80,
@@ -136,8 +139,20 @@ impl<'a> MacroContext<'a> {
     }
 
     /// Sets whether the context is running in local isolation mode (`--local`).
+    ///
+    /// Disables `{command:...}` macro evaluation when `local_mode` is `true`
+    /// to prevent passive command execution from untrusted directories.
     pub fn with_local_mode(mut self, local_mode: bool) -> Self {
         self.local_mode = local_mode;
+        if local_mode {
+            self.allow_command_macros = false;
+        }
+        self
+    }
+
+    /// Controls whether `{command:...}` / `{cmd:...}` shell macros are evaluated.
+    pub fn with_allow_command_macros(mut self, allow: bool) -> Self {
+        self.allow_command_macros = allow;
         self
     }
 
@@ -346,16 +361,12 @@ impl<'a> MacroContext<'a> {
         )
     }
 
-    /// Loads a user-specified Markdown file with optional YAML frontmatter
-    /// (`title`, `width`, `height`), expands placeholders and `~` in `path_expr`,
-    /// and interpolates placeholders in both the title and Markdown body.
-    pub fn render_info_file(
-        &self,
-        path_expr: &str,
-    ) -> Result<(MarkdownFrontmatter, String), String> {
+    /// Resolves an `{info:<path>}` file path expression (expanding placeholders
+    /// and leading `~`) against the filesystem, `bashmenu_dir`, and `dev_dir`.
+    pub fn resolve_info_file_path(&self, path_expr: &str) -> PathBuf {
         let expanded_expr = interpolate_placeholders(path_expr.trim(), self);
         let candidate = expand_tilde_path(&expanded_expr, &self.home_dir);
-        let resolved = if candidate.is_absolute() || candidate.is_file() {
+        if candidate.is_absolute() || candidate.is_file() {
             candidate
         } else {
             let in_bm = self.bashmenu_dir.join(&candidate);
@@ -369,7 +380,17 @@ impl<'a> MacroContext<'a> {
                     candidate
                 }
             }
-        };
+        }
+    }
+
+    /// Loads a user-specified Markdown file with optional YAML frontmatter
+    /// (`title`, `width`, `height`), expands placeholders and `~` in `path_expr`,
+    /// and interpolates placeholders in both the title and Markdown body.
+    pub fn render_info_file(
+        &self,
+        path_expr: &str,
+    ) -> Result<(MarkdownFrontmatter, String), String> {
+        let resolved = self.resolve_info_file_path(path_expr);
 
         let raw = std::fs::read_to_string(&resolved).map_err(|e| {
             format!(
@@ -380,8 +401,9 @@ impl<'a> MacroContext<'a> {
         })?;
 
         let (mut fm, body) = parse_markdown_frontmatter_full(&raw);
+        let safe_ctx = self.clone().with_allow_command_macros(false);
         if let Some(ref t) = fm.title {
-            fm.title = Some(interpolate_placeholders(t, self));
+            fm.title = Some(interpolate_placeholders(t, &safe_ctx));
         } else {
             let fallback_title = resolved
                 .file_name()
@@ -390,7 +412,7 @@ impl<'a> MacroContext<'a> {
                 .to_string();
             fm.title = Some(fallback_title);
         }
-        let rendered_body = interpolate_placeholders(body, self);
+        let rendered_body = interpolate_placeholders(body, &safe_ctx);
         Ok((fm, rendered_body))
     }
 
@@ -409,6 +431,8 @@ pub struct MarkdownFrontmatter {
     pub width: Option<u16>,
     /// Optional popup window height in percent of terminal height (`height:` in frontmatter)
     pub height: Option<u16>,
+    /// When true, `bashmenu-<lang>` fenced code blocks execute interactively
+    pub interactive: bool,
 }
 
 /// Parses a percentage value (`80`, `"80"`, `"80%"`) from a YAML value, clamped to `1..=100`.
@@ -435,19 +459,26 @@ fn parse_percent_value(val: &serde_json::Value) -> Option<u16> {
 /// Parses optional YAML frontmatter (`--- ... ---`) at the top of a Markdown
 /// document, returning `(MarkdownFrontmatter, remaining_markdown_body)`.
 pub fn parse_markdown_frontmatter_full(raw: &str) -> (MarkdownFrontmatter, &str) {
-    let trimmed = raw.strip_prefix('\u{feff}').unwrap_or(raw);
-    let after_open = if let Some(rest) = trimmed.strip_prefix("---\r\n") {
-        rest
-    } else if let Some(rest) = trimmed.strip_prefix("---\n") {
-        rest
-    } else {
-        return (MarkdownFrontmatter::default(), raw);
+    let mut trimmed = raw.strip_prefix('\u{feff}').unwrap_or(raw);
+    if trimmed.starts_with("#!") {
+        if let Some(nl) = trimmed.find('\n') {
+            trimmed = &trimmed[nl + 1..];
+        } else {
+            return (MarkdownFrontmatter::default(), "");
+        }
+    }
+    let Some(first_nl) = trimmed.find('\n') else {
+        return (MarkdownFrontmatter::default(), trimmed);
     };
+    if trimmed[..first_nl].trim_end() != "---" {
+        return (MarkdownFrontmatter::default(), trimmed);
+    }
+    let after_open = &trimmed[first_nl + 1..];
 
     let mut offset = 0;
     for line in after_open.split_inclusive('\n') {
         let line_no_nl = line.trim_end_matches(['\r', '\n']);
-        if line_no_nl == "---" {
+        if line_no_nl.trim_end() == "---" {
             let yaml_block = &after_open[..offset];
             let body = &after_open[offset + line.len()..];
             let mut fm = MarkdownFrontmatter::default();
@@ -459,13 +490,17 @@ pub fn parse_markdown_frontmatter_full(raw: &str) -> (MarkdownFrontmatter, &str)
                     .filter(|s| !s.is_empty());
                 fm.width = val.get("width").and_then(parse_percent_value);
                 fm.height = val.get("height").and_then(parse_percent_value);
+                fm.interactive = val
+                    .get("interactive")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
             }
             return (fm, body.trim_start_matches(['\r', '\n']));
         }
         offset += line.len();
     }
 
-    (MarkdownFrontmatter::default(), raw)
+    (MarkdownFrontmatter::default(), trimmed)
 }
 
 /// Parses optional YAML frontmatter (`--- ... ---`) at the top of a Markdown
@@ -476,10 +511,25 @@ pub fn parse_markdown_frontmatter(raw: &str) -> (Option<String>, &str) {
 }
 
 /// Finds the byte span `(start, end, inner_path)` of the first `{info:<path>}`
-/// macro in `text`, supporting nested `{...}` placeholders inside `<path>`.
+/// or `{imarkdown:<path>}` macro in `text`, supporting nested `{...}`
+/// placeholders inside `<path>` and skipping double-brace escapes.
 pub fn find_info_macro_span(text: &str) -> Option<(usize, usize, String)> {
-    let start = text.find("{info:")?;
-    let content_start = start + "{info:".len();
+    let mut best: Option<(usize, usize)> = None;
+    for prefix in ["{info:", "{imarkdown:"] {
+        let mut search = 0usize;
+        while let Some(rel) = text[search..].find(prefix) {
+            let start = search + rel;
+            if start > 0 && text.as_bytes()[start - 1] == b'{' {
+                search = start + prefix.len();
+                continue;
+            }
+            if best.map(|(b, _)| start < b).unwrap_or(true) {
+                best = Some((start, start + prefix.len()));
+            }
+            break;
+        }
+    }
+    let (start, content_start) = best?;
     let mut depth = 1usize;
     for (rel_idx, ch) in text[content_start..].char_indices() {
         match ch {
@@ -500,7 +550,8 @@ pub fn find_info_macro_span(text: &str) -> Option<(usize, usize, String)> {
     None
 }
 
-/// Extracts the inner path expression from the first `{info:<path>}` macro in `text`.
+/// Extracts the inner path expression from the first `{info:<path>}` or
+/// `{imarkdown:<path>}` macro in `text`.
 pub fn extract_info_macro_path(text: &str) -> Option<String> {
     find_info_macro_span(text).map(|(_, _, p)| p)
 }
@@ -1271,14 +1322,78 @@ fn expand_tilde_path(raw: &str, home_dir: &Path) -> PathBuf {
     }
 }
 
+/// Escapes `value` as a single POSIX shell argument using single quotes.
+///
+/// Embedded single quotes are replaced with `'\''`, preventing command
+/// substitution (`$(...)`, backticks), variable expansion, word splitting,
+/// and globbing when passed to `/bin/bash -c`.
+pub fn posix_shell_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\\''"))
+}
+
+/// POSIX shell quoting state at a byte offset within a command template.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ShellQuoteState {
+    Unquoted,
+    SingleQuoted,
+    DoubleQuoted,
+}
+
+/// Determines the active POSIX shell quote state at `token_start` in `template`.
+fn shell_quote_state_at(template: &str, token_start: usize) -> ShellQuoteState {
+    let prefix = &template[..token_start.min(template.len())];
+    let mut state = ShellQuoteState::Unquoted;
+    let mut chars = prefix.chars();
+    while let Some(ch) = chars.next() {
+        match state {
+            ShellQuoteState::Unquoted => match ch {
+                '\\' => {
+                    let _ = chars.next();
+                }
+                '\'' => state = ShellQuoteState::SingleQuoted,
+                '"' => state = ShellQuoteState::DoubleQuoted,
+                _ => {}
+            },
+            ShellQuoteState::SingleQuoted => {
+                if ch == '\'' {
+                    state = ShellQuoteState::Unquoted;
+                }
+            }
+            ShellQuoteState::DoubleQuoted => match ch {
+                '\\' => {
+                    let _ = chars.next();
+                }
+                '"' => state = ShellQuoteState::Unquoted,
+                _ => {}
+            },
+        }
+    }
+    state
+}
+
+/// Escapes `value` safely for POSIX shell substitution at `token_start`.
+///
+/// Preserves the surrounding quote state after the token:
+/// - Unquoted: `'value'`
+/// - Inside `'...'`: escapes internal `'` as `'\''`
+/// - Inside `"..."`: closes `"`, emits `'value'`, and reopens `"`
+pub fn shell_quote_for_context(template: &str, token_start: usize, value: &str) -> String {
+    match shell_quote_state_at(template, token_start) {
+        ShellQuoteState::Unquoted => posix_shell_quote(value),
+        ShellQuoteState::SingleQuoted => value.replace('\'', "'\\''"),
+        ShellQuoteState::DoubleQuoted => format!("\"{}\"", posix_shell_quote(value)),
+    }
+}
+
 /// Parses a picker macro type and optional colon-delimited specification into
-/// `(is_new, modifier, start_dir_string)`.
-pub fn parse_picker_macro(
+/// `(is_new, is_raw, modifier, start_dir_string)`.
+fn parse_picker_macro_flags(
     macro_type: &str,
     spec: Option<&str>,
     ctx: Option<&MacroContext>,
-) -> (bool, Option<String>, Option<String>) {
+) -> (bool, bool, Option<String>, Option<String>) {
     let mut is_new = macro_type.ends_with("_new");
+    let mut is_raw = false;
     let mut modifier = None;
     let mut start_dir = None;
 
@@ -1296,6 +1411,10 @@ pub fn parse_picker_macro(
         let mut tokens: Vec<&str> = resolved_spec.split(':').collect();
         if let Some(pos) = tokens.iter().position(|&t| t == "new") {
             is_new = true;
+            tokens.remove(pos);
+        }
+        if let Some(pos) = tokens.iter().position(|&t| t == "raw") {
+            is_raw = true;
             tokens.remove(pos);
         }
 
@@ -1316,6 +1435,17 @@ pub fn parse_picker_macro(
         }
     }
 
+    (is_new, is_raw, modifier, start_dir)
+}
+
+/// Parses a picker macro type and optional colon-delimited specification into
+/// `(is_new, modifier, start_dir_string)`.
+pub fn parse_picker_macro(
+    macro_type: &str,
+    spec: Option<&str>,
+    ctx: Option<&MacroContext>,
+) -> (bool, Option<String>, Option<String>) {
+    let (is_new, _, modifier, start_dir) = parse_picker_macro_flags(macro_type, spec, ctx);
     (is_new, modifier, start_dir)
 }
 
@@ -1373,12 +1503,35 @@ pub fn extract_picker_spec(
     })
 }
 
-/// Substitutes `{file_picker...}` macros and their modifiers (`:stem`, `:name`, `:base`, `:dir`, `:ext`, `:path:`)
-/// with the chosen file path.
+/// Substitutes `{file_picker...}` macros and their modifiers (`:stem`, `:name`,
+/// `:base`, `:dir`, `:ext`, `:path:`, `:raw`) with the chosen file path.
+///
+/// Substitutions are POSIX shell-quoted by default unless `:raw` is specified.
 pub fn apply_file_picker_macros(
     template_str: &str,
     chosen_path: &Path,
     ctx: Option<&MacroContext>,
+) -> String {
+    apply_file_picker_macros_inner(template_str, chosen_path, ctx, true)
+}
+
+/// Substitutes `{file_picker...}` macros without POSIX shell quoting.
+///
+/// Use for non-shell targets such as editor file paths passed directly via
+/// `Command::arg`.
+pub fn apply_file_picker_macros_raw(
+    template_str: &str,
+    chosen_path: &Path,
+    ctx: Option<&MacroContext>,
+) -> String {
+    apply_file_picker_macros_inner(template_str, chosen_path, ctx, false)
+}
+
+fn apply_file_picker_macros_inner(
+    template_str: &str,
+    chosen_path: &Path,
+    ctx: Option<&MacroContext>,
+    shell_quote: bool,
 ) -> String {
     if !template_str.contains("{file_picker") {
         return template_str.to_string();
@@ -1412,12 +1565,13 @@ pub fn apply_file_picker_macros(
         .unwrap_or_default();
 
     let mut res = template_str.to_string();
+    let mut search_from = 0usize;
 
     // Avoid duplicating a preceding directory prefix when the macro has no modifier
     if let Some(caps) = FILE_PICKER_MACRO_RE.captures(&res) {
         if let (Some(full), Some(m_type)) = (caps.get(0), caps.get(1)) {
-            let (_, modifier, _) =
-                parse_picker_macro(m_type.as_str(), caps.get(2).map(|m| m.as_str()), ctx);
+            let (_, is_raw, modifier, _) =
+                parse_picker_macro_flags(m_type.as_str(), caps.get(2).map(|m| m.as_str()), ctx);
             if modifier.is_none() {
                 let preceding = &res[..full.start()];
                 let dir_cap = PRECEDING_QUOTED_DIR_RE
@@ -1441,12 +1595,15 @@ pub fn apply_file_picker_macros(
                         if (!cand_clean.is_empty() && cand_clean == parent_clean)
                             || cand_path.is_dir()
                         {
-                            res = format!(
-                                "{}{}{}",
-                                &res[..dir_match.start()],
-                                fpath,
-                                &res[full.end()..]
-                            );
+                            let replacement = if shell_quote && !is_raw {
+                                shell_quote_for_context(&res, dir_match.start(), &fpath)
+                            } else {
+                                fpath.clone()
+                            };
+                            let start = dir_match.start();
+                            let end = full.end();
+                            res.replace_range(start..end, &replacement);
+                            search_from = start + replacement.len();
                         }
                     }
                 }
@@ -1454,29 +1611,62 @@ pub fn apply_file_picker_macros(
         }
     }
 
-    FILE_PICKER_MACRO_RE
-        .replace_all(&res, |caps: &Captures| {
-            let m_type = &caps[1];
-            let spec_opt = caps.get(2).map(|m| m.as_str());
-            let (_, modifier, _) = parse_picker_macro(m_type, spec_opt, ctx);
-            match modifier.as_deref() {
-                Some("stem") => p_stem.clone(),
-                Some("name") => p_name.clone(),
-                Some("base") => p_base.clone(),
-                Some("dir") => p_dir.clone(),
-                Some("ext") => p_ext.clone(),
-                _ => fpath.clone(),
-            }
-        })
-        .into_owned()
+    while let Some(caps) = FILE_PICKER_MACRO_RE.captures(&res[search_from..]) {
+        let full = caps.get(0).unwrap();
+        let start = search_from + full.start();
+        let end = search_from + full.end();
+        let m_type = caps[1].to_string();
+        let spec_opt = caps.get(2).map(|m| m.as_str().to_string());
+        let (_, is_raw, modifier, _) = parse_picker_macro_flags(&m_type, spec_opt.as_deref(), ctx);
+        let raw_val = match modifier.as_deref() {
+            Some("stem") => &p_stem,
+            Some("name") => &p_name,
+            Some("base") => &p_base,
+            Some("dir") => &p_dir,
+            Some("ext") => &p_ext,
+            _ => &fpath,
+        };
+        let replacement = if shell_quote && !is_raw {
+            shell_quote_for_context(&res, start, raw_val)
+        } else {
+            raw_val.clone()
+        };
+        res.replace_range(start..end, &replacement);
+        search_from = start + replacement.len();
+    }
+
+    res
 }
 
-/// Substitutes `{dir_picker...}` macros and their modifiers (`:name`, `:dir`, `:parent`, `:path:`)
-/// with the chosen directory path.
+/// Substitutes `{dir_picker...}` macros and their modifiers (`:name`, `:dir`,
+/// `:parent`, `:path:`, `:raw`) with the chosen directory path.
+///
+/// Substitutions are POSIX shell-quoted by default unless `:raw` is specified.
 pub fn apply_dir_picker_macros(
     template_str: &str,
     chosen_path: &Path,
     ctx: Option<&MacroContext>,
+) -> String {
+    apply_dir_picker_macros_inner(template_str, chosen_path, ctx, true)
+}
+
+/// Substitutes `{dir_picker...}` macros without POSIX shell quoting.
+///
+/// Use for non-shell targets such as editor file paths passed directly via
+/// `Command::arg`.
+pub fn apply_dir_picker_macros_raw(
+    template_str: &str,
+    chosen_path: &Path,
+    ctx: Option<&MacroContext>,
+) -> String {
+    apply_dir_picker_macros_inner(template_str, chosen_path, ctx, false)
+}
+
+fn apply_dir_picker_macros_inner(
+    template_str: &str,
+    chosen_path: &Path,
+    ctx: Option<&MacroContext>,
+    shell_quote: bool,
 ) -> String {
     if !template_str.contains("{dir_picker") {
         return template_str.to_string();
@@ -1492,11 +1682,12 @@ pub fn apply_dir_picker_macros(
         .unwrap_or_default();
 
     let mut res = template_str.to_string();
+    let mut search_from = 0usize;
 
     if let Some(caps) = DIR_PICKER_MACRO_RE.captures(&res) {
         if let (Some(full), Some(m_type)) = (caps.get(0), caps.get(1)) {
-            let (_, modifier, _) =
-                parse_picker_macro(m_type.as_str(), caps.get(2).map(|m| m.as_str()), ctx);
+            let (_, is_raw, modifier, _) =
+                parse_picker_macro_flags(m_type.as_str(), caps.get(2).map(|m| m.as_str()), ctx);
             if modifier.is_none() {
                 let preceding = &res[..full.start()];
                 let dir_cap = PRECEDING_QUOTED_DIR_RE
@@ -1520,12 +1711,15 @@ pub fn apply_dir_picker_macros(
                         if (!cand_clean.is_empty() && cand_clean == parent_clean)
                             || cand_path.is_dir()
                         {
-                            res = format!(
-                                "{}{}{}",
-                                &res[..dir_match.start()],
-                                dpath,
-                                &res[full.end()..]
-                            );
+                            let replacement = if shell_quote && !is_raw {
+                                shell_quote_for_context(&res, dir_match.start(), &dpath)
+                            } else {
+                                dpath.clone()
+                            };
+                            let start = dir_match.start();
+                            let end = full.end();
+                            res.replace_range(start..end, &replacement);
+                            search_from = start + replacement.len();
                         }
                     }
                 }
@@ -1533,18 +1727,28 @@ pub fn apply_dir_picker_macros(
         }
     }
 
-    DIR_PICKER_MACRO_RE
-        .replace_all(&res, |caps: &Captures| {
-            let m_type = &caps[1];
-            let spec_opt = caps.get(2).map(|m| m.as_str());
-            let (_, modifier, _) = parse_picker_macro(m_type, spec_opt, ctx);
-            match modifier.as_deref() {
-                Some("name") => p_name.clone(),
-                Some("dir") | Some("parent") => p_dir.clone(),
-                _ => dpath.clone(),
-            }
-        })
-        .into_owned()
+    while let Some(caps) = DIR_PICKER_MACRO_RE.captures(&res[search_from..]) {
+        let full = caps.get(0).unwrap();
+        let start = search_from + full.start();
+        let end = search_from + full.end();
+        let m_type = caps[1].to_string();
+        let spec_opt = caps.get(2).map(|m| m.as_str().to_string());
+        let (_, is_raw, modifier, _) = parse_picker_macro_flags(&m_type, spec_opt.as_deref(), ctx);
+        let raw_val = match modifier.as_deref() {
+            Some("name") => &p_name,
+            Some("dir") | Some("parent") => &p_dir,
+            _ => &dpath,
+        };
+        let replacement = if shell_quote && !is_raw {
+            shell_quote_for_context(&res, start, raw_val)
+        } else {
+            raw_val.clone()
+        };
+        res.replace_range(start..end, &replacement);
+        search_from = start + replacement.len();
+    }
+
+    res
 }
 /// Regular expression matching toast macro directives `{toast:[duration:]"message"}`.
 static TOAST_RE: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
@@ -1628,6 +1832,275 @@ pub fn extract_toasts(text: &str, ctx: &MacroContext) -> (String, Vec<ToastNotif
     });
 
     (cleaned.into_owned(), notifications)
+}
+
+/// Parsed payload of an interactive `{message:...}` macro.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct MessageMacroData {
+    /// Optional modal header title (`title="..."`). `None` means no title badge.
+    pub title: Option<String>,
+    /// Message body text (`text="..."` or shorthand `{message:"..."}`).
+    pub text: String,
+}
+
+/// Parsed fields from an inline `{message:...}` or `{param:...}` macro body.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct InlineMacroFields {
+    pub title: Option<String>,
+    pub text: Option<String>,
+    pub default_value: Option<String>,
+    pub masked: bool,
+    pub raw: bool,
+}
+
+/// Scans a macro span starting at `start` (pointing at `{`) to its matching
+/// closing `}`, respecting `"..."`, `'...'`, `` `...` `` quotes (with backslash
+/// escapes) and nested `{...}` placeholders.
+pub(crate) fn scan_balanced_macro_end(text: &str, start: usize) -> Option<usize> {
+    let mut depth = 0usize;
+    let mut in_quote: Option<char> = None;
+    let mut chars = text[start..].char_indices();
+
+    while let Some((off, ch)) = chars.next() {
+        if let Some(q) = in_quote {
+            if ch == '\\' {
+                let _ = chars.next();
+                continue;
+            }
+            if ch == q {
+                in_quote = None;
+            }
+            continue;
+        }
+        match ch {
+            '"' | '\'' | '`' => in_quote = Some(ch),
+            '{' => depth += 1,
+            '}' => {
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return Some(start + off + 1);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// Parses a single quoted (`"..."`, `'...'`, `` `...` ``) value starting at
+/// `s[0]`, returning `(unescaped_value, remaining_slice_after_closing_quote)`.
+fn parse_quoted_value(s: &str) -> Option<(String, &str)> {
+    let mut chars = s.char_indices();
+    let (_, delim) = chars.next()?;
+    if !matches!(delim, '"' | '\'' | '`') {
+        return None;
+    }
+    let mut out = String::new();
+    while let Some((off, ch)) = chars.next() {
+        if ch == '\\' {
+            if let Some((_, next_ch)) = chars.next() {
+                match next_ch {
+                    'n' => out.push('\n'),
+                    't' => out.push('\t'),
+                    '\\' => out.push('\\'),
+                    c if c == delim => out.push(c),
+                    other => {
+                        out.push('\\');
+                        out.push(other);
+                    }
+                }
+            } else {
+                out.push('\\');
+            }
+            continue;
+        }
+        if ch == delim {
+            return Some((out, &s[off + ch.len_utf8()..]));
+        }
+        out.push(ch);
+    }
+    None
+}
+
+/// Checks if `rest` starts with a recognized inline macro key/flag token.
+fn starts_with_macro_key(rest: &str) -> bool {
+    let trimmed = rest.trim_start();
+    for key in ["title", "text", "prompt", "default", "masked", "raw"] {
+        if let Some(after) = trimmed.strip_prefix(key) {
+            let after_ws = after.trim_start();
+            if after_ws.is_empty() || after_ws.starts_with('=') || after_ws.starts_with(':') {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Reads an unquoted value up to the next `:` that precedes another recognized
+/// macro key/flag (preserving nested `{...}` and trailing colons such as
+/// `prompt=Enter Host or IP:`).
+fn parse_unquoted_value(s: &str) -> (String, &str) {
+    let mut depth = 0usize;
+    for (off, ch) in s.char_indices() {
+        match ch {
+            '{' => depth += 1,
+            '}' => depth = depth.saturating_sub(1),
+            ':' if depth == 0 => {
+                let after_colon = &s[off + 1..];
+                if starts_with_macro_key(after_colon) {
+                    let val = s[..off].trim().replace("\\n", "\n");
+                    return (val, &s[off..]);
+                }
+            }
+            _ => {}
+        }
+    }
+    (s.trim().replace("\\n", "\n"), "")
+}
+
+/// Parses colon-separated `key = value` pairs and flags inside `{message:...}`
+/// or `{param:...}` / `{prompt:...}` payloads.
+///
+/// Supports optional spaces around `:` and `=`, quoted values (`"`, `'`, `` ` ``),
+/// shorthand positional text (`{message:"TEXT"}` / `{param:"TEXT"}`), and
+/// legacy flags (`masked`, `masked=true`, `raw`, `raw=true`).
+pub(crate) fn parse_inline_macro_fields(inner: &str) -> InlineMacroFields {
+    let mut fields = InlineMacroFields::default();
+    let mut rest = inner.trim();
+
+    while !rest.is_empty() {
+        rest = rest.trim_start();
+        if let Some(stripped) = rest.strip_prefix(':') {
+            rest = stripped.trim_start();
+            continue;
+        }
+        if rest.is_empty() {
+            break;
+        }
+
+        // Check if this segment begins with a recognized key/flag
+        let mut matched_key: Option<(&str, &str)> = None;
+        for key in ["title", "text", "prompt", "default", "masked", "raw"] {
+            if let Some(after) = rest.strip_prefix(key) {
+                let after_ws = after.trim_start();
+                if after_ws.is_empty() || after_ws.starts_with('=') || after_ws.starts_with(':') {
+                    matched_key = Some((key, after_ws));
+                    break;
+                }
+            }
+        }
+
+        if let Some((key, after_key)) = matched_key {
+            if let Some(after_eq) = after_key.strip_prefix('=') {
+                let val_start = after_eq.trim_start();
+                let (val, next_rest) = if let Some((qval, rem)) = parse_quoted_value(val_start) {
+                    (qval, rem)
+                } else {
+                    parse_unquoted_value(val_start)
+                };
+                match key {
+                    "title" => fields.title = Some(val),
+                    "text" | "prompt" => fields.text = Some(val),
+                    "default" => fields.default_value = Some(val),
+                    "masked" => {
+                        fields.masked = !val.eq_ignore_ascii_case("false") && val != "0";
+                    }
+                    "raw" => {
+                        fields.raw = !val.eq_ignore_ascii_case("false") && val != "0";
+                    }
+                    _ => {}
+                }
+                rest = next_rest.trim_start();
+                if let Some(stripped) = rest.strip_prefix(':') {
+                    rest = stripped;
+                }
+            } else {
+                // Standalone boolean flag (`:masked`, `:raw`)
+                match key {
+                    "masked" => fields.masked = true,
+                    "raw" => fields.raw = true,
+                    _ => {}
+                }
+                rest = after_key.trim_start();
+                if let Some(stripped) = rest.strip_prefix(':') {
+                    rest = stripped;
+                }
+            }
+        } else if let Some((qval, rem)) = parse_quoted_value(rest) {
+            // Positional quoted shorthand: {message:"TEXT"} or {param:"TEXT"}
+            fields.text = Some(qval);
+            rest = rem.trim_start();
+            if let Some(stripped) = rest.strip_prefix(':') {
+                rest = stripped;
+            }
+        } else {
+            // Positional unquoted fallback
+            let (uval, rem) = parse_unquoted_value(rest);
+            if !uval.is_empty() {
+                fields.text = Some(uval);
+            }
+            rest = rem.trim_start();
+            if let Some(stripped) = rest.strip_prefix(':') {
+                rest = stripped;
+            }
+        }
+    }
+
+    fields
+}
+
+/// Finds the byte bounds and parsed [`MessageMacroData`] of the first
+/// `{message:...}` macro in `text`, skipping double-brace escaped
+/// `{{message:...}}` sequences.
+///
+/// Supports `{message:"TEXT"}` (no title) and
+/// `{message:title="Title":text="Body"}` with `"`, `'`, or `` ` `` quotes and
+/// optional whitespace around `:` and `=`.
+pub fn find_message_macro_span(text: &str) -> Option<(usize, usize, MessageMacroData)> {
+    const PREFIX: &str = "{message:";
+    let bytes = text.as_bytes();
+    let mut search_from = 0usize;
+
+    while let Some(rel) = text[search_from..].find(PREFIX) {
+        let start = search_from + rel;
+        // Skip double-brace escaped `{{message:...}}`
+        if start > 0 && bytes[start - 1] == b'{' {
+            search_from = start + PREFIX.len();
+            continue;
+        }
+        if let Some(end) = scan_balanced_macro_end(text, start) {
+            let inner = &text[start + PREFIX.len()..end - 1];
+            let parsed = parse_inline_macro_fields(inner);
+            let title = parsed.title.filter(|t| !t.is_empty());
+            let body = parsed.text.unwrap_or_default();
+            return Some((start, end, MessageMacroData { title, text: body }));
+        }
+        search_from = start + PREFIX.len();
+    }
+
+    None
+}
+
+/// Extracts the first `{message:...}` macro from `text`, interpolates nested
+/// placeholders inside its title and body using `ctx`, and returns
+/// `(remaining_text, MessageMacroData)`.
+pub fn extract_first_message_macro(
+    text: &str,
+    ctx: &MacroContext,
+) -> Option<(String, MessageMacroData)> {
+    let (start, end, mut data) = find_message_macro_span(text)?;
+    if let Some(ref t) = data.title {
+        if t.contains('{') {
+            data.title = Some(interpolate_placeholders(t, ctx));
+        }
+    }
+    if data.text.contains('{') {
+        data.text = interpolate_placeholders(&data.text, ctx);
+    }
+    let mut remaining = String::with_capacity(text.len());
+    remaining.push_str(&text[..start]);
+    remaining.push_str(&text[end..]);
+    Some((remaining.trim().to_string(), data))
 }
 
 /// Recursively interpolates macro placeholders within a text string.
@@ -2106,7 +2579,7 @@ fn interpolate_internal(text: &str, ctx: &MacroContext, depth: usize) -> String 
     }
 
     // 7. Command substitution: {command:<cmd>} / {cmd:<cmd>} with 30s TTL caching
-    if res.contains("{command:") || res.contains("{cmd:") {
+    if ctx.allow_command_macros && (res.contains("{command:") || res.contains("{cmd:")) {
         res = COMMAND_RE
             .replace_all(&res, |caps: &Captures| {
                 let raw_cmd = &caps[1];
@@ -2212,5 +2685,33 @@ mod tests {
             interpolate_placeholders(r#"Status: {toast:2:"popup"}Ready"#, &ctx),
             "Status: Ready"
         );
+    }
+
+    #[test]
+    fn test_parse_markdown_frontmatter_with_shebang() {
+        let raw = "\
+#!/usr/bin/env -S bashmenu --imarkdown
+---
+title: Standalone Wizard
+width: 90%
+height: 80%
+interactive: true
+---
+# Hello
+Body text
+";
+        let (fm, body) = parse_markdown_frontmatter_full(raw);
+        assert_eq!(fm.title.as_deref(), Some("Standalone Wizard"));
+        assert_eq!(fm.width, Some(90));
+        assert_eq!(fm.height, Some(80));
+        assert!(fm.interactive);
+        assert!(body.starts_with("# Hello"));
+        assert!(!body.contains("#!/usr/bin/env"));
+
+        // Shebang without frontmatter still strips the shebang line
+        let no_fm = "#!/usr/bin/env -S bashmenu --imarkdown\n# Plain Doc\n";
+        let (fm2, body2) = parse_markdown_frontmatter_full(no_fm);
+        assert_eq!(fm2.title, None);
+        assert_eq!(body2, "# Plain Doc\n");
     }
 }

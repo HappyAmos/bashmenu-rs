@@ -319,6 +319,9 @@ bmpager:
   wrap_on: "Ajuste de línea: SÍ"
   wrap_off: "Ajuste de línea: NO"
   wrap_markdown_always: "Ajuste de línea: siempre activo en modo Markdown"
+  raw_on: "Vista: código fuente SIN FORMATO"
+  raw_off: "Vista: Renderizada"
+  raw_already: "Ya está en vista de texto sin formato"
   opened: "abierto {target}"
   viewed: "visualizado {target}"
   file_not_found: "archivo no encontrado: {target}"
@@ -348,7 +351,14 @@ help:
     ## Directivas de entrada interactiva
     | Macro / Marcador | Descripción |
     | :--- | :--- |
-    | {{param}} | Solicita entrada de texto modal (admite masked=true) |
+    | {{param}} | Solicita entrada de texto modal (admite title="...", text="...", default="...", masked, raw) |
+    | {{message:"TEXT"}} | Diálogo emergente centrado con botón Aceptar (sin título; o title="...":text="...", admite ", ', `) |
+    | {{input:id=VAR:default="":...}} | Campo de texto integrado en Markdown interactivo (width, multiline, scrollbar, height=5, masked) |
+    | {{radio:VAR:"Option 1":"Option 2"}} | Lista de selección única en Markdown interactivo (admite id=, default=, layout="horizontal") |
+    | {{checkbox:VAR:"Label":false}} | Casilla de verificación booleana en Markdown interactivo (exporta "true"/"false") |
+    | {{id:VAR}} | Valor interpolado en vivo de {{input}}/{{radio}}/{{checkbox}} (en Bash: {{id:VAR="VAL"}} escribe al documento) |
+    | {{button:type="submit"\|"ok"\|"action"\|"cancel":action="ID"}} | Botón de acción que ejecuta ```bashmenu-bash:id="ID"``` (action permanece en página; opcional text="...") |
+    | {{clear}} | Limpia la pantalla de Markdown interactivo antes de mostrar el contenido siguiente |
     | {{file_picker}} | Abre el selector visual de archivos |
     | {{file_picker:path:<dir>}} | Selector de archivos en el directorio especificado |
     | {{file_picker:stem}} | Ruta sin extensión de archivo (/ruta/a/img) |
@@ -458,7 +468,7 @@ help:
     | {{app.<key.path>}} | Clave de configuración en bashmenu.yml (ej. {{app.theme}}) |
     | {{env:<var_name>}} | Valor de variable de entorno (ej. {{env:USER}}) |
     | {{env}} / {{environment}} | Modal / tabla de inspección de variables de entorno |
-    | {{info:<path>}} | Muestra archivo Markdown con frontmatter YAML (title, width, height) |
+    | {{info:<path>}} / {{imarkdown:<path>}} | Muestra archivo Markdown / Markdown interactivo con frontmatter YAML (title, width, height, interactive) |
     | {{help}} | Acción integrada: abre el manual de documentación de BashMenu |
     | {{theme_picker}} | Acción integrada: abre el selector interactivo de temas |
     | {{text_editor}} | Acción integrada: inicia el editor de texto bashedit |
@@ -486,6 +496,7 @@ help:
     | title: <text> | Título de la ventana emergente (admite marcadores; por defecto el archivo) |
     | width: <1..100>[%] | Ancho en % de la terminal (acepta 80, "80" o "80%") |
     | height: <1..100>[%] | Alto en % de la terminal (acepta 70, "70" o "70%") |
+    | interactive: true | Habilita bloques reservados bashmenu-bash:id="...", {{input:...}}, {{button:...}}, {{clear}} y {{id:...}} en vivo |
   markdown_reference: |-
     # Referencia de sintaxis Markdown
 
@@ -570,6 +581,7 @@ cli:
     repo: "Cargar archivos de configuración desde el directorio defaults del repositorio"
     image: "Renderizar imágenes de fondo TrueColor directamente mediante framebuffer"
     locale: "Sobrescribir el idioma activo (ej. \"en_US\", \"es_ES\", o ruta a archivo YAML)"
+    imarkdown: "Ejecutar un documento Markdown interactivo directamente como TUI independiente"
   bashedit:
     about: "Editor de texto de terminal con recuperación de fallos, pestañas y archivos swap locales"
     file: "Archivo a editar (dejar vacío para un búfer nuevo sin guardar)"
@@ -631,6 +643,7 @@ cli:
         -V, --version     Mostrar la versión y salir.
         -m, --markdown    Renderizar la entrada formateada como Markdown.
         -w, --wrap        Ajustar líneas de texto plano al ancho de la ventana.
+        --remote-images   Descargar y almacenar en caché imágenes Markdown http(s) (opcional).
         +N                Comenzar en la línea N arriba de la ventana.
         +/PATRÓN          Comenzar en la primera línea que contenga PATRÓN.
         -c, --no-color    Descartar secuencias ANSI en lugar de renderizarlas.
@@ -651,5 +664,5 @@ cli:
         g Inicio          Ir al INICIO         G Fin           Ir al FINAL
         /                 Buscar adelante      n / N           Coincidencia sig./ant.
         l o               Abrir enlace         e               Abrir en editor
-        w W               Alternar ajuste      h ? F1          Manual de ayuda
-        q Q Ctrl-C Esc    Salir
+        w W               Alternar ajuste      r R             Alternar texto sin formato
+        h ? F1            Manual de ayuda      q Q Ctrl-C Esc  Salir
