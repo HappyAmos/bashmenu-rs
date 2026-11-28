@@ -916,17 +916,52 @@ fn is_valid_svg_bytes(bytes: &[u8]) -> bool {
     resvg::usvg::Tree::from_data(bytes, &opt).is_ok()
 }
 
+/// Computes natural half-block pixel dimensions `(target_w, target_h)` for an
+/// image of intrinsic size `(src_w, src_h)` within `(max_cols, max_rows * 2)`.
+///
+/// Uses ~3 CSS pixels per half-block cell (`~2.5x` typical browser display size
+/// so badges and icons stay compact yet legible, while large photos/diagrams
+/// still scale cleanly up to the viewport bounds).
+fn compute_target_dimensions(
+    src_w: f64,
+    src_h: f64,
+    max_cols: usize,
+    max_rows: usize,
+    is_svg: bool,
+) -> (u32, u32) {
+    let w = src_w.max(1.0);
+    let h = src_h.max(1.0);
+    let max_px_w = max_cols.max(1) as f64;
+    let max_px_h = (max_rows.max(1) * 2) as f64;
+
+    // For SVGs and small raster badges/icons (<= 64px tall), map ~3 source px
+    // to 1 half-block pixel so shields.io badges (e.g. 110x20) render at ~37x3
+    // terminal cells instead of 110x10. Tiny swatches (<= 24px) keep 1:1 scale.
+    let natural_scale: f64 = if (is_svg || h <= 64.0) && (w > 24.0 || h > 24.0) {
+        1.0 / 3.0
+    } else {
+        1.0
+    };
+
+    let fit_scale = (max_px_w / w).min(max_px_h / h);
+    let scale = natural_scale.min(fit_scale);
+
+    let target_w = ((w * scale).round() as u32).max(1);
+    let target_h = ((h * scale).round() as u32).max(2);
+    (target_w, target_h)
+}
+
 /// Decodes raster image bytes (PNG/JPEG/WebP/GIF) or rasterizes an SVG/SVGZ
 /// into an RGBA buffer sized to fit `(max_cols, max_rows * 2)` pixels.
 fn decode_image_or_svg(bytes: &[u8], max_cols: usize, max_rows: usize) -> Option<image::RgbaImage> {
     if let Ok(img) = image::load_from_memory(bytes) {
-        let img_w = img.width().max(1);
-        let img_h = img.height().max(1);
-        let scale_w = max_cols as f64 / img_w as f64;
-        let scale_h = (max_rows * 2) as f64 / img_h as f64;
-        let scale = scale_w.min(scale_h).min(1.0);
-        let target_w = ((img_w as f64 * scale).round() as u32).max(1);
-        let target_h = ((img_h as f64 * scale).round() as u32).max(2);
+        let (target_w, target_h) = compute_target_dimensions(
+            img.width() as f64,
+            img.height() as f64,
+            max_cols,
+            max_rows,
+            false,
+        );
         return Some(
             img.resize_exact(target_w, target_h, image::imageops::FilterType::Triangle)
                 .to_rgba8(),
@@ -939,13 +974,13 @@ fn decode_image_or_svg(bytes: &[u8], max_cols: usize, max_rows: usize) -> Option
     };
     let tree = resvg::usvg::Tree::from_data(bytes, &opt).ok()?;
     let size = tree.size();
-    let svg_w = (size.width() as f64).max(1.0);
-    let svg_h = (size.height() as f64).max(1.0);
-    let scale_w = max_cols as f64 / svg_w;
-    let scale_h = (max_rows * 2) as f64 / svg_h;
-    let scale = scale_w.min(scale_h).min(1.0);
-    let target_w = ((svg_w * scale).round() as u32).max(1);
-    let target_h = ((svg_h * scale).round() as u32).max(2);
+    let (target_w, target_h) = compute_target_dimensions(
+        size.width() as f64,
+        size.height() as f64,
+        max_cols,
+        max_rows,
+        true,
+    );
 
     let mut pixmap = resvg::tiny_skia::Pixmap::new(target_w, target_h)?;
     let sx = target_w as f32 / size.width().max(1.0);
