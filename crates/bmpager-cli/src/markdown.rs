@@ -876,10 +876,6 @@ impl MarkdownRenderer {
                     next_tick,
                 });
             }
-            if !alt_trimmed.is_empty() {
-                self.output
-                    .push_str(&format!("\x1b[2;3m  {alt_trimmed}\x1b[0m\n"));
-            }
             return;
         }
 
@@ -896,11 +892,6 @@ impl MarkdownRenderer {
         for row in render_rgba_to_halfblocks(&rgba) {
             self.output.push_str(&row);
             self.output.push('\n');
-        }
-
-        if !alt_trimmed.is_empty() {
-            self.output
-                .push_str(&format!("\x1b[2;3m  {alt_trimmed}\x1b[0m\n"));
         }
     }
 

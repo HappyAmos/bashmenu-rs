@@ -244,7 +244,10 @@ fn test_bmpager_markdown_image_halfblock_and_fallback() {
         stdout.contains("▀") && stdout.contains("38;2;255;0;0"),
         "expected TrueColor half-block rendering, got:\n{stdout}"
     );
-    assert!(stdout.contains("Red Blue Swatch"));
+    assert!(
+        !stdout.contains("Red Blue Swatch"),
+        "alt text should not display when image renders successfully"
+    );
     assert!(stdout.contains("[Image: Missing (nope.png)]"));
 
     // 2. --no-color falls back cleanly without half-block pixels
@@ -326,7 +329,10 @@ fn test_bmpager_remote_images_opt_in_and_cache() {
         stdout_remote.contains('▀') && stdout_remote.contains("38;2;0;200;50"),
         "expected TrueColor remote image rendering, got:\n{stdout_remote}"
     );
-    assert!(stdout_remote.contains("Web Swatch"));
+    assert!(
+        !stdout_remote.contains("Web Swatch"),
+        "alt text should not display when remote image renders successfully"
+    );
 
     let _ = server.join();
     let cache_images = dir.join("bashmenu").join("cache").join("images");
@@ -363,7 +369,10 @@ fn test_bmpager_markdown_svg_rendering() {
         stdout.contains('▀') && stdout.contains("38;2;255;0;0"),
         "expected TrueColor half-block SVG rendering, got:\n{stdout}"
     );
-    assert!(stdout.contains("Vector Swatch"));
+    assert!(
+        !stdout.contains("Vector Swatch"),
+        "alt text should not display when SVG renders successfully"
+    );
 
     // Shields.io-style SVG badge renders as crisp 3-row Option B badge (▄ / text / ▀)
     let badge_svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="110" height="20">
