@@ -412,3 +412,41 @@ fn test_bmpager_markdown_svg_rendering() {
 
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn test_bmpager_markdown_image_before_setext_rule_no_orphan_heading() {
+    let dir = std::env::temp_dir().join(format!("bmpager_setext_test_{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&dir);
+    let svg_path = dir.join("preview.svg");
+    let md_path = dir.join("doc.md");
+
+    let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="20" height="10">
+  <rect x="0" y="0" width="20" height="10" fill="#00ff00"/>
+</svg>"##;
+    std::fs::write(&svg_path, svg).expect("write svg");
+    // CommonMark parses `![...](...)\n---` (no blank line) as a Setext H2 containing only an image.
+    // The renderer must not emit an orphan `## ` heading line after the image.
+    std::fs::write(
+        &md_path,
+        "---\n![Preview](preview.svg)\n---\n\n## What On Earth Is This?\n",
+    )
+    .expect("write md");
+
+    let out = bmpager_cmd()
+        .args(["--markdown", md_path.to_str().unwrap()])
+        .output()
+        .expect("run bmpager --markdown on setext image");
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains('▀'), "expected image to render:\n{stdout}");
+    assert!(
+        stdout.contains("## What On Earth Is This?"),
+        "expected real H2 heading to render:\n{stdout}"
+    );
+    assert!(
+        !stdout.contains("## \x1b[0m"),
+        "must not emit orphan empty `## ` heading:\n{stdout}"
+    );
+
+    let _ = std::fs::remove_dir_all(&dir);
+}

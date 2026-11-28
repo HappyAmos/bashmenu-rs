@@ -524,7 +524,11 @@ impl MarkdownRenderer {
 
     /// Renders heading levels H1..H6 with rich box borders and colored markers.
     fn render_heading(&mut self, level: HeadingLevel) {
+        self.flush_badges();
         let text = self.heading_text.trim();
+        if text.is_empty() {
+            return;
+        }
         match level {
             HeadingLevel::H1 => {
                 // Match rich.sh heavy box panel:
