@@ -319,6 +319,9 @@ bmpager:
   wrap_on: "Ajuste de línea: SÍ"
   wrap_off: "Ajuste de línea: NO"
   wrap_markdown_always: "Ajuste de línea: siempre activo en modo Markdown"
+  raw_on: "Vista: código fuente SIN FORMATO"
+  raw_off: "Vista: Renderizada"
+  raw_already: "Ya está en vista de texto sin formato"
   opened: "abierto {target}"
   viewed: "visualizado {target}"
   file_not_found: "archivo no encontrado: {target}"
@@ -661,5 +664,5 @@ cli:
         g Inicio          Ir al INICIO         G Fin           Ir al FINAL
         /                 Buscar adelante      n / N           Coincidencia sig./ant.
         l o               Abrir enlace         e               Abrir en editor
-        w W               Alternar ajuste      h ? F1          Manual de ayuda
-        q Q Ctrl-C Esc    Salir
+        w W               Alternar ajuste      r R             Alternar texto sin formato
+        h ? F1            Manual de ayuda      q Q Ctrl-C Esc  Salir

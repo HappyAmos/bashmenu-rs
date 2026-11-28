@@ -25,6 +25,8 @@ pub struct Pager {
     pub raw_content: String,
     /// Multi-frame animated GIFs anchored to line offsets in `lines`
     pub animations: Vec<crate::markdown::AnimatedImage>,
+    /// When `true`, bypasses active content renderers (e.g. Markdown) to show raw source text
+    pub raw_mode: bool,
     /// 1-based index of the line currently at the top of the viewport
     pub top_line: usize,
     /// Total count of document lines
@@ -79,6 +81,7 @@ impl Pager {
             lines,
             raw_content,
             animations: Vec::new(),
+            raw_mode: false,
             top_line: 1,
             total,
             args,
@@ -178,7 +181,7 @@ impl Pager {
             .or_else(|| self.args.files.first())
             .and_then(|p| p.parent())
             .map(std::path::Path::to_path_buf);
-        let mut rebuilt: Vec<String> = if self.args.markdown {
+        let mut rebuilt: Vec<String> = if self.args.markdown && !self.raw_mode {
             let rendered = crate::markdown::render_markdown_full(
                 &self.raw_content,
                 width,
@@ -203,9 +206,29 @@ impl Pager {
         self.clamp_top();
     }
 
+    /// Returns `true` if a content renderer (such as Markdown) is configured.
+    pub fn has_renderer(&self) -> bool {
+        self.args.markdown
+    }
+
+    /// Toggles between rendered view and raw source text (`r` / `R`).
+    pub fn toggle_raw(&mut self) {
+        if !self.has_renderer() {
+            self.message = t!("bmpager.raw_already");
+            return;
+        }
+        self.raw_mode = !self.raw_mode;
+        self.rebuild_lines();
+        self.message = if self.raw_mode {
+            t!("bmpager.raw_on")
+        } else {
+            t!("bmpager.raw_off")
+        };
+    }
+
     /// Toggles soft line wrapping (`w` / `W`) for plain and ANSI text documents.
     pub fn toggle_wrap(&mut self) {
-        if self.args.markdown {
+        if self.has_renderer() && !self.raw_mode {
             self.message = t!("bmpager.wrap_markdown_always");
             return;
         }
@@ -364,6 +387,10 @@ impl Pager {
                 self.toggle_wrap();
                 clear_message = false;
             }
+            KeyCode::Char('r') | KeyCode::Char('R') => {
+                self.toggle_raw();
+                clear_message = false;
+            }
             KeyCode::Char('h') | KeyCode::Char('?') | KeyCode::F(1) => {
                 show_help_modal(self.args.strip_colors)?;
             }
@@ -444,6 +471,16 @@ impl Pager {
             }
         } else {
             String::new()
+        };
+
+        let badge = if self.raw_mode {
+            if badge.is_empty() {
+                "[ RAW ]".to_string()
+            } else {
+                format!("{badge} [RAW]")
+            }
+        } else {
+            badge
         };
 
         let center_start = if !badge.is_empty() {
@@ -991,5 +1028,44 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_pager_toggle_raw_key_switches_between_rendered_and_raw() {
+        let raw_md = "# Hello Heading\n\nSome **bold** text.\n".to_string();
+        let args = PagerArgs {
+            markdown: true,
+            ..Default::default()
+        };
+        let rendered = crate::markdown::render_markdown_full(&raw_md, 80, None, true, false);
+        let init_lines: Vec<String> = rendered.text.lines().map(String::from).collect();
+        let mut pager = Pager::new(init_lines, args).with_raw_content(raw_md);
+        pager.cols = 80;
+
+        assert!(!pager.raw_mode);
+        assert!(pager.lines.iter().any(|l| l.contains("Hello Heading")));
+        assert!(!pager.lines.iter().any(|l| l.starts_with("# Hello Heading")));
+
+        // Press 'r' -> switches to raw source text
+        let exit = pager
+            .handle_key(crossterm::event::KeyEvent::new(
+                KeyCode::Char('r'),
+                KeyModifiers::NONE,
+            ))
+            .unwrap();
+        assert!(!exit);
+        assert!(pager.raw_mode);
+        assert_eq!(pager.lines[0], "# Hello Heading");
+        assert!(pager.lines.iter().any(|l| l.contains("**bold**")));
+
+        // Press 'r' again -> restores rendered Markdown view
+        pager
+            .handle_key(crossterm::event::KeyEvent::new(
+                KeyCode::Char('r'),
+                KeyModifiers::NONE,
+            ))
+            .unwrap();
+        assert!(!pager.raw_mode);
+        assert!(!pager.lines.iter().any(|l| l.starts_with("# Hello Heading")));
     }
 }

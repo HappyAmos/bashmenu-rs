@@ -281,6 +281,8 @@ The `bmpager` standalone pager provides full-screen interactive viewing of files
 | `--max-lines=N` | Cap in-memory line buffer to `N` lines (ring buffer). |
 | `--file=PATH`, `--edit-target=PATH` | Associate an explicit file path for editing when paging a stream. |
 | `--reload-cmd=CMD` | Re-run `CMD` to refresh buffer contents after editing. |
+
+Inside `bmpager`, press `r` / `R` to toggle between the rendered view (e.g., Markdown) and the raw unformatted source text, and `w` / `W` to toggle soft word wrapping on plain/raw text.
 | `+N` | Start viewing with line `N` at the top of the window. |
 | `+/PATTERN` | Jump to the first line matching search pattern. |
 

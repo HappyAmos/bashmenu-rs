@@ -321,6 +321,9 @@ bmpager:
   wrap_on: "Wrap: ON"
   wrap_off: "Wrap: OFF"
   wrap_markdown_always: "Wrap: always ON in Markdown mode"
+  raw_on: "View: RAW source"
+  raw_off: "View: Rendered"
+  raw_already: "Already in raw text view"
   opened: "opened {target}"
   viewed: "viewed {target}"
   file_not_found: "file not found: {target}"
@@ -663,5 +666,5 @@ cli:
         g Home            Jump to TOP          G End           Jump to BOT
         /                 Search forward       n / N           Next / prev match
         l o               Follow / open link   e               Open in editor
-        w W               Toggle soft-wrap     h ? F1          Help manual modal
-        q Q Ctrl-C Esc    Quit
+        w W               Toggle soft-wrap     r R             Toggle raw view
+        h ? F1            Help manual modal    q Q Ctrl-C Esc  Quit
