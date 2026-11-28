@@ -77,6 +77,8 @@ struct MarkdownRenderer {
     allow_images: bool,
     /// Whether remote `http(s)://` image fetching into `{cache_dir}/images` is enabled
     allow_remote_images: bool,
+    /// Pending 3-row crisp SVG badges (`([top, mid, bot], visual_width)`) to render side-by-side
+    pending_badges: Vec<([String; 3], usize)>,
     /// Whether parser is inside a markdown table
     in_table: bool,
     /// Whether parser is currently in the table header row
@@ -129,6 +131,7 @@ impl MarkdownRenderer {
             base_dir,
             allow_images,
             allow_remote_images,
+            pending_badges: Vec::new(),
             in_table: false,
             table_head: false,
             table_rows: Vec::new(),
@@ -141,12 +144,61 @@ impl MarkdownRenderer {
         }
     }
 
+    /// Flushes any accumulated 3-row Option B SVG badges horizontally side-by-side,
+    /// wrapping to a new 3-row strip if the row exceeds `self.width`.
+    fn flush_badges(&mut self) {
+        if self.pending_badges.is_empty() {
+            return;
+        }
+        let badges = std::mem::take(&mut self.pending_badges);
+        if !self.output.is_empty() && !self.output.ends_with("\n\n") {
+            if !self.output.ends_with('\n') {
+                self.output.push('\n');
+            }
+            self.output.push('\n');
+        }
+
+        let mut row0 = String::new();
+        let mut row1 = String::new();
+        let mut row2 = String::new();
+        let mut cur_w = 0usize;
+
+        for (rows, bw) in badges {
+            let sep_w = if cur_w > 0 { 1 } else { 0 };
+            if cur_w > 0 && cur_w + sep_w + bw > self.width {
+                self.output
+                    .push_str(&format!("{row0}\x1b[0m\n{row1}\x1b[0m\n{row2}\x1b[0m\n"));
+                row0.clear();
+                row1.clear();
+                row2.clear();
+                cur_w = 0;
+            }
+            if cur_w > 0 {
+                row0.push_str("\x1b[0m ");
+                row1.push_str("\x1b[0m ");
+                row2.push_str("\x1b[0m ");
+                cur_w += 1;
+            }
+            row0.push_str(&rows[0]);
+            row1.push_str(&rows[1]);
+            row2.push_str(&rows[2]);
+            cur_w += bw;
+        }
+        if cur_w > 0 {
+            self.output
+                .push_str(&format!("{row0}\x1b[0m\n{row1}\x1b[0m\n{row2}\x1b[0m\n"));
+        }
+    }
+
     /// Appends the current accumulated line to the formatted output and clears the buffer.
     fn flush_line(&mut self) {
         if !self.current_line.is_empty() {
+            self.flush_badges();
             self.output.push_str(&self.current_line);
             self.output.push('\n');
             self.current_line.clear();
+        } else {
+            self.flush_badges();
         }
     }
 
@@ -160,6 +212,7 @@ impl MarkdownRenderer {
 
     /// Emits a word to the active line, soft-wrapping to a continuation line if line width is exceeded.
     fn emit_word(&mut self, word: &str) {
+        self.flush_badges();
         let prefix = if self.in_blockquote {
             "\x1b[38;5;244m│ \x1b[0m"
         } else if let Some(state) = self.list_stack.last() {
@@ -742,6 +795,20 @@ impl MarkdownRenderer {
             return;
         };
 
+        // Try crisp 3-row Option B badge rendering first for badge-like SVGs with text
+        if let Some((mut badge_rows, badge_w)) = try_render_svg_badge(&raw_bytes) {
+            if let Some(ref url) = self.link_url {
+                for row in &mut badge_rows {
+                    *row = format!("\x1b]8;;{url}\x1b\\{row}\x1b]8;;\x1b\\");
+                }
+            }
+            if !self.current_line.is_empty() {
+                self.flush_line();
+            }
+            self.pending_badges.push((badge_rows, badge_w));
+            return;
+        }
+
         let max_cols = self.width.saturating_sub(2).clamp(8, 120);
         let max_rows = 28usize;
         let Some(rgba) = decode_image_or_svg(&raw_bytes, max_cols, max_rows) else {
@@ -906,6 +973,24 @@ fn svg_fontdb() -> std::sync::Arc<resvg::usvg::fontdb::Database> {
     std::sync::Arc::clone(DB.get_or_init(|| {
         let mut db = resvg::usvg::fontdb::Database::new();
         db.load_system_fonts();
+        // Ensure generic CSS font families (e.g. `sans-serif` used by shields.io)
+        // always resolve even on minimal Linux systems.
+        let first_family = db
+            .faces()
+            .find_map(|f| f.families.first().map(|(name, _)| name.clone()));
+        if let Some(first_family) = first_family {
+            let preferred_sans = ["DejaVu Sans", "Liberation Sans", "Noto Sans", "Arial"]
+                .into_iter()
+                .find(|cand| {
+                    db.faces()
+                        .any(|f| f.families.iter().any(|(n, _)| n == cand))
+                })
+                .map(String::from)
+                .unwrap_or_else(|| first_family.clone());
+            db.set_sans_serif_family(&preferred_sans);
+            db.set_serif_family(&preferred_sans);
+            db.set_monospace_family(&first_family);
+        }
         std::sync::Arc::new(db)
     }))
 }
@@ -914,6 +999,169 @@ fn svg_fontdb() -> std::sync::Arc<resvg::usvg::fontdb::Database> {
 fn is_valid_svg_bytes(bytes: &[u8]) -> bool {
     let opt = resvg::usvg::Options::default();
     resvg::usvg::Tree::from_data(bytes, &opt).is_ok()
+}
+
+/// Extracted text segment from a badge-like SVG (`shields.io`, GitHub Actions, etc.).
+struct SvgBadgeSegment {
+    text: String,
+    center_x: f32,
+    fg_rgb: Option<(u8, u8, u8)>,
+    opacity: f32,
+}
+
+fn collect_svg_text_segments(group: &resvg::usvg::Group, out: &mut Vec<SvgBadgeSegment>) {
+    for node in group.children() {
+        match node {
+            resvg::usvg::Node::Group(g) => collect_svg_text_segments(g, out),
+            resvg::usvg::Node::Text(text) => {
+                let mut label = String::new();
+                let mut fg_rgb: Option<(u8, u8, u8)> = None;
+                let mut best_opacity = 0.0f32;
+                for chunk in text.chunks() {
+                    let s = chunk.text().trim();
+                    if !s.is_empty() {
+                        if !label.is_empty() {
+                            label.push(' ');
+                        }
+                        label.push_str(s);
+                    }
+                    for span in chunk.spans() {
+                        if let Some(fill) = span.fill() {
+                            let op = fill.opacity().get();
+                            if op > best_opacity {
+                                best_opacity = op;
+                                if let resvg::usvg::Paint::Color(c) = fill.paint() {
+                                    fg_rgb = Some((c.red, c.green, c.blue));
+                                }
+                            }
+                        }
+                    }
+                }
+                if !label.is_empty() && best_opacity >= 0.5 {
+                    let bbox = text.abs_bounding_box();
+                    let center_x = bbox.x() + bbox.width() * 0.5;
+                    out.push(SvgBadgeSegment {
+                        text: label,
+                        center_x,
+                        fg_rgb,
+                        opacity: best_opacity,
+                    });
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Detects badge-like SVGs (`height <= 48px`, wide aspect ratio, containing
+/// legible `<text>` elements) and renders them as a crisp 3-row Option B badge
+/// (`▄` top cap, bold TrueColor terminal text middle row, `▀` bottom cap) using
+/// the exact background and foreground colors sampled from the SVG.
+fn try_render_svg_badge(bytes: &[u8]) -> Option<([String; 3], usize)> {
+    let opt = resvg::usvg::Options {
+        fontdb: svg_fontdb(),
+        ..Default::default()
+    };
+    let tree = resvg::usvg::Tree::from_data(bytes, &opt).ok()?;
+    let size = tree.size();
+    let w = size.width();
+    let h = size.height();
+    if h > 48.0 || h < 8.0 || w < h * 1.5 {
+        return None;
+    }
+
+    let mut raw_segs = Vec::new();
+    collect_svg_text_segments(tree.root(), &mut raw_segs);
+    if raw_segs.is_empty() {
+        return None;
+    }
+
+    raw_segs.sort_by(|a, b| {
+        a.center_x
+            .partial_cmp(&b.center_x)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    // Deduplicate identical text at nearly the same x (e.g., shadow/duplicate layers)
+    let mut segs: Vec<SvgBadgeSegment> = Vec::new();
+    for seg in raw_segs {
+        if let Some(prev) = segs.last_mut() {
+            if prev.text == seg.text && (prev.center_x - seg.center_x).abs() < 6.0 {
+                if seg.opacity >= prev.opacity {
+                    *prev = seg;
+                }
+                continue;
+            }
+        }
+        segs.push(seg);
+    }
+    if segs.is_empty() || segs.len() > 6 {
+        return None;
+    }
+
+    // Rasterize at native CSS resolution to sample exact segment background colors
+    let pw = (w.round() as u32).max(4);
+    let ph = (h.round() as u32).max(4);
+    let mut pixmap = resvg::tiny_skia::Pixmap::new(pw, ph)?;
+    resvg::render(
+        &tree,
+        resvg::tiny_skia::Transform::identity(),
+        &mut pixmap.as_mut(),
+    );
+    let data = pixmap.data();
+    let sample_rgb = |x: u32, y: u32| -> Option<(u8, u8, u8)> {
+        let sx = x.min(pw - 1);
+        let sy = y.min(ph - 1);
+        let idx = ((sy * pw + sx) * 4) as usize;
+        let a = data[idx + 3];
+        if a < 128 {
+            return None;
+        }
+        let af = a as f32 / 255.0;
+        Some((
+            (data[idx] as f32 / af).round().min(255.0) as u8,
+            (data[idx + 1] as f32 / af).round().min(255.0) as u8,
+            (data[idx + 2] as f32 / af).round().min(255.0) as u8,
+        ))
+    };
+
+    let mut row0 = String::new();
+    let mut row1 = String::new();
+    let mut row2 = String::new();
+    let mut total_w = 0usize;
+
+    for seg in segs {
+        let sx = (seg.center_x.round().max(2.0) as u32).min(pw.saturating_sub(2));
+        // Sample near top/bottom edge (2px inset) where pure background rect sits
+        let (br, bg, bb) = sample_rgb(sx, 2.min(ph - 1))
+            .or_else(|| sample_rgb(sx, ph.saturating_sub(3)))
+            .unwrap_or((85, 85, 85));
+        let (fr, fg, fb) = seg.fg_rgb.unwrap_or_else(|| {
+            let luma = 0.299 * br as f32 + 0.587 * bg as f32 + 0.114 * bb as f32;
+            if luma > 160.0 {
+                (20, 20, 20)
+            } else {
+                (255, 255, 255)
+            }
+        });
+
+        let padded = format!(" {} ", seg.text);
+        let seg_w = UnicodeWidthStr::width(padded.as_str());
+        row0.push_str(&format!(
+            "\x1b[0m\x1b[38;2;{br};{bg};{bb}m{}",
+            "▄".repeat(seg_w)
+        ));
+        row1.push_str(&format!(
+            "\x1b[38;2;{fr};{fg};{fb};48;2;{br};{bg};{bb};1m{padded}\x1b[0m"
+        ));
+        row2.push_str(&format!(
+            "\x1b[0m\x1b[38;2;{br};{bg};{bb}m{}",
+            "▀".repeat(seg_w)
+        ));
+        total_w += seg_w;
+    }
+
+    Some(([row0, row1, row2], total_w))
 }
 
 /// Computes natural half-block pixel dimensions `(target_w, target_h)` for an

@@ -365,5 +365,41 @@ fn test_bmpager_markdown_svg_rendering() {
     );
     assert!(stdout.contains("Vector Swatch"));
 
+    // Shields.io-style SVG badge renders as crisp 3-row Option B badge (▄ / text / ▀)
+    let badge_svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="110" height="20">
+  <rect width="70" height="20" fill="#555555"/>
+  <rect x="70" width="40" height="20" fill="#fe7d37"/>
+  <g fill="#fff" text-anchor="middle" font-family="sans-serif" font-size="110">
+    <text x="350" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)">bashmenu</text>
+    <text x="350" y="140" transform="scale(.1)">bashmenu</text>
+    <text x="900" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)">rust</text>
+    <text x="900" y="140" transform="scale(.1)">rust</text>
+  </g>
+</svg>"##;
+    let shields_path = dir.join("shields.svg");
+    let badge_md = dir.join("badges.md");
+    std::fs::write(&shields_path, badge_svg).expect("write shields svg");
+    std::fs::write(&badge_md, "![Build](shields.svg)\n").expect("write badges md");
+
+    let out_badge = bmpager_cmd()
+        .args(["--markdown", badge_md.to_str().unwrap()])
+        .output()
+        .expect("run bmpager on shields badge");
+    assert!(out_badge.status.success());
+    let badge_out = String::from_utf8_lossy(&out_badge.stdout);
+    assert!(badge_out.contains("▄"), "expected top cap ▄:\n{badge_out}");
+    assert!(
+        badge_out.contains(" bashmenu ") && badge_out.contains(" rust "),
+        "expected crisp badge text:\n{badge_out}"
+    );
+    assert!(
+        badge_out.contains("48;2;85;85;85") && badge_out.contains("48;2;254;125;55"),
+        "expected exact #555555 and #fe7d37 TrueColor backgrounds:\n{badge_out}"
+    );
+    assert!(
+        badge_out.contains("▀"),
+        "expected bottom cap ▀:\n{badge_out}"
+    );
+
     let _ = std::fs::remove_dir_all(&dir);
 }
