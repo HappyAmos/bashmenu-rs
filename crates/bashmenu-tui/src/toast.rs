@@ -1,6 +1,5 @@
 //! Non-blocking toast notification rack and popup rendering.
 //!
-//! Provides 1:1 visual and functional parity with Python Textual's Toast notifications.
 //! Features:
 //! - Docked in the bottom-right corner above the status gutter / bottom border.
 //! - Styled with an accent left indicator block `▌`, bold title header, and padded body.

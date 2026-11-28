@@ -2,7 +2,7 @@
 //!
 //! Provides compile-time embedded English (US) fallback string catalogs,
 //! runtime locale loading from YAML files, transparent missing-key fallback,
-//! and variable interpolation via the [`t!`] macro.
+//! and variable interpolation via the [`crate::t!`] macro.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};

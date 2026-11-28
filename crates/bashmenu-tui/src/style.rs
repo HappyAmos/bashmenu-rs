@@ -344,7 +344,7 @@ pub struct ResolvedThemeStyles {
     pub plugin: Style,
     /// Text selection highlight style
     pub selection: Style,
-    /// Shortcut key indicator style (e.g., [1] or <F1>)
+    /// Shortcut key indicator style (e.g., `[1]` or `<F1>`)
     pub shortcut_key: Style,
     /// Key assignment badge color in shortcuts lists
     pub key_color: Style,
