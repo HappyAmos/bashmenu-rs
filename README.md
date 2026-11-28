@@ -5,15 +5,16 @@
 [![ShellCheck](https://github.com/HappyAmos/bashmenu-rs/actions/workflows/shellcheck-app.yml/badge.svg)](https://github.com/HappyAmos/bashmenu-rs/actions/workflows/shellcheck-app.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> Modern, fast terminal menu system, cheat sheet and markdown pager in **Rust + Bash scripting** using **Ratatui** and **Crossterm**.
+> Fast terminal menu system, cheat sheet and markdown pager, interactive markdown engine in **Rust + Bash scripting** using **Ratatui** and **Crossterm**.
 
 ---
 ![Bashmenu Preview](assets/bashmenu.gif)
+
 ---
 
 ## What On Earth Is This?
 
-This started as a Bash menu script to create reproducible installs for my homelab, then a Python version, then a Rust version. While I throw as much as I can at it, it should be considered to be in an alpha state. In addition to being a script launcher, over time I've incorporated a built-in text editor (because why not), a visual theme editor, a keyboard shortcuts editor (default is a `<ctrl>` + `<space>` leader key then a shortcut key), visual menu editor, custom pager that does a decent job of rendering basic Markdown in a terminal, cheatsheet management tool (list, search, etc.) which uses the built-in pager tool to display Markdown, and a collection of small utility scripts.
+This started as a Bash menu script to create reproducible installs for my homelab, then a Python version, then a Rust version. While I throw as much as I can at it, it should be considered to be in an alpha state. In addition to being a script launcher, over time I've incorporated a built-in text editor (because why not), a visual theme editor, a keyboard shortcuts editor (default is a `<ctrl>` + `<space>` leader key then a shortcut key), visual menu editor, custom pager that does a decent job of rendering basic Markdown in a terminal, cheatsheet management tool (list, search, etc.) which uses the built-in pager tool to display Markdown, an interactive Markdown engine that can be used to easily create forms (works with bash scripting), and a collection of small utility scripts.
 
 BM uses `{}` brackets to include environment variables, custom scripts, dynamic data, etc. All `{}` placeholders/macros may be used in scripts, commands, status gutter, plug-ins, etc. View [bashmenu.md](assets/bashmenu.md) for more details on the included placeholders/macros.
 

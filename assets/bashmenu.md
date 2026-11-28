@@ -269,7 +269,8 @@ The `bmpager` standalone pager provides full-screen interactive viewing of files
 
 | Option | Description |
 | :--- | :--- |
-| `-m`, `--markdown` | Render input formatted as CommonMark Markdown (wrapped to window width). |
+| `-m`, `--markdown` | Render input formatted as CommonMark Markdown (wrapped to window width, with inline local PNG/JPEG/WebP/GIF/SVG image rendering via Unicode half-blocks). |
+| `--remote-images` | Opt-in flag to download and cache remote `http(s)://` Markdown images (including SVGs) into `{cache_dir}/images/` (5s timeout, 10 MiB cap; disabled by default). |
 | `-w`, `--wrap`, `--wrap-text` | Soft-wrap non-markdown plain and ANSI text lines to terminal width. |
 | `-c`, `--no-color` | Discard ANSI escape sequences instead of rendering colors. |
 | `--no-help` | Hide the bottom help bar for maximum content lines. |
@@ -280,6 +281,8 @@ The `bmpager` standalone pager provides full-screen interactive viewing of files
 | `--max-lines=N` | Cap in-memory line buffer to `N` lines (ring buffer). |
 | `--file=PATH`, `--edit-target=PATH` | Associate an explicit file path for editing when paging a stream. |
 | `--reload-cmd=CMD` | Re-run `CMD` to refresh buffer contents after editing. |
+
+Inside `bmpager`, press `r` / `R` to toggle between the rendered view (e.g., Markdown) and the raw unformatted source text, and `w` / `W` to toggle soft word wrapping on plain/raw text.
 | `+N` | Start viewing with line `N` at the top of the window. |
 | `+/PATTERN` | Jump to the first line matching search pattern. |
 
