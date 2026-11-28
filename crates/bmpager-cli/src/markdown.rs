@@ -1011,7 +1011,7 @@ fn try_decode_animated_gif(
             raw_frames[i].buffer(),
             target_w,
             target_h,
-            image::imageops::FilterType::Nearest,
+            image::imageops::FilterType::Triangle,
         );
         out.push((
             render_rgba_to_halfblocks(&resized),
