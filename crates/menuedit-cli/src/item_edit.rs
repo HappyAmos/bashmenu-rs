@@ -1,8 +1,8 @@
 //! Modal editor for menu item properties and flags.
 //!
-//! Provides 1:1 parity with the Python Textual `ItemEditModal`, featuring
-//! dynamic divider / standard field layouts, 3-way execution mode selection,
-//! live item and divider preview boxes, file browse triggers, and full footer shortcut keys.
+//! Features dynamic divider and standard field layouts, 3-way execution mode
+//! selection, live item and divider preview boxes, file browse triggers, and
+//! full footer shortcut keys.
 
 use bashmenu_core::{
     interpolate_placeholders, t, BashMenuConfig, MacroContext, MenuItem, MenuItemType,
@@ -1759,7 +1759,7 @@ impl ItemEditModal {
         ItemEditResult::Continue
     }
 
-    /// Builds the updated MenuItem matching Python `perform_save()`
+    /// Builds the updated `MenuItem` from the current form field values.
     pub fn build_updated_item(&self) -> MenuItem {
         if self.is_divider() {
             let mut item = MenuItem::divider();
@@ -2567,7 +2567,7 @@ impl ItemEditModal {
             cancel_style,
         );
 
-        // 4. Two-Row Footer matching Python Menuedit
+        // 4. Two-Row Footer
         let footer_y1 = inner.y + inner.height.saturating_sub(2);
         let footer_y2 = inner.y + inner.height.saturating_sub(1);
 
@@ -2975,7 +2975,7 @@ impl FormRow {
     }
 }
 
-/// Renders a single menu item preview line matching Python `render_menu_item_preview()`
+/// Renders a single menu item preview line clamped to `avail_w` columns.
 pub fn render_item_preview_line(item: &MenuItem, avail_w: usize) -> String {
     let cfg = BashMenuConfig::default();
     let ctx = MacroContext::new(&cfg).with_allow_command_macros(false);

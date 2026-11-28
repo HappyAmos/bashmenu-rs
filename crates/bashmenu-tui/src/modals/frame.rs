@@ -182,7 +182,8 @@ pub fn render_modal_frame(
     inner
 }
 
-/// Returns true if the mouse click was on the [X] close button for a modal dialog with inner rect `inner`
+/// Returns true if the mouse click was on the `[X]` close button for a modal
+/// dialog with inner rect `inner`.
 pub fn is_close_button_clicked(inner: Rect, mouse_row: u16, mouse_col: u16) -> bool {
     let top_y = inner.y.saturating_sub(1);
     let right_x = inner.x + inner.width;

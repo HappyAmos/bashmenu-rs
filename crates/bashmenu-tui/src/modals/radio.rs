@@ -8,7 +8,7 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Modifier;
 
-/// Interactive Radio modal dialog matching Python Textual `RadioModalScreen`
+/// Interactive radio-button selection modal dialog.
 #[derive(Debug, Clone)]
 pub struct RadioModal {
     /// Dialog title header

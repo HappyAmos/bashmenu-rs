@@ -85,7 +85,7 @@ pub enum BackgroundConfigAction {
     Cancel,
 }
 
-/// Available wallpaper scaling algorithms matching Python parity.
+/// Available wallpaper scaling algorithms.
 pub const SCALING_OPTIONS: [(&str, &str); 5] = [
     ("cover", "cover (fill window)"),
     ("stretch", "stretch (exact fit)"),
@@ -94,7 +94,7 @@ pub const SCALING_OPTIONS: [(&str, &str); 5] = [
     ("tile", "tile (repeat pattern)"),
 ];
 
-/// Available wallpaper rendering modes matching Python parity.
+/// Available wallpaper rendering modes.
 pub const MODE_OPTIONS: [(&str, &str); 2] = [
     ("halfblock", "halfblock (▀▄ dual-pixel)"),
     ("quarterblock", "quarterblock (▖▗ quad-pixel)"),
